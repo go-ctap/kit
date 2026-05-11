@@ -69,17 +69,10 @@ func WithStrictPermissions(strict bool) Option {
 	}
 }
 
-func (s *Service) Start(ctx context.Context, emitter EventEmitter) error {
-	s.mu.Lock()
-	s.emitter = emitter
-	s.mu.Unlock()
-
-	go func() {
-		<-ctx.Done()
-		_ = s.Close()
-	}()
-
-	return nil
+func WithEventEmitter(emitter EventEmitter) Option {
+	return func(service *Service) {
+		service.emitter = emitter
+	}
 }
 
 func (s *Service) Close() error {
