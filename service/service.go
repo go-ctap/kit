@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	ctapkit "github.com/go-ctap/kit"
 	"github.com/go-ctap/kit/model"
@@ -35,6 +36,8 @@ type managedSession struct {
 
 	mu              sync.RWMutex
 	activeOperation OperationID
+	openedAt        time.Time
+	updatedAt       time.Time
 }
 
 type operationState struct {
@@ -134,9 +137,12 @@ func (s *Service) OpenSession(ctx context.Context, req OpenSessionRequest) (Sess
 		return SessionSnapshot{}, err
 	}
 
+	now := time.Now().UTC()
 	managed := &managedSession{
-		id:      sessionID,
-		session: session,
+		id:        sessionID,
+		session:   session,
+		openedAt:  now,
+		updatedAt: now,
 	}
 
 	s.mu.Lock()
@@ -192,6 +198,7 @@ func (s *Service) CloseSession(ctx context.Context, id SessionID) (SessionSnapsh
 	}
 
 	err := session.session.Close()
+	session.touch()
 
 	return session.snapshot(), err
 }
@@ -215,6 +222,7 @@ func (s *Service) CloseAllSessions(ctx context.Context) ([]SessionSnapshot, erro
 		if err := session.session.Close(); err != nil {
 			closeErr = errors.Join(closeErr, err)
 		}
+		session.touch()
 
 		snapshot := session.snapshot()
 		snapshots = append(snapshots, snapshot)
@@ -438,18 +446,29 @@ func (s *Service) emit(name string, payload any) {
 func (m *managedSession) snapshot() SessionSnapshot {
 	m.mu.RLock()
 	running := m.activeOperation != ""
+	openedAt := m.openedAt
+	updatedAt := m.updatedAt
 	m.mu.RUnlock()
 
 	return SessionSnapshot{
-		ID:      m.id,
-		Info:    m.session.Info(),
-		Running: running,
+		ID:        m.id,
+		Info:      m.session.Info(),
+		Running:   running,
+		OpenedAt:  openedAt,
+		UpdatedAt: updatedAt,
 	}
 }
 
 func (m *managedSession) setActiveOperation(id OperationID) {
 	m.mu.Lock()
 	m.activeOperation = id
+	m.updatedAt = time.Now().UTC()
+	m.mu.Unlock()
+}
+
+func (m *managedSession) touch() {
+	m.mu.Lock()
+	m.updatedAt = time.Now().UTC()
 	m.mu.Unlock()
 }
 

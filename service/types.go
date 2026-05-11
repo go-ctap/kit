@@ -4,6 +4,7 @@ package service
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/go-ctap/kit/model"
 	appmds "github.com/go-ctap/kit/model/mds"
@@ -35,9 +36,11 @@ type OpenSessionRequest struct {
 }
 
 type SessionSnapshot struct {
-	ID      SessionID         `json:"id"`
-	Info    model.SessionInfo `json:"info"`
-	Running bool              `json:"running,omitempty"`
+	ID        SessionID         `json:"id"`
+	Info      model.SessionInfo `json:"info"`
+	Running   bool              `json:"running,omitempty"`
+	OpenedAt  time.Time         `json:"openedAt"`
+	UpdatedAt time.Time         `json:"updatedAt"`
 }
 
 type OperationEnvelope struct {
