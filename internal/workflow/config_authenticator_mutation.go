@@ -1,0 +1,128 @@
+package workflow
+
+import (
+	"context"
+
+	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/kit/internal/ctaperrors"
+	"github.com/go-ctap/kit/internal/secret"
+	"github.com/go-ctap/kit/model"
+	appconfig "github.com/go-ctap/kit/model/config"
+	"github.com/go-ctap/kit/model/safety"
+)
+
+func (r Runner) setAlwaysUV(ctx context.Context, req model.SetAlwaysUVOperation) (model.OperationResult, error) {
+	var output model.AuthenticatorConfigOutput
+
+	status := r.statusReport()
+
+	mode := safety.PreviewModeDryRun
+	if !req.DryRun {
+		mode = safety.PreviewModeExecute
+	}
+
+	preview, err := appconfig.BuildAlwaysUVPreview(status, req.Target, mode)
+	if err != nil {
+		return output, err
+	}
+
+	output.Preview = preview
+	if req.DryRun {
+		return output, nil
+	}
+
+	if err := r.confirmMutation(ctx, confirmationRequest{
+		confirmed:       req.Confirmed,
+		message:         req.ConfirmationMessage,
+		fallbackMessage: "Set alwaysUv " + string(req.Target) + " on authenticator " + r.env.Selected.DeviceID + "?",
+		destructive:     false,
+		declinedErr:     appconfig.ErrConfirmationRequired,
+		preview:         preview,
+	}); err != nil {
+		return output, err
+	}
+
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), ctaptypes.PermissionAuthenticatorConfiguration, "")
+	if err != nil {
+		return output, ctaperrors.Annotate(err, ctaperrors.WithConfigSubCommand(
+			model.OperationSetAlwaysUV,
+			ctaptypes.ConfigSubCommandToggleAlwaysUv,
+		))
+	}
+	defer secret.Zero(token)
+
+	if err := r.configManager().ToggleAlwaysUV(token); err != nil {
+		return output, ctaperrors.Annotate(err, ctaperrors.WithConfigSubCommand(
+			model.OperationSetAlwaysUV,
+			ctaptypes.ConfigSubCommandToggleAlwaysUv,
+		))
+	}
+
+	output.Result = new(appconfig.AlwaysUVResult(
+		r.env.Selected.DeviceID,
+		req.Target,
+		preview.RequestedAlwaysUV,
+	))
+	return output, nil
+}
+
+func (r Runner) setMinPINLength(ctx context.Context, req model.SetMinPINLengthOperation) (model.OperationResult, error) {
+	var output model.AuthenticatorConfigOutput
+
+	status := r.statusReport()
+	minReq := appconfig.MinPINLengthRequest{
+		Length:              req.Length,
+		RPIDs:               req.RPIDs,
+		ForceChangePin:      req.ForceChangePin,
+		PinComplexityPolicy: req.PinComplexityPolicy,
+		Confirmed:           req.Confirmed,
+	}
+
+	mode := safety.PreviewModeDryRun
+	if !req.DryRun {
+		mode = safety.PreviewModeExecute
+	}
+
+	preview, err := appconfig.BuildMinPINLengthPreview(status, minReq, mode)
+	if err != nil {
+		return output, ctaperrors.Annotate(err, ctaperrors.WithConfigSubCommand(
+			model.OperationSetMinPINLength,
+			ctaptypes.ConfigSubCommandSetMinPINLength,
+		))
+	}
+
+	output.Preview = preview
+	if req.DryRun {
+		return output, nil
+	}
+
+	if err := r.confirmMutation(ctx, confirmationRequest{
+		confirmed:       req.Confirmed,
+		message:         req.ConfirmationMessage,
+		fallbackMessage: "Set minimum PIN length on authenticator " + r.env.Selected.DeviceID + "?",
+		destructive:     false,
+		declinedErr:     appconfig.ErrConfirmationRequired,
+		preview:         preview,
+	}); err != nil {
+		return output, err
+	}
+
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), ctaptypes.PermissionAuthenticatorConfiguration, "")
+	if err != nil {
+		return output, err
+	}
+	defer secret.Zero(token)
+
+	if err := r.configManager().SetMinPINLength(
+		token,
+		req.Length,
+		req.RPIDs,
+		req.ForceChangePin,
+		req.PinComplexityPolicy,
+	); err != nil {
+		return output, err
+	}
+
+	output.Result = new(appconfig.MinPINLengthResult(r.env.Selected.DeviceID, req.Length))
+	return output, nil
+}

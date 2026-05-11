@@ -1,0 +1,158 @@
+package workflow
+
+import (
+	"context"
+	"encoding/hex"
+
+	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/kit/internal/ctaperrors"
+	"github.com/go-ctap/kit/internal/secret"
+	"github.com/go-ctap/kit/model"
+	appconfig "github.com/go-ctap/kit/model/config"
+	"github.com/go-ctap/kit/model/safety"
+)
+
+func (r Runner) enrollBio(ctx context.Context, req model.BioEnrollOperation) (model.OperationResult, error) {
+	var output model.BioEnrollOutput
+
+	status := r.statusReport()
+
+	mode := safety.PreviewModeExecute
+	if req.DryRun {
+		mode = safety.PreviewModeDryRun
+	}
+
+	preview, err := appconfig.BuildBioEnrollPreview(status, req.TimeoutMilliseconds, mode)
+	if err != nil {
+		return output, err
+	}
+
+	output.Preview = preview
+	if req.DryRun {
+		return output, nil
+	}
+
+	if err := r.confirmMutation(ctx, confirmationRequest{
+		confirmed:       req.Confirmed,
+		message:         req.ConfirmationMessage,
+		fallbackMessage: "Start biometric enrollment on authenticator " + r.env.Selected.DeviceID + "?",
+		destructive:     false,
+		declinedErr:     appconfig.ErrConfirmationRequired,
+		preview:         preview,
+	}); err != nil {
+		return output, err
+	}
+
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), ctaptypes.PermissionBioEnrollment, "")
+	if err != nil {
+		return output, err
+	}
+	defer secret.Zero(token)
+
+	result, err := r.runBioEnrollment(
+		ctx,
+		appconfig.BioEnrollRequest{
+			TimeoutMilliseconds: req.TimeoutMilliseconds,
+			Confirmed:           true,
+		},
+		preview,
+		token,
+	)
+
+	output.Result = &result
+	return output, err
+}
+
+func (r Runner) bioEnrollmentProgress() appconfig.BioEnrollProgress {
+	var completed uint64
+
+	return func(sample appconfig.BioEnrollSample) error {
+		completed++
+		total := completed + uint64(sample.RemainingSamples)
+		r.env.Events.Emit(model.OperationEvent{
+			Stage:        model.OperationStageCapturingBioSample,
+			Completed:    new(completed),
+			Total:        new(total),
+			SampleStatus: sample.Status,
+		})
+
+		return nil
+	}
+}
+
+func (r Runner) runBioEnrollment(
+	ctx context.Context,
+	req appconfig.BioEnrollRequest,
+	preview appconfig.BioEnrollPreview,
+	token []byte,
+) (appconfig.BioEnrollResult, error) {
+	authenticator := r.bioEnrollmentManager()
+	progress := r.bioEnrollmentProgress()
+	result := appconfig.BioEnrollResult{
+		DeviceID:    preview.Device.DeviceID,
+		PreviewOnly: preview.PreviewOnly,
+	}
+
+	cancelAfterFailure := func(cause error) (appconfig.BioEnrollResult, error) {
+		result.CancelAttempted = true
+		if err := authenticator.CancelCurrentEnrollment(); err == nil {
+			result.CancelSucceeded = true
+		}
+
+		return result, appconfig.BioEnrollError{Result: result, Err: cause}
+	}
+
+	recordSample := func(resp ctaptypes.AuthenticatorBioEnrollmentResponse) error {
+		if len(resp.TemplateID) > 0 {
+			result.TemplateIDHex = hex.EncodeToString(resp.TemplateID)
+		}
+
+		result.LastEnrollSampleStatus = resp.LastEnrollSampleStatus.String()
+		result.RemainingSamples = resp.RemainingSamples
+		sample := appconfig.BioEnrollSample{
+			Status:           result.LastEnrollSampleStatus,
+			RemainingSamples: resp.RemainingSamples,
+		}
+
+		result.Samples = append(result.Samples, sample)
+		if progress != nil {
+			return progress(sample)
+		}
+
+		return nil
+	}
+
+	begin, err := authenticator.BeginEnroll(token, req.TimeoutMilliseconds)
+	if err != nil {
+		return appconfig.BioEnrollResult{}, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
+			model.OperationBioEnroll,
+			bioEnrollmentCommand(r.statusReport()),
+			ctaptypes.BioEnrollmentSubCommandEnrollBegin,
+		))
+	}
+
+	if err := recordSample(begin); err != nil {
+		return cancelAfterFailure(err)
+	}
+
+	for result.RemainingSamples > 0 {
+		if err := ctx.Err(); err != nil {
+			return cancelAfterFailure(err)
+		}
+
+		next, err := authenticator.EnrollCaptureNextSample(token, begin.TemplateID, req.TimeoutMilliseconds)
+		if err != nil {
+			return cancelAfterFailure(ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
+				model.OperationBioEnroll,
+				bioEnrollmentCommand(r.statusReport()),
+				ctaptypes.BioEnrollmentSubCommandEnrollCaptureNextSample,
+			)))
+		}
+
+		if err := recordSample(next); err != nil {
+			return cancelAfterFailure(err)
+		}
+	}
+
+	return result, nil
+}

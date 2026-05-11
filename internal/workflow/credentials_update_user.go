@@ -1,0 +1,124 @@
+package workflow
+
+import (
+	"context"
+	"encoding/hex"
+
+	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctaphid/pkg/webauthntypes"
+	"github.com/go-ctap/kit/internal/ctaperrors"
+	"github.com/go-ctap/kit/internal/secret"
+	"github.com/go-ctap/kit/model"
+	appcredentials "github.com/go-ctap/kit/model/credentials"
+)
+
+func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCredentialUserOperation) (model.OperationResult, error) {
+	var output model.CredentialUpdateOutput
+
+	report, err := r.readCredentialInventoryReport(ctx)
+	if err != nil {
+		return output, err
+	}
+	defer zeroCredentialInventoryReport(&report)
+
+	updateReq := appcredentials.UpdateUserRequest{
+		CredentialIDHex: req.CredentialIDHex,
+		UserIDHex:       req.UserIDHex,
+		Name:            req.Name,
+		DisplayName:     req.DisplayName,
+		UserIDProvided:  req.UserIDProvided,
+		NameProvided:    req.NameProvided,
+		DisplayProvided: req.DisplayProvided,
+		Confirmed:       req.Confirmed,
+	}
+
+	preview, err := appcredentials.BuildUpdateUserPreview(report, updateReq)
+	if err != nil {
+		return output, err
+	}
+
+	output.Preview = preview
+	if req.DryRun {
+		return output, nil
+	}
+
+	if err := r.confirmMutation(ctx, confirmationRequest{
+		confirmed:       req.Confirmed,
+		message:         req.ConfirmationMessage,
+		fallbackMessage: "Update resident credential " + req.CredentialIDHex + "?",
+		destructive:     false,
+		declinedErr:     appcredentials.ErrConfirmationRequired,
+		preview:         preview,
+	}); err != nil {
+		return output, err
+	}
+
+	updateReq.Confirmed = true
+
+	publicTarget, err := appcredentials.FindCredentialByHexID(report, req.CredentialIDHex)
+	if err != nil {
+		return output, err
+	}
+
+	proposed, err := appcredentials.ResolveUpdatedUser(publicTarget, updateReq)
+	if err != nil {
+		return output, err
+	}
+
+	userID, err := decodeCredentialHex(proposed.UserIDHex)
+	if err != nil {
+		return output, err
+	}
+
+	descriptor, err := credentialDescriptor(publicTarget.Record)
+	if err != nil {
+		return output, err
+	}
+
+	updatedUser := webauthntypes.PublicKeyCredentialUserEntity{
+		ID:          userID,
+		Name:        proposed.Name,
+		DisplayName: proposed.DisplayName,
+	}
+
+	token, err := r.env.Tokens.Acquire(
+		ctx,
+		r.tokenProvider(),
+		ctaptypes.PermissionCredentialManagement,
+		r.credentialMutationRPID(publicTarget),
+	)
+	if err != nil {
+		return output, err
+	}
+	defer secret.Zero(token)
+
+	if err := r.credentialManager().UpdateUserInformation(token, descriptor, updatedUser); err != nil {
+		return output, ctaperrors.Annotate(err, ctaperrors.WithCredentialManagementSubCommand(
+			model.OperationUpdateCredentialUser,
+			credentialManagementCommand(r.infoProvider().GetInfo()),
+			ctaptypes.CredentialManagementSubCommandUpdateUserInformation,
+		))
+	}
+
+	result := appcredentials.UpdateUserResult{
+		DeviceID:        r.env.Selected.DeviceID,
+		CredentialIDHex: publicTarget.Record.CredentialIDHex,
+		RPID:            publicTarget.RP.ID,
+		RPName:          publicTarget.RP.Name,
+		Previous:        publicTarget.User,
+		Current:         proposed,
+	}
+
+	output.Result = &result
+
+	return output, nil
+}
+
+func decodeCredentialHex(value string) ([]byte, error) {
+	decoded, err := hex.DecodeString(value)
+	if err != nil {
+		return nil, appcredentials.ErrInvalidUserIDHex
+	}
+
+	return decoded, nil
+}
