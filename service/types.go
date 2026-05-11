@@ -18,12 +18,8 @@ type OperationID string
 type InteractionID string
 
 const (
-	EventDiscoveryCompleted   = "ctapkit:discovery-completed"
-	EventSessionOpened        = "ctapkit:session-opened"
-	EventSessionClosed        = "ctapkit:session-closed"
 	EventOperationEvent       = "ctapkit:operation-event"
 	EventInteractionRequested = "ctapkit:interaction-requested"
-	EventOperationCompleted   = "ctapkit:operation-completed"
 )
 
 type DiscoverRequest struct {
@@ -42,12 +38,6 @@ type SessionSnapshot struct {
 	ID      SessionID         `json:"id"`
 	Info    model.SessionInfo `json:"info"`
 	Running bool              `json:"running,omitempty"`
-}
-
-type RunOperationRequest struct {
-	SessionID        SessionID              `json:"sessionId"`
-	Operation        model.Operation        `json:"-"`
-	VerificationFlow model.VerificationFlow `json:"verificationFlow,omitempty"`
 }
 
 type OperationEnvelope struct {

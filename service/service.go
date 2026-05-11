@@ -119,10 +119,7 @@ func (s *Service) Discover(ctx context.Context, req DiscoverRequest) (DiscoveryS
 	s.devices = devices
 	s.mu.Unlock()
 
-	snapshot := DiscoverySnapshot{Devices: deviceReports(devices)}
-	s.emit(EventDiscoveryCompleted, snapshot)
-
-	return snapshot, nil
+	return DiscoverySnapshot{Devices: deviceReports(devices)}, nil
 }
 
 func (s *Service) OpenSession(ctx context.Context, req OpenSessionRequest) (SessionSnapshot, error) {
@@ -153,10 +150,7 @@ func (s *Service) OpenSession(ctx context.Context, req OpenSessionRequest) (Sess
 	s.sessions[managed.id] = managed
 	s.mu.Unlock()
 
-	snapshot := managed.snapshot()
-	s.emit(EventSessionOpened, snapshot)
-
-	return snapshot, nil
+	return managed.snapshot(), nil
 }
 
 func (s *Service) Sessions(ctx context.Context) ([]SessionSnapshot, error) {
@@ -205,10 +199,8 @@ func (s *Service) CloseSession(ctx context.Context, id SessionID) (SessionSnapsh
 	}
 
 	err := session.session.Close()
-	snapshot := session.snapshot()
-	s.emit(EventSessionClosed, snapshot)
 
-	return snapshot, err
+	return session.snapshot(), err
 }
 
 func (s *Service) CloseAllSessions(ctx context.Context) ([]SessionSnapshot, error) {
@@ -233,19 +225,18 @@ func (s *Service) CloseAllSessions(ctx context.Context) ([]SessionSnapshot, erro
 
 		snapshot := session.snapshot()
 		snapshots = append(snapshots, snapshot)
-		s.emit(EventSessionClosed, snapshot)
 	}
 
 	return snapshots, closeErr
 }
 
-func (s *Service) RunOperation(ctx context.Context, req RunOperationRequest) (OperationEnvelope, error) {
+func (s *Service) runOperation(ctx context.Context, req OperationRequest, operation model.Operation) (OperationEnvelope, error) {
 	session, ok := s.session(req.SessionID)
 	if !ok {
 		return OperationEnvelope{}, invalidSessionError()
 	}
 
-	if req.Operation == nil {
+	if operation == nil {
 		return OperationEnvelope{}, invalidOperationError("operation is required")
 	}
 
@@ -264,7 +255,7 @@ func (s *Service) RunOperation(ctx context.Context, req RunOperationRequest) (Op
 	defer s.unregisterOperation(operationID)
 
 	opts := runOptions(req.VerificationFlow)
-	result, err := session.session.Run(ctx, req.Operation, interactionHandler{
+	result, err := session.session.Run(ctx, operation, interactionHandler{
 		service:     s,
 		sessionID:   req.SessionID,
 		operationID: operationID,
@@ -273,11 +264,10 @@ func (s *Service) RunOperation(ctx context.Context, req RunOperationRequest) (Op
 	envelope := OperationEnvelope{
 		OperationID: operationID,
 		SessionID:   req.SessionID,
-		Kind:        req.Operation.Kind(),
+		Kind:        operation.Kind(),
 		Result:      result,
 		Error:       runtimeErrorEnvelope(err),
 	}
-	s.emit(EventOperationCompleted, envelope)
 
 	return envelope, err
 }
