@@ -4,8 +4,8 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/fxamacker/cbor/v2 v2.9.2 h1:X4Ksno9+x3cz0TZv69ec1hxP/+tymuR8PXQJyDwfh78=
 github.com/fxamacker/cbor/v2 v2.9.2/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
-github.com/go-ctap/ctaphid v0.9.1 h1:met8FMGNfQfTnskiY8YcwiVDMzr3n/x8AY338Qi7wUc=
-github.com/go-ctap/ctaphid v0.9.1/go.mod h1:3zErStQGAaTlH4tfCY1aAGltycjZbq61YrBmROaUZhk=
+github.com/go-ctap/ctaphid v0.10.0 h1:tOsAzI8Gqybjxb1xMAqAP+EmqYciTyw5jWcZBc/kOtk=
+github.com/go-ctap/ctaphid v0.10.0/go.mod h1:3zErStQGAaTlH4tfCY1aAGltycjZbq61YrBmROaUZhk=
 github.com/go-ctap/hid v0.5.0 h1:CPGVw9g5a0xLrTt+EET6o4vP5jfPtKR+RA3NUdVsvdg=
 github.com/go-ctap/hid v0.5.0/go.mod h1:GTZGG8VIRx5uM4nSNmKbRKnr02O1mtS6OZ9P0yeIz2A=
 github.com/goforj/godump v1.9.0 h1:Y/APfWKQKnJetXgVJxDqD7vEpTGSgAwbKJGmj0UAteI=
