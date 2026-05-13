@@ -425,7 +425,7 @@ func (a *bioErrorAuthenticator) GetPinUvAuthTokenUsingUV(ctaptypes.Permission, s
 	return []byte("token"), nil
 }
 
-func (a *bioErrorAuthenticator) BeginEnroll([]byte, uint) (ctaptypes.AuthenticatorBioEnrollmentResponse, error) {
+func (a *bioErrorAuthenticator) EnrollBegin([]byte, uint) (ctaptypes.AuthenticatorBioEnrollmentResponse, error) {
 	return ctaptypes.AuthenticatorBioEnrollmentResponse{}, a.beginErr
 }
 

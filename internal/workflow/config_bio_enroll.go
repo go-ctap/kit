@@ -122,7 +122,7 @@ func (r Runner) runBioEnrollment(
 		return nil
 	}
 
-	begin, err := authenticator.BeginEnroll(token, req.TimeoutMilliseconds)
+	begin, err := authenticator.EnrollBegin(token, req.TimeoutMilliseconds)
 	if err != nil {
 		return appconfig.BioEnrollResult{}, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
 			model.OperationBioEnroll,

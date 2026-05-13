@@ -100,7 +100,7 @@ func (a *contractAuthenticator) GetFingerprintSensorInfo() (ctaptypes.Authentica
 	return ctaptypes.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) BeginEnroll([]byte, uint) (ctaptypes.AuthenticatorBioEnrollmentResponse, error) {
+func (a *contractAuthenticator) EnrollBegin([]byte, uint) (ctaptypes.AuthenticatorBioEnrollmentResponse, error) {
 	return ctaptypes.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
 }
 

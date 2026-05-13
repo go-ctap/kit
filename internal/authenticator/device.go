@@ -73,7 +73,7 @@ type ConfigManager interface {
 type BioEnrollmentManager interface {
 	GetBioModality() (ctaptypes.AuthenticatorBioEnrollmentResponse, error)
 	GetFingerprintSensorInfo() (ctaptypes.AuthenticatorBioEnrollmentResponse, error)
-	BeginEnroll(pinUvAuthToken []byte, timeoutMilliseconds uint) (ctaptypes.AuthenticatorBioEnrollmentResponse, error)
+	EnrollBegin(pinUvAuthToken []byte, timeoutMilliseconds uint) (ctaptypes.AuthenticatorBioEnrollmentResponse, error)
 	EnrollCaptureNextSample(pinUvAuthToken []byte, templateID []byte, timeoutMilliseconds uint) (ctaptypes.AuthenticatorBioEnrollmentResponse, error)
 	CancelCurrentEnrollment() error
 	EnumerateEnrollments(pinUvAuthToken []byte) (ctaptypes.AuthenticatorBioEnrollmentResponse, error)
