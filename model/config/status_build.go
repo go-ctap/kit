@@ -90,8 +90,8 @@ func buildPINStatus(info protocol.AuthenticatorGetInfoResponse) PINStatus {
 	status.ProtocolSupported = len(info.PinUvAuthProtocols) > 0
 	status.ForcePINChange = info.ForcePINChange
 	status.PinComplexityPolicy = info.PinComplexityPolicy
-	if len(info.PinComplexityPolicyURL) > 0 {
-		status.PinComplexityURL = append([]byte(nil), info.PinComplexityPolicyURL...)
+	if info.PinComplexityPolicyURL != nil {
+		status.PinComplexityURL = *info.PinComplexityPolicyURL
 	}
 	status.MinPINLength = info.MinPINLength
 	status.MaxPINLength = info.MaxPINLength
