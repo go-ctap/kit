@@ -1,12 +1,12 @@
 package workflow
 
 import (
-	"github.com/go-ctap/ctaphid/pkg/crypto"
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/crypto"
+	"github.com/go-ctap/ctap/protocol"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 )
 
-func buildWriteMutation(state targetBlobState, payload []byte) ([]ctaptypes.LargeBlob, applargeblobs.MutationResult, error) {
+func buildWriteMutation(state targetBlobState, payload []byte) ([]protocol.LargeBlob, applargeblobs.MutationResult, error) {
 	operation := applargeblobs.MutationCreate
 	if state.currentBlobIndex >= 0 {
 		operation = applargeblobs.MutationReplace
@@ -32,7 +32,7 @@ func buildWriteMutation(state targetBlobState, payload []byte) ([]ctaptypes.Larg
 	return replacement, result, nil
 }
 
-func buildDeleteMutation(state targetBlobState) ([]ctaptypes.LargeBlob, applargeblobs.MutationResult, bool, error) {
+func buildDeleteMutation(state targetBlobState) ([]protocol.LargeBlob, applargeblobs.MutationResult, bool, error) {
 	if state.currentBlobIndex < 0 {
 		return nil, buildMutationResult(state, applargeblobs.MutationNoBlob, 0, state.serializedArraySizeBefore, true), true, nil
 	}

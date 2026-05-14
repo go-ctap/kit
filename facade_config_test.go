@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaphid"
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/ctap/transport/ctaphid"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
@@ -36,7 +36,7 @@ func TestBioSensorInfoReportsSpecNamedEnums(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := &bioSensorAuthenticator{
-				modality:        ctaptypes.BioModalityFingerprint,
+				modality:        protocol.BioModalityFingerprint,
 				fingerprintKind: tt.kind,
 			}
 			session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
@@ -78,7 +78,7 @@ func TestBioSensorInfoReportsSpecNamedEnums(t *testing.T) {
 func TestBioSensorInfoOmitsUnknownSpecValues(t *testing.T) {
 	tests := []struct {
 		name            string
-		modality        ctaptypes.BioModality
+		modality        protocol.BioModality
 		fingerprintKind uint
 	}{
 		{
@@ -86,7 +86,7 @@ func TestBioSensorInfoOmitsUnknownSpecValues(t *testing.T) {
 		},
 		{
 			name:            "unknown",
-			modality:        ctaptypes.BioModality(99),
+			modality:        protocol.BioModality(99),
 			fingerprintKind: 99,
 		},
 	}
@@ -209,7 +209,7 @@ func TestResetRequestsTouchInteractionBeforeReset(t *testing.T) {
 
 func TestResetWindowExpiredMapsNotAllowed(t *testing.T) {
 	err := runConfirmedResetWithError(t, &ctaphid.CTAPError{
-		Command:    ctaptypes.AuthenticatorReset,
+		Command:    protocol.AuthenticatorReset,
 		StatusCode: ctaphid.CTAP2_ERR_NOT_ALLOWED,
 	})
 
@@ -231,7 +231,7 @@ func TestResetTimeoutStatusMapsTimeout(t *testing.T) {
 	for _, status := range tests {
 		t.Run(status.String(), func(t *testing.T) {
 			err := runConfirmedResetWithError(t, &ctaphid.CTAPError{
-				Command:    ctaptypes.AuthenticatorReset,
+				Command:    protocol.AuthenticatorReset,
 				StatusCode: status,
 			})
 
@@ -244,7 +244,7 @@ func TestResetTimeoutStatusMapsTimeout(t *testing.T) {
 
 func TestResetNotAllowedForOtherCommandDoesNotMapWindowExpired(t *testing.T) {
 	err := runConfirmedResetWithError(t, &ctaphid.CTAPError{
-		Command:    ctaptypes.AuthenticatorMakeCredential,
+		Command:    protocol.AuthenticatorMakeCredential,
 		StatusCode: ctaphid.CTAP2_ERR_NOT_ALLOWED,
 	})
 
@@ -260,7 +260,7 @@ func TestResetNotAllowedForOtherCommandDoesNotMapWindowExpired(t *testing.T) {
 func TestRunReturnsNormalizedCTAPErrorCategory(t *testing.T) {
 	events := &recordingEventSink{}
 	err := runConfirmedResetWithErrorAndEvents(t, events, &ctaphid.CTAPError{
-		Command:    ctaptypes.AuthenticatorReset,
+		Command:    protocol.AuthenticatorReset,
 		StatusCode: ctaphid.CTAP2_ERR_ACTION_TIMEOUT,
 	})
 
@@ -285,7 +285,7 @@ func TestPINMutationCTAPStatusMapsSentinel(t *testing.T) {
 			operation: model.SetPINOperation{NewPIN: "1234", Confirmed: true},
 			auth: &pinMutationCountingAuthenticator{
 				setErr: &ctaphid.CTAPError{
-					Command:    ctaptypes.AuthenticatorClientPIN,
+					Command:    protocol.AuthenticatorClientPIN,
 					StatusCode: ctaphid.CTAP2_ERR_PIN_POLICY_VIOLATION,
 				},
 			},
@@ -297,7 +297,7 @@ func TestPINMutationCTAPStatusMapsSentinel(t *testing.T) {
 			auth: &pinMutationCountingAuthenticator{
 				configured: true,
 				changeErr: &ctaphid.CTAPError{
-					Command:    ctaptypes.AuthenticatorClientPIN,
+					Command:    protocol.AuthenticatorClientPIN,
 					StatusCode: ctaphid.CTAP2_ERR_PIN_INVALID,
 				},
 			},
@@ -335,7 +335,7 @@ func TestBioEnrollmentCTAPStatusMapsSentinel(t *testing.T) {
 			operation: model.BioEnrollOperation{Confirmed: true},
 			auth: &bioErrorAuthenticator{
 				beginErr: &ctaphid.CTAPError{
-					Command:    ctaptypes.AuthenticatorBioEnrollment,
+					Command:    protocol.AuthenticatorBioEnrollment,
 					StatusCode: ctaphid.CTAP2_ERR_FP_DATABASE_FULL,
 				},
 			},
@@ -346,7 +346,7 @@ func TestBioEnrollmentCTAPStatusMapsSentinel(t *testing.T) {
 			operation: model.BioRemoveOperation{TemplateIDHex: "c05e", Confirmed: true},
 			auth: &bioErrorAuthenticator{
 				removeErr: &ctaphid.CTAPError{
-					Command:    ctaptypes.AuthenticatorBioEnrollment,
+					Command:    protocol.AuthenticatorBioEnrollment,
 					StatusCode: ctaphid.CTAP2_ERR_INVALID_OPTION,
 				},
 			},
@@ -410,23 +410,23 @@ type bioErrorAuthenticator struct {
 	removeErr error
 }
 
-func (a *bioErrorAuthenticator) GetInfo() ctaptypes.AuthenticatorGetInfoResponse {
-	return ctaptypes.AuthenticatorGetInfoResponse{
-		Options: map[ctaptypes.Option]bool{
-			ctaptypes.OptionBioEnroll:        true,
-			ctaptypes.OptionUvBioEnroll:      true,
-			ctaptypes.OptionPinUvAuthToken:   true,
-			ctaptypes.OptionUserVerification: true,
+func (a *bioErrorAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	return protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionBioEnroll:        true,
+			protocol.OptionUvBioEnroll:      true,
+			protocol.OptionPinUvAuthToken:   true,
+			protocol.OptionUserVerification: true,
 		},
 	}
 }
 
-func (a *bioErrorAuthenticator) GetPinUvAuthTokenUsingUV(ctaptypes.Permission, string) ([]byte, error) {
+func (a *bioErrorAuthenticator) GetPinUvAuthTokenUsingUV(protocol.Permission, string) ([]byte, error) {
 	return []byte("token"), nil
 }
 
-func (a *bioErrorAuthenticator) EnrollBegin([]byte, uint) (ctaptypes.AuthenticatorBioEnrollmentResponse, error) {
-	return ctaptypes.AuthenticatorBioEnrollmentResponse{}, a.beginErr
+func (a *bioErrorAuthenticator) EnrollBegin([]byte, uint) (protocol.AuthenticatorBioEnrollmentResponse, error) {
+	return protocol.AuthenticatorBioEnrollmentResponse{}, a.beginErr
 }
 
 func (a *bioErrorAuthenticator) RemoveEnrollment([]byte, []byte) error {
@@ -435,24 +435,24 @@ func (a *bioErrorAuthenticator) RemoveEnrollment([]byte, []byte) error {
 
 type bioSensorAuthenticator struct {
 	contractAuthenticator
-	modality        ctaptypes.BioModality
+	modality        protocol.BioModality
 	fingerprintKind uint
 }
 
-func (a *bioSensorAuthenticator) GetInfo() ctaptypes.AuthenticatorGetInfoResponse {
-	return ctaptypes.AuthenticatorGetInfoResponse{
-		Options: map[ctaptypes.Option]bool{
-			ctaptypes.OptionBioEnroll: true,
+func (a *bioSensorAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	return protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionBioEnroll: true,
 		},
 	}
 }
 
-func (a *bioSensorAuthenticator) GetBioModality() (ctaptypes.AuthenticatorBioEnrollmentResponse, error) {
-	return ctaptypes.AuthenticatorBioEnrollmentResponse{Modality: a.modality}, nil
+func (a *bioSensorAuthenticator) GetBioModality() (protocol.AuthenticatorBioEnrollmentResponse, error) {
+	return protocol.AuthenticatorBioEnrollmentResponse{Modality: &a.modality}, nil
 }
 
-func (a *bioSensorAuthenticator) GetFingerprintSensorInfo() (ctaptypes.AuthenticatorBioEnrollmentResponse, error) {
-	return ctaptypes.AuthenticatorBioEnrollmentResponse{FingerprintKind: a.fingerprintKind}, nil
+func (a *bioSensorAuthenticator) GetFingerprintSensorInfo() (protocol.AuthenticatorBioEnrollmentResponse, error) {
+	return protocol.AuthenticatorBioEnrollmentResponse{FingerprintKind: &a.fingerprintKind}, nil
 }
 
 func TestPINMutationsRejectEmptyPINAtSessionRun(t *testing.T) {

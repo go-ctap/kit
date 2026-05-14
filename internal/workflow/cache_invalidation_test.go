@@ -3,7 +3,7 @@ package workflow
 import (
 	"testing"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/secret"
 	rtsession "github.com/go-ctap/kit/internal/session"
 	"github.com/go-ctap/kit/model"
@@ -158,60 +158,60 @@ func TestInvalidateCachesAfterUsesTokenPolicy(t *testing.T) {
 		{
 			name:      "read operation keeps token",
 			operation: model.ConfigStatusOperation{},
-			key:       rtsession.TokenKey{Permission: ctaptypes.PermissionCredentialManagement},
+			key:       rtsession.TokenKey{Permission: protocol.PermissionCredentialManagement},
 			want:      true,
 		},
 		{
 			name:      "pin mutation invalidates all tokens",
 			operation: model.ChangePINOperation{},
-			key:       rtsession.TokenKey{Permission: ctaptypes.PermissionCredentialManagement},
+			key:       rtsession.TokenKey{Permission: protocol.PermissionCredentialManagement},
 		},
 		{
 			name:      "bio rename keeps bio token",
 			operation: model.BioRenameOperation{},
-			key:       rtsession.TokenKey{Permission: ctaptypes.PermissionBioEnrollment},
+			key:       rtsession.TokenKey{Permission: protocol.PermissionBioEnrollment},
 			want:      true,
 		},
 		{
 			name:      "bio enroll keeps bio token",
 			operation: model.BioEnrollOperation{},
-			key:       rtsession.TokenKey{Permission: ctaptypes.PermissionBioEnrollment},
+			key:       rtsession.TokenKey{Permission: protocol.PermissionBioEnrollment},
 			want:      true,
 		},
 		{
 			name:      "bio remove keeps credential token",
 			operation: model.BioRemoveOperation{},
-			key:       rtsession.TokenKey{Permission: ctaptypes.PermissionCredentialManagement},
+			key:       rtsession.TokenKey{Permission: protocol.PermissionCredentialManagement},
 			want:      true,
 		},
 		{
 			name:      "authenticator config mutation keeps config token",
 			operation: model.SetAlwaysUVOperation{},
-			key:       rtsession.TokenKey{Permission: ctaptypes.PermissionAuthenticatorConfiguration},
+			key:       rtsession.TokenKey{Permission: protocol.PermissionAuthenticatorConfiguration},
 			want:      true,
 		},
 		{
 			name:      "authenticator config mutation keeps bio token",
 			operation: model.SetAlwaysUVOperation{},
-			key:       rtsession.TokenKey{Permission: ctaptypes.PermissionBioEnrollment},
+			key:       rtsession.TokenKey{Permission: protocol.PermissionBioEnrollment},
 			want:      true,
 		},
 		{
 			name:      "large blob mutation keeps token",
 			operation: model.WriteLargeBlobOperation{},
-			key:       rtsession.TokenKey{Permission: ctaptypes.PermissionCredentialManagement},
+			key:       rtsession.TokenKey{Permission: protocol.PermissionCredentialManagement},
 			want:      true,
 		},
 		{
 			name:      "dry run mutation keeps token",
 			operation: model.BioRemoveOperation{DryRun: true},
-			key:       rtsession.TokenKey{Permission: ctaptypes.PermissionBioEnrollment},
+			key:       rtsession.TokenKey{Permission: protocol.PermissionBioEnrollment},
 			want:      true,
 		},
 		{
 			name:      "reset invalidates token",
 			operation: model.ResetFactoryOperation{},
-			key:       rtsession.TokenKey{Permission: ctaptypes.PermissionCredentialManagement},
+			key:       rtsession.TokenKey{Permission: protocol.PermissionCredentialManagement},
 		},
 	}
 
@@ -237,18 +237,18 @@ func TestUserPresenceTokenEffectsClearsPermissionsExceptLargeBlobWrite(t *testin
 	}{
 		{
 			name:        "successful user presence clears credential token",
-			key:         rtsession.TokenKey{Permission: ctaptypes.PermissionCredentialManagement},
+			key:         rtsession.TokenKey{Permission: protocol.PermissionCredentialManagement},
 			userPresent: true,
 		},
 		{
 			name:        "successful user presence preserves large blob write token",
-			key:         rtsession.TokenKey{Permission: ctaptypes.PermissionLargeBlobWrite},
+			key:         rtsession.TokenKey{Permission: protocol.PermissionLargeBlobWrite},
 			userPresent: true,
 			want:        true,
 		},
 		{
 			name:        "operation without user presence leaves token untouched",
-			key:         rtsession.TokenKey{Permission: ctaptypes.PermissionCredentialManagement},
+			key:         rtsession.TokenKey{Permission: protocol.PermissionCredentialManagement},
 			userPresent: false,
 			want:        true,
 		},

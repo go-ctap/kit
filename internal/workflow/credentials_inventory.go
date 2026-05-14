@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
-	"github.com/go-ctap/ctaphid/pkg/webauthntypes"
+	"github.com/go-ctap/ctap/credential"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/ctaperrors"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
@@ -56,7 +56,7 @@ func (r Runner) readCredentialInventoryReport(ctx context.Context) (appcredentia
 	return report, nil
 }
 
-func (r Runner) buildCredentialInventoryReport(token []byte, permission ctaptypes.Permission) (appcredentials.InventoryReport, error) {
+func (r Runner) buildCredentialInventoryReport(token []byte, permission protocol.Permission) (appcredentials.InventoryReport, error) {
 	authenticator := r.credentialManager()
 	info := authenticator.GetInfo()
 
@@ -65,7 +65,7 @@ func (r Runner) buildCredentialInventoryReport(token []byte, permission ctaptype
 		return appcredentials.InventoryReport{}, ctaperrors.Annotate(err, ctaperrors.WithCredentialManagementSubCommand(
 			model.OperationListCredentials,
 			credentialManagementCommand(info),
-			ctaptypes.CredentialManagementSubCommandGetCredsMetadata,
+			protocol.CredentialManagementSubCommandGetCredsMetadata,
 		))
 	}
 
@@ -74,7 +74,7 @@ func (r Runner) buildCredentialInventoryReport(token []byte, permission ctaptype
 		Support: appcredentials.SupportReport{
 			CredentialManagement: true,
 			PreviewOnly:          info.Versions.IsPreviewOnly(),
-			ReadOnlyPermission:   permission == ctaptypes.PermissionPersistentCredentialManagementReadOnly,
+			ReadOnlyPermission:   permission == protocol.PermissionPersistentCredentialManagementReadOnly,
 		},
 		Summary: appcredentials.InventorySummary{
 			ExistingResidentCredentialsCount:             metadata.ExistingResidentCredentialsCount,
@@ -82,7 +82,7 @@ func (r Runner) buildCredentialInventoryReport(token []byte, permission ctaptype
 		},
 	}
 
-	rpResponses := make([]ctaptypes.AuthenticatorCredentialManagementResponse, 0)
+	rpResponses := make([]protocol.AuthenticatorCredentialManagementResponse, 0)
 	var rpTotal uint64
 
 	for rpResponse, err := range authenticator.EnumerateRPs(token) {
@@ -90,7 +90,7 @@ func (r Runner) buildCredentialInventoryReport(token []byte, permission ctaptype
 			return appcredentials.InventoryReport{}, ctaperrors.Annotate(err, ctaperrors.WithCredentialManagementSubCommand(
 				model.OperationListCredentials,
 				credentialManagementCommand(info),
-				ctaptypes.CredentialManagementSubCommandEnumerateRPsBegin,
+				protocol.CredentialManagementSubCommandEnumerateRPsBegin,
 			))
 		}
 
@@ -122,7 +122,7 @@ func (r Runner) buildCredentialInventoryReport(token []byte, permission ctaptype
 				return appcredentials.InventoryReport{}, ctaperrors.Annotate(err, ctaperrors.WithCredentialManagementSubCommand(
 					model.OperationListCredentials,
 					credentialManagementCommand(info),
-					ctaptypes.CredentialManagementSubCommandEnumerateCredentialsBegin,
+					protocol.CredentialManagementSubCommandEnumerateCredentialsBegin,
 				))
 			}
 
@@ -172,30 +172,30 @@ func zeroCredentialInventoryReport(report *appcredentials.InventoryReport) {
 	}
 }
 
-func credentialManagementCommand(info ctaptypes.AuthenticatorGetInfoResponse) ctaptypes.Command {
+func credentialManagementCommand(info protocol.AuthenticatorGetInfoResponse) protocol.Command {
 	if info.Versions.IsPreviewOnly() {
-		return ctaptypes.PrototypeAuthenticatorCredentialManagement
+		return protocol.PrototypeAuthenticatorCredentialManagement
 	}
 
-	return ctaptypes.AuthenticatorCredentialManagement
+	return protocol.AuthenticatorCredentialManagement
 }
 
-func inventoryPermission(info ctaptypes.AuthenticatorGetInfoResponse) (ctaptypes.Permission, error) {
+func inventoryPermission(info protocol.AuthenticatorGetInfoResponse) (protocol.Permission, error) {
 	if !supportsCredentialManagement(info) {
 		return 0, fmt.Errorf("%w: device does not support resident credential management", appcredentials.ErrUnsupportedCredentialManagement)
 	}
 
-	if info.Options[ctaptypes.OptionCredentialManagementReadOnly] {
-		return ctaptypes.PermissionPersistentCredentialManagementReadOnly, nil
+	if info.Options[protocol.OptionCredentialManagementReadOnly] {
+		return protocol.PermissionPersistentCredentialManagementReadOnly, nil
 	}
 
-	return ctaptypes.PermissionCredentialManagement, nil
+	return protocol.PermissionCredentialManagement, nil
 }
 
-func supportsCredentialManagement(info ctaptypes.AuthenticatorGetInfoResponse) bool {
-	option := ctaptypes.OptionCredentialManagement
+func supportsCredentialManagement(info protocol.AuthenticatorGetInfoResponse) bool {
+	option := protocol.OptionCredentialManagement
 	if info.Versions.IsPreviewOnly() {
-		option = ctaptypes.OptionCredentialManagementPreview
+		option = protocol.OptionCredentialManagementPreview
 	}
 
 	enabled, ok := info.Options[option]
@@ -203,12 +203,12 @@ func supportsCredentialManagement(info ctaptypes.AuthenticatorGetInfoResponse) b
 	return ok && enabled
 }
 
-func credentialTransports(transports []webauthntypes.AuthenticatorTransport) []string {
+func credentialTransports(transports []credential.AuthenticatorTransport) []string {
 	if len(transports) == 0 {
 		return nil
 	}
 
-	return lo.Map(transports, func(transport webauthntypes.AuthenticatorTransport, _ int) string {
+	return lo.Map(transports, func(transport credential.AuthenticatorTransport, _ int) string {
 		return string(transport)
 	})
 }

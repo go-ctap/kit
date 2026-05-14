@@ -3,7 +3,7 @@ package workflow
 import (
 	"context"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/ctaperrors"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
@@ -47,12 +47,12 @@ func (r Runner) renameBio(ctx context.Context, req model.BioRenameOperation) (mo
 		return output, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), ctaptypes.PermissionBioEnrollment, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionBioEnrollment, "")
 	if err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
 			model.OperationBioRename,
 			bioEnrollmentCommand(status),
-			ctaptypes.BioEnrollmentSubCommandSetFriendlyName,
+			protocol.BioEnrollmentSubCommandSetFriendlyName,
 		))
 	}
 	defer secret.Zero(token)
@@ -61,7 +61,7 @@ func (r Runner) renameBio(ctx context.Context, req model.BioRenameOperation) (mo
 		return output, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
 			model.OperationBioRename,
 			bioEnrollmentCommand(status),
-			ctaptypes.BioEnrollmentSubCommandSetFriendlyName,
+			protocol.BioEnrollmentSubCommandSetFriendlyName,
 		))
 	}
 
@@ -113,12 +113,12 @@ func (r Runner) removeBio(ctx context.Context, req model.BioRemoveOperation) (mo
 		return output, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), ctaptypes.PermissionBioEnrollment, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionBioEnrollment, "")
 	if err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
 			model.OperationBioRemove,
 			bioEnrollmentCommand(status),
-			ctaptypes.BioEnrollmentSubCommandRemoveEnrollment,
+			protocol.BioEnrollmentSubCommandRemoveEnrollment,
 		))
 	}
 	defer secret.Zero(token)
@@ -127,7 +127,7 @@ func (r Runner) removeBio(ctx context.Context, req model.BioRemoveOperation) (mo
 		return output, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
 			model.OperationBioRemove,
 			bioEnrollmentCommand(status),
-			ctaptypes.BioEnrollmentSubCommandRemoveEnrollment,
+			protocol.BioEnrollmentSubCommandRemoveEnrollment,
 		))
 	}
 

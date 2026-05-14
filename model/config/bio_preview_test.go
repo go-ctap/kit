@@ -4,14 +4,14 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/model/safety"
 )
 
 func TestBioEnrollPreviewAllowsSupportedAuthenticatorWithNoEnrollments(t *testing.T) {
-	status := BuildStatusReport(nilDevice(), ctaptypes.AuthenticatorGetInfoResponse{
-		Options: map[ctaptypes.Option]bool{
-			ctaptypes.OptionBioEnroll: false,
+	status := BuildStatusReport(nilDevice(), protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionBioEnroll: false,
 		},
 	})
 
@@ -25,9 +25,9 @@ func TestBioEnrollPreviewAllowsSupportedAuthenticatorWithNoEnrollments(t *testin
 }
 
 func TestBioMutationPreviewRejectsKnownEmptyEnrollmentSet(t *testing.T) {
-	status := BuildStatusReport(nilDevice(), ctaptypes.AuthenticatorGetInfoResponse{
-		Options: map[ctaptypes.Option]bool{
-			ctaptypes.OptionBioEnroll: false,
+	status := BuildStatusReport(nilDevice(), protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionBioEnroll: false,
 		},
 	})
 

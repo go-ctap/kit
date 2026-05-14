@@ -3,14 +3,14 @@ package session
 import (
 	"testing"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/secret"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 )
 
 func TestCacheSetTokenInvalidatesReplacedSecret(t *testing.T) {
 	cache := NewCache()
-	key := TokenKey{Permission: ctaptypes.PermissionCredentialManagement}
+	key := TokenKey{Permission: protocol.PermissionCredentialManagement}
 	previous := secret.New([]byte("previous-token"))
 
 	cache.SetToken(key, previous)
@@ -25,9 +25,9 @@ func TestCacheSetTokenInvalidatesExistingSecrets(t *testing.T) {
 	cache := NewCache()
 	existing := secret.New([]byte("existing-token"))
 
-	cache.SetToken(TokenKey{Permission: ctaptypes.PermissionCredentialManagement}, existing)
+	cache.SetToken(TokenKey{Permission: protocol.PermissionCredentialManagement}, existing)
 	cache.SetToken(
-		TokenKey{Permission: ctaptypes.PermissionCredentialManagement, RPID: "example.com"},
+		TokenKey{Permission: protocol.PermissionCredentialManagement, RPID: "example.com"},
 		secret.New([]byte("token")),
 	)
 
@@ -35,18 +35,18 @@ func TestCacheSetTokenInvalidatesExistingSecrets(t *testing.T) {
 		t.Fatal("expected existing token secret to be invalidated")
 	}
 
-	if _, ok, _ := cache.GetToken(TokenKey{Permission: ctaptypes.PermissionCredentialManagement}); ok {
+	if _, ok, _ := cache.GetToken(TokenKey{Permission: protocol.PermissionCredentialManagement}); ok {
 		t.Fatal("existing token key still cached")
 	}
 
-	if _, ok, _ := cache.GetToken(TokenKey{Permission: ctaptypes.PermissionCredentialManagement, RPID: "example.com"}); !ok {
+	if _, ok, _ := cache.GetToken(TokenKey{Permission: protocol.PermissionCredentialManagement, RPID: "example.com"}); !ok {
 		t.Fatal("token was not cached")
 	}
 }
 
 func TestCacheInvalidateAllInvalidatesToken(t *testing.T) {
 	cache := NewCache()
-	key := TokenKey{Permission: ctaptypes.PermissionCredentialManagement}
+	key := TokenKey{Permission: protocol.PermissionCredentialManagement}
 	token := secret.New([]byte("token"))
 
 	cache.SetToken(key, token)
@@ -59,7 +59,7 @@ func TestCacheInvalidateAllInvalidatesToken(t *testing.T) {
 
 func TestCacheInvalidateTokenClearsCurrentToken(t *testing.T) {
 	cache := NewCache()
-	scopedKey := TokenKey{Permission: ctaptypes.PermissionCredentialManagement, RPID: "example.com"}
+	scopedKey := TokenKey{Permission: protocol.PermissionCredentialManagement, RPID: "example.com"}
 
 	cache.SetToken(scopedKey, secret.New([]byte("scoped-token")))
 	cache.InvalidateToken()
@@ -141,10 +141,10 @@ func TestCacheInvalidateCredentialsWipesCachedLargeBlobKey(t *testing.T) {
 
 func TestCacheInvalidateTokenUnlessPermissionPreservesMatchingPermission(t *testing.T) {
 	cache := NewCache()
-	key := TokenKey{Permission: ctaptypes.PermissionLargeBlobWrite}
+	key := TokenKey{Permission: protocol.PermissionLargeBlobWrite}
 
 	cache.SetToken(key, secret.New([]byte("token")))
-	cache.InvalidateTokenUnlessPermission(ctaptypes.PermissionLargeBlobWrite)
+	cache.InvalidateTokenUnlessPermission(protocol.PermissionLargeBlobWrite)
 
 	if _, ok, _ := cache.GetToken(key); !ok {
 		t.Fatal("matching token was invalidated")
@@ -153,10 +153,10 @@ func TestCacheInvalidateTokenUnlessPermissionPreservesMatchingPermission(t *test
 
 func TestCacheInvalidateTokenUnlessPermissionClearsOtherPermission(t *testing.T) {
 	cache := NewCache()
-	key := TokenKey{Permission: ctaptypes.PermissionCredentialManagement}
+	key := TokenKey{Permission: protocol.PermissionCredentialManagement}
 
 	cache.SetToken(key, secret.New([]byte("token")))
-	cache.InvalidateTokenUnlessPermission(ctaptypes.PermissionLargeBlobWrite)
+	cache.InvalidateTokenUnlessPermission(protocol.PermissionLargeBlobWrite)
 
 	if _, ok, _ := cache.GetToken(key); ok {
 		t.Fatal("non-matching token still cached")

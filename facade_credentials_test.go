@@ -8,9 +8,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaphid"
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
-	"github.com/go-ctap/ctaphid/pkg/webauthntypes"
+	"github.com/go-ctap/ctap/credential"
+	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/ctap/transport/ctaphid"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
@@ -154,7 +154,7 @@ func TestCredentialMutationCTAPStatusMapsSentinel(t *testing.T) {
 			operation: model.DeleteCredentialOperation{CredentialIDHex: "c05e", Confirmed: true},
 			setupErr: func(a *credentialMutationTokenAuthenticator) {
 				a.deleteErr = &ctaphid.CTAPError{
-					Command:    ctaptypes.AuthenticatorCredentialManagement,
+					Command:    protocol.AuthenticatorCredentialManagement,
 					StatusCode: ctaphid.CTAP2_ERR_NO_CREDENTIALS,
 				}
 			},
@@ -165,7 +165,7 @@ func TestCredentialMutationCTAPStatusMapsSentinel(t *testing.T) {
 			operation: model.UpdateCredentialUserOperation{CredentialIDHex: "c05e", Name: "updated", NameProvided: true, Confirmed: true},
 			setupErr: func(a *credentialMutationTokenAuthenticator) {
 				a.updateErr = &ctaphid.CTAPError{
-					Command:    ctaptypes.AuthenticatorCredentialManagement,
+					Command:    protocol.AuthenticatorCredentialManagement,
 					StatusCode: ctaphid.CTAP2_ERR_KEY_STORE_FULL,
 				}
 			},
@@ -197,39 +197,39 @@ type progressCredentialAuthenticator struct {
 	contractAuthenticator
 }
 
-func (a *progressCredentialAuthenticator) GetInfo() ctaptypes.AuthenticatorGetInfoResponse {
-	return ctaptypes.AuthenticatorGetInfoResponse{
-		Options: map[ctaptypes.Option]bool{
-			ctaptypes.OptionCredentialManagement: true,
-			ctaptypes.OptionPinUvAuthToken:       true,
-			ctaptypes.OptionUserVerification:     true,
+func (a *progressCredentialAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	return protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionCredentialManagement: true,
+			protocol.OptionPinUvAuthToken:       true,
+			protocol.OptionUserVerification:     true,
 		},
 	}
 }
 
-func (a *progressCredentialAuthenticator) GetPinUvAuthTokenUsingUV(ctaptypes.Permission, string) ([]byte, error) {
+func (a *progressCredentialAuthenticator) GetPinUvAuthTokenUsingUV(protocol.Permission, string) ([]byte, error) {
 	return []byte("token"), nil
 }
 
-func (a *progressCredentialAuthenticator) GetCredsMetadata([]byte) (ctaptypes.AuthenticatorCredentialManagementResponse, error) {
-	return ctaptypes.AuthenticatorCredentialManagementResponse{
+func (a *progressCredentialAuthenticator) GetCredsMetadata([]byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
+	return protocol.AuthenticatorCredentialManagementResponse{
 		ExistingResidentCredentialsCount:             3,
 		MaxPossibleRemainingResidentCredentialsCount: 10,
 	}, nil
 }
 
-func (a *progressCredentialAuthenticator) EnumerateRPs([]byte) iter.Seq2[ctaptypes.AuthenticatorCredentialManagementResponse, error] {
-	return func(yield func(ctaptypes.AuthenticatorCredentialManagementResponse, error) bool) {
-		if !yield(ctaptypes.AuthenticatorCredentialManagementResponse{
-			RP:       webauthntypes.PublicKeyCredentialRpEntity{ID: "alpha.example", Name: "Alpha"},
+func (a *progressCredentialAuthenticator) EnumerateRPs([]byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
+		if !yield(protocol.AuthenticatorCredentialManagementResponse{
+			RP:       credential.PublicKeyCredentialRpEntity{ID: "alpha.example", Name: "Alpha"},
 			RPIDHash: []byte("alpha-rp-hash"),
 			TotalRPs: 2,
 		}, nil) {
 			return
 		}
 
-		yield(ctaptypes.AuthenticatorCredentialManagementResponse{
-			RP:       webauthntypes.PublicKeyCredentialRpEntity{ID: "beta.example", Name: "Beta"},
+		yield(protocol.AuthenticatorCredentialManagementResponse{
+			RP:       credential.PublicKeyCredentialRpEntity{ID: "beta.example", Name: "Beta"},
 			RPIDHash: []byte("beta-rp-hash"),
 		}, nil)
 	}
@@ -238,8 +238,8 @@ func (a *progressCredentialAuthenticator) EnumerateRPs([]byte) iter.Seq2[ctaptyp
 func (a *progressCredentialAuthenticator) EnumerateCredentials(
 	_ []byte,
 	rpIDHash []byte,
-) iter.Seq2[ctaptypes.AuthenticatorCredentialManagementResponse, error] {
-	return func(yield func(ctaptypes.AuthenticatorCredentialManagementResponse, error) bool) {
+) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
 		if bytes.Equal(rpIDHash, []byte("alpha-rp-hash")) {
 			if !yield(progressCredentialResponse("alpha-user-1", []byte{0xa1}, 2), nil) {
 				return
@@ -258,15 +258,15 @@ func progressCredentialResponse(
 	userName string,
 	credentialID []byte,
 	totalCredentials uint,
-) ctaptypes.AuthenticatorCredentialManagementResponse {
-	return ctaptypes.AuthenticatorCredentialManagementResponse{
-		User: webauthntypes.PublicKeyCredentialUserEntity{
+) protocol.AuthenticatorCredentialManagementResponse {
+	return protocol.AuthenticatorCredentialManagementResponse{
+		User: credential.PublicKeyCredentialUserEntity{
 			ID:          []byte(userName),
 			Name:        userName,
 			DisplayName: userName,
 		},
-		CredentialID: webauthntypes.PublicKeyCredentialDescriptor{
-			Type: webauthntypes.PublicKeyCredentialTypePublicKey,
+		CredentialID: credential.PublicKeyCredentialDescriptor{
+			Type: credential.PublicKeyCredentialTypePublicKey,
 			ID:   credentialID,
 		},
 		TotalCredentials: totalCredentials,
@@ -282,18 +282,18 @@ type credentialMutationTokenAuthenticator struct {
 	updateErr    error
 }
 
-func (a *credentialMutationTokenAuthenticator) GetInfo() ctaptypes.AuthenticatorGetInfoResponse {
-	return ctaptypes.AuthenticatorGetInfoResponse{
-		Options: map[ctaptypes.Option]bool{
-			ctaptypes.OptionCredentialManagement: true,
-			ctaptypes.OptionPinUvAuthToken:       true,
-			ctaptypes.OptionUserVerification:     true,
+func (a *credentialMutationTokenAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	return protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionCredentialManagement: true,
+			protocol.OptionPinUvAuthToken:       true,
+			protocol.OptionUserVerification:     true,
 		},
 	}
 }
 
 func (a *credentialMutationTokenAuthenticator) GetPinUvAuthTokenUsingUV(
-	_ ctaptypes.Permission,
+	_ protocol.Permission,
 	rpID string,
 ) ([]byte, error) {
 	a.tokenRPIDs = append(a.tokenRPIDs, rpID)
@@ -303,8 +303,8 @@ func (a *credentialMutationTokenAuthenticator) GetPinUvAuthTokenUsingUV(
 
 func (a *credentialMutationTokenAuthenticator) GetCredsMetadata(
 	[]byte,
-) (ctaptypes.AuthenticatorCredentialManagementResponse, error) {
-	return ctaptypes.AuthenticatorCredentialManagementResponse{
+) (protocol.AuthenticatorCredentialManagementResponse, error) {
+	return protocol.AuthenticatorCredentialManagementResponse{
 		ExistingResidentCredentialsCount:             1,
 		MaxPossibleRemainingResidentCredentialsCount: 8,
 	}, nil
@@ -312,10 +312,10 @@ func (a *credentialMutationTokenAuthenticator) GetCredsMetadata(
 
 func (a *credentialMutationTokenAuthenticator) EnumerateRPs(
 	[]byte,
-) iter.Seq2[ctaptypes.AuthenticatorCredentialManagementResponse, error] {
-	return func(yield func(ctaptypes.AuthenticatorCredentialManagementResponse, error) bool) {
-		yield(ctaptypes.AuthenticatorCredentialManagementResponse{
-			RP:       webauthntypes.PublicKeyCredentialRpEntity{ID: "id.example", Name: "Example"},
+) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
+		yield(protocol.AuthenticatorCredentialManagementResponse{
+			RP:       credential.PublicKeyCredentialRpEntity{ID: "id.example", Name: "Example"},
 			RPIDHash: []byte("rp-hash"),
 			TotalRPs: 1,
 		}, nil)
@@ -325,16 +325,16 @@ func (a *credentialMutationTokenAuthenticator) EnumerateRPs(
 func (a *credentialMutationTokenAuthenticator) EnumerateCredentials(
 	[]byte,
 	[]byte,
-) iter.Seq2[ctaptypes.AuthenticatorCredentialManagementResponse, error] {
-	return func(yield func(ctaptypes.AuthenticatorCredentialManagementResponse, error) bool) {
-		yield(ctaptypes.AuthenticatorCredentialManagementResponse{
-			User: webauthntypes.PublicKeyCredentialUserEntity{
+) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
+		yield(protocol.AuthenticatorCredentialManagementResponse{
+			User: credential.PublicKeyCredentialUserEntity{
 				ID:          []byte("user"),
 				Name:        "savely",
 				DisplayName: "Savely",
 			},
-			CredentialID: webauthntypes.PublicKeyCredentialDescriptor{
-				Type: webauthntypes.PublicKeyCredentialTypePublicKey,
+			CredentialID: credential.PublicKeyCredentialDescriptor{
+				Type: credential.PublicKeyCredentialTypePublicKey,
 				ID:   []byte{0xc0, 0x5e},
 			},
 			TotalCredentials: 1,
@@ -344,7 +344,7 @@ func (a *credentialMutationTokenAuthenticator) EnumerateCredentials(
 
 func (a *credentialMutationTokenAuthenticator) DeleteCredential(
 	token []byte,
-	_ webauthntypes.PublicKeyCredentialDescriptor,
+	_ credential.PublicKeyCredentialDescriptor,
 ) error {
 	a.deleteTokens = append(a.deleteTokens, string(token))
 
@@ -353,8 +353,8 @@ func (a *credentialMutationTokenAuthenticator) DeleteCredential(
 
 func (a *credentialMutationTokenAuthenticator) UpdateUserInformation(
 	token []byte,
-	_ webauthntypes.PublicKeyCredentialDescriptor,
-	_ webauthntypes.PublicKeyCredentialUserEntity,
+	_ credential.PublicKeyCredentialDescriptor,
+	_ credential.PublicKeyCredentialUserEntity,
 ) error {
 	a.updateTokens = append(a.updateTokens, string(token))
 

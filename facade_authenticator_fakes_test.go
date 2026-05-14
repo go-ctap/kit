@@ -6,114 +6,116 @@ import (
 	"iter"
 	"sync/atomic"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
-	"github.com/go-ctap/ctaphid/pkg/webauthntypes"
+	"github.com/go-ctap/ctap/attestation"
+	"github.com/go-ctap/ctap/credential"
+	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/ctap/webauthn"
 	"github.com/go-ctap/kit/model"
 )
 
 type contractAuthenticator struct{}
 
-func (a *contractAuthenticator) GetInfo() ctaptypes.AuthenticatorGetInfoResponse {
-	return ctaptypes.AuthenticatorGetInfoResponse{Options: map[ctaptypes.Option]bool{}}
+func (a *contractAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	return protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{}}
 }
 
 func (a *contractAuthenticator) Close() error { return nil }
 
-func (a *contractAuthenticator) GetPinUvAuthTokenUsingPIN(string, ctaptypes.Permission, string) ([]byte, error) {
+func (a *contractAuthenticator) GetPinUvAuthTokenUsingPIN(string, protocol.Permission, string) ([]byte, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) GetPinUvAuthTokenUsingUV(ctaptypes.Permission, string) ([]byte, error) {
+func (a *contractAuthenticator) GetPinUvAuthTokenUsingUV(protocol.Permission, string) ([]byte, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) GetCredsMetadata([]byte) (ctaptypes.AuthenticatorCredentialManagementResponse, error) {
-	return ctaptypes.AuthenticatorCredentialManagementResponse{}, errors.New("not implemented")
+func (a *contractAuthenticator) GetCredsMetadata([]byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
+	return protocol.AuthenticatorCredentialManagementResponse{}, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) EnumerateRPs([]byte) iter.Seq2[ctaptypes.AuthenticatorCredentialManagementResponse, error] {
-	return func(yield func(ctaptypes.AuthenticatorCredentialManagementResponse, error) bool) {}
+func (a *contractAuthenticator) EnumerateRPs([]byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {}
 }
 
-func (a *contractAuthenticator) EnumerateCredentials([]byte, []byte) iter.Seq2[ctaptypes.AuthenticatorCredentialManagementResponse, error] {
-	return func(yield func(ctaptypes.AuthenticatorCredentialManagementResponse, error) bool) {}
+func (a *contractAuthenticator) EnumerateCredentials([]byte, []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {}
 }
 
-func (a *contractAuthenticator) DeleteCredential([]byte, webauthntypes.PublicKeyCredentialDescriptor) error {
+func (a *contractAuthenticator) DeleteCredential([]byte, credential.PublicKeyCredentialDescriptor) error {
 	return errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) UpdateUserInformation([]byte, webauthntypes.PublicKeyCredentialDescriptor, webauthntypes.PublicKeyCredentialUserEntity) error {
+func (a *contractAuthenticator) UpdateUserInformation([]byte, credential.PublicKeyCredentialDescriptor, credential.PublicKeyCredentialUserEntity) error {
 	return errors.New("not implemented")
 }
 
 func (a *contractAuthenticator) MakeCredential(
 	[]byte,
 	[]byte,
-	webauthntypes.PublicKeyCredentialRpEntity,
-	webauthntypes.PublicKeyCredentialUserEntity,
-	[]webauthntypes.PublicKeyCredentialParameters,
-	[]webauthntypes.PublicKeyCredentialDescriptor,
-	*webauthntypes.CreateAuthenticationExtensionsClientInputs,
-	map[ctaptypes.Option]bool,
+	credential.PublicKeyCredentialRpEntity,
+	credential.PublicKeyCredentialUserEntity,
+	[]credential.PublicKeyCredentialParameters,
+	[]credential.PublicKeyCredentialDescriptor,
+	*webauthn.CreateAuthenticationExtensionsClientInputs,
+	map[protocol.Option]bool,
 	uint,
-	[]webauthntypes.AttestationStatementFormatIdentifier,
-) (ctaptypes.AuthenticatorMakeCredentialResponse, error) {
-	return ctaptypes.AuthenticatorMakeCredentialResponse{}, errors.New("not implemented")
+	[]attestation.AttestationStatementFormatIdentifier,
+) (protocol.AuthenticatorMakeCredentialResponse, error) {
+	return protocol.AuthenticatorMakeCredentialResponse{}, errors.New("not implemented")
 }
 
 func (a *contractAuthenticator) GetAssertion(
 	[]byte,
 	string,
 	[]byte,
-	[]webauthntypes.PublicKeyCredentialDescriptor,
-	*webauthntypes.GetAuthenticationExtensionsClientInputs,
-	map[ctaptypes.Option]bool,
-) iter.Seq2[ctaptypes.AuthenticatorGetAssertionResponse, error] {
-	return func(yield func(ctaptypes.AuthenticatorGetAssertionResponse, error) bool) {}
+	[]credential.PublicKeyCredentialDescriptor,
+	*webauthn.GetAuthenticationExtensionsClientInputs,
+	map[protocol.Option]bool,
+) iter.Seq2[protocol.AuthenticatorGetAssertionResponse, error] {
+	return func(yield func(protocol.AuthenticatorGetAssertionResponse, error) bool) {}
 }
 
-func (a *contractAuthenticator) GetLargeBlobs() ([]ctaptypes.LargeBlob, error) {
+func (a *contractAuthenticator) GetLargeBlobs() ([]protocol.LargeBlob, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) SetLargeBlobs([]byte, []ctaptypes.LargeBlob) error {
+func (a *contractAuthenticator) SetLargeBlobs([]byte, []protocol.LargeBlob) error {
 	return errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) GetPINRetries() (uint, bool, error) { return 0, false, nil }
-func (a *contractAuthenticator) GetUVRetries() (uint, error)        { return 0, nil }
-func (a *contractAuthenticator) SetPIN(string) error                { return errors.New("not implemented") }
-func (a *contractAuthenticator) ChangePIN(string, string) error     { return errors.New("not implemented") }
-func (a *contractAuthenticator) Reset() error                       { return errors.New("not implemented") }
-func (a *contractAuthenticator) ToggleAlwaysUV([]byte) error        { return errors.New("not implemented") }
+func (a *contractAuthenticator) GetPINRetries() (uint, *bool, error) { return 0, nil, nil }
+func (a *contractAuthenticator) GetUVRetries() (uint, error)         { return 0, nil }
+func (a *contractAuthenticator) SetPIN(string) error                 { return errors.New("not implemented") }
+func (a *contractAuthenticator) ChangePIN(string, string) error      { return errors.New("not implemented") }
+func (a *contractAuthenticator) Reset() error                        { return errors.New("not implemented") }
+func (a *contractAuthenticator) ToggleAlwaysUV([]byte) error         { return errors.New("not implemented") }
 
 func (a *contractAuthenticator) SetMinPINLength([]byte, uint, []string, bool, bool) error {
 	return errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) GetBioModality() (ctaptypes.AuthenticatorBioEnrollmentResponse, error) {
-	return ctaptypes.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
+func (a *contractAuthenticator) GetBioModality() (protocol.AuthenticatorBioEnrollmentResponse, error) {
+	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) GetFingerprintSensorInfo() (ctaptypes.AuthenticatorBioEnrollmentResponse, error) {
-	return ctaptypes.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
+func (a *contractAuthenticator) GetFingerprintSensorInfo() (protocol.AuthenticatorBioEnrollmentResponse, error) {
+	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) EnrollBegin([]byte, uint) (ctaptypes.AuthenticatorBioEnrollmentResponse, error) {
-	return ctaptypes.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
+func (a *contractAuthenticator) EnrollBegin([]byte, uint) (protocol.AuthenticatorBioEnrollmentResponse, error) {
+	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) EnrollCaptureNextSample([]byte, []byte, uint) (ctaptypes.AuthenticatorBioEnrollmentResponse, error) {
-	return ctaptypes.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
+func (a *contractAuthenticator) EnrollCaptureNextSample([]byte, []byte, uint) (protocol.AuthenticatorBioEnrollmentResponse, error) {
+	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
 }
 
 func (a *contractAuthenticator) CancelCurrentEnrollment() error {
 	return errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) EnumerateEnrollments([]byte) (ctaptypes.AuthenticatorBioEnrollmentResponse, error) {
-	return ctaptypes.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
+func (a *contractAuthenticator) EnumerateEnrollments([]byte) (protocol.AuthenticatorBioEnrollmentResponse, error) {
+	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
 }
 
 func (a *contractAuthenticator) SetFriendlyName([]byte, []byte, string) error {
@@ -157,10 +159,10 @@ type pinMutationCountingAuthenticator struct {
 	changeCalls atomic.Int32
 }
 
-func (a *pinMutationCountingAuthenticator) GetInfo() ctaptypes.AuthenticatorGetInfoResponse {
-	return ctaptypes.AuthenticatorGetInfoResponse{
-		Options: map[ctaptypes.Option]bool{
-			ctaptypes.OptionClientPIN: a.configured,
+func (a *pinMutationCountingAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	return protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionClientPIN: a.configured,
 		},
 	}
 }
@@ -201,19 +203,19 @@ type uvTokenAuthenticator struct {
 	userVerificationSeen atomic.Bool
 }
 
-func (a *uvTokenAuthenticator) GetInfo() ctaptypes.AuthenticatorGetInfoResponse {
-	return ctaptypes.AuthenticatorGetInfoResponse{
-		Options: map[ctaptypes.Option]bool{
-			ctaptypes.OptionPinUvAuthToken:      true,
-			ctaptypes.OptionUserVerification:    true,
-			ctaptypes.OptionAuthenticatorConfig: true,
-			ctaptypes.OptionUvAcfg:              true,
-			ctaptypes.OptionAlwaysUv:            false,
+func (a *uvTokenAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	return protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionPinUvAuthToken:      true,
+			protocol.OptionUserVerification:    true,
+			protocol.OptionAuthenticatorConfig: true,
+			protocol.OptionUvAcfg:              true,
+			protocol.OptionAlwaysUv:            false,
 		},
 	}
 }
 
-func (a *uvTokenAuthenticator) GetPinUvAuthTokenUsingUV(ctaptypes.Permission, string) ([]byte, error) {
+func (a *uvTokenAuthenticator) GetPinUvAuthTokenUsingUV(protocol.Permission, string) ([]byte, error) {
 	for _, event := range a.events.Events() {
 		if event.Stage == model.OperationStageInteractionRequired &&
 			event.Kind == model.InteractionKindUserVerification {
@@ -235,8 +237,8 @@ func (a *uvTokenAuthenticator) ToggleAlwaysUV([]byte) error {
 type largeBlobWriteEventAuthenticator struct {
 	contractAuthenticator
 	setErr                      error
-	largeBlobs                  []ctaptypes.LargeBlob
-	lastSetLargeBlobs           []ctaptypes.LargeBlob
+	largeBlobs                  []protocol.LargeBlob
+	lastSetLargeBlobs           []protocol.LargeBlob
 	maxSerializedLargeBlobArray uint
 	rpEnumerations              atomic.Int32
 	credentialEnumerations      atomic.Int32
@@ -244,51 +246,51 @@ type largeBlobWriteEventAuthenticator struct {
 	largeBlobWrites             atomic.Int32
 }
 
-func (a *largeBlobWriteEventAuthenticator) GetInfo() ctaptypes.AuthenticatorGetInfoResponse {
-	return ctaptypes.AuthenticatorGetInfoResponse{
-		Options: map[ctaptypes.Option]bool{
-			ctaptypes.OptionCredentialManagement: true,
-			ctaptypes.OptionLargeBlobs:           true,
-			ctaptypes.OptionPinUvAuthToken:       true,
-			ctaptypes.OptionUserVerification:     true,
+func (a *largeBlobWriteEventAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	return protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionCredentialManagement: true,
+			protocol.OptionLargeBlobs:           true,
+			protocol.OptionPinUvAuthToken:       true,
+			protocol.OptionUserVerification:     true,
 		},
 		MaxSerializedLargeBlobArray: new(a.maxSerializedLargeBlobArray),
 	}
 }
 
-func (a *largeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingUV(ctaptypes.Permission, string) ([]byte, error) {
+func (a *largeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingUV(protocol.Permission, string) ([]byte, error) {
 	return []byte("token"), nil
 }
 
-func (a *largeBlobWriteEventAuthenticator) GetCredsMetadata([]byte) (ctaptypes.AuthenticatorCredentialManagementResponse, error) {
-	return ctaptypes.AuthenticatorCredentialManagementResponse{
+func (a *largeBlobWriteEventAuthenticator) GetCredsMetadata([]byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
+	return protocol.AuthenticatorCredentialManagementResponse{
 		ExistingResidentCredentialsCount:             1,
 		MaxPossibleRemainingResidentCredentialsCount: 10,
 	}, nil
 }
 
-func (a *largeBlobWriteEventAuthenticator) EnumerateRPs([]byte) iter.Seq2[ctaptypes.AuthenticatorCredentialManagementResponse, error] {
-	return func(yield func(ctaptypes.AuthenticatorCredentialManagementResponse, error) bool) {
+func (a *largeBlobWriteEventAuthenticator) EnumerateRPs([]byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
 		a.rpEnumerations.Add(1)
-		yield(ctaptypes.AuthenticatorCredentialManagementResponse{
-			RP:       webauthntypes.PublicKeyCredentialRpEntity{ID: "id.example", Name: "Example"},
+		yield(protocol.AuthenticatorCredentialManagementResponse{
+			RP:       credential.PublicKeyCredentialRpEntity{ID: "id.example", Name: "Example"},
 			RPIDHash: []byte("rp-hash"),
 			TotalRPs: 1,
 		}, nil)
 	}
 }
 
-func (a *largeBlobWriteEventAuthenticator) EnumerateCredentials([]byte, []byte) iter.Seq2[ctaptypes.AuthenticatorCredentialManagementResponse, error] {
-	return func(yield func(ctaptypes.AuthenticatorCredentialManagementResponse, error) bool) {
+func (a *largeBlobWriteEventAuthenticator) EnumerateCredentials([]byte, []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
 		a.credentialEnumerations.Add(1)
-		yield(ctaptypes.AuthenticatorCredentialManagementResponse{
-			User: webauthntypes.PublicKeyCredentialUserEntity{
+		yield(protocol.AuthenticatorCredentialManagementResponse{
+			User: credential.PublicKeyCredentialUserEntity{
 				ID:          []byte("user"),
 				Name:        "savely",
 				DisplayName: "Savely",
 			},
-			CredentialID: webauthntypes.PublicKeyCredentialDescriptor{
-				Type: webauthntypes.PublicKeyCredentialTypePublicKey,
+			CredentialID: credential.PublicKeyCredentialDescriptor{
+				Type: credential.PublicKeyCredentialTypePublicKey,
 				ID:   []byte{0xc0, 0x5e},
 			},
 			LargeBlobKey: bytes.Repeat([]byte{0x01}, 32),
@@ -296,27 +298,27 @@ func (a *largeBlobWriteEventAuthenticator) EnumerateCredentials([]byte, []byte) 
 	}
 }
 
-func (a *largeBlobWriteEventAuthenticator) GetLargeBlobs() ([]ctaptypes.LargeBlob, error) {
+func (a *largeBlobWriteEventAuthenticator) GetLargeBlobs() ([]protocol.LargeBlob, error) {
 	a.largeBlobReads.Add(1)
 
 	return cloneTestLargeBlobs(a.largeBlobs), nil
 }
 
-func (a *largeBlobWriteEventAuthenticator) SetLargeBlobs(_ []byte, blobs []ctaptypes.LargeBlob) error {
+func (a *largeBlobWriteEventAuthenticator) SetLargeBlobs(_ []byte, blobs []protocol.LargeBlob) error {
 	a.largeBlobWrites.Add(1)
 	a.lastSetLargeBlobs = cloneTestLargeBlobs(blobs)
 
 	return a.setErr
 }
 
-func cloneTestLargeBlobs(blobs []ctaptypes.LargeBlob) []ctaptypes.LargeBlob {
+func cloneTestLargeBlobs(blobs []protocol.LargeBlob) []protocol.LargeBlob {
 	if blobs == nil {
 		return nil
 	}
 
-	cloned := make([]ctaptypes.LargeBlob, 0, len(blobs))
+	cloned := make([]protocol.LargeBlob, 0, len(blobs))
 	for _, blob := range blobs {
-		cloned = append(cloned, ctaptypes.LargeBlob{
+		cloned = append(cloned, protocol.LargeBlob{
 			Ciphertext: append([]byte(nil), blob.Ciphertext...),
 			Nonce:      append([]byte(nil), blob.Nonce...),
 			OrigSize:   blob.OrigSize,
@@ -333,20 +335,20 @@ type pinOnlyLargeBlobWriteEventAuthenticator struct {
 	pinErr   error
 }
 
-func (a *pinOnlyLargeBlobWriteEventAuthenticator) GetInfo() ctaptypes.AuthenticatorGetInfoResponse {
-	return ctaptypes.AuthenticatorGetInfoResponse{
-		Options: map[ctaptypes.Option]bool{
-			ctaptypes.OptionCredentialManagement: true,
-			ctaptypes.OptionLargeBlobs:           true,
-			ctaptypes.OptionClientPIN:            true,
-			ctaptypes.OptionPinUvAuthToken:       true,
+func (a *pinOnlyLargeBlobWriteEventAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	return protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionCredentialManagement: true,
+			protocol.OptionLargeBlobs:           true,
+			protocol.OptionClientPIN:            true,
+			protocol.OptionPinUvAuthToken:       true,
 		},
 	}
 }
 
 func (a *pinOnlyLargeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingPIN(
 	string,
-	ctaptypes.Permission,
+	protocol.Permission,
 	string,
 ) ([]byte, error) {
 	a.pinCalls.Add(1)
@@ -359,7 +361,7 @@ func (a *pinOnlyLargeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingPIN(
 }
 
 func (a *pinOnlyLargeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingUV(
-	ctaptypes.Permission,
+	protocol.Permission,
 	string,
 ) ([]byte, error) {
 	a.uvCalls.Add(1)
@@ -375,7 +377,7 @@ type pinPreferredLargeBlobWriteEventAuthenticator struct {
 
 func (a *pinPreferredLargeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingPIN(
 	string,
-	ctaptypes.Permission,
+	protocol.Permission,
 	string,
 ) ([]byte, error) {
 	a.pinCalls.Add(1)
@@ -384,7 +386,7 @@ func (a *pinPreferredLargeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingPIN
 }
 
 func (a *pinPreferredLargeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingUV(
-	ctaptypes.Permission,
+	protocol.Permission,
 	string,
 ) ([]byte, error) {
 	a.uvCalls.Add(1)

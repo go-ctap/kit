@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io/fs"
 
-	ctapdevice "github.com/go-ctap/ctaphid/pkg/device"
-	"github.com/go-ctap/ctaphid/pkg/options"
+	ctapdevice "github.com/go-ctap/ctap/authenticator"
+	"github.com/go-ctap/ctap/options"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/transport"
 )

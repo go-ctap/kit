@@ -5,24 +5,24 @@ import (
 	"slices"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
-	"github.com/go-ctap/ctaphid/pkg/webauthntypes"
+	"github.com/go-ctap/ctap/extension"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/model"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 	"github.com/samber/lo"
 )
 
-func buildLargeBlobSupportReport(info ctaptypes.AuthenticatorGetInfoResponse) applargeblobs.SupportReport {
+func buildLargeBlobSupportReport(info protocol.AuthenticatorGetInfoResponse) applargeblobs.SupportReport {
 	report := applargeblobs.SupportReport{}
-	report.LargeBlobs = info.Options[ctaptypes.OptionLargeBlobs]
+	report.LargeBlobs = info.Options[protocol.OptionLargeBlobs]
 
 	report.MaxSerializedLargeBlobArray = snapshotPtr(info.MaxSerializedLargeBlobArray)
-	report.LargeBlobKeyExtension = lo.Contains(info.Extensions, webauthntypes.ExtensionIdentifierLargeBlobKey)
+	report.LargeBlobKeyExtension = lo.Contains(info.Extensions, extension.ExtensionIdentifierLargeBlobKey)
 
 	return report
 }
 
-func serializedLargeBlobArraySize(blobs []ctaptypes.LargeBlob) (int, error) {
+func serializedLargeBlobArraySize(blobs []protocol.LargeBlob) (int, error) {
 	encMode, err := cbor.CTAP2EncOptions().EncMode()
 	if err != nil {
 		return 0, err
@@ -50,7 +50,7 @@ func checkSerializedArrayLimit(limit *uint, size int) error {
 	return model.NewRuntimeError(model.ErrorInvalidState, "large blob array capacity would be exceeded", cause)
 }
 
-func (r Runner) readLargeBlobArray() ([]ctaptypes.LargeBlob, error) {
+func (r Runner) readLargeBlobArray() ([]protocol.LargeBlob, error) {
 	blobs, err := r.largeBlobManager().GetLargeBlobs()
 	if err != nil {
 		return nil, err
@@ -59,14 +59,14 @@ func (r Runner) readLargeBlobArray() ([]ctaptypes.LargeBlob, error) {
 	return cloneLargeBlobs(blobs), nil
 }
 
-func cloneLargeBlobs(blobs []ctaptypes.LargeBlob) []ctaptypes.LargeBlob {
+func cloneLargeBlobs(blobs []protocol.LargeBlob) []protocol.LargeBlob {
 	if len(blobs) == 0 {
 		return nil
 	}
 
-	cloned := make([]ctaptypes.LargeBlob, 0, len(blobs))
+	cloned := make([]protocol.LargeBlob, 0, len(blobs))
 	for _, blob := range blobs {
-		cloned = append(cloned, ctaptypes.LargeBlob{
+		cloned = append(cloned, protocol.LargeBlob{
 			Ciphertext: slices.Clone(blob.Ciphertext),
 			Nonce:      slices.Clone(blob.Nonce),
 			OrigSize:   blob.OrigSize,
@@ -77,11 +77,11 @@ func cloneLargeBlobs(blobs []ctaptypes.LargeBlob) []ctaptypes.LargeBlob {
 }
 
 func replaceBlob(
-	blobs []ctaptypes.LargeBlob,
+	blobs []protocol.LargeBlob,
 	index int,
-	blob ctaptypes.LargeBlob,
+	blob protocol.LargeBlob,
 	operation applargeblobs.MutationOperation,
-) []ctaptypes.LargeBlob {
+) []protocol.LargeBlob {
 	out := cloneLargeBlobs(blobs)
 	if operation == applargeblobs.MutationReplace && index >= 0 {
 		out[index] = blob
@@ -92,18 +92,18 @@ func replaceBlob(
 	return append(out, blob)
 }
 
-func removeBlobAt(blobs []ctaptypes.LargeBlob, index int) []ctaptypes.LargeBlob {
+func removeBlobAt(blobs []protocol.LargeBlob, index int) []protocol.LargeBlob {
 	if index < 0 || index >= len(blobs) {
 		return cloneLargeBlobs(blobs)
 	}
 
-	out := make([]ctaptypes.LargeBlob, 0, len(blobs)-1)
+	out := make([]protocol.LargeBlob, 0, len(blobs)-1)
 	for candidateIndex, blob := range blobs {
 		if candidateIndex == index {
 			continue
 		}
 
-		out = append(out, ctaptypes.LargeBlob{
+		out = append(out, protocol.LargeBlob{
 			Ciphertext: slices.Clone(blob.Ciphertext),
 			Nonce:      slices.Clone(blob.Nonce),
 			OrigSize:   blob.OrigSize,

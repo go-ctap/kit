@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/go-ctap/ctaphid/pkg/crypto"
-	"github.com/go-ctap/ctaphid/pkg/ctaphid"
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/crypto"
+	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/ctap/transport/ctaphid"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
@@ -196,7 +196,7 @@ func TestLargeBlobDeleteLastBlobWritesEmptyArray(t *testing.T) {
 	}
 
 	a := &largeBlobWriteEventAuthenticator{
-		largeBlobs: []ctaptypes.LargeBlob{current},
+		largeBlobs: []protocol.LargeBlob{current},
 	}
 	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
@@ -254,7 +254,7 @@ func TestLargeBlobGarbageCollectNoopDoesNotWrite(t *testing.T) {
 	}
 
 	a := &largeBlobWriteEventAuthenticator{
-		largeBlobs: []ctaptypes.LargeBlob{matched},
+		largeBlobs: []protocol.LargeBlob{matched},
 	}
 	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
@@ -293,13 +293,13 @@ func TestLargeBlobGarbageCollectNoopDoesNotWrite(t *testing.T) {
 }
 
 func TestLargeBlobGarbageCollectSkipsNonConformingEntries(t *testing.T) {
-	nonConforming := ctaptypes.LargeBlob{
+	nonConforming := protocol.LargeBlob{
 		Ciphertext: []byte("not-a-gcm-ciphertext"),
 		Nonce:      []byte("short"),
 		OrigSize:   4,
 	}
 	a := &largeBlobWriteEventAuthenticator{
-		largeBlobs: []ctaptypes.LargeBlob{nonConforming},
+		largeBlobs: []protocol.LargeBlob{nonConforming},
 	}
 	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
@@ -345,7 +345,7 @@ func TestLargeBlobGarbageCollectRemovesOnlyUnmatchedEntries(t *testing.T) {
 	}
 
 	a := &largeBlobWriteEventAuthenticator{
-		largeBlobs: []ctaptypes.LargeBlob{matched, unmatched},
+		largeBlobs: []protocol.LargeBlob{matched, unmatched},
 	}
 	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
@@ -396,7 +396,7 @@ func TestLargeBlobGarbageCollectAllUnmatchedWritesEmptyArray(t *testing.T) {
 	}
 
 	a := &largeBlobWriteEventAuthenticator{
-		largeBlobs: []ctaptypes.LargeBlob{unmatched},
+		largeBlobs: []protocol.LargeBlob{unmatched},
 	}
 	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
@@ -506,7 +506,7 @@ func TestLargeBlobWritePINTokenCTAPStatusMapsSentinel(t *testing.T) {
 	a := &pinOnlyLargeBlobWriteEventAuthenticator{
 		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
 		pinErr: &ctaphid.CTAPError{
-			Command:    ctaptypes.AuthenticatorClientPIN,
+			Command:    protocol.AuthenticatorClientPIN,
 			StatusCode: ctaphid.CTAP2_ERR_PIN_INVALID,
 		},
 	}
@@ -609,7 +609,7 @@ func TestLargeBlobWriteCTAPStatusMapsSentinel(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			a := &largeBlobWriteEventAuthenticator{
 				setErr: &ctaphid.CTAPError{
-					Command:    ctaptypes.AuthenticatorLargeBlobs,
+					Command:    protocol.AuthenticatorLargeBlobs,
 					StatusCode: tt.status,
 				},
 			}

@@ -1,38 +1,17 @@
 package webauthn
 
 import (
-	"encoding/hex"
 	"fmt"
 	"strings"
 
+	"github.com/go-ctap/ctap/attestation"
+	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/model/safety"
 	"github.com/samber/lo"
 )
 
-const PublicKeyCredentialTypePublicKey = "public-key"
-
-type RelyingParty struct {
-	ID   string `json:"id"`
-	Name string `json:"name,omitempty"`
-}
-
-type User struct {
-	IDHex       string `json:"userIDHex,omitempty"`
-	Name        string `json:"name,omitempty"`
-	DisplayName string `json:"displayName,omitempty"`
-}
-
-type CredentialDescriptor struct {
-	Type       string   `json:"type,omitempty"`
-	IDHex      string   `json:"credentialIDHex"`
-	Transports []string `json:"transports,omitempty"`
-}
-
-type CredentialParameter struct {
-	Type      string `json:"type,omitempty"`
-	Algorithm int64  `json:"alg"`
-}
+const PublicKeyCredentialTypePublicKey = credential.PublicKeyCredentialTypePublicKey
 
 type AuthenticatorOptions struct {
 	ResidentKey      *bool `json:"residentKey,omitempty"`
@@ -41,44 +20,44 @@ type AuthenticatorOptions struct {
 }
 
 type MakeCredentialInput struct {
-	RP               RelyingParty           `json:"rp"`
-	User             User                   `json:"user"`
-	ClientDataJSON   []byte                 `json:"clientDataJSON"`
-	PubKeyCredParams []CredentialParameter  `json:"pubKeyCredParams"`
-	ExcludeList      []CredentialDescriptor `json:"excludeList,omitempty"`
-	Options          AuthenticatorOptions   `json:"options,omitempty"`
+	RP               credential.PublicKeyCredentialRpEntity     `json:"rp"`
+	User             credential.PublicKeyCredentialUserEntity   `json:"user"`
+	ClientDataJSON   []byte                                     `json:"clientDataJSON"`
+	PubKeyCredParams []credential.PublicKeyCredentialParameters `json:"pubKeyCredParams"`
+	ExcludeList      []credential.PublicKeyCredentialDescriptor `json:"excludeList,omitempty"`
+	Options          AuthenticatorOptions                       `json:"options,omitempty"`
 }
 
 type GetAssertionInput struct {
-	RPID           string                 `json:"rpID"`
-	ClientDataJSON []byte                 `json:"clientDataJSON"`
-	AllowList      []CredentialDescriptor `json:"allowList,omitempty"`
-	Options        AuthenticatorOptions   `json:"options,omitempty"`
+	RPID           string                                     `json:"rpID"`
+	ClientDataJSON []byte                                     `json:"clientDataJSON"`
+	AllowList      []credential.PublicKeyCredentialDescriptor `json:"allowList,omitempty"`
+	Options        AuthenticatorOptions                       `json:"options,omitempty"`
 }
 
 type MakeCredentialPreview struct {
-	Device           report.DeviceReport    `json:"device"`
-	RP               RelyingParty           `json:"rp"`
-	User             User                   `json:"user"`
-	PubKeyCredParams []CredentialParameter  `json:"pubKeyCredParams"`
-	ExcludeList      []CredentialDescriptor `json:"excludeList,omitempty"`
-	Options          AuthenticatorOptions   `json:"options,omitempty"`
-	Warnings         []safety.Warning       `json:"warnings,omitempty"`
+	Device           report.DeviceReport                        `json:"device"`
+	RP               credential.PublicKeyCredentialRpEntity     `json:"rp"`
+	User             credential.PublicKeyCredentialUserEntity   `json:"user"`
+	PubKeyCredParams []credential.PublicKeyCredentialParameters `json:"pubKeyCredParams"`
+	ExcludeList      []credential.PublicKeyCredentialDescriptor `json:"excludeList,omitempty"`
+	Options          AuthenticatorOptions                       `json:"options,omitempty"`
+	Warnings         []safety.Warning                           `json:"warnings,omitempty"`
 }
 
 type MakeCredentialResult struct {
-	DeviceID                 string `json:"deviceId"`
-	RPID                     string `json:"rpID"`
-	Format                   string `json:"fmt"`
-	CredentialIDHex          string `json:"credentialIDHex"`
-	PublicKeyCOSEHex         string `json:"publicKeyCOSEHex"`
-	AuthenticatorDataHex     string `json:"authenticatorDataHex"`
-	AttestationObjectCBORHex string `json:"attestationObjectCBORHex"`
-	AAGUID                   string `json:"aaguid,omitempty"`
-	SignCount                uint32 `json:"signCount"`
-	UserPresent              bool   `json:"userPresent"`
-	UserVerified             bool   `json:"userVerified"`
-	EnterpriseAttestation    bool   `json:"enterpriseAttestation,omitempty"`
+	DeviceID                 string                                           `json:"deviceId"`
+	RPID                     string                                           `json:"rpID"`
+	Format                   attestation.AttestationStatementFormatIdentifier `json:"fmt"`
+	CredentialIDHex          string                                           `json:"credentialIDHex"`
+	PublicKeyCOSEHex         string                                           `json:"publicKeyCOSEHex"`
+	AuthenticatorDataHex     string                                           `json:"authenticatorDataHex"`
+	AttestationObjectCBORHex string                                           `json:"attestationObjectCBORHex"`
+	AAGUID                   string                                           `json:"aaguid,omitempty"`
+	SignCount                uint32                                           `json:"signCount"`
+	UserPresent              bool                                             `json:"userPresent"`
+	UserVerified             bool                                             `json:"userVerified"`
+	EnterpriseAttestation    bool                                             `json:"enterpriseAttestation,omitempty"`
 }
 
 type GetAssertionResult struct {
@@ -88,16 +67,16 @@ type GetAssertionResult struct {
 }
 
 type Assertion struct {
-	Index                uint                 `json:"index"`
-	Credential           CredentialDescriptor `json:"credential"`
-	AuthenticatorDataHex string               `json:"authenticatorDataHex"`
-	SignatureHex         string               `json:"signatureHex"`
-	User                 *User                `json:"user,omitempty"`
-	NumberOfCredentials  uint                 `json:"numberOfCredentials,omitempty"`
-	UserSelected         bool                 `json:"userSelected,omitempty"`
-	SignCount            uint32               `json:"signCount"`
-	UserPresent          bool                 `json:"userPresent"`
-	UserVerified         bool                 `json:"userVerified"`
+	Index                uint                                      `json:"index"`
+	Credential           credential.PublicKeyCredentialDescriptor  `json:"credential"`
+	AuthenticatorDataHex string                                    `json:"authenticatorDataHex"`
+	SignatureHex         string                                    `json:"signatureHex"`
+	User                 *credential.PublicKeyCredentialUserEntity `json:"user,omitempty"`
+	NumberOfCredentials  uint                                      `json:"numberOfCredentials,omitempty"`
+	UserSelected         bool                                      `json:"userSelected,omitempty"`
+	SignCount            uint32                                    `json:"signCount"`
+	UserPresent          bool                                      `json:"userPresent"`
+	UserVerified         bool                                      `json:"userVerified"`
 }
 
 func BuildMakeCredentialPreview(device report.DeviceReport, input MakeCredentialInput) (MakeCredentialPreview, error) {
@@ -132,14 +111,10 @@ func NormalizeMakeCredentialInput(input MakeCredentialInput) (MakeCredentialInpu
 
 	input.User.Name = strings.TrimSpace(input.User.Name)
 	input.User.DisplayName = strings.TrimSpace(input.User.DisplayName)
-	userIDHex, err := normalizeHex(input.User.IDHex, "user id")
-	if err != nil {
-		return MakeCredentialInput{}, err
-	}
-	if userIDHex == "" {
+	if len(input.User.ID) == 0 {
 		return MakeCredentialInput{}, invalidInput("user id is required")
 	}
-	input.User.IDHex = userIDHex
+	input.User.ID = lo.Clone(input.User.ID)
 
 	if len(input.ClientDataJSON) == 0 {
 		return MakeCredentialInput{}, invalidInput("clientDataJSON is required")
@@ -150,10 +125,10 @@ func NormalizeMakeCredentialInput(input MakeCredentialInput) (MakeCredentialInpu
 		return MakeCredentialInput{}, invalidInput("public key credential parameters are required")
 	}
 
-	pubKeyCredParams, err := lo.MapErr(input.PubKeyCredParams, func(param CredentialParameter, _ int) (CredentialParameter, error) {
+	pubKeyCredParams, err := lo.MapErr(input.PubKeyCredParams, func(param credential.PublicKeyCredentialParameters, _ int) (credential.PublicKeyCredentialParameters, error) {
 		param = normalizeCredentialParameter(param)
 		if param.Algorithm == 0 {
-			return CredentialParameter{}, invalidInput("public key credential algorithm is required")
+			return credential.PublicKeyCredentialParameters{}, invalidInput("public key credential algorithm is required")
 		}
 
 		return param, nil
@@ -192,49 +167,32 @@ func NormalizeGetAssertionInput(input GetAssertionInput) (GetAssertionInput, err
 	return input, nil
 }
 
-func normalizeDescriptors(in []CredentialDescriptor) ([]CredentialDescriptor, error) {
-	return lo.MapErr(in, func(descriptor CredentialDescriptor, _ int) (CredentialDescriptor, error) {
+func normalizeDescriptors(in []credential.PublicKeyCredentialDescriptor) ([]credential.PublicKeyCredentialDescriptor, error) {
+	return lo.MapErr(in, func(descriptor credential.PublicKeyCredentialDescriptor, _ int) (credential.PublicKeyCredentialDescriptor, error) {
 		descriptor.Type = credentialTypeOrDefault(descriptor.Type)
-		idHex, err := normalizeHex(descriptor.IDHex, "credential id")
-		if err != nil {
-			return CredentialDescriptor{}, err
+		if len(descriptor.ID) == 0 {
+			return credential.PublicKeyCredentialDescriptor{}, invalidInput("credential id is required")
 		}
-		if idHex == "" {
-			return CredentialDescriptor{}, invalidInput("credential id is required")
-		}
-		descriptor.IDHex = idHex
+		descriptor.ID = lo.Clone(descriptor.ID)
+		descriptor.Transports = lo.Clone(descriptor.Transports)
 
 		return descriptor, nil
 	})
 }
 
-func normalizeCredentialParameter(param CredentialParameter) CredentialParameter {
+func normalizeCredentialParameter(param credential.PublicKeyCredentialParameters) credential.PublicKeyCredentialParameters {
 	param.Type = credentialTypeOrDefault(param.Type)
 
 	return param
 }
 
-func credentialTypeOrDefault(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
+func credentialTypeOrDefault(value credential.PublicKeyCredentialType) credential.PublicKeyCredentialType {
+	trimmed := strings.TrimSpace(string(value))
+	if trimmed == "" {
 		return PublicKeyCredentialTypePublicKey
 	}
 
-	return value
-}
-
-func normalizeHex(value string, label string) (string, error) {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return "", nil
-	}
-
-	decoded, err := hex.DecodeString(value)
-	if err != nil {
-		return "", invalidInput("%s must be valid hex: %q", label, value)
-	}
-
-	return hex.EncodeToString(decoded), nil
+	return credential.PublicKeyCredentialType(trimmed)
 }
 
 func invalidInput(format string, args ...any) error {

@@ -3,7 +3,7 @@ package workflow
 import (
 	"context"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/ctaperrors"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
@@ -42,11 +42,11 @@ func (r Runner) setAlwaysUV(ctx context.Context, req model.SetAlwaysUVOperation)
 		return output, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), ctaptypes.PermissionAuthenticatorConfiguration, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionAuthenticatorConfiguration, "")
 	if err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithConfigSubCommand(
 			model.OperationSetAlwaysUV,
-			ctaptypes.ConfigSubCommandToggleAlwaysUv,
+			protocol.ConfigSubCommandToggleAlwaysUv,
 		))
 	}
 	defer secret.Zero(token)
@@ -54,7 +54,7 @@ func (r Runner) setAlwaysUV(ctx context.Context, req model.SetAlwaysUVOperation)
 	if err := r.configManager().ToggleAlwaysUV(token); err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithConfigSubCommand(
 			model.OperationSetAlwaysUV,
-			ctaptypes.ConfigSubCommandToggleAlwaysUv,
+			protocol.ConfigSubCommandToggleAlwaysUv,
 		))
 	}
 
@@ -87,7 +87,7 @@ func (r Runner) setMinPINLength(ctx context.Context, req model.SetMinPINLengthOp
 	if err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithConfigSubCommand(
 			model.OperationSetMinPINLength,
-			ctaptypes.ConfigSubCommandSetMinPINLength,
+			protocol.ConfigSubCommandSetMinPINLength,
 		))
 	}
 
@@ -107,7 +107,7 @@ func (r Runner) setMinPINLength(ctx context.Context, req model.SetMinPINLengthOp
 		return output, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), ctaptypes.PermissionAuthenticatorConfiguration, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionAuthenticatorConfiguration, "")
 	if err != nil {
 		return output, err
 	}

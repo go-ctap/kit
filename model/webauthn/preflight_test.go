@@ -1,16 +1,19 @@
 package webauthn
 
 import (
+	"bytes"
 	"errors"
 	"testing"
+
+	"github.com/go-ctap/ctap/credential"
 )
 
 func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {
 	base := MakeCredentialInput{
-		RP:             RelyingParty{ID: "example.com"},
-		User:           User{IDHex: "0102"},
+		RP:             credential.PublicKeyCredentialRpEntity{ID: "example.com"},
+		User:           credential.PublicKeyCredentialUserEntity{ID: []byte{0x01, 0x02}},
 		ClientDataJSON: []byte(`{"type":"webauthn.create"}`),
-		PubKeyCredParams: []CredentialParameter{
+		PubKeyCredParams: []credential.PublicKeyCredentialParameters{
 			{Algorithm: -7},
 		},
 	}
@@ -57,16 +60,7 @@ func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {
 				RP:               base.RP,
 				User:             base.User,
 				ClientDataJSON:   base.ClientDataJSON,
-				PubKeyCredParams: []CredentialParameter{{}},
-			},
-		},
-		{
-			name: "invalid user id hex",
-			input: MakeCredentialInput{
-				RP:               base.RP,
-				User:             User{IDHex: "not-hex"},
-				ClientDataJSON:   base.ClientDataJSON,
-				PubKeyCredParams: base.PubKeyCredParams,
+				PubKeyCredParams: []credential.PublicKeyCredentialParameters{{}},
 			},
 		},
 	}
@@ -81,16 +75,18 @@ func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {
 	}
 }
 
-func TestNormalizeInputsNormalizeHexAndDefaultCredentialTypes(t *testing.T) {
+func TestNormalizeInputsTrimCloneAndDefaultCredentialTypes(t *testing.T) {
+	userID := []byte{0x0a, 0x0b}
+	credentialID := []byte{0xc0, 0x5e}
 	input, err := NormalizeMakeCredentialInput(MakeCredentialInput{
-		RP:             RelyingParty{ID: " example.com "},
-		User:           User{IDHex: "0A0B"},
+		RP:             credential.PublicKeyCredentialRpEntity{ID: " example.com "},
+		User:           credential.PublicKeyCredentialUserEntity{ID: userID},
 		ClientDataJSON: []byte("client-data"),
-		PubKeyCredParams: []CredentialParameter{
+		PubKeyCredParams: []credential.PublicKeyCredentialParameters{
 			{Algorithm: -7},
 		},
-		ExcludeList: []CredentialDescriptor{
-			{IDHex: "C05E"},
+		ExcludeList: []credential.PublicKeyCredentialDescriptor{
+			{ID: credentialID},
 		},
 	})
 	if err != nil {
@@ -101,8 +97,8 @@ func TestNormalizeInputsNormalizeHexAndDefaultCredentialTypes(t *testing.T) {
 		t.Fatalf("RP.ID = %q, want trimmed", input.RP.ID)
 	}
 
-	if input.User.IDHex != "0a0b" {
-		t.Fatalf("User.IDHex = %q, want normalized lower-case hex", input.User.IDHex)
+	if !bytes.Equal(input.User.ID, userID) || &input.User.ID[0] == &userID[0] {
+		t.Fatalf("User.ID = %#v, want cloned user id", input.User.ID)
 	}
 
 	if input.PubKeyCredParams[0].Type != PublicKeyCredentialTypePublicKey {
@@ -110,20 +106,21 @@ func TestNormalizeInputsNormalizeHexAndDefaultCredentialTypes(t *testing.T) {
 	}
 
 	if input.ExcludeList[0].Type != PublicKeyCredentialTypePublicKey ||
-		input.ExcludeList[0].IDHex != "c05e" {
-		t.Fatalf("exclude descriptor = %#v, want normalized public-key/c05e", input.ExcludeList[0])
+		!bytes.Equal(input.ExcludeList[0].ID, credentialID) ||
+		&input.ExcludeList[0].ID[0] == &credentialID[0] {
+		t.Fatalf("exclude descriptor = %#v, want default public-key with cloned id", input.ExcludeList[0])
 	}
 }
 
-func TestNormalizeGetAssertionInputValidatesAllowList(t *testing.T) {
+func TestNormalizeGetAssertionInputValidatesAllowListID(t *testing.T) {
 	_, err := NormalizeGetAssertionInput(GetAssertionInput{
 		RPID:           "example.com",
 		ClientDataJSON: []byte("client-data"),
-		AllowList: []CredentialDescriptor{
-			{IDHex: "xyz"},
+		AllowList: []credential.PublicKeyCredentialDescriptor{
+			{},
 		},
 	})
 	if !errors.Is(err, ErrInvalidInput) {
-		t.Fatalf("NormalizeGetAssertionInput error = %v, want invalid credential id", err)
+		t.Fatalf("NormalizeGetAssertionInput error = %v, want invalid input", err)
 	}
 }

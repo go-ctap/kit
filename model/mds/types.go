@@ -3,7 +3,7 @@ package mds
 import (
 	"time"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/google/uuid"
 )
 
@@ -86,40 +86,40 @@ const (
 )
 
 type MetadataStatement struct {
-	LegalHeader                          *string                                `json:"legalHeader,omitempty"`
-	AAID                                 *string                                `json:"aaid,omitempty"`
-	AAGUID                               *uuid.UUID                             `json:"aaguid,omitempty"`
-	AttestationCertificateKeyIdentifiers []string                               `json:"attestationCertificateKeyIdentifiers,omitempty"`
-	FriendlyNames                        map[string]string                      `json:"friendlyNames,omitempty"`
-	Description                          string                                 `json:"description,omitempty"`
-	AlternativeDescriptions              map[string]string                      `json:"alternativeDescriptions,omitempty"`
-	AuthenticatorVersion                 *uint32                                `json:"authenticatorVersion"`
-	ProtocolFamily                       string                                 `json:"protocolFamily"`
-	Schema                               uint16                                 `json:"schema"`
-	UPV                                  []Version                              `json:"upv"`
-	AuthenticationAlgorithms             []string                               `json:"authenticationAlgorithms"`
-	PublicKeyAlgAndEncodings             []string                               `json:"publicKeyAlgAndEncodings"`
-	AttestationTypes                     []string                               `json:"attestationTypes"`
-	UserVerificationDetails              []any                                  `json:"userVerificationDetails"`
-	KeyProtection                        []string                               `json:"keyProtection"`
-	IsKeyRestricted                      *bool                                  `json:"isKeyRestricted,omitempty"`
-	IsFreshUserVerificationRequired      *bool                                  `json:"isFreshUserVerificationRequired,omitempty"`
-	MatcherProtection                    []string                               `json:"matcherProtection"`
-	CryptoStrength                       *uint16                                `json:"cryptoStrength,omitempty"`
-	AttachmentHint                       []string                               `json:"attachmentHint,omitempty"`
-	TcDisplay                            []string                               `json:"tcDisplay"`
-	TcDisplayContentType                 *string                                `json:"tcDisplayContentType,omitempty"`
-	TcDisplayPNGCharacteristics          []DisplayPNGCharacteristicsDescriptor  `json:"tcDisplayPNGCharacteristics,omitempty"`
-	AttestationRootCertificates          []string                               `json:"attestationRootCertificates"`
-	ECDAATrustAnchor                     []ECDAATrustAnchor                     `json:"ECDAATrustAnchor,omitempty"`
-	Icon                                 *string                                `json:"icon,omitempty"`
-	IconDark                             *string                                `json:"iconDark,omitempty"`
-	ProviderLogoLight                    *string                                `json:"providerLogoLight,omitempty"`
-	ProviderLogoDark                     *string                                `json:"providerLogoDark,omitempty"`
-	ExtensionDescriptor                  []ExtensionDescriptor                  `json:"extensionDescriptor,omitempty"`
-	MultiDeviceCredentialSupport         *string                                `json:"multiDeviceCredentialSupport"`
-	AuthenticatorGetInfo                 ctaptypes.AuthenticatorGetInfoResponse `json:"authenticatorGetInfo,omitempty"`
-	CxConfigURL                          *string                                `json:"cxConfigURL"`
+	LegalHeader                          *string                               `json:"legalHeader,omitempty"`
+	AAID                                 *string                               `json:"aaid,omitempty"`
+	AAGUID                               *uuid.UUID                            `json:"aaguid,omitempty"`
+	AttestationCertificateKeyIdentifiers []string                              `json:"attestationCertificateKeyIdentifiers,omitempty"`
+	FriendlyNames                        map[string]string                     `json:"friendlyNames,omitempty"`
+	Description                          string                                `json:"description,omitempty"`
+	AlternativeDescriptions              map[string]string                     `json:"alternativeDescriptions,omitempty"`
+	AuthenticatorVersion                 *uint32                               `json:"authenticatorVersion"`
+	ProtocolFamily                       string                                `json:"protocolFamily"`
+	Schema                               uint16                                `json:"schema"`
+	UPV                                  []Version                             `json:"upv"`
+	AuthenticationAlgorithms             []string                              `json:"authenticationAlgorithms"`
+	PublicKeyAlgAndEncodings             []string                              `json:"publicKeyAlgAndEncodings"`
+	AttestationTypes                     []string                              `json:"attestationTypes"`
+	UserVerificationDetails              []any                                 `json:"userVerificationDetails"`
+	KeyProtection                        []string                              `json:"keyProtection"`
+	IsKeyRestricted                      *bool                                 `json:"isKeyRestricted,omitempty"`
+	IsFreshUserVerificationRequired      *bool                                 `json:"isFreshUserVerificationRequired,omitempty"`
+	MatcherProtection                    []string                              `json:"matcherProtection"`
+	CryptoStrength                       *uint16                               `json:"cryptoStrength,omitempty"`
+	AttachmentHint                       []string                              `json:"attachmentHint,omitempty"`
+	TcDisplay                            []string                              `json:"tcDisplay"`
+	TcDisplayContentType                 *string                               `json:"tcDisplayContentType,omitempty"`
+	TcDisplayPNGCharacteristics          []DisplayPNGCharacteristicsDescriptor `json:"tcDisplayPNGCharacteristics,omitempty"`
+	AttestationRootCertificates          []string                              `json:"attestationRootCertificates"`
+	ECDAATrustAnchor                     []ECDAATrustAnchor                    `json:"ECDAATrustAnchor,omitempty"`
+	Icon                                 *string                               `json:"icon,omitempty"`
+	IconDark                             *string                               `json:"iconDark,omitempty"`
+	ProviderLogoLight                    *string                               `json:"providerLogoLight,omitempty"`
+	ProviderLogoDark                     *string                               `json:"providerLogoDark,omitempty"`
+	ExtensionDescriptor                  []ExtensionDescriptor                 `json:"extensionDescriptor,omitempty"`
+	MultiDeviceCredentialSupport         *string                               `json:"multiDeviceCredentialSupport"`
+	AuthenticatorGetInfo                 protocol.AuthenticatorGetInfoResponse `json:"authenticatorGetInfo,omitempty"`
+	CxConfigURL                          *string                               `json:"cxConfigURL"`
 }
 
 type Version struct {

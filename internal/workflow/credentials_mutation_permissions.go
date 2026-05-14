@@ -3,7 +3,7 @@ package workflow
 import (
 	"encoding/hex"
 
-	"github.com/go-ctap/ctaphid/pkg/webauthntypes"
+	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 )
@@ -16,31 +16,31 @@ func (r Runner) credentialMutationRPID(target appcredentials.CredentialTarget) s
 	return target.RP.ID
 }
 
-func credentialDescriptor(record appcredentials.CredentialRecord) (webauthntypes.PublicKeyCredentialDescriptor, error) {
+func credentialDescriptor(record appcredentials.CredentialRecord) (credential.PublicKeyCredentialDescriptor, error) {
 	id, err := hex.DecodeString(record.CredentialIDHex)
 	if err != nil {
-		return webauthntypes.PublicKeyCredentialDescriptor{}, model.NewRuntimeError(
+		return credential.PublicKeyCredentialDescriptor{}, model.NewRuntimeError(
 			model.ErrorInvalidState,
 			"cached credential has invalid credential id",
 			err,
 		)
 	}
 
-	return webauthntypes.PublicKeyCredentialDescriptor{
-		Type:       webauthntypes.PublicKeyCredentialType(record.CredentialType),
+	return credential.PublicKeyCredentialDescriptor{
+		Type:       credential.PublicKeyCredentialType(record.CredentialType),
 		ID:         id,
 		Transports: credentialAuthenticatorTransports(record.CredentialTransports),
 	}, nil
 }
 
-func credentialAuthenticatorTransports(transports []string) []webauthntypes.AuthenticatorTransport {
+func credentialAuthenticatorTransports(transports []string) []credential.AuthenticatorTransport {
 	if len(transports) == 0 {
 		return nil
 	}
 
-	out := make([]webauthntypes.AuthenticatorTransport, 0, len(transports))
+	out := make([]credential.AuthenticatorTransport, 0, len(transports))
 	for _, transport := range transports {
-		out = append(out, webauthntypes.AuthenticatorTransport(transport))
+		out = append(out, credential.AuthenticatorTransport(transport))
 	}
 
 	return out

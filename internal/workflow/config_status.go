@@ -3,7 +3,7 @@ package workflow
 import (
 	"context"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/report"
 )
@@ -27,7 +27,7 @@ func (r Runner) statusReport() appconfig.StatusReport {
 	return buildStatusReport(r.env.Selected, r.infoProvider().GetInfo())
 }
 
-func buildStatusReport(selected report.DeviceReport, info ctaptypes.AuthenticatorGetInfoResponse) appconfig.StatusReport {
+func buildStatusReport(selected report.DeviceReport, info protocol.AuthenticatorGetInfoResponse) appconfig.StatusReport {
 	return appconfig.BuildStatusReport(selected, info)
 }
 
@@ -40,7 +40,7 @@ func (r Runner) statusWithRetries(ctx context.Context) (appconfig.StatusReport, 
 	rep := r.statusReport()
 	if rep.PIN.Supported {
 		retries, powerCycle, err := authenticator.GetPINRetries()
-		rep.PIN.Retries = retryState(retries, &powerCycle, err)
+		rep.PIN.Retries = retryState(retries, powerCycle, err)
 	}
 
 	if rep.UV.Supported &&

@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/hex"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
-	"github.com/go-ctap/ctaphid/pkg/webauthntypes"
+	"github.com/go-ctap/ctap/credential"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/ctaperrors"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
@@ -75,7 +75,7 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 		return output, err
 	}
 
-	updatedUser := webauthntypes.PublicKeyCredentialUserEntity{
+	updatedUser := credential.PublicKeyCredentialUserEntity{
 		ID:          userID,
 		Name:        proposed.Name,
 		DisplayName: proposed.DisplayName,
@@ -84,7 +84,7 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 	token, err := r.env.Tokens.Acquire(
 		ctx,
 		r.tokenProvider(),
-		ctaptypes.PermissionCredentialManagement,
+		protocol.PermissionCredentialManagement,
 		r.credentialMutationRPID(publicTarget),
 	)
 	if err != nil {
@@ -96,7 +96,7 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 		return output, ctaperrors.Annotate(err, ctaperrors.WithCredentialManagementSubCommand(
 			model.OperationUpdateCredentialUser,
 			credentialManagementCommand(r.infoProvider().GetInfo()),
-			ctaptypes.CredentialManagementSubCommandUpdateUserInformation,
+			protocol.CredentialManagementSubCommandUpdateUserInformation,
 		))
 	}
 

@@ -5,8 +5,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
-	ctapdevice "github.com/go-ctap/ctaphid/pkg/device"
+	ctapdevice "github.com/go-ctap/ctap/authenticator"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
 	"github.com/samber/lo"
@@ -22,10 +22,10 @@ func TestTokenServiceCachesByPermissionAndRPID(t *testing.T) {
 		model.VerificationFlowDefault,
 	)
 
-	acquireTokenForTest(t, tokens, authenticator, ctaptypes.PermissionCredentialManagement, "")
-	acquireTokenForTest(t, tokens, authenticator, ctaptypes.PermissionCredentialManagement, "")
-	acquireTokenForTest(t, tokens, authenticator, ctaptypes.PermissionCredentialManagement, "example.com")
-	acquireTokenForTest(t, tokens, authenticator, ctaptypes.PermissionCredentialManagement, "")
+	acquireTokenForTest(t, tokens, authenticator, protocol.PermissionCredentialManagement, "")
+	acquireTokenForTest(t, tokens, authenticator, protocol.PermissionCredentialManagement, "")
+	acquireTokenForTest(t, tokens, authenticator, protocol.PermissionCredentialManagement, "example.com")
+	acquireTokenForTest(t, tokens, authenticator, protocol.PermissionCredentialManagement, "")
 
 	wantRPIDs := []string{"", "example.com", ""}
 	if !slices.Equal(authenticator.uvRPIDs, wantRPIDs) {
@@ -50,7 +50,7 @@ func TestTokenServiceDefaultFlowRequestsUVInteractionBeforeUVCommand(t *testing.
 		model.VerificationFlowDefault,
 	)
 
-	acquireTokenForTest(t, tokens, authenticator, ctaptypes.PermissionCredentialManagement, "")
+	acquireTokenForTest(t, tokens, authenticator, protocol.PermissionCredentialManagement, "")
 
 	if len(requests) != 1 {
 		t.Fatalf("interactions = %d, want 1", len(requests))
@@ -79,7 +79,7 @@ func TestTokenServiceDefaultFlowCanceledUVInteractionSkipsUVCommand(t *testing.T
 	token, err := tokens.Acquire(
 		context.Background(),
 		authenticator,
-		ctaptypes.PermissionCredentialManagement,
+		protocol.PermissionCredentialManagement,
 		"",
 	)
 	if token != nil {
@@ -109,7 +109,7 @@ func TestTokenServiceDefaultFlowFallsBackToPINAfterUVFallbackError(t *testing.T)
 		model.VerificationFlowDefault,
 	)
 
-	acquireTokenForTest(t, tokens, authenticator, ctaptypes.PermissionCredentialManagement, "")
+	acquireTokenForTest(t, tokens, authenticator, protocol.PermissionCredentialManagement, "")
 
 	wantKinds := []model.InteractionKind{
 		model.InteractionKindUserVerification,
@@ -138,7 +138,7 @@ func TestTokenServicePINFlowSkipsUVInteractionAndCommand(t *testing.T) {
 		model.VerificationFlowPIN,
 	)
 
-	acquireTokenForTest(t, tokens, authenticator, ctaptypes.PermissionCredentialManagement, "")
+	acquireTokenForTest(t, tokens, authenticator, protocol.PermissionCredentialManagement, "")
 
 	if len(authenticator.uvRPIDs) != 0 {
 		t.Fatalf("UV token calls = %d, want 0", len(authenticator.uvRPIDs))
@@ -153,7 +153,7 @@ func TestTokenServiceCachedPINFlowPerformsNoInteraction(t *testing.T) {
 	var requests []model.InteractionRequest
 	cache := &testTokenCache{}
 	handle := secret.New([]byte("cached"))
-	cache.SetToken(TokenKey{Permission: ctaptypes.PermissionCredentialManagement}, handle)
+	cache.SetToken(TokenKey{Permission: protocol.PermissionCredentialManagement}, handle)
 	authenticator := &recordingTokenDevice{info: uvTokenInfo()}
 	tokens := NewTokenService(
 		cache,
@@ -161,7 +161,7 @@ func TestTokenServiceCachedPINFlowPerformsNoInteraction(t *testing.T) {
 		model.VerificationFlowPIN,
 	)
 
-	acquireTokenForTest(t, tokens, authenticator, ctaptypes.PermissionCredentialManagement, "")
+	acquireTokenForTest(t, tokens, authenticator, protocol.PermissionCredentialManagement, "")
 
 	if len(requests) != 0 {
 		t.Fatalf("interactions = %d, want 0", len(requests))
@@ -184,7 +184,7 @@ func TestTokenServiceMissingHandlerForUVReturnsInvalidStateBeforeUVCommand(t *te
 	token, err := tokens.Acquire(
 		context.Background(),
 		authenticator,
-		ctaptypes.PermissionCredentialManagement,
+		protocol.PermissionCredentialManagement,
 		"",
 	)
 	if token != nil {
@@ -223,7 +223,7 @@ func acquireTokenForTest(
 	t *testing.T,
 	tokens *TokenService,
 	authenticator *recordingTokenDevice,
-	permission ctaptypes.Permission,
+	permission protocol.Permission,
 	rpID string,
 ) []byte {
 	t.Helper()
@@ -237,11 +237,11 @@ func acquireTokenForTest(
 	return slices.Clone(token)
 }
 
-func uvTokenInfo() ctaptypes.AuthenticatorGetInfoResponse {
-	return ctaptypes.AuthenticatorGetInfoResponse{
-		Options: map[ctaptypes.Option]bool{
-			ctaptypes.OptionPinUvAuthToken:   true,
-			ctaptypes.OptionUserVerification: true,
+func uvTokenInfo() protocol.AuthenticatorGetInfoResponse {
+	return protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionPinUvAuthToken:   true,
+			protocol.OptionUserVerification: true,
 		},
 	}
 }
@@ -283,7 +283,7 @@ func (c *testTokenCache) InvalidateToken() {
 }
 
 type recordingTokenDevice struct {
-	info             ctaptypes.AuthenticatorGetInfoResponse
+	info             protocol.AuthenticatorGetInfoResponse
 	uvErr            error
 	requests         *[]model.InteractionRequest
 	pinRPIDs         []string
@@ -291,13 +291,13 @@ type recordingTokenDevice struct {
 	uvSawInteraction bool
 }
 
-func (d *recordingTokenDevice) GetInfo() ctaptypes.AuthenticatorGetInfoResponse {
+func (d *recordingTokenDevice) GetInfo() protocol.AuthenticatorGetInfoResponse {
 	return d.info
 }
 
 func (d *recordingTokenDevice) GetPinUvAuthTokenUsingPIN(
 	_ string,
-	_ ctaptypes.Permission,
+	_ protocol.Permission,
 	rpID string,
 ) ([]byte, error) {
 	d.pinRPIDs = append(d.pinRPIDs, rpID)
@@ -305,7 +305,7 @@ func (d *recordingTokenDevice) GetPinUvAuthTokenUsingPIN(
 	return []byte("pin-token-" + rpID), nil
 }
 
-func (d *recordingTokenDevice) GetPinUvAuthTokenUsingUV(_ ctaptypes.Permission, rpID string) ([]byte, error) {
+func (d *recordingTokenDevice) GetPinUvAuthTokenUsingUV(_ protocol.Permission, rpID string) ([]byte, error) {
 	if d.requests != nil && len(*d.requests) > 0 {
 		last := (*d.requests)[len(*d.requests)-1]
 		d.uvSawInteraction = last.Kind == model.InteractionKindUserVerification

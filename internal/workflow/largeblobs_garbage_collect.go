@@ -4,8 +4,8 @@ import (
 	"context"
 	"slices"
 
-	"github.com/go-ctap/ctaphid/pkg/crypto"
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/crypto"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/ctaperrors"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
@@ -16,8 +16,8 @@ import (
 
 type garbageCollectState struct {
 	support        applargeblobs.SupportReport
-	blobs          []ctaptypes.LargeBlob
-	replacement    []ctaptypes.LargeBlob
+	blobs          []protocol.LargeBlob
+	replacement    []protocol.LargeBlob
 	matchedCount   int
 	unmatchedCount int
 	sizeBefore     int
@@ -56,7 +56,7 @@ func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageC
 		return output, nil
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), ctaptypes.PermissionLargeBlobWrite, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionLargeBlobWrite, "")
 	if err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithLargeBlobsSubCommand(
 			model.OperationGarbageCollectLargeBlobs,
@@ -103,7 +103,7 @@ func (r Runner) loadGarbageCollectState(ctx context.Context) (garbageCollectStat
 	}
 
 	keys := largeBlobKeys(inventory)
-	replacement := make([]ctaptypes.LargeBlob, 0, len(blobs))
+	replacement := make([]protocol.LargeBlob, 0, len(blobs))
 	var matchedCount, unmatchedCount int
 	for _, blob := range blobs {
 		if !largeBlobMapConforming(blob) {
@@ -190,7 +190,7 @@ func largeBlobKeys(inventory appcredentials.InventoryReport) [][]byte {
 	return keys
 }
 
-func blobMatchesAnyKey(blob ctaptypes.LargeBlob, keys [][]byte) bool {
+func blobMatchesAnyKey(blob protocol.LargeBlob, keys [][]byte) bool {
 	if !largeBlobMapConforming(blob) {
 		return false
 	}
@@ -207,7 +207,7 @@ func blobMatchesAnyKey(blob ctaptypes.LargeBlob, keys [][]byte) bool {
 	return false
 }
 
-func largeBlobMapConforming(blob ctaptypes.LargeBlob) bool {
+func largeBlobMapConforming(blob protocol.LargeBlob) bool {
 	return len(blob.Nonce) == 12 && blob.Ciphertext != nil
 }
 
@@ -217,8 +217,8 @@ func zeroKeys(keys [][]byte) {
 	}
 }
 
-func cloneLargeBlob(blob ctaptypes.LargeBlob) ctaptypes.LargeBlob {
-	return ctaptypes.LargeBlob{
+func cloneLargeBlob(blob protocol.LargeBlob) protocol.LargeBlob {
+	return protocol.LargeBlob{
 		Ciphertext: slices.Clone(blob.Ciphertext),
 		Nonce:      slices.Clone(blob.Nonce),
 		OrigSize:   blob.OrigSize,

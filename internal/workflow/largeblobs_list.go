@@ -4,8 +4,8 @@ import (
 	"context"
 	"slices"
 
-	"github.com/go-ctap/ctaphid/pkg/crypto"
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/crypto"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/ctaperrors"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
@@ -38,7 +38,7 @@ func (r Runner) listLargeBlobs(ctx context.Context, _ model.ListLargeBlobsOperat
 type listBuildContext struct {
 	selected           report.DeviceReport
 	support            applargeblobs.SupportReport
-	blobs              []ctaptypes.LargeBlob
+	blobs              []protocol.LargeBlob
 	matchedBlobIndexes map[int]bool
 }
 
@@ -59,7 +59,7 @@ func (r Runner) listLargeBlobsFromInventory(
 	}
 
 	var (
-		blobs []ctaptypes.LargeBlob
+		blobs []protocol.LargeBlob
 		err   error
 	)
 

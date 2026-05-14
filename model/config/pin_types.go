@@ -21,7 +21,7 @@ type PINStatus struct {
 	MaxPINLength        *uint      `json:"maxPINLength,omitempty"`
 	ForcePINChange      *bool      `json:"forcePINChange,omitempty"`
 	PinComplexityPolicy *bool      `json:"pinComplexityPolicy,omitempty"`
-	PinComplexityURL    *string    `json:"pinComplexityPolicyURL,omitempty"`
+	PinComplexityURL    []byte     `json:"pinComplexityPolicyURL,omitempty"`
 	Retries             RetryState `json:"retries"`
 }
 

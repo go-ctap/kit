@@ -4,12 +4,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/samber/lo"
 )
 
-func BuildStatusReport(device report.DeviceReport, info ctaptypes.AuthenticatorGetInfoResponse) StatusReport {
+func BuildStatusReport(device report.DeviceReport, info protocol.AuthenticatorGetInfoResponse) StatusReport {
 	r := StatusReport{
 		Device: device,
 		PIN: PINStatus{
@@ -34,20 +34,19 @@ func BuildStatusReport(device report.DeviceReport, info ctaptypes.AuthenticatorG
 	}
 
 	r.PIN = buildPINStatus(info)
-	r.UV = buildUVStatus(configuredOptionCapability(info, ctaptypes.OptionUserVerification, false))
+	r.UV = buildUVStatus(configuredOptionCapability(info, protocol.OptionUserVerification, false))
 	r.Bio = buildBioStatus(bioCapability(info))
 	if info.UvModality != nil {
-		uvModality := uint(*info.UvModality)
-		r.Bio.UVModality = &uvModality
+		r.Bio.UVModality = new(uint(*info.UvModality))
 		r.Bio.UVModalityLabel = formatUVModalityLabel(*info.UvModality)
 	}
 	r.ResetHints.LongTouchForReset = boolConfiguredState(info.LongTouchForReset)
 	r.ResetHints.TransportsForReset = lo.Clone(info.TransportsForReset)
-	r.Bio.UVBioEnroll = requiredOptionCapability(info, ctaptypes.OptionUvBioEnroll, false)
-	r.AuthenticatorConfig = buildAuthenticatorConfigStatus(requiredOptionCapability(info, ctaptypes.OptionAuthenticatorConfig, false))
-	r.AuthenticatorConfig.UVAcfg = requiredOptionCapability(info, ctaptypes.OptionUvAcfg, false)
-	r.AuthenticatorConfig.AlwaysUV = configuredOptionCapability(info, ctaptypes.OptionAlwaysUv, false)
-	r.AuthenticatorConfig.SetMinPINLength = requiredOptionCapability(info, ctaptypes.OptionSetMinPINLength, false)
+	r.Bio.UVBioEnroll = requiredOptionCapability(info, protocol.OptionUvBioEnroll, false)
+	r.AuthenticatorConfig = buildAuthenticatorConfigStatus(requiredOptionCapability(info, protocol.OptionAuthenticatorConfig, false))
+	r.AuthenticatorConfig.UVAcfg = requiredOptionCapability(info, protocol.OptionUvAcfg, false)
+	r.AuthenticatorConfig.AlwaysUV = configuredOptionCapability(info, protocol.OptionAlwaysUv, false)
+	r.AuthenticatorConfig.SetMinPINLength = requiredOptionCapability(info, protocol.OptionSetMinPINLength, false)
 	r.Limits = buildLimitsStatus(info)
 
 	return r
@@ -83,7 +82,7 @@ func formatUVModalityLabel[T uvModalityStringer](modality T) string {
 	return strings.Join(labels, ", ")
 }
 
-func buildPINStatus(info ctaptypes.AuthenticatorGetInfoResponse) PINStatus {
+func buildPINStatus(info protocol.AuthenticatorGetInfoResponse) PINStatus {
 	status := PINStatus{
 		State:   StateUnknown,
 		Retries: RetryState{State: StateUnknown},
@@ -91,11 +90,13 @@ func buildPINStatus(info ctaptypes.AuthenticatorGetInfoResponse) PINStatus {
 	status.ProtocolSupported = len(info.PinUvAuthProtocols) > 0
 	status.ForcePINChange = info.ForcePINChange
 	status.PinComplexityPolicy = info.PinComplexityPolicy
-	status.PinComplexityURL = info.PinComplexityPolicyURL
+	if len(info.PinComplexityPolicyURL) > 0 {
+		status.PinComplexityURL = append([]byte(nil), info.PinComplexityPolicyURL...)
+	}
 	status.MinPINLength = info.MinPINLength
 	status.MaxPINLength = info.MaxPINLength
 
-	value, ok := info.Options[ctaptypes.OptionClientPIN]
+	value, ok := info.Options[protocol.OptionClientPIN]
 	if !ok {
 		status.State = StateUnsupported
 
@@ -103,9 +104,7 @@ func buildPINStatus(info ctaptypes.AuthenticatorGetInfoResponse) PINStatus {
 	}
 
 	status.Supported = true
-	configured := value
-
-	status.Configured = &configured
+	status.Configured = new(value)
 	if value {
 		status.State = StateConfigured
 	} else {
@@ -115,17 +114,15 @@ func buildPINStatus(info ctaptypes.AuthenticatorGetInfoResponse) PINStatus {
 	return status
 }
 
-func configuredOptionCapability(info ctaptypes.AuthenticatorGetInfoResponse, option ctaptypes.Option, previewOnly bool) CapabilityState {
+func configuredOptionCapability(info protocol.AuthenticatorGetInfoResponse, option protocol.Option, previewOnly bool) CapabilityState {
 	value, ok := info.Options[option]
 	if !ok {
 		return CapabilityState{State: StateUnsupported}
 	}
 
-	configured := value
-
 	state := CapabilityState{
 		Supported:   true,
-		Configured:  &configured,
+		Configured:  new(value),
 		PreviewOnly: previewOnly,
 	}
 	if previewOnly {
@@ -139,7 +136,7 @@ func configuredOptionCapability(info ctaptypes.AuthenticatorGetInfoResponse, opt
 	return state
 }
 
-func requiredOptionCapability(info ctaptypes.AuthenticatorGetInfoResponse, option ctaptypes.Option, previewOnly bool) CapabilityState {
+func requiredOptionCapability(info protocol.AuthenticatorGetInfoResponse, option protocol.Option, previewOnly bool) CapabilityState {
 	value, ok := info.Options[option]
 	if !ok || !value {
 		return CapabilityState{State: StateUnsupported}
@@ -157,12 +154,12 @@ func requiredOptionCapability(info ctaptypes.AuthenticatorGetInfoResponse, optio
 	return state
 }
 
-func bioCapability(info ctaptypes.AuthenticatorGetInfoResponse) CapabilityState {
+func bioCapability(info protocol.AuthenticatorGetInfoResponse) CapabilityState {
 	if info.Versions.IsPreviewOnly() {
-		return configuredOptionCapability(info, ctaptypes.OptionUserVerificationMgmtPreview, true)
+		return configuredOptionCapability(info, protocol.OptionUserVerificationMgmtPreview, true)
 	}
 
-	return configuredOptionCapability(info, ctaptypes.OptionBioEnroll, false)
+	return configuredOptionCapability(info, protocol.OptionBioEnroll, false)
 }
 
 func buildUVStatus(capability CapabilityState) UVStatus {
@@ -220,7 +217,7 @@ func boolConfiguredState(value *bool) StateValue {
 	return StateNotConfigured
 }
 
-func buildLimitsStatus(info ctaptypes.AuthenticatorGetInfoResponse) LimitsStatus {
+func buildLimitsStatus(info protocol.AuthenticatorGetInfoResponse) LimitsStatus {
 	return LimitsStatus{
 		MinPINLength:                info.MinPINLength,
 		MaxPINLength:                info.MaxPINLength,

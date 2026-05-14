@@ -4,7 +4,7 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/internal/secret"
 	appconfig "github.com/go-ctap/kit/model/config"
@@ -154,7 +154,7 @@ func (c *Cache) InvalidateToken() {
 	c.invalidateTokensLocked()
 }
 
-func (c *Cache) InvalidateTokenUnlessPermission(permission ctaptypes.Permission) {
+func (c *Cache) InvalidateTokenUnlessPermission(permission protocol.Permission) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

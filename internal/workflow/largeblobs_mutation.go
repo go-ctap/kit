@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/ctaperrors"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
@@ -57,7 +57,7 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 		return output, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), ctaptypes.PermissionLargeBlobWrite, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionLargeBlobWrite, "")
 	if err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithLargeBlobsSubCommand(
 			model.OperationWriteLargeBlob,
@@ -127,7 +127,7 @@ func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOp
 		return output, nil
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), ctaptypes.PermissionLargeBlobWrite, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionLargeBlobWrite, "")
 	if err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithLargeBlobsSubCommand(
 			model.OperationDeleteLargeBlob,

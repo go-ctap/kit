@@ -5,21 +5,21 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/model/report"
 )
 
 func TestBuildStatusReportMatchesCtaphidOptionSemantics(t *testing.T) {
-	info := ctaptypes.AuthenticatorGetInfoResponse{
-		Options: map[ctaptypes.Option]bool{
-			ctaptypes.OptionClientPIN:           false,
-			ctaptypes.OptionUserVerification:    false,
-			ctaptypes.OptionBioEnroll:           false,
-			ctaptypes.OptionUvBioEnroll:         false,
-			ctaptypes.OptionAuthenticatorConfig: true,
-			ctaptypes.OptionUvAcfg:              false,
-			ctaptypes.OptionAlwaysUv:            false,
-			ctaptypes.OptionSetMinPINLength:     false,
+	info := protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionClientPIN:           false,
+			protocol.OptionUserVerification:    false,
+			protocol.OptionBioEnroll:           false,
+			protocol.OptionUvBioEnroll:         false,
+			protocol.OptionAuthenticatorConfig: true,
+			protocol.OptionUvAcfg:              false,
+			protocol.OptionAlwaysUv:            false,
+			protocol.OptionSetMinPINLength:     false,
 		},
 		LongTouchForReset: new(false),
 	}
@@ -71,8 +71,7 @@ func TestBuildStatusReportMatchesCtaphidOptionSemantics(t *testing.T) {
 }
 
 func TestRetryStateReportsZeroRemainingRetries(t *testing.T) {
-	powerCycle := false
-	state := retryState(0, &powerCycle, nil)
+	state := retryState(0, new(false), nil)
 
 	if state.State != StateSupported {
 		t.Fatalf("state = %s, want supported", state.State)
@@ -88,11 +87,11 @@ func TestRetryStateReportsZeroRemainingRetries(t *testing.T) {
 }
 
 func TestBuildStatusReportLabelsUVModality(t *testing.T) {
-	statusReport := BuildStatusReport(nilDevice(), ctaptypes.AuthenticatorGetInfoResponse{
-		UvModality: ptr(ctaptypes.UserVerifyFingerprintInternal),
+	statusReport := BuildStatusReport(nilDevice(), protocol.AuthenticatorGetInfoResponse{
+		UvModality: new(protocol.UserVerifyFingerprintInternal),
 	})
 
-	if statusReport.Bio.UVModality == nil || *statusReport.Bio.UVModality != uint(ctaptypes.UserVerifyFingerprintInternal) {
+	if statusReport.Bio.UVModality == nil || *statusReport.Bio.UVModality != uint(protocol.UserVerifyFingerprintInternal) {
 		t.Fatalf("uv modality = %#v, want numeric fingerprint flag", statusReport.Bio.UVModality)
 	}
 	if statusReport.Bio.UVModalityLabel != "fingerprint_internal" {
@@ -101,10 +100,10 @@ func TestBuildStatusReportLabelsUVModality(t *testing.T) {
 }
 
 func TestPreviewOnlyBioStatusReportsSupportWhenNoEnrollmentProvisioned(t *testing.T) {
-	statusReport := BuildStatusReport(nilDevice(), ctaptypes.AuthenticatorGetInfoResponse{
-		Versions: []ctaptypes.Version{ctaptypes.FIDO_2_0, ctaptypes.FIDO_2_1_PRE},
-		Options: map[ctaptypes.Option]bool{
-			ctaptypes.OptionUserVerificationMgmtPreview: false,
+	statusReport := BuildStatusReport(nilDevice(), protocol.AuthenticatorGetInfoResponse{
+		Versions: []protocol.Version{protocol.FIDO_2_0, protocol.FIDO_2_1_PRE},
+		Options: map[protocol.Option]bool{
+			protocol.OptionUserVerificationMgmtPreview: false,
 		},
 	})
 	if !statusReport.Bio.Supported ||
@@ -115,10 +114,10 @@ func TestPreviewOnlyBioStatusReportsSupportWhenNoEnrollmentProvisioned(t *testin
 		t.Fatalf("preview bio false should mean preview-only support with no enrollment provisioned: %#v", statusReport.Bio)
 	}
 
-	statusReport = BuildStatusReport(nilDevice(), ctaptypes.AuthenticatorGetInfoResponse{
-		Versions: []ctaptypes.Version{ctaptypes.FIDO_2_0, ctaptypes.FIDO_2_1_PRE},
-		Options: map[ctaptypes.Option]bool{
-			ctaptypes.OptionUserVerificationMgmtPreview: true,
+	statusReport = BuildStatusReport(nilDevice(), protocol.AuthenticatorGetInfoResponse{
+		Versions: []protocol.Version{protocol.FIDO_2_0, protocol.FIDO_2_1_PRE},
+		Options: map[protocol.Option]bool{
+			protocol.OptionUserVerificationMgmtPreview: true,
 		},
 	})
 	if !statusReport.Bio.Supported || statusReport.Bio.State != StatePreviewOnly {
@@ -127,17 +126,17 @@ func TestPreviewOnlyBioStatusReportsSupportWhenNoEnrollmentProvisioned(t *testin
 }
 
 func TestBuildStatusReportPreservesExplicitZeroNullableLimits(t *testing.T) {
-	statusReport := BuildStatusReport(nilDevice(), ctaptypes.AuthenticatorGetInfoResponse{
-		Options: map[ctaptypes.Option]bool{
-			ctaptypes.OptionClientPIN: false,
+	statusReport := BuildStatusReport(nilDevice(), protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionClientPIN: false,
 		},
-		ForcePINChange:              ptr(false),
-		MinPINLength:                ptr(uint(0)),
-		MaxPINLength:                ptr(uint(0)),
-		MaxRPIDsForSetMinPINLength:  ptr(uint(0)),
-		PreferredPlatformUvAttempts: ptr(uint(0)),
-		UvCountSinceLastPinEntry:    ptr(uint(0)),
-		PinComplexityPolicy:         ptr(false),
+		ForcePINChange:              new(false),
+		MinPINLength:                new(uint(0)),
+		MaxPINLength:                new(uint(0)),
+		MaxRPIDsForSetMinPINLength:  new(uint(0)),
+		PreferredPlatformUvAttempts: new(uint(0)),
+		UvCountSinceLastPinEntry:    new(uint(0)),
+		PinComplexityPolicy:         new(false),
 	})
 
 	if statusReport.PIN.MinPINLength == nil || *statusReport.PIN.MinPINLength != 0 {
@@ -175,7 +174,7 @@ func TestBuildStatusReportPreservesExplicitZeroNullableLimits(t *testing.T) {
 }
 
 func TestBuildStatusReportOmitsAbsentNullableLimits(t *testing.T) {
-	statusReport := BuildStatusReport(nilDevice(), ctaptypes.AuthenticatorGetInfoResponse{})
+	statusReport := BuildStatusReport(nilDevice(), protocol.AuthenticatorGetInfoResponse{})
 
 	raw, err := json.Marshal(statusReport)
 	if err != nil {
@@ -200,8 +199,4 @@ func TestBuildStatusReportOmitsAbsentNullableLimits(t *testing.T) {
 
 func nilDevice() report.DeviceReport {
 	return report.DeviceReport{}
-}
-
-func ptr[T any](value T) *T {
-	return &value
 }

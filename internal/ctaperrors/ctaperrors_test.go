@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaphid"
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/ctap/transport/ctaphid"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
@@ -23,123 +23,123 @@ func TestNormalizeCommandAwareMatrix(t *testing.T) {
 	}{
 		{
 			name:     "make credential excluded",
-			ctx:      WithCommand("", ctaptypes.AuthenticatorMakeCredential, ""),
+			ctx:      WithCommand("", protocol.AuthenticatorMakeCredential, ""),
 			status:   ctaphid.CTAP2_ERR_CREDENTIAL_EXCLUDED,
 			category: model.ErrorInvalidState,
 			sentinel: appcredentials.ErrCredentialExcluded,
 		},
 		{
 			name:     "make credential store full",
-			ctx:      WithCommand("", ctaptypes.AuthenticatorMakeCredential, ""),
+			ctx:      WithCommand("", protocol.AuthenticatorMakeCredential, ""),
 			status:   ctaphid.CTAP2_ERR_KEY_STORE_FULL,
 			category: model.ErrorInvalidState,
 			sentinel: appcredentials.ErrCredentialStoreFull,
 		},
 		{
 			name:     "get assertion no credentials",
-			ctx:      WithCommand("", ctaptypes.AuthenticatorGetAssertion, ""),
+			ctx:      WithCommand("", protocol.AuthenticatorGetAssertion, ""),
 			status:   ctaphid.CTAP2_ERR_NO_CREDENTIALS,
 			category: model.ErrorInvalidState,
 			sentinel: appcredentials.ErrCredentialNotFound,
 		},
 		{
 			name:     "get assertion invalid credential",
-			ctx:      WithCommand("", ctaptypes.AuthenticatorGetAssertion, ""),
+			ctx:      WithCommand("", protocol.AuthenticatorGetAssertion, ""),
 			status:   ctaphid.CTAP2_ERR_INVALID_CREDENTIAL,
 			category: model.ErrorInvalidState,
 			sentinel: appcredentials.ErrCredentialNotFound,
 		},
 		{
 			name:     "get next assertion no continuation",
-			ctx:      WithCommand("", ctaptypes.AuthenticatorGetNextAssertion, ""),
+			ctx:      WithCommand("", protocol.AuthenticatorGetNextAssertion, ""),
 			status:   ctaphid.CTAP2_ERR_NOT_ALLOWED,
 			category: model.ErrorInvalidState,
 		},
 		{
 			name:     "get info unsupported",
-			ctx:      WithCommand("", ctaptypes.AuthenticatorGetInfo, ""),
+			ctx:      WithCommand("", protocol.AuthenticatorGetInfo, ""),
 			status:   ctaphid.CTAP1_ERR_INVALID_COMMAND,
 			category: model.ErrorUnsupported,
 		},
 		{
 			name:     "client pin invalid",
-			ctx:      WithClientPINSubCommand("", ctaptypes.ClientPINSubCommandGetPinUvAuthTokenUsingPinWithPermissions),
+			ctx:      WithClientPINSubCommand("", protocol.ClientPINSubCommandGetPinUvAuthTokenUsingPinWithPermissions),
 			status:   ctaphid.CTAP2_ERR_PIN_INVALID,
 			category: model.ErrorInvalidState,
 			sentinel: appconfig.ErrPINInvalid,
 		},
 		{
 			name:     "client pin blocked",
-			ctx:      WithClientPINSubCommand("", ctaptypes.ClientPINSubCommandGetPinUvAuthTokenUsingPinWithPermissions),
+			ctx:      WithClientPINSubCommand("", protocol.ClientPINSubCommandGetPinUvAuthTokenUsingPinWithPermissions),
 			status:   ctaphid.CTAP2_ERR_PIN_BLOCKED,
 			category: model.ErrorInvalidState,
 			sentinel: appconfig.ErrPINBlocked,
 		},
 		{
 			name:     "set pin auth invalid also means already configured",
-			ctx:      WithClientPINSubCommand("", ctaptypes.ClientPINSubCommandSetPIN),
+			ctx:      WithClientPINSubCommand("", protocol.ClientPINSubCommandSetPIN),
 			status:   ctaphid.CTAP2_ERR_PIN_AUTH_INVALID,
 			category: model.ErrorInvalidState,
 			sentinel: appconfig.ErrPINAlreadyConfigured,
 		},
 		{
 			name:     "client pin policy violation",
-			ctx:      WithClientPINSubCommand("", ctaptypes.ClientPINSubCommandChangePIN),
+			ctx:      WithClientPINSubCommand("", protocol.ClientPINSubCommandChangePIN),
 			status:   ctaphid.CTAP2_ERR_PIN_POLICY_VIOLATION,
 			category: model.ErrorInvalidState,
 			sentinel: appconfig.ErrPINPolicyViolation,
 		},
 		{
 			name:     "uv invalid",
-			ctx:      WithClientPINSubCommand("", ctaptypes.ClientPINSubCommandGetPinUvAuthTokenUsingUvWithPermissions),
+			ctx:      WithClientPINSubCommand("", protocol.ClientPINSubCommandGetPinUvAuthTokenUsingUvWithPermissions),
 			status:   ctaphid.CTAP2_ERR_UV_INVALID,
 			category: model.ErrorInvalidState,
 			sentinel: appconfig.ErrUserVerificationInvalid,
 		},
 		{
 			name:     "reset window expired",
-			ctx:      WithCommand("", ctaptypes.AuthenticatorReset, DomainConfig),
+			ctx:      WithCommand("", protocol.AuthenticatorReset, DomainConfig),
 			status:   ctaphid.CTAP2_ERR_NOT_ALLOWED,
 			category: model.ErrorInvalidState,
 			sentinel: appconfig.ErrResetWindowExpired,
 		},
 		{
 			name:     "reset timeout",
-			ctx:      WithCommand("", ctaptypes.AuthenticatorReset, DomainConfig),
+			ctx:      WithCommand("", protocol.AuthenticatorReset, DomainConfig),
 			status:   ctaphid.CTAP2_ERR_USER_ACTION_TIMEOUT,
 			category: model.ErrorTimeout,
 		},
 		{
 			name:     "bio database full",
-			ctx:      WithBioEnrollmentSubCommand("", ctaptypes.AuthenticatorBioEnrollment, ctaptypes.BioEnrollmentSubCommandEnrollBegin),
+			ctx:      WithBioEnrollmentSubCommand("", protocol.AuthenticatorBioEnrollment, protocol.BioEnrollmentSubCommandEnrollBegin),
 			status:   ctaphid.CTAP2_ERR_FP_DATABASE_FULL,
 			category: model.ErrorInvalidState,
 			sentinel: appconfig.ErrBioDatabaseFull,
 		},
 		{
 			name:     "prototype bio template missing",
-			ctx:      WithBioEnrollmentSubCommand("", ctaptypes.PrototypeAuthenticatorBioEnrollment, ctaptypes.BioEnrollmentSubCommandRemoveEnrollment),
+			ctx:      WithBioEnrollmentSubCommand("", protocol.PrototypeAuthenticatorBioEnrollment, protocol.BioEnrollmentSubCommandRemoveEnrollment),
 			status:   ctaphid.CTAP2_ERR_INVALID_OPTION,
 			category: model.ErrorInvalidState,
 			sentinel: appconfig.ErrBioEnrollmentNotFound,
 		},
 		{
 			name:     "credential management no credentials",
-			ctx:      WithCredentialManagementSubCommand("", ctaptypes.AuthenticatorCredentialManagement, ctaptypes.CredentialManagementSubCommandDeleteCredential),
+			ctx:      WithCredentialManagementSubCommand("", protocol.AuthenticatorCredentialManagement, protocol.CredentialManagementSubCommandDeleteCredential),
 			status:   ctaphid.CTAP2_ERR_NO_CREDENTIALS,
 			category: model.ErrorInvalidState,
 			sentinel: appcredentials.ErrCredentialNotFound,
 		},
 		{
 			name:     "prototype credential management token invalid",
-			ctx:      WithCredentialManagementSubCommand("", ctaptypes.PrototypeAuthenticatorCredentialManagement, ctaptypes.CredentialManagementSubCommandEnumerateRPsBegin),
+			ctx:      WithCredentialManagementSubCommand("", protocol.PrototypeAuthenticatorCredentialManagement, protocol.CredentialManagementSubCommandEnumerateRPsBegin),
 			status:   ctaphid.CTAP2_ERR_PIN_AUTH_INVALID,
 			category: model.ErrorInvalidState,
 			sentinel: appconfig.ErrPINAuthInvalid,
 		},
 		{
 			name:     "selection canceled",
-			ctx:      WithCommand("", ctaptypes.AuthenticatorSelection, ""),
+			ctx:      WithCommand("", protocol.AuthenticatorSelection, ""),
 			status:   ctaphid.CTAP2_ERR_KEEPALIVE_CANCEL,
 			category: model.ErrorCanceled,
 		},
@@ -159,14 +159,14 @@ func TestNormalizeCommandAwareMatrix(t *testing.T) {
 		},
 		{
 			name:     "config operation denied",
-			ctx:      WithConfigSubCommand("", ctaptypes.ConfigSubCommandToggleAlwaysUv),
+			ctx:      WithConfigSubCommand("", protocol.ConfigSubCommandToggleAlwaysUv),
 			status:   ctaphid.CTAP2_ERR_OPERATION_DENIED,
 			category: model.ErrorInvalidState,
 			sentinel: appconfig.ErrOperationDenied,
 		},
 		{
 			name:     "config min pin key store full",
-			ctx:      WithConfigSubCommand("", ctaptypes.ConfigSubCommandSetMinPINLength),
+			ctx:      WithConfigSubCommand("", protocol.ConfigSubCommandSetMinPINLength),
 			status:   ctaphid.CTAP2_ERR_KEY_STORE_FULL,
 			category: model.ErrorInvalidState,
 			sentinel: appconfig.ErrAuthenticatorConfigStorageFull,
@@ -257,7 +257,7 @@ func TestNormalizeGenericStatusCoverage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := Normalize(&ctaphid.CTAPError{
-				Command:    ctaptypes.AuthenticatorMakeCredential,
+				Command:    protocol.AuthenticatorMakeCredential,
 				StatusCode: tt.status,
 			})
 

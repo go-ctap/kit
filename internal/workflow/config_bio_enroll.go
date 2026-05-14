@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/ctaperrors"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
@@ -43,7 +43,7 @@ func (r Runner) enrollBio(ctx context.Context, req model.BioEnrollOperation) (mo
 		return output, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), ctaptypes.PermissionBioEnrollment, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionBioEnrollment, "")
 	if err != nil {
 		return output, err
 	}
@@ -102,16 +102,20 @@ func (r Runner) runBioEnrollment(
 		return result, appconfig.BioEnrollError{Result: result, Err: cause}
 	}
 
-	recordSample := func(resp ctaptypes.AuthenticatorBioEnrollmentResponse) error {
+	recordSample := func(resp protocol.AuthenticatorBioEnrollmentResponse) error {
 		if len(resp.TemplateID) > 0 {
 			result.TemplateIDHex = hex.EncodeToString(resp.TemplateID)
 		}
 
-		result.LastEnrollSampleStatus = resp.LastEnrollSampleStatus.String()
-		result.RemainingSamples = resp.RemainingSamples
+		if resp.LastEnrollSampleStatus != nil {
+			result.LastEnrollSampleStatus = resp.LastEnrollSampleStatus.String()
+		}
+		if resp.RemainingSamples != nil {
+			result.RemainingSamples = *resp.RemainingSamples
+		}
 		sample := appconfig.BioEnrollSample{
 			Status:           result.LastEnrollSampleStatus,
-			RemainingSamples: resp.RemainingSamples,
+			RemainingSamples: result.RemainingSamples,
 		}
 
 		result.Samples = append(result.Samples, sample)
@@ -127,7 +131,7 @@ func (r Runner) runBioEnrollment(
 		return appconfig.BioEnrollResult{}, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
 			model.OperationBioEnroll,
 			bioEnrollmentCommand(r.statusReport()),
-			ctaptypes.BioEnrollmentSubCommandEnrollBegin,
+			protocol.BioEnrollmentSubCommandEnrollBegin,
 		))
 	}
 
@@ -145,7 +149,7 @@ func (r Runner) runBioEnrollment(
 			return cancelAfterFailure(ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
 				model.OperationBioEnroll,
 				bioEnrollmentCommand(r.statusReport()),
-				ctaptypes.BioEnrollmentSubCommandEnrollCaptureNextSample,
+				protocol.BioEnrollmentSubCommandEnrollCaptureNextSample,
 			)))
 		}
 

@@ -1,7 +1,7 @@
 package workflow
 
 import (
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/model"
 )
 
@@ -38,7 +38,7 @@ func (e Effects) Apply(cache CacheStore) {
 		cache.InvalidateToken()
 	}
 	if e.ClearTokenUnlessLargeBlobWrite {
-		cache.InvalidateTokenUnlessPermission(ctaptypes.PermissionLargeBlobWrite)
+		cache.InvalidateTokenUnlessPermission(protocol.PermissionLargeBlobWrite)
 	}
 }
 

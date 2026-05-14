@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"slices"
 
-	"github.com/go-ctap/ctaphid/pkg/crypto"
+	"github.com/go-ctap/ctap/crypto"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"

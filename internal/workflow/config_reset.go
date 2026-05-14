@@ -3,7 +3,7 @@ package workflow
 import (
 	"context"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/ctaperrors"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
@@ -47,7 +47,7 @@ func (r Runner) resetFactory(ctx context.Context, req model.ResetFactoryOperatio
 	if err := r.configManager().Reset(); err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithCommand(
 			model.OperationResetFactory,
-			ctaptypes.AuthenticatorReset,
+			protocol.AuthenticatorReset,
 			ctaperrors.DomainConfig,
 		))
 	}

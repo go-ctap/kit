@@ -5,13 +5,11 @@ import (
 	"encoding/hex"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
-	"github.com/go-ctap/ctaphid/pkg/webauthntypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/ctaperrors"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
 	appwebauthn "github.com/go-ctap/kit/model/webauthn"
-	"github.com/ldclabs/cose/key"
 	"github.com/samber/lo"
 )
 
@@ -45,7 +43,7 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 	}
 
 	if makeCredentialNeedsToken(r.infoProvider().GetInfo(), input) {
-		token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), ctaptypes.PermissionMakeCredential, input.RP.ID)
+		token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionMakeCredential, input.RP.ID)
 		if err != nil {
 			return output, annotateMakeCredentialError(err)
 		}
@@ -103,7 +101,7 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 			token,
 			input.RPID,
 			input.ClientDataJSON,
-			ctapCredentialDescriptors(input.AllowList),
+			input.AllowList,
 			nil,
 			ctapAuthenticatorOptions(input.Options),
 		) {
@@ -118,7 +116,7 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 		return nil
 	}
 	if tokenRequired {
-		token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), ctaptypes.PermissionGetAssertion, input.RPID)
+		token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionGetAssertion, input.RPID)
 		if err != nil {
 			return output, err
 		}
@@ -139,19 +137,14 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 func (r Runner) callMakeCredential(
 	token []byte,
 	input appwebauthn.MakeCredentialInput,
-) (ctaptypes.AuthenticatorMakeCredentialResponse, error) {
+) (protocol.AuthenticatorMakeCredentialResponse, error) {
 	return r.webAuthnManager().MakeCredential(
 		token,
 		input.ClientDataJSON,
-		ctapRelyingParty(input.RP),
-		ctapUser(input.User),
-		lo.Map(input.PubKeyCredParams, func(param appwebauthn.CredentialParameter, _ int) webauthntypes.PublicKeyCredentialParameters {
-			return webauthntypes.PublicKeyCredentialParameters{
-				Type:      webauthntypes.PublicKeyCredentialType(param.Type),
-				Algorithm: key.Alg(param.Algorithm),
-			}
-		}),
-		ctapCredentialDescriptors(input.ExcludeList),
+		input.RP,
+		input.User,
+		input.PubKeyCredParams,
+		input.ExcludeList,
 		nil,
 		ctapAuthenticatorOptions(input.Options),
 		0,
@@ -162,7 +155,7 @@ func (r Runner) callMakeCredential(
 func annotateMakeCredentialError(err error) error {
 	return ctaperrors.Annotate(err, ctaperrors.WithCommand(
 		model.OperationMakeCredential,
-		ctaptypes.AuthenticatorMakeCredential,
+		protocol.AuthenticatorMakeCredential,
 		ctaperrors.DomainCredentials,
 	))
 }
@@ -170,20 +163,20 @@ func annotateMakeCredentialError(err error) error {
 func annotateGetAssertionError(err error) error {
 	return ctaperrors.Annotate(err, ctaperrors.WithCommand(
 		model.OperationGetAssertion,
-		ctaptypes.AuthenticatorGetAssertion,
+		protocol.AuthenticatorGetAssertion,
 		ctaperrors.DomainCredentials,
 	))
 }
 
 func makeCredentialNeedsToken(
-	info ctaptypes.AuthenticatorGetInfoResponse,
+	info protocol.AuthenticatorGetInfoResponse,
 	input appwebauthn.MakeCredentialInput,
 ) bool {
 	if lo.FromPtr(input.Options.UserVerification) {
 		return true
 	}
 
-	notRequired, ok := info.Options[ctaptypes.OptionMakeCredentialUvNotRequired]
+	notRequired, ok := info.Options[protocol.OptionMakeCredentialUvNotRequired]
 
 	return !ok || !notRequired
 }
@@ -191,7 +184,7 @@ func makeCredentialNeedsToken(
 func makeCredentialResult(
 	deviceID string,
 	rpID string,
-	response ctaptypes.AuthenticatorMakeCredentialResponse,
+	response protocol.AuthenticatorMakeCredentialResponse,
 ) (appwebauthn.MakeCredentialResult, error) {
 	if response.AuthData == nil || response.AuthData.AttestedCredentialData == nil {
 		return appwebauthn.MakeCredentialResult{}, appwebauthn.ErrAttestedCredentialDataMissing
@@ -210,7 +203,7 @@ func makeCredentialResult(
 	return appwebauthn.MakeCredentialResult{
 		DeviceID:                 deviceID,
 		RPID:                     rpID,
-		Format:                   string(response.Format),
+		Format:                   response.Format,
 		CredentialIDHex:          hex.EncodeToString(response.AuthData.AttestedCredentialData.CredentialID),
 		PublicKeyCOSEHex:         hex.EncodeToString(publicKeyCOSE),
 		AuthenticatorDataHex:     hex.EncodeToString(response.AuthDataRaw),
@@ -223,7 +216,7 @@ func makeCredentialResult(
 	}, nil
 }
 
-func attestationObjectCBOR(response ctaptypes.AuthenticatorMakeCredentialResponse) ([]byte, error) {
+func attestationObjectCBOR(response protocol.AuthenticatorMakeCredentialResponse) ([]byte, error) {
 	attestationStatement := response.AttestationStatement
 	if attestationStatement == nil {
 		attestationStatement = map[string]any{}
@@ -241,14 +234,18 @@ func attestationObjectCBOR(response ctaptypes.AuthenticatorMakeCredentialRespons
 	})
 }
 
-func assertionResult(index uint, response ctaptypes.AuthenticatorGetAssertionResponse) appwebauthn.Assertion {
+func assertionResult(index uint, response protocol.AuthenticatorGetAssertionResponse) appwebauthn.Assertion {
 	assertion := appwebauthn.Assertion{
 		Index:                index,
-		Credential:           publicCredentialDescriptor(response.Credential),
+		Credential:           response.Credential,
 		AuthenticatorDataHex: hex.EncodeToString(response.AuthDataRaw),
 		SignatureHex:         hex.EncodeToString(response.Signature),
-		NumberOfCredentials:  response.NumberOfCredentials,
-		UserSelected:         response.UserSelected,
+	}
+	if response.NumberOfCredentials != nil {
+		assertion.NumberOfCredentials = *response.NumberOfCredentials
+	}
+	if response.UserSelected != nil {
+		assertion.UserSelected = *response.UserSelected
 	}
 
 	if response.AuthData != nil {
@@ -258,73 +255,24 @@ func assertionResult(index uint, response ctaptypes.AuthenticatorGetAssertionRes
 	}
 
 	if response.User != nil {
-		assertion.User = &appwebauthn.User{
-			IDHex:       hex.EncodeToString(response.User.ID),
-			Name:        response.User.Name,
-			DisplayName: response.User.DisplayName,
-		}
+		user := *response.User
+		user.ID = append([]byte(nil), response.User.ID...)
+		assertion.User = &user
 	}
 
 	return assertion
 }
 
-func ctapRelyingParty(rp appwebauthn.RelyingParty) webauthntypes.PublicKeyCredentialRpEntity {
-	return webauthntypes.PublicKeyCredentialRpEntity{
-		ID:   rp.ID,
-		Name: rp.Name,
-	}
-}
-
-func ctapUser(user appwebauthn.User) webauthntypes.PublicKeyCredentialUserEntity {
-	userID, _ := hex.DecodeString(user.IDHex)
-
-	return webauthntypes.PublicKeyCredentialUserEntity{
-		ID:          userID,
-		Name:        user.Name,
-		DisplayName: user.DisplayName,
-	}
-}
-
-func ctapCredentialDescriptors(
-	descriptors []appwebauthn.CredentialDescriptor,
-) []webauthntypes.PublicKeyCredentialDescriptor {
-	return lo.Map(descriptors, func(descriptor appwebauthn.CredentialDescriptor, _ int) webauthntypes.PublicKeyCredentialDescriptor {
-		id, _ := hex.DecodeString(descriptor.IDHex)
-		var transports []webauthntypes.AuthenticatorTransport
-		if len(descriptor.Transports) > 0 {
-			transports = lo.Map(descriptor.Transports, func(transport string, _ int) webauthntypes.AuthenticatorTransport {
-				return webauthntypes.AuthenticatorTransport(transport)
-			})
-		}
-
-		return webauthntypes.PublicKeyCredentialDescriptor{
-			Type:       webauthntypes.PublicKeyCredentialType(descriptor.Type),
-			ID:         id,
-			Transports: transports,
-		}
-	})
-}
-
-func publicCredentialDescriptor(
-	descriptor webauthntypes.PublicKeyCredentialDescriptor,
-) appwebauthn.CredentialDescriptor {
-	return appwebauthn.CredentialDescriptor{
-		Type:       string(descriptor.Type),
-		IDHex:      hex.EncodeToString(descriptor.ID),
-		Transports: credentialTransports(descriptor.Transports),
-	}
-}
-
-func ctapAuthenticatorOptions(options appwebauthn.AuthenticatorOptions) map[ctaptypes.Option]bool {
-	out := make(map[ctaptypes.Option]bool)
+func ctapAuthenticatorOptions(options appwebauthn.AuthenticatorOptions) map[protocol.Option]bool {
+	out := make(map[protocol.Option]bool)
 	if options.ResidentKey != nil {
-		out[ctaptypes.OptionResidentKeys] = lo.FromPtr(options.ResidentKey)
+		out[protocol.OptionResidentKeys] = lo.FromPtr(options.ResidentKey)
 	}
 	if options.UserPresence != nil {
-		out[ctaptypes.OptionUserPresence] = lo.FromPtr(options.UserPresence)
+		out[protocol.OptionUserPresence] = lo.FromPtr(options.UserPresence)
 	}
 	if options.UserVerification != nil {
-		out[ctaptypes.OptionUserVerification] = lo.FromPtr(options.UserVerification)
+		out[protocol.OptionUserVerification] = lo.FromPtr(options.UserVerification)
 	}
 
 	if len(out) == 0 {

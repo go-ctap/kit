@@ -3,8 +3,8 @@ package ctaperrors
 import (
 	"errors"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaphid"
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/ctap/transport/ctaphid"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
@@ -37,23 +37,23 @@ const (
 
 type Context struct {
 	Operation        model.OperationKind
-	Command          ctaptypes.Command
+	Command          protocol.Command
 	SubCommandFamily SubCommandFamily
 	SubCommand       uint64
 	Domain           Domain
 }
 
-func WithClientPINSubCommand(operation model.OperationKind, subCommand ctaptypes.ClientPINSubCommand) Context {
+func WithClientPINSubCommand(operation model.OperationKind, subCommand protocol.ClientPINSubCommand) Context {
 	return Context{
 		Operation:        operation,
-		Command:          ctaptypes.AuthenticatorClientPIN,
+		Command:          protocol.AuthenticatorClientPIN,
 		SubCommandFamily: SubCommandClientPIN,
 		SubCommand:       uint64(subCommand),
 		Domain:           DomainConfig,
 	}
 }
 
-func WithBioEnrollmentSubCommand(operation model.OperationKind, command ctaptypes.Command, subCommand ctaptypes.BioEnrollmentSubCommand) Context {
+func WithBioEnrollmentSubCommand(operation model.OperationKind, command protocol.Command, subCommand protocol.BioEnrollmentSubCommand) Context {
 	return Context{
 		Operation:        operation,
 		Command:          command,
@@ -63,7 +63,7 @@ func WithBioEnrollmentSubCommand(operation model.OperationKind, command ctaptype
 	}
 }
 
-func WithCredentialManagementSubCommand(operation model.OperationKind, command ctaptypes.Command, subCommand ctaptypes.CredentialManagementSubCommand) Context {
+func WithCredentialManagementSubCommand(operation model.OperationKind, command protocol.Command, subCommand protocol.CredentialManagementSubCommand) Context {
 	return Context{
 		Operation:        operation,
 		Command:          command,
@@ -76,24 +76,24 @@ func WithCredentialManagementSubCommand(operation model.OperationKind, command c
 func WithLargeBlobsSubCommand(operation model.OperationKind, subCommand uint64) Context {
 	return Context{
 		Operation:        operation,
-		Command:          ctaptypes.AuthenticatorLargeBlobs,
+		Command:          protocol.AuthenticatorLargeBlobs,
 		SubCommandFamily: SubCommandLargeBlobs,
 		SubCommand:       subCommand,
 		Domain:           DomainLargeBlobs,
 	}
 }
 
-func WithConfigSubCommand(operation model.OperationKind, subCommand ctaptypes.ConfigSubCommand) Context {
+func WithConfigSubCommand(operation model.OperationKind, subCommand protocol.ConfigSubCommand) Context {
 	return Context{
 		Operation:        operation,
-		Command:          ctaptypes.AuthenticatorConfig,
+		Command:          protocol.AuthenticatorConfig,
 		SubCommandFamily: SubCommandConfig,
 		SubCommand:       uint64(subCommand),
 		Domain:           DomainConfig,
 	}
 }
 
-func WithCommand(operation model.OperationKind, command ctaptypes.Command, domain Domain) Context {
+func WithCommand(operation model.OperationKind, command protocol.Command, domain Domain) Context {
 	return Context{
 		Operation: operation,
 		Command:   command,
@@ -172,27 +172,27 @@ type rule struct {
 
 func commandRule(status ctaphid.StatusCode, ctx Context) (rule, bool) {
 	switch ctx.Command {
-	case ctaptypes.AuthenticatorMakeCredential:
+	case protocol.AuthenticatorMakeCredential:
 		return makeCredentialRule(status, ctx)
-	case ctaptypes.AuthenticatorGetAssertion:
+	case protocol.AuthenticatorGetAssertion:
 		return getAssertionRule(status, ctx)
-	case ctaptypes.AuthenticatorGetNextAssertion:
+	case protocol.AuthenticatorGetNextAssertion:
 		return getNextAssertionRule(status, ctx)
-	case ctaptypes.AuthenticatorGetInfo:
+	case protocol.AuthenticatorGetInfo:
 		return getInfoRule(status, ctx)
-	case ctaptypes.AuthenticatorClientPIN:
+	case protocol.AuthenticatorClientPIN:
 		return clientPINRule(status, ctx)
-	case ctaptypes.AuthenticatorReset:
+	case protocol.AuthenticatorReset:
 		return resetRule(status, ctx)
-	case ctaptypes.AuthenticatorBioEnrollment, ctaptypes.PrototypeAuthenticatorBioEnrollment:
+	case protocol.AuthenticatorBioEnrollment, protocol.PrototypeAuthenticatorBioEnrollment:
 		return bioEnrollmentRule(status, ctx)
-	case ctaptypes.AuthenticatorCredentialManagement, ctaptypes.PrototypeAuthenticatorCredentialManagement:
+	case protocol.AuthenticatorCredentialManagement, protocol.PrototypeAuthenticatorCredentialManagement:
 		return credentialManagementRule(status, ctx)
-	case ctaptypes.AuthenticatorSelection:
+	case protocol.AuthenticatorSelection:
 		return selectionRule(status, ctx)
-	case ctaptypes.AuthenticatorLargeBlobs:
+	case protocol.AuthenticatorLargeBlobs:
 		return largeBlobsRule(status, ctx)
-	case ctaptypes.AuthenticatorConfig:
+	case protocol.AuthenticatorConfig:
 		return configRule(status, ctx)
 	default:
 		return rule{}, false
@@ -273,11 +273,11 @@ func clientPINRule(status ctaphid.StatusCode, ctx Context) (rule, bool) {
 }
 
 func clientPINAuthInvalidRule(ctx Context) rule {
-	switch ctaptypes.ClientPINSubCommand(ctx.SubCommand) {
-	case ctaptypes.ClientPINSubCommandSetPIN:
+	switch protocol.ClientPINSubCommand(ctx.SubCommand) {
+	case protocol.ClientPINSubCommandSetPIN:
 		return invalidState("PIN is already configured or PIN/UV auth verification failed", errors.Join(appconfig.ErrPINAlreadyConfigured, appconfig.ErrPINAuthInvalid))
-	case ctaptypes.ClientPINSubCommandGetPinUvAuthTokenUsingPinWithPermissions,
-		ctaptypes.ClientPINSubCommandGetPinToken:
+	case protocol.ClientPINSubCommandGetPinUvAuthTokenUsingPinWithPermissions,
+		protocol.ClientPINSubCommandGetPinToken:
 		return invalidState("PIN/UV auth verification failed", appconfig.ErrPINAuthInvalid)
 	default:
 		return invalidState("PIN/UV auth verification failed", appconfig.ErrPINAuthInvalid)
@@ -321,11 +321,11 @@ func bioEnrollmentRule(status ctaphid.StatusCode, ctx Context) (rule, bool) {
 }
 
 func bioInvalidOptionRule(ctx Context) rule {
-	switch ctaptypes.BioEnrollmentSubCommand(ctx.SubCommand) {
-	case ctaptypes.BioEnrollmentSubCommandEnumerateEnrollments:
+	switch protocol.BioEnrollmentSubCommand(ctx.SubCommand) {
+	case protocol.BioEnrollmentSubCommandEnumerateEnrollments:
 		return invalidState("authenticator has no biometric enrollments", appconfig.ErrBioNoEnrollments)
-	case ctaptypes.BioEnrollmentSubCommandSetFriendlyName,
-		ctaptypes.BioEnrollmentSubCommandRemoveEnrollment:
+	case protocol.BioEnrollmentSubCommandSetFriendlyName,
+		protocol.BioEnrollmentSubCommandRemoveEnrollment:
 		return invalidState("biometric enrollment was not found", appconfig.ErrBioEnrollmentNotFound)
 	default:
 		return invalidState("invalid biometric enrollment option", nil)
@@ -378,7 +378,7 @@ func largeBlobsRule(status ctaphid.StatusCode, _ Context) (rule, bool) {
 func configRule(status ctaphid.StatusCode, ctx Context) (rule, bool) {
 	switch status {
 	case ctaphid.CTAP2_ERR_OPERATION_DENIED:
-		if ctaptypes.ConfigSubCommand(ctx.SubCommand) == ctaptypes.ConfigSubCommandToggleAlwaysUv {
+		if protocol.ConfigSubCommand(ctx.SubCommand) == protocol.ConfigSubCommandToggleAlwaysUv {
 			return invalidState("authenticator does not allow disabling alwaysUv", appconfig.ErrOperationDenied), true
 		}
 

@@ -3,7 +3,7 @@ package workflow
 import (
 	"context"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/ctaperrors"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
@@ -53,7 +53,7 @@ func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredential
 	token, err := r.env.Tokens.Acquire(
 		ctx,
 		r.tokenProvider(),
-		ctaptypes.PermissionCredentialManagement,
+		protocol.PermissionCredentialManagement,
 		r.credentialMutationRPID(publicTarget),
 	)
 	if err != nil {
@@ -65,7 +65,7 @@ func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredential
 		return output, ctaperrors.Annotate(err, ctaperrors.WithCredentialManagementSubCommand(
 			model.OperationDeleteCredential,
 			credentialManagementCommand(r.infoProvider().GetInfo()),
-			ctaptypes.CredentialManagementSubCommandDeleteCredential,
+			protocol.CredentialManagementSubCommandDeleteCredential,
 		))
 	}
 

@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaphid"
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
-	ctapdevice "github.com/go-ctap/ctaphid/pkg/device"
+	ctapdevice "github.com/go-ctap/ctap/authenticator"
+	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/ctap/transport/ctaphid"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/ctaperrors"
 	"github.com/go-ctap/kit/internal/secret"
@@ -14,7 +14,7 @@ import (
 )
 
 type TokenKey struct {
-	Permission ctaptypes.Permission
+	Permission protocol.Permission
 	RPID       string
 }
 
@@ -49,7 +49,7 @@ func NewTokenService(
 func (s *TokenService) Acquire(
 	ctx context.Context,
 	authenticator authenticator.TokenProvider,
-	permission ctaptypes.Permission,
+	permission protocol.Permission,
 	rpID string,
 ) ([]byte, error) {
 	key := TokenKey{
@@ -84,7 +84,7 @@ func (s *TokenService) Acquire(
 		if !fallbackToPIN(err) {
 			return nil, ctaperrors.Annotate(err, ctaperrors.WithClientPINSubCommand(
 				"",
-				ctaptypes.ClientPINSubCommandGetPinUvAuthTokenUsingUvWithPermissions,
+				protocol.ClientPINSubCommandGetPinUvAuthTokenUsingUvWithPermissions,
 			))
 		}
 	}
@@ -102,7 +102,7 @@ func (s *TokenService) Acquire(
 	if err != nil {
 		return nil, ctaperrors.Annotate(err, ctaperrors.WithClientPINSubCommand(
 			"",
-			ctaptypes.ClientPINSubCommandGetPinUvAuthTokenUsingPinWithPermissions,
+			protocol.ClientPINSubCommandGetPinUvAuthTokenUsingPinWithPermissions,
 		))
 	}
 
@@ -119,18 +119,18 @@ func (s *TokenService) storeToken(key TokenKey, token []byte) []byte {
 }
 
 func supportsUserVerificationForPermission(
-	info ctaptypes.AuthenticatorGetInfoResponse,
-	permission ctaptypes.Permission,
+	info protocol.AuthenticatorGetInfoResponse,
+	permission protocol.Permission,
 ) bool {
-	if !info.Options[ctaptypes.OptionPinUvAuthToken] || !info.Options[ctaptypes.OptionUserVerification] {
+	if !info.Options[protocol.OptionPinUvAuthToken] || !info.Options[protocol.OptionUserVerification] {
 		return false
 	}
 
-	if permission&ctaptypes.PermissionBioEnrollment != 0 && !info.Options[ctaptypes.OptionUvBioEnroll] {
+	if permission&protocol.PermissionBioEnrollment != 0 && !info.Options[protocol.OptionUvBioEnroll] {
 		return false
 	}
 
-	if permission&ctaptypes.PermissionAuthenticatorConfiguration != 0 && !info.Options[ctaptypes.OptionUvAcfg] {
+	if permission&protocol.PermissionAuthenticatorConfiguration != 0 && !info.Options[protocol.OptionUvAcfg] {
 		return false
 	}
 

@@ -6,8 +6,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-ctap/ctaphid/pkg/options"
-	"github.com/go-ctap/ctaphid/pkg/sugar"
+	"github.com/go-ctap/ctap/discover"
+	"github.com/go-ctap/ctap/options"
 )
 
 func NewDefaultResolver() ProviderResolver {
@@ -34,7 +34,7 @@ func (hidProvider) Check(context.Context) error {
 }
 
 func (hidProvider) List(ctx context.Context) ([]Descriptor, error) {
-	infos, err := sugar.EnumerateFIDODevices(options.WithContext(ctx))
+	infos, err := discover.EnumerateFIDODevices(options.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}

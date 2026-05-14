@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/go-ctap/ctaphid/pkg/crypto"
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/crypto"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/secret"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
@@ -17,7 +17,7 @@ type targetBlobState struct {
 	support                   applargeblobs.SupportReport
 	target                    appcredentials.CredentialTarget
 	key                       []byte
-	blobs                     []ctaptypes.LargeBlob
+	blobs                     []protocol.LargeBlob
 	currentBlobIndex          int
 	currentBytes              []byte
 	serializedArraySizeBefore int

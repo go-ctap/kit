@@ -10,9 +10,11 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaphid"
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
-	"github.com/go-ctap/ctaphid/pkg/webauthntypes"
+	"github.com/go-ctap/ctap/attestation"
+	"github.com/go-ctap/ctap/credential"
+	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/ctap/transport/ctaphid"
+	"github.com/go-ctap/ctap/webauthn"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
@@ -66,8 +68,8 @@ func TestMakeCredentialMapsRequestAndUsesRawClientDataJSON(t *testing.T) {
 		ResidentKey:      &rk,
 		UserVerification: &uv,
 	}
-	op.ExcludeList = []appwebauthn.CredentialDescriptor{
-		{IDHex: "C05E", Transports: []string{"usb"}},
+	op.ExcludeList = []credential.PublicKeyCredentialDescriptor{
+		{ID: []byte{0xc0, 0x5e}, Transports: []credential.AuthenticatorTransport{credential.AuthenticatorTransportUSB}},
 	}
 
 	_, err := session.Run(context.Background(), op, userVerificationHandler(t))
@@ -86,12 +88,12 @@ func TestMakeCredentialMapsRequestAndUsesRawClientDataJSON(t *testing.T) {
 	}
 	if len(a.makeCredentialExcludeList) != 1 ||
 		!bytes.Equal(a.makeCredentialExcludeList[0].ID, []byte{0xc0, 0x5e}) ||
-		a.makeCredentialExcludeList[0].Transports[0] != webauthntypes.AuthenticatorTransportUSB {
+		a.makeCredentialExcludeList[0].Transports[0] != credential.AuthenticatorTransportUSB {
 		t.Fatalf("mapped excludeList = %#v", a.makeCredentialExcludeList)
 	}
-	wantOptions := map[ctaptypes.Option]bool{
-		ctaptypes.OptionResidentKeys:     false,
-		ctaptypes.OptionUserVerification: true,
+	wantOptions := map[protocol.Option]bool{
+		protocol.OptionResidentKeys:     false,
+		protocol.OptionUserVerification: true,
 	}
 	if !maps.Equal(a.makeCredentialOptions, wantOptions) {
 		t.Fatalf("options = %#v, want %#v", a.makeCredentialOptions, wantOptions)
@@ -163,8 +165,8 @@ func TestGetAssertionReturnsAllAssertionsInOrder(t *testing.T) {
 		GetAssertionInput: appwebauthn.GetAssertionInput{
 			RPID:           "example.com",
 			ClientDataJSON: []byte(`{"type":"webauthn.get"}`),
-			AllowList: []appwebauthn.CredentialDescriptor{
-				{IDHex: "C05E"},
+			AllowList: []credential.PublicKeyCredentialDescriptor{
+				{ID: []byte{0xc0, 0x5e}},
 			},
 		},
 	}, nil)
@@ -176,12 +178,12 @@ func TestGetAssertionReturnsAllAssertionsInOrder(t *testing.T) {
 	if len(result.Assertions) != 2 {
 		t.Fatalf("assertions = %#v, want 2", result.Assertions)
 	}
-	if result.Assertions[0].Credential.IDHex != "c05e" ||
-		result.Assertions[1].Credential.IDHex != "b0b0" {
+	if !bytes.Equal(result.Assertions[0].Credential.ID, []byte{0xc0, 0x5e}) ||
+		!bytes.Equal(result.Assertions[1].Credential.ID, []byte{0xb0, 0xb0}) {
 		t.Fatalf("assertion order = %#v", result.Assertions)
 	}
 	if result.Assertions[0].SignatureHex != "aabb" ||
-		result.Assertions[1].User.IDHex != "757365722d32" {
+		!bytes.Equal(result.Assertions[1].User.ID, []byte("user-2")) {
 		t.Fatalf("assertion mapping = %#v", result.Assertions)
 	}
 	if !bytes.Equal(a.getAssertionClientData, []byte(`{"type":"webauthn.get"}`)) {
@@ -236,7 +238,7 @@ func TestWebAuthnCTAPStatusMapsSentinels(t *testing.T) {
 			},
 			setupErr: func(a *webauthnTestAuthenticator) {
 				a.makeCredentialErr = &ctaphid.CTAPError{
-					Command:    ctaptypes.AuthenticatorMakeCredential,
+					Command:    protocol.AuthenticatorMakeCredential,
 					StatusCode: ctaphid.CTAP2_ERR_CREDENTIAL_EXCLUDED,
 				}
 			},
@@ -252,7 +254,7 @@ func TestWebAuthnCTAPStatusMapsSentinels(t *testing.T) {
 			},
 			setupErr: func(a *webauthnTestAuthenticator) {
 				a.getAssertionErr = &ctaphid.CTAPError{
-					Command:    ctaptypes.AuthenticatorGetAssertion,
+					Command:    protocol.AuthenticatorGetAssertion,
 					StatusCode: ctaphid.CTAP2_ERR_NO_CREDENTIALS,
 				}
 			},
@@ -301,17 +303,17 @@ func TestWebAuthnOutputsDoNotMarshalTokens(t *testing.T) {
 func sampleMakeCredentialOperation(dryRun bool) model.MakeCredentialOperation {
 	return model.MakeCredentialOperation{
 		MakeCredentialInput: appwebauthn.MakeCredentialInput{
-			RP: appwebauthn.RelyingParty{
+			RP: credential.PublicKeyCredentialRpEntity{
 				ID:   "example.com",
 				Name: "Example",
 			},
-			User: appwebauthn.User{
-				IDHex:       "0102",
+			User: credential.PublicKeyCredentialUserEntity{
+				ID:          []byte{0x01, 0x02},
 				Name:        "alice@example.com",
 				DisplayName: "Alice",
 			},
 			ClientDataJSON: []byte(`{"type":"webauthn.create"}`),
-			PubKeyCredParams: []appwebauthn.CredentialParameter{
+			PubKeyCredParams: []credential.PublicKeyCredentialParameters{
 				{Algorithm: -7},
 			},
 		},
@@ -328,11 +330,11 @@ type webauthnTestAuthenticator struct {
 	makeCredentialErr         error
 	makeCredentialToken       []byte
 	makeCredentialClientData  []byte
-	makeCredentialRP          webauthntypes.PublicKeyCredentialRpEntity
-	makeCredentialUser        webauthntypes.PublicKeyCredentialUserEntity
-	makeCredentialParams      []webauthntypes.PublicKeyCredentialParameters
-	makeCredentialExcludeList []webauthntypes.PublicKeyCredentialDescriptor
-	makeCredentialOptions     map[ctaptypes.Option]bool
+	makeCredentialRP          credential.PublicKeyCredentialRpEntity
+	makeCredentialUser        credential.PublicKeyCredentialUserEntity
+	makeCredentialParams      []credential.PublicKeyCredentialParameters
+	makeCredentialExcludeList []credential.PublicKeyCredentialDescriptor
+	makeCredentialOptions     map[protocol.Option]bool
 
 	getAssertionErr        error
 	getAssertionToken      []byte
@@ -341,19 +343,19 @@ type webauthnTestAuthenticator struct {
 	metadataCalls int
 }
 
-func (a *webauthnTestAuthenticator) GetInfo() ctaptypes.AuthenticatorGetInfoResponse {
-	return ctaptypes.AuthenticatorGetInfoResponse{
-		Options: map[ctaptypes.Option]bool{
-			ctaptypes.OptionCredentialManagement:        true,
-			ctaptypes.OptionPinUvAuthToken:              true,
-			ctaptypes.OptionUserVerification:            true,
-			ctaptypes.OptionMakeCredentialUvNotRequired: a.makeCredentialUvNotRequired,
+func (a *webauthnTestAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	return protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionCredentialManagement:        true,
+			protocol.OptionPinUvAuthToken:              true,
+			protocol.OptionUserVerification:            true,
+			protocol.OptionMakeCredentialUvNotRequired: a.makeCredentialUvNotRequired,
 		},
 	}
 }
 
 func (a *webauthnTestAuthenticator) GetPinUvAuthTokenUsingUV(
-	_ ctaptypes.Permission,
+	_ protocol.Permission,
 	rpID string,
 ) ([]byte, error) {
 	a.tokenRPIDs = append(a.tokenRPIDs, rpID)
@@ -364,27 +366,27 @@ func (a *webauthnTestAuthenticator) GetPinUvAuthTokenUsingUV(
 func (a *webauthnTestAuthenticator) MakeCredential(
 	pinUvAuthToken []byte,
 	clientData []byte,
-	rp webauthntypes.PublicKeyCredentialRpEntity,
-	user webauthntypes.PublicKeyCredentialUserEntity,
-	pubKeyCredParams []webauthntypes.PublicKeyCredentialParameters,
-	excludeList []webauthntypes.PublicKeyCredentialDescriptor,
-	_ *webauthntypes.CreateAuthenticationExtensionsClientInputs,
-	options map[ctaptypes.Option]bool,
+	rp credential.PublicKeyCredentialRpEntity,
+	user credential.PublicKeyCredentialUserEntity,
+	pubKeyCredParams []credential.PublicKeyCredentialParameters,
+	excludeList []credential.PublicKeyCredentialDescriptor,
+	_ *webauthn.CreateAuthenticationExtensionsClientInputs,
+	options map[protocol.Option]bool,
 	_ uint,
-	_ []webauthntypes.AttestationStatementFormatIdentifier,
-) (ctaptypes.AuthenticatorMakeCredentialResponse, error) {
+	_ []attestation.AttestationStatementFormatIdentifier,
+) (protocol.AuthenticatorMakeCredentialResponse, error) {
 	a.makeCredentialCalls++
 	a.makeCredentialToken = append([]byte(nil), pinUvAuthToken...)
 	a.makeCredentialClientData = append([]byte(nil), clientData...)
 	a.makeCredentialRP = rp
 	a.makeCredentialUser = user
-	a.makeCredentialParams = append([]webauthntypes.PublicKeyCredentialParameters(nil), pubKeyCredParams...)
-	a.makeCredentialExcludeList = append([]webauthntypes.PublicKeyCredentialDescriptor(nil), excludeList...)
+	a.makeCredentialParams = append([]credential.PublicKeyCredentialParameters(nil), pubKeyCredParams...)
+	a.makeCredentialExcludeList = append([]credential.PublicKeyCredentialDescriptor(nil), excludeList...)
 	if options != nil {
 		a.makeCredentialOptions = lo.Assign(options)
 	}
 	if a.makeCredentialErr != nil {
-		return ctaptypes.AuthenticatorMakeCredentialResponse{}, a.makeCredentialErr
+		return protocol.AuthenticatorMakeCredentialResponse{}, a.makeCredentialErr
 	}
 
 	return sampleMakeCredentialResponse(), nil
@@ -394,15 +396,15 @@ func (a *webauthnTestAuthenticator) GetAssertion(
 	pinUvAuthToken []byte,
 	_ string,
 	clientData []byte,
-	_ []webauthntypes.PublicKeyCredentialDescriptor,
-	_ *webauthntypes.GetAuthenticationExtensionsClientInputs,
-	_ map[ctaptypes.Option]bool,
-) iter.Seq2[ctaptypes.AuthenticatorGetAssertionResponse, error] {
-	return func(yield func(ctaptypes.AuthenticatorGetAssertionResponse, error) bool) {
+	_ []credential.PublicKeyCredentialDescriptor,
+	_ *webauthn.GetAuthenticationExtensionsClientInputs,
+	_ map[protocol.Option]bool,
+) iter.Seq2[protocol.AuthenticatorGetAssertionResponse, error] {
+	return func(yield func(protocol.AuthenticatorGetAssertionResponse, error) bool) {
 		a.getAssertionToken = append([]byte(nil), pinUvAuthToken...)
 		a.getAssertionClientData = append([]byte(nil), clientData...)
 		if a.getAssertionErr != nil {
-			yield(ctaptypes.AuthenticatorGetAssertionResponse{}, a.getAssertionErr)
+			yield(protocol.AuthenticatorGetAssertionResponse{}, a.getAssertionErr)
 
 			return
 		}
@@ -416,10 +418,10 @@ func (a *webauthnTestAuthenticator) GetAssertion(
 
 func (a *webauthnTestAuthenticator) GetCredsMetadata(
 	[]byte,
-) (ctaptypes.AuthenticatorCredentialManagementResponse, error) {
+) (protocol.AuthenticatorCredentialManagementResponse, error) {
 	a.metadataCalls++
 
-	return ctaptypes.AuthenticatorCredentialManagementResponse{
+	return protocol.AuthenticatorCredentialManagementResponse{
 		ExistingResidentCredentialsCount:             1,
 		MaxPossibleRemainingResidentCredentialsCount: 8,
 	}, nil
@@ -427,10 +429,10 @@ func (a *webauthnTestAuthenticator) GetCredsMetadata(
 
 func (a *webauthnTestAuthenticator) EnumerateRPs(
 	[]byte,
-) iter.Seq2[ctaptypes.AuthenticatorCredentialManagementResponse, error] {
-	return func(yield func(ctaptypes.AuthenticatorCredentialManagementResponse, error) bool) {
-		yield(ctaptypes.AuthenticatorCredentialManagementResponse{
-			RP:       webauthntypes.PublicKeyCredentialRpEntity{ID: "example.com", Name: "Example"},
+) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
+		yield(protocol.AuthenticatorCredentialManagementResponse{
+			RP:       credential.PublicKeyCredentialRpEntity{ID: "example.com", Name: "Example"},
 			RPIDHash: []byte("rp-hash"),
 			TotalRPs: 1,
 		}, nil)
@@ -440,16 +442,16 @@ func (a *webauthnTestAuthenticator) EnumerateRPs(
 func (a *webauthnTestAuthenticator) EnumerateCredentials(
 	[]byte,
 	[]byte,
-) iter.Seq2[ctaptypes.AuthenticatorCredentialManagementResponse, error] {
-	return func(yield func(ctaptypes.AuthenticatorCredentialManagementResponse, error) bool) {
-		yield(ctaptypes.AuthenticatorCredentialManagementResponse{
-			User: webauthntypes.PublicKeyCredentialUserEntity{
+) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
+		yield(protocol.AuthenticatorCredentialManagementResponse{
+			User: credential.PublicKeyCredentialUserEntity{
 				ID:          []byte("user"),
 				Name:        "alice@example.com",
 				DisplayName: "Alice",
 			},
-			CredentialID: webauthntypes.PublicKeyCredentialDescriptor{
-				Type: webauthntypes.PublicKeyCredentialTypePublicKey,
+			CredentialID: credential.PublicKeyCredentialDescriptor{
+				Type: credential.PublicKeyCredentialTypePublicKey,
 				ID:   []byte{0xc0, 0x5e},
 			},
 			TotalCredentials: 1,
@@ -457,14 +459,14 @@ func (a *webauthnTestAuthenticator) EnumerateCredentials(
 	}
 }
 
-func sampleMakeCredentialResponse() ctaptypes.AuthenticatorMakeCredentialResponse {
-	return ctaptypes.AuthenticatorMakeCredentialResponse{
-		Format:      webauthntypes.AttestationStatementFormatIdentifierPacked,
+func sampleMakeCredentialResponse() protocol.AuthenticatorMakeCredentialResponse {
+	return protocol.AuthenticatorMakeCredentialResponse{
+		Format:      attestation.AttestationStatementFormatIdentifierPacked,
 		AuthDataRaw: []byte{0x01, 0x02, 0x03},
-		AuthData: &ctaptypes.MakeCredentialAuthData{
-			Flags:     ctaptypes.AuthDataFlagUserPresent | ctaptypes.AuthDataFlagUserVerified,
+		AuthData: &protocol.MakeCredentialAuthData{
+			Flags:     protocol.AuthDataFlagUserPresent | protocol.AuthDataFlagUserVerified,
 			SignCount: 7,
-			AttestedCredentialData: &ctaptypes.AttestedCredentialData{
+			AttestedCredentialData: &protocol.AttestedCredentialData{
 				AAGUID:       uuid.Must(uuid.Parse("00112233-4455-6677-8899-aabbccddeeff")),
 				CredentialID: []byte{0xc0, 0x5e},
 				CredentialPublicKey: key.Key{
@@ -488,20 +490,20 @@ func sampleAssertionResponse(
 	signature []byte,
 	userID []byte,
 	numberOfCredentials uint,
-) ctaptypes.AuthenticatorGetAssertionResponse {
-	return ctaptypes.AuthenticatorGetAssertionResponse{
-		Credential: webauthntypes.PublicKeyCredentialDescriptor{
-			Type:       webauthntypes.PublicKeyCredentialTypePublicKey,
+) protocol.AuthenticatorGetAssertionResponse {
+	return protocol.AuthenticatorGetAssertionResponse{
+		Credential: credential.PublicKeyCredentialDescriptor{
+			Type:       credential.PublicKeyCredentialTypePublicKey,
 			ID:         credentialID,
-			Transports: []webauthntypes.AuthenticatorTransport{webauthntypes.AuthenticatorTransportUSB},
+			Transports: []credential.AuthenticatorTransport{credential.AuthenticatorTransportUSB},
 		},
 		AuthDataRaw: []byte{0x05, 0x06},
-		AuthData: &ctaptypes.GetAssertionAuthData{
-			Flags:     ctaptypes.AuthDataFlagUserPresent,
+		AuthData: &protocol.GetAssertionAuthData{
+			Flags:     protocol.AuthDataFlagUserPresent,
 			SignCount: 9,
 		},
 		Signature:           signature,
-		User:                &webauthntypes.PublicKeyCredentialUserEntity{ID: userID, Name: string(userID)},
-		NumberOfCredentials: numberOfCredentials,
+		User:                &credential.PublicKeyCredentialUserEntity{ID: userID, Name: string(userID)},
+		NumberOfCredentials: &numberOfCredentials,
 	}
 }

@@ -3,7 +3,7 @@ package workflow
 import (
 	"context"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
@@ -31,7 +31,7 @@ type InteractionRequester interface {
 }
 
 type TokenService interface {
-	Acquire(context.Context, authenticator.TokenProvider, ctaptypes.Permission, string) ([]byte, error)
+	Acquire(context.Context, authenticator.TokenProvider, protocol.Permission, string) ([]byte, error)
 }
 
 type CacheStore interface {
@@ -46,5 +46,5 @@ type CacheStore interface {
 	InvalidateLargeBlobs()
 	InvalidateConfig()
 	InvalidateToken()
-	InvalidateTokenUnlessPermission(ctaptypes.Permission)
+	InvalidateTokenUnlessPermission(protocol.Permission)
 }

@@ -1,7 +1,7 @@
 package workflow
 
 import (
-	"github.com/go-ctap/ctaphid/pkg/crypto"
+	"github.com/go-ctap/ctap/crypto"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/safety"
 )

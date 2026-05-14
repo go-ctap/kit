@@ -5,14 +5,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
-	"github.com/go-ctap/ctaphid/pkg/webauthntypes"
+	"github.com/go-ctap/ctap/credential"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/report"
-	"github.com/go-ctap/kit/model/webauthn"
+	webauthn2 "github.com/go-ctap/kit/model/webauthn"
 	"github.com/ldclabs/cose/key"
 )
 
@@ -189,18 +189,18 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 		{
 			name: "inspect mirrors authenticator get info",
 			value: model.InspectOutput{
-				Result: model.NewInspectResult(report.DeviceReport{}, ctaptypes.AuthenticatorGetInfoResponse{
+				Result: model.NewInspectResult(report.DeviceReport{}, protocol.AuthenticatorGetInfoResponse{
 					ForcePINChange:              new(true),
 					MinPINLength:                new(uint(4)),
 					MaxCredentialIdLength:       new(uint(32)),
 					MaxRPIDsForSetMinPINLength:  new(uint(3)),
-					Algorithms:                  []webauthntypes.PublicKeyCredentialParameters{{Type: webauthntypes.PublicKeyCredentialTypePublicKey, Algorithm: key.Alg(-7)}},
+					Algorithms:                  []credential.PublicKeyCredentialParameters{{Type: credential.PublicKeyCredentialTypePublicKey, Algorithm: key.Alg(-7)}},
 					PinComplexityPolicy:         new(true),
-					PinComplexityPolicyURL:      new("https://policy.example"),
+					PinComplexityPolicyURL:      []byte("https://policy.example"),
 					MaxPINLength:                new(uint(64)),
-					EncCredStoreState:           new("encrypted-store-state"),
+					EncCredStoreState:           []byte("encrypted-store-state"),
 					AuthenticatorConfigCommands: []uint{1, 4},
-					UvModality:                  new(ctaptypes.UserVerifyFingerprintInternal),
+					UvModality:                  new(protocol.UserVerifyFingerprintInternal),
 				}),
 			},
 			want: []string{
@@ -210,9 +210,9 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 				`"maxCredentialIdLength":32`,
 				`"maxRPIDsForSetMinPINLength":3`,
 				`"algorithms":[{"type":"public-key","alg":-7}]`,
-				`"pinComplexityPolicyURL":"https://policy.example"`,
+				`"pinComplexityPolicyURL":"aHR0cHM6Ly9wb2xpY3kuZXhhbXBsZQ=="`,
 				`"maxPINLength":64`,
-				`"encCredStoreState":"encrypted-store-state"`,
+				`"encCredStoreState":"ZW5jcnlwdGVkLXN0b3JlLXN0YXRl"`,
 				`"authenticatorConfigCommands":[1,4]`,
 				`"uvModality":2`,
 				`"uvModalityLabel":"fingerprint_internal"`,
@@ -328,35 +328,37 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 		{
 			name: "WebAuthn operation kinds and inputs use acronym spellings",
 			value: model.MakeCredentialOperation{
-				MakeCredentialInput: webauthn.MakeCredentialInput{
-					RP:             webauthn.RelyingParty{ID: "example.com"},
-					User:           webauthn.User{IDHex: "0102"},
+				MakeCredentialInput: webauthn2.MakeCredentialInput{
+					RP:             credential.PublicKeyCredentialRpEntity{ID: "example.com"},
+					User:           credential.PublicKeyCredentialUserEntity{ID: []byte{0x01, 0x02}},
 					ClientDataJSON: []byte("client-data"),
-					PubKeyCredParams: []webauthn.CredentialParameter{
+					PubKeyCredParams: []credential.PublicKeyCredentialParameters{
 						{Algorithm: -7},
 					},
-					ExcludeList: []webauthn.CredentialDescriptor{
-						{IDHex: "beef"},
+					ExcludeList: []credential.PublicKeyCredentialDescriptor{
+						{ID: []byte{0xbe, 0xef}},
 					},
 				},
 			},
 			want: []string{
 				`"rp"`,
 				`"clientDataJSON"`,
-				`"userIDHex":"0102"`,
+				`"id":"AQI="`,
 				`"pubKeyCredParams"`,
-				`"credentialIDHex":"beef"`,
+				`"id":"vu8="`,
 			},
 			reject: []string{
 				`"clientDataJson"`,
 				`"userIdHex"`,
+				`"userIDHex"`,
 				`"credentialIdHex"`,
+				`"credentialIDHex"`,
 			},
 		},
 		{
 			name: "WebAuthn outputs include CTAP artifact spellings",
 			value: model.MakeCredentialOutput{
-				Result: &webauthn.MakeCredentialResult{
+				Result: &webauthn2.MakeCredentialResult{
 					DeviceID:                 "device-1",
 					RPID:                     "example.com",
 					Format:                   "packed",
@@ -392,7 +394,7 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 						MinPINLength:        new(uint(4)),
 						MaxPINLength:        new(uint(64)),
 						ForcePINChange:      new(true),
-						PinComplexityURL:    new("https://policy.example"),
+						PinComplexityURL:    []byte("https://policy.example"),
 						PinComplexityPolicy: new(true),
 						Retries: config.RetryState{
 							State:           config.StateSupported,
@@ -418,7 +420,7 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 				`"minPINLength":4`,
 				`"maxPINLength":64`,
 				`"forcePINChange":true`,
-				`"pinComplexityPolicyURL":"https://policy.example"`,
+				`"pinComplexityPolicyURL":"aHR0cHM6Ly9wb2xpY3kuZXhhbXBsZQ=="`,
 				`"uvBioEnroll"`,
 				`"uvModality":2`,
 				`"uvModalityLabel":"fingerprint_internal"`,

@@ -3,7 +3,7 @@ package workflow
 import (
 	"context"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/ctaperrors"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
@@ -45,7 +45,7 @@ func (r Runner) setPIN(ctx context.Context, req model.SetPINOperation) (model.Op
 	if err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithClientPINSubCommand(
 			model.OperationSetPIN,
-			ctaptypes.ClientPINSubCommandSetPIN,
+			protocol.ClientPINSubCommandSetPIN,
 		))
 	}
 
@@ -88,7 +88,7 @@ func (r Runner) changePIN(ctx context.Context, req model.ChangePINOperation) (mo
 	if err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithClientPINSubCommand(
 			model.OperationChangePIN,
-			ctaptypes.ClientPINSubCommandChangePIN,
+			protocol.ClientPINSubCommandChangePIN,
 		))
 	}
 

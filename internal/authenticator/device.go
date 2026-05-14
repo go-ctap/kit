@@ -3,8 +3,10 @@ package authenticator
 import (
 	"iter"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
-	"github.com/go-ctap/ctaphid/pkg/webauthntypes"
+	"github.com/go-ctap/ctap/attestation"
+	"github.com/go-ctap/ctap/credential"
+	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/ctap/webauthn"
 )
 
 type Lifecycle interface {
@@ -12,22 +14,22 @@ type Lifecycle interface {
 }
 
 type InfoProvider interface {
-	GetInfo() ctaptypes.AuthenticatorGetInfoResponse
+	GetInfo() protocol.AuthenticatorGetInfoResponse
 }
 
 type TokenProvider interface {
 	InfoProvider
-	GetPinUvAuthTokenUsingPIN(pin string, permission ctaptypes.Permission, rpID string) ([]byte, error)
-	GetPinUvAuthTokenUsingUV(permission ctaptypes.Permission, rpID string) ([]byte, error)
+	GetPinUvAuthTokenUsingPIN(pin string, permission protocol.Permission, rpID string) ([]byte, error)
+	GetPinUvAuthTokenUsingUV(permission protocol.Permission, rpID string) ([]byte, error)
 }
 
 type CredentialManager interface {
 	InfoProvider
-	GetCredsMetadata(pinUvAuthToken []byte) (ctaptypes.AuthenticatorCredentialManagementResponse, error)
-	EnumerateRPs(pinUvAuthToken []byte) iter.Seq2[ctaptypes.AuthenticatorCredentialManagementResponse, error]
-	EnumerateCredentials(pinUvAuthToken []byte, rpIDHash []byte) iter.Seq2[ctaptypes.AuthenticatorCredentialManagementResponse, error]
-	DeleteCredential(pinUvAuthToken []byte, credentialID webauthntypes.PublicKeyCredentialDescriptor) error
-	UpdateUserInformation(pinUvAuthToken []byte, credentialID webauthntypes.PublicKeyCredentialDescriptor, user webauthntypes.PublicKeyCredentialUserEntity) error
+	GetCredsMetadata(pinUvAuthToken []byte) (protocol.AuthenticatorCredentialManagementResponse, error)
+	EnumerateRPs(pinUvAuthToken []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error]
+	EnumerateCredentials(pinUvAuthToken []byte, rpIDHash []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error]
+	DeleteCredential(pinUvAuthToken []byte, credentialID credential.PublicKeyCredentialDescriptor) error
+	UpdateUserInformation(pinUvAuthToken []byte, credentialID credential.PublicKeyCredentialDescriptor, user credential.PublicKeyCredentialUserEntity) error
 }
 
 type WebAuthnManager interface {
@@ -35,33 +37,33 @@ type WebAuthnManager interface {
 	MakeCredential(
 		pinUvAuthToken []byte,
 		clientData []byte,
-		rp webauthntypes.PublicKeyCredentialRpEntity,
-		user webauthntypes.PublicKeyCredentialUserEntity,
-		pubKeyCredParams []webauthntypes.PublicKeyCredentialParameters,
-		excludeList []webauthntypes.PublicKeyCredentialDescriptor,
-		extInputs *webauthntypes.CreateAuthenticationExtensionsClientInputs,
-		options map[ctaptypes.Option]bool,
+		rp credential.PublicKeyCredentialRpEntity,
+		user credential.PublicKeyCredentialUserEntity,
+		pubKeyCredParams []credential.PublicKeyCredentialParameters,
+		excludeList []credential.PublicKeyCredentialDescriptor,
+		extInputs *webauthn.CreateAuthenticationExtensionsClientInputs,
+		options map[protocol.Option]bool,
 		enterpriseAttestation uint,
-		attestationFormatsPreference []webauthntypes.AttestationStatementFormatIdentifier,
-	) (ctaptypes.AuthenticatorMakeCredentialResponse, error)
+		attestationFormatsPreference []attestation.AttestationStatementFormatIdentifier,
+	) (protocol.AuthenticatorMakeCredentialResponse, error)
 	GetAssertion(
 		pinUvAuthToken []byte,
 		rpID string,
 		clientData []byte,
-		allowList []webauthntypes.PublicKeyCredentialDescriptor,
-		extInputs *webauthntypes.GetAuthenticationExtensionsClientInputs,
-		options map[ctaptypes.Option]bool,
-	) iter.Seq2[ctaptypes.AuthenticatorGetAssertionResponse, error]
+		allowList []credential.PublicKeyCredentialDescriptor,
+		extInputs *webauthn.GetAuthenticationExtensionsClientInputs,
+		options map[protocol.Option]bool,
+	) iter.Seq2[protocol.AuthenticatorGetAssertionResponse, error]
 }
 
 type LargeBlobManager interface {
 	InfoProvider
-	GetLargeBlobs() ([]ctaptypes.LargeBlob, error)
-	SetLargeBlobs(pinUvAuthToken []byte, blobs []ctaptypes.LargeBlob) error
+	GetLargeBlobs() ([]protocol.LargeBlob, error)
+	SetLargeBlobs(pinUvAuthToken []byte, blobs []protocol.LargeBlob) error
 }
 
 type ConfigManager interface {
-	GetPINRetries() (uint, bool, error)
+	GetPINRetries() (uint, *bool, error)
 	GetUVRetries() (uint, error)
 	SetPIN(pin string) error
 	ChangePIN(currentPin, newPin string) error
@@ -71,12 +73,12 @@ type ConfigManager interface {
 }
 
 type BioEnrollmentManager interface {
-	GetBioModality() (ctaptypes.AuthenticatorBioEnrollmentResponse, error)
-	GetFingerprintSensorInfo() (ctaptypes.AuthenticatorBioEnrollmentResponse, error)
-	EnrollBegin(pinUvAuthToken []byte, timeoutMilliseconds uint) (ctaptypes.AuthenticatorBioEnrollmentResponse, error)
-	EnrollCaptureNextSample(pinUvAuthToken []byte, templateID []byte, timeoutMilliseconds uint) (ctaptypes.AuthenticatorBioEnrollmentResponse, error)
+	GetBioModality() (protocol.AuthenticatorBioEnrollmentResponse, error)
+	GetFingerprintSensorInfo() (protocol.AuthenticatorBioEnrollmentResponse, error)
+	EnrollBegin(pinUvAuthToken []byte, timeoutMilliseconds uint) (protocol.AuthenticatorBioEnrollmentResponse, error)
+	EnrollCaptureNextSample(pinUvAuthToken []byte, templateID []byte, timeoutMilliseconds uint) (protocol.AuthenticatorBioEnrollmentResponse, error)
 	CancelCurrentEnrollment() error
-	EnumerateEnrollments(pinUvAuthToken []byte) (ctaptypes.AuthenticatorBioEnrollmentResponse, error)
+	EnumerateEnrollments(pinUvAuthToken []byte) (protocol.AuthenticatorBioEnrollmentResponse, error)
 	SetFriendlyName(pinUvAuthToken []byte, templateID []byte, name string) error
 	RemoveEnrollment(pinUvAuthToken []byte, templateID []byte) error
 }

@@ -1,12 +1,12 @@
 package model
 
 import (
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/model/report"
 )
 
 type InspectInfo struct {
-	ctaptypes.AuthenticatorGetInfoResponse
+	protocol.AuthenticatorGetInfoResponse
 	UVModalityLabel string `json:"uvModalityLabel,omitempty"`
 }
 
@@ -21,7 +21,7 @@ type InspectOutput struct {
 
 func (InspectOutput) ctapkitResult() {}
 
-func NewInspectResult(device report.DeviceReport, info ctaptypes.AuthenticatorGetInfoResponse) InspectResult {
+func NewInspectResult(device report.DeviceReport, info protocol.AuthenticatorGetInfoResponse) InspectResult {
 	result := InspectResult{
 		Device: device,
 		Info: InspectInfo{

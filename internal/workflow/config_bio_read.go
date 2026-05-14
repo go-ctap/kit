@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/go-ctap/ctaphid/pkg/ctaptypes"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/ctaperrors"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
@@ -23,7 +23,7 @@ func (r Runner) bioList(ctx context.Context) (appconfig.BioListReport, error) {
 		return appconfig.BioListReport{}, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), ctaptypes.PermissionBioEnrollment, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionBioEnrollment, "")
 	if err != nil {
 		return appconfig.BioListReport{}, err
 	}
@@ -57,7 +57,7 @@ func (r Runner) bioSensorReport(ctx context.Context) (appconfig.BioSensorReport,
 		return appconfig.BioSensorReport{}, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
 			model.OperationBioSensorInfo,
 			bioEnrollmentCommand(status),
-			ctaptypes.BioEnrollmentSubCommandGetFingerprintSensorInfo,
+			protocol.BioEnrollmentSubCommandGetFingerprintSensorInfo,
 		))
 	}
 
@@ -66,25 +66,25 @@ func (r Runner) bioSensorReport(ctx context.Context) (appconfig.BioSensorReport,
 		Supported:   true,
 		PreviewOnly: status.Bio.PreviewOnly,
 	}
-	if modality.Modality != 0 {
-		report.Modality = bioModality(modality.Modality)
+	if modality.Modality != nil {
+		report.Modality = bioModality(*modality.Modality)
 	}
-	if sensor.FingerprintKind != 0 {
-		report.FingerprintKind = fingerprintKind(sensor.FingerprintKind)
+	if sensor.FingerprintKind != nil {
+		report.FingerprintKind = fingerprintKind(*sensor.FingerprintKind)
 	}
-	if sensor.MaxCaptureSamplesRequiredForEnroll != 0 {
-		report.MaxCaptureSamplesRequiredForEnroll = new(sensor.MaxCaptureSamplesRequiredForEnroll)
+	if sensor.MaxCaptureSamplesRequiredForEnroll != nil {
+		report.MaxCaptureSamplesRequiredForEnroll = sensor.MaxCaptureSamplesRequiredForEnroll
 	}
-	if sensor.MaxTemplateFriendlyName != 0 {
-		report.MaxTemplateFriendlyName = new(sensor.MaxTemplateFriendlyName)
+	if sensor.MaxTemplateFriendlyName != nil {
+		report.MaxTemplateFriendlyName = sensor.MaxTemplateFriendlyName
 	}
 
 	return report, nil
 }
 
-func bioModality(value ctaptypes.BioModality) *appconfig.BioModality {
+func bioModality(value protocol.BioModality) *appconfig.BioModality {
 	switch value {
-	case ctaptypes.BioModalityFingerprint:
+	case protocol.BioModalityFingerprint:
 		return new(appconfig.BioModalityFingerprint)
 	default:
 		return nil
@@ -116,11 +116,11 @@ func (r Runner) bioListReport(ctx context.Context, status appconfig.StatusReport
 		return appconfig.BioListReport{}, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
 			model.OperationBioList,
 			bioEnrollmentCommand(status),
-			ctaptypes.BioEnrollmentSubCommandEnumerateEnrollments,
+			protocol.BioEnrollmentSubCommandEnumerateEnrollments,
 		))
 	}
 
-	records := lo.Map(resp.TemplateInfos, func(info ctaptypes.TemplateInfo, _ int) appconfig.BioEnrollmentRecord {
+	records := lo.Map(resp.TemplateInfos, func(info protocol.TemplateInfo, _ int) appconfig.BioEnrollmentRecord {
 		return appconfig.BioEnrollmentRecord{
 			TemplateIDHex: hex.EncodeToString(info.TemplateID),
 			FriendlyName:  info.TemplateFriendlyName,
@@ -135,10 +135,10 @@ func (r Runner) bioListReport(ctx context.Context, status appconfig.StatusReport
 	}, nil
 }
 
-func bioEnrollmentCommand(status appconfig.StatusReport) ctaptypes.Command {
+func bioEnrollmentCommand(status appconfig.StatusReport) protocol.Command {
 	if status.Bio.PreviewOnly {
-		return ctaptypes.PrototypeAuthenticatorBioEnrollment
+		return protocol.PrototypeAuthenticatorBioEnrollment
 	}
 
-	return ctaptypes.AuthenticatorBioEnrollment
+	return protocol.AuthenticatorBioEnrollment
 }
