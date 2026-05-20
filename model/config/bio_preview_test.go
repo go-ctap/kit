@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/go-ctap/ctap/protocol"
@@ -36,5 +38,32 @@ func TestBioMutationPreviewRejectsKnownEmptyEnrollmentSet(t *testing.T) {
 	}
 	if _, err := BuildBioRemovePreview(status, "01", safety.PreviewModeDryRun); !errors.Is(err, ErrBioNoEnrollments) {
 		t.Fatalf("BuildBioRemovePreview error = %v, want ErrBioNoEnrollments", err)
+	}
+}
+
+func TestBioEnrollJSONPreservesExplicitZeroRemainingSamples(t *testing.T) {
+	result := BioEnrollResult{
+		TemplateIDHex:    "abcd",
+		RemainingSamples: new(uint(0)),
+		Samples: []BioEnrollSample{
+			{Status: "good", RemainingSamples: new(uint(0))},
+		},
+	}
+
+	raw, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+
+	if got := strings.Count(string(raw), `"remainingSamples":0`); got != 2 {
+		t.Fatalf("JSON = %s, want two explicit zero remainingSamples fields", raw)
+	}
+
+	raw, err = json.Marshal(BioEnrollResult{TemplateIDHex: "abcd"})
+	if err != nil {
+		t.Fatalf("Marshal absent: %v", err)
+	}
+	if strings.Contains(string(raw), "remainingSamples") {
+		t.Fatalf("JSON = %s, want absent remainingSamples omitted", raw)
 	}
 }

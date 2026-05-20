@@ -90,9 +90,7 @@ func buildPINStatus(info protocol.AuthenticatorGetInfoResponse) PINStatus {
 	status.ProtocolSupported = len(info.PinUvAuthProtocols) > 0
 	status.ForcePINChange = info.ForcePINChange
 	status.PinComplexityPolicy = info.PinComplexityPolicy
-	if info.PinComplexityPolicyURL != nil {
-		status.PinComplexityURL = *info.PinComplexityPolicyURL
-	}
+	status.PinComplexityURL = clonePtr(info.PinComplexityPolicyURL)
 	status.MinPINLength = info.MinPINLength
 	status.MaxPINLength = info.MaxPINLength
 
@@ -225,4 +223,12 @@ func buildLimitsStatus(info protocol.AuthenticatorGetInfoResponse) LimitsStatus 
 		PreferredPlatformUVAttempts: info.PreferredPlatformUvAttempts,
 		UVCountSinceLastPINEntry:    info.UvCountSinceLastPinEntry,
 	}
+}
+
+func clonePtr[T any](value *T) *T {
+	if value == nil {
+		return nil
+	}
+
+	return new(*value)
 }

@@ -37,7 +37,7 @@ func serializedLargeBlobArraySize(blobs []protocol.LargeBlob) (int, error) {
 }
 
 func checkSerializedArrayLimit(limit *uint, size int) error {
-	if limit == nil || *limit == 0 || uint(size) <= *limit {
+	if limit == nil || uint(size) <= *limit {
 		return nil
 	}
 

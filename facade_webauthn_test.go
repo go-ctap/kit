@@ -186,6 +186,12 @@ func TestGetAssertionReturnsAllAssertionsInOrder(t *testing.T) {
 		!bytes.Equal(result.Assertions[1].User.ID, []byte("user-2")) {
 		t.Fatalf("assertion mapping = %#v", result.Assertions)
 	}
+	if result.Assertions[1].NumberOfCredentials == nil || *result.Assertions[1].NumberOfCredentials != 0 {
+		t.Fatalf("numberOfCredentials = %#v, want explicit 0", result.Assertions[1].NumberOfCredentials)
+	}
+	if result.Assertions[0].UserSelected == nil || *result.Assertions[0].UserSelected {
+		t.Fatalf("userSelected = %#v, want explicit false", result.Assertions[0].UserSelected)
+	}
 	if !bytes.Equal(a.getAssertionClientData, []byte(`{"type":"webauthn.get"}`)) {
 		t.Fatalf("getAssertion clientDataJSON = %q", a.getAssertionClientData)
 	}
@@ -505,5 +511,6 @@ func sampleAssertionResponse(
 		Signature:           signature,
 		User:                &credential.PublicKeyCredentialUserEntity{ID: userID, Name: string(userID)},
 		NumberOfCredentials: &numberOfCredentials,
+		UserSelected:        new(false),
 	}
 }

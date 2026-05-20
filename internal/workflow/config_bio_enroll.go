@@ -68,13 +68,16 @@ func (r Runner) bioEnrollmentProgress() appconfig.BioEnrollProgress {
 
 	return func(sample appconfig.BioEnrollSample) error {
 		completed++
-		total := completed + uint64(sample.RemainingSamples)
-		r.env.Events.Emit(model.OperationEvent{
+		event := model.OperationEvent{
 			Stage:        model.OperationStageCapturingBioSample,
 			Completed:    new(completed),
-			Total:        new(total),
 			SampleStatus: sample.Status,
-		})
+		}
+		if sample.RemainingSamples != nil {
+			total := completed + uint64(*sample.RemainingSamples)
+			event.Total = new(total)
+		}
+		r.env.Events.Emit(event)
 
 		return nil
 	}
@@ -110,9 +113,7 @@ func (r Runner) runBioEnrollment(
 		if resp.LastEnrollSampleStatus != nil {
 			result.LastEnrollSampleStatus = resp.LastEnrollSampleStatus.String()
 		}
-		if resp.RemainingSamples != nil {
-			result.RemainingSamples = *resp.RemainingSamples
-		}
+		result.RemainingSamples = snapshotPtr(resp.RemainingSamples)
 		sample := appconfig.BioEnrollSample{
 			Status:           result.LastEnrollSampleStatus,
 			RemainingSamples: result.RemainingSamples,
@@ -139,7 +140,7 @@ func (r Runner) runBioEnrollment(
 		return cancelAfterFailure(err)
 	}
 
-	for result.RemainingSamples > 0 {
+	for result.RemainingSamples != nil && *result.RemainingSamples > 0 {
 		if err := ctx.Err(); err != nil {
 			return cancelAfterFailure(err)
 		}

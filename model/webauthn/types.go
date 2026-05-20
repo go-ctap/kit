@@ -72,8 +72,8 @@ type Assertion struct {
 	AuthenticatorDataHex string                                    `json:"authenticatorDataHex"`
 	SignatureHex         string                                    `json:"signatureHex"`
 	User                 *credential.PublicKeyCredentialUserEntity `json:"user,omitempty"`
-	NumberOfCredentials  uint                                      `json:"numberOfCredentials,omitempty"`
-	UserSelected         bool                                      `json:"userSelected,omitempty"`
+	NumberOfCredentials  *uint                                     `json:"numberOfCredentials,omitempty"`
+	UserSelected         *bool                                     `json:"userSelected,omitempty"`
 	SignCount            uint32                                    `json:"signCount"`
 	UserPresent          bool                                      `json:"userPresent"`
 	UserVerified         bool                                      `json:"userVerified"`

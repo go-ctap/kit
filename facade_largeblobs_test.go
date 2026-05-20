@@ -98,7 +98,7 @@ func TestLargeBlobWriteEventsFollowInteractionAndInventoryOrder(t *testing.T) {
 }
 
 func TestLargeBlobWriteCapacityErrorMapsInvalidStateAndKeepsPreview(t *testing.T) {
-	a := &largeBlobWriteEventAuthenticator{maxSerializedLargeBlobArray: 16}
+	a := &largeBlobWriteEventAuthenticator{maxSerializedLargeBlobArray: new(uint(16))}
 	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
@@ -128,6 +128,31 @@ func TestLargeBlobWriteCapacityErrorMapsInvalidStateAndKeepsPreview(t *testing.T
 			output.Preview.SerializedLargeBlobArraySizeAfter,
 			*output.Preview.SerializedLargeBlobArrayLimit,
 		)
+	}
+}
+
+func TestLargeBlobWriteExplicitZeroCapacityRejectsMutation(t *testing.T) {
+	a := &largeBlobWriteEventAuthenticator{maxSerializedLargeBlobArray: new(uint(0))}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	result, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
+		CredentialIDHex: "c05e",
+		Payload:         []byte("test"),
+		DryRun:          true,
+	}, userVerificationHandler(t))
+	if !errors.Is(err, applargeblobs.ErrLargeBlobArrayTooBig) {
+		t.Fatalf("Run error = %v, want large blob array sentinel", err)
+	}
+
+	output, ok := result.(model.LargeBlobMutationOutput)
+	if !ok {
+		t.Fatalf("result = %T, want LargeBlobMutationOutput", result)
+	}
+	if output.Preview.SerializedLargeBlobArrayLimit == nil || *output.Preview.SerializedLargeBlobArrayLimit != 0 {
+		t.Fatalf("preview limit = %#v, want explicit 0", output.Preview.SerializedLargeBlobArrayLimit)
 	}
 }
 

@@ -394,7 +394,7 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 						MinPINLength:        new(uint(4)),
 						MaxPINLength:        new(uint(64)),
 						ForcePINChange:      new(true),
-						PinComplexityURL:    "https://policy.example",
+						PinComplexityURL:    new("https://policy.example"),
 						PinComplexityPolicy: new(true),
 						Retries: config.RetryState{
 							State:           config.StateSupported,

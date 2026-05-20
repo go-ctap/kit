@@ -242,10 +242,10 @@ func assertionResult(index uint, response protocol.AuthenticatorGetAssertionResp
 		SignatureHex:         hex.EncodeToString(response.Signature),
 	}
 	if response.NumberOfCredentials != nil {
-		assertion.NumberOfCredentials = *response.NumberOfCredentials
+		assertion.NumberOfCredentials = snapshotPtr(response.NumberOfCredentials)
 	}
 	if response.UserSelected != nil {
-		assertion.UserSelected = *response.UserSelected
+		assertion.UserSelected = snapshotPtr(response.UserSelected)
 	}
 
 	if response.AuthData != nil {

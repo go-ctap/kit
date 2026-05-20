@@ -137,6 +137,7 @@ func TestBuildStatusReportPreservesExplicitZeroNullableLimits(t *testing.T) {
 		PreferredPlatformUvAttempts: new(uint(0)),
 		UvCountSinceLastPinEntry:    new(uint(0)),
 		PinComplexityPolicy:         new(false),
+		PinComplexityPolicyURL:      new(""),
 	})
 
 	if statusReport.PIN.MinPINLength == nil || *statusReport.PIN.MinPINLength != 0 {
@@ -163,6 +164,7 @@ func TestBuildStatusReportPreservesExplicitZeroNullableLimits(t *testing.T) {
 		`"maxPINLength":0`,
 		`"forcePINChange":false`,
 		`"pinComplexityPolicy":false`,
+		`"pinComplexityPolicyURL":""`,
 		`"maxRPIDsForSetMinPINLength":0`,
 		`"preferredPlatformUvAttempts":0`,
 		`"uvCountSinceLastPinEntry":0`,
@@ -187,6 +189,7 @@ func TestBuildStatusReportOmitsAbsentNullableLimits(t *testing.T) {
 		"maxPINLength",
 		"forcePINChange",
 		"pinComplexityPolicy",
+		"pinComplexityPolicyURL",
 		"maxRPIDsForSetMinPINLength",
 		"preferredPlatformUvAttempts",
 		"uvCountSinceLastPinEntry",

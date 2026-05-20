@@ -62,7 +62,7 @@ type BioEnrollPreview struct {
 
 type BioEnrollSample struct {
 	Status           string `json:"status"`
-	RemainingSamples uint   `json:"remainingSamples"`
+	RemainingSamples *uint  `json:"remainingSamples,omitempty"`
 }
 
 type BioEnrollResult struct {
@@ -71,7 +71,7 @@ type BioEnrollResult struct {
 	TemplateIDHex          string            `json:"templateIDHex"`
 	Samples                []BioEnrollSample `json:"samples,omitempty"`
 	LastEnrollSampleStatus string            `json:"lastEnrollSampleStatus,omitempty"`
-	RemainingSamples       uint              `json:"remainingSamples"`
+	RemainingSamples       *uint             `json:"remainingSamples,omitempty"`
 	CancelAttempted        bool              `json:"cancelAttempted"`
 	CancelSucceeded        bool              `json:"cancelSucceeded"`
 }

@@ -239,7 +239,7 @@ type largeBlobWriteEventAuthenticator struct {
 	setErr                      error
 	largeBlobs                  []protocol.LargeBlob
 	lastSetLargeBlobs           []protocol.LargeBlob
-	maxSerializedLargeBlobArray uint
+	maxSerializedLargeBlobArray *uint
 	rpEnumerations              atomic.Int32
 	credentialEnumerations      atomic.Int32
 	largeBlobReads              atomic.Int32
@@ -254,7 +254,7 @@ func (a *largeBlobWriteEventAuthenticator) GetInfo() protocol.AuthenticatorGetIn
 			protocol.OptionPinUvAuthToken:       true,
 			protocol.OptionUserVerification:     true,
 		},
-		MaxSerializedLargeBlobArray: new(a.maxSerializedLargeBlobArray),
+		MaxSerializedLargeBlobArray: a.maxSerializedLargeBlobArray,
 	}
 }
 
