@@ -20,9 +20,9 @@ const (
 )
 
 type RuntimeError struct {
-	Category ErrorCategory
-	Message  string
-	Err      error
+	Category ErrorCategory `json:"category"`
+	Message  string        `json:"message"`
+	Err      error         `json:"err"`
 }
 
 func NewRuntimeError(category ErrorCategory, message string, err error) RuntimeError {
