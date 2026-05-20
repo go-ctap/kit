@@ -229,7 +229,7 @@ func (c *Client) fetchAndVerify(ctx context.Context, source string, local *Blob)
 		return nil, nil, false, fmt.Errorf("%w: %w", ErrFetch, err)
 	}
 
-	blob, err := c.ParseAndVerifyWithOptions(ctx, body)
+	blob, err := c.parseAndVerify(ctx, body)
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -250,7 +250,7 @@ func (c *Client) loadDiskCache(ctx context.Context, source string) (*Blob, bool)
 		return nil, false
 	}
 
-	blob, err := c.ParseAndVerifyWithOptions(ctx, body)
+	blob, err := c.parseAndVerify(ctx, body)
 	if err != nil {
 		_ = os.Remove(path)
 		return nil, false
@@ -325,10 +325,7 @@ func (c *Client) diskCachePath(source string) (string, error) {
 	return filepath.Join(dir, hex.EncodeToString(sum[:])+".jwt"), nil
 }
 
-// ParseAndVerifyWithOptions parses a compact MDS JWT and verifies its signature
-// and signing certificate chain. It is kept as a public compatibility wrapper;
-// new validation code belongs in internal/mdsverify.
-func (c *Client) ParseAndVerifyWithOptions(ctx context.Context, raw []byte) (*Blob, error) {
+func (c *Client) parseAndVerify(ctx context.Context, raw []byte) (*Blob, error) {
 	verified, err := c.verifier().Verify(ctx, raw)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrVerify, err)

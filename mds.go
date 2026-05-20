@@ -17,12 +17,9 @@ type MDSOption func(*mdsConfig)
 type mdsConfig struct {
 	source     string
 	httpClient *http.Client
-	cache      rtmds.Cache
 	cacheDir   string
 	refresh    bool
 }
-
-var defaultMDSCache = rtmds.NewCache()
 
 // WithMDSSource overrides the default FIDO MDS3 blob URL.
 func WithMDSSource(url string) MDSOption {
@@ -35,12 +32,6 @@ func WithMDSSource(url string) MDSOption {
 func WithMDSHTTPClient(client *http.Client) MDSOption {
 	return func(config *mdsConfig) {
 		config.httpClient = client
-	}
-}
-
-func WithMDSCache(cache rtmds.Cache) MDSOption {
-	return func(config *mdsConfig) {
-		config.cache = cache
 	}
 }
 
@@ -78,7 +69,6 @@ func lookupMDS(
 	client := &rtmds.Client{
 		Source:     config.source,
 		HTTPClient: config.httpClient,
-		Cache:      config.cache,
 		CacheDir:   config.cacheDir,
 	}
 	result, err := client.Lookup(ctx, aaguid, rtmds.LookupOptions{Refresh: config.refresh})
