@@ -144,25 +144,28 @@ type GetAssertionRequest struct {
 	webauthn.GetAssertionInput
 }
 
-func (s *Service) Inspect(ctx context.Context, req OperationRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req, model.InspectOperation{})
+func (s *Service) Inspect(ctx context.Context, req OperationRequest) (InspectEnvelope, error) {
+	meta, result, err := runTypedOperation[model.InspectOutput](s, ctx, req, model.InspectOperation{})
+	return InspectEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) ListCredentials(ctx context.Context, req OperationRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req, model.ListCredentialsOperation{})
+func (s *Service) ListCredentials(ctx context.Context, req OperationRequest) (CredentialsEnvelope, error) {
+	meta, result, err := runTypedOperation[model.CredentialsOutput](s, ctx, req, model.ListCredentialsOperation{})
+	return CredentialsEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) DeleteCredential(ctx context.Context, req CredentialDeleteRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req.OperationRequest, model.DeleteCredentialOperation{
+func (s *Service) DeleteCredential(ctx context.Context, req CredentialDeleteRequest) (CredentialDeleteEnvelope, error) {
+	meta, result, err := runTypedOperation[model.CredentialDeleteOutput](s, ctx, req.OperationRequest, model.DeleteCredentialOperation{
 		CredentialIDHex:     req.CredentialIDHex,
 		Confirmed:           req.Confirmed,
 		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
+	return CredentialDeleteEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) UpdateCredentialUser(ctx context.Context, req CredentialUpdateRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req.OperationRequest, model.UpdateCredentialUserOperation{
+func (s *Service) UpdateCredentialUser(ctx context.Context, req CredentialUpdateRequest) (CredentialUpdateEnvelope, error) {
+	meta, result, err := runTypedOperation[model.CredentialUpdateOutput](s, ctx, req.OperationRequest, model.UpdateCredentialUserOperation{
 		CredentialIDHex:     req.CredentialIDHex,
 		UserIDHex:           req.UserIDHex,
 		Name:                req.Name,
@@ -174,57 +177,65 @@ func (s *Service) UpdateCredentialUser(ctx context.Context, req CredentialUpdate
 		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
+	return CredentialUpdateEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) ReadLargeBlob(ctx context.Context, req LargeBlobReadRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req.OperationRequest, model.ReadLargeBlobOperation{
+func (s *Service) ReadLargeBlob(ctx context.Context, req LargeBlobReadRequest) (LargeBlobReadEnvelope, error) {
+	meta, result, err := runTypedOperation[model.LargeBlobReadOutput](s, ctx, req.OperationRequest, model.ReadLargeBlobOperation{
 		CredentialIDHex: req.CredentialIDHex,
 		DecodeMode:      req.DecodeMode,
 	})
+	return LargeBlobReadEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) ListLargeBlobs(ctx context.Context, req OperationRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req, model.ListLargeBlobsOperation{})
+func (s *Service) ListLargeBlobs(ctx context.Context, req OperationRequest) (LargeBlobListEnvelope, error) {
+	meta, result, err := runTypedOperation[model.LargeBlobListOutput](s, ctx, req, model.ListLargeBlobsOperation{})
+	return LargeBlobListEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) WriteLargeBlob(ctx context.Context, req LargeBlobMutationRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req.OperationRequest, model.WriteLargeBlobOperation{
+func (s *Service) WriteLargeBlob(ctx context.Context, req LargeBlobMutationRequest) (LargeBlobMutationEnvelope, error) {
+	meta, result, err := runTypedOperation[model.LargeBlobMutationOutput](s, ctx, req.OperationRequest, model.WriteLargeBlobOperation{
 		CredentialIDHex:     req.CredentialIDHex,
 		Payload:             req.Payload,
 		Confirmed:           req.Confirmed,
 		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
+	return LargeBlobMutationEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) DeleteLargeBlob(ctx context.Context, req LargeBlobMutationRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req.OperationRequest, model.DeleteLargeBlobOperation{
+func (s *Service) DeleteLargeBlob(ctx context.Context, req LargeBlobMutationRequest) (LargeBlobMutationEnvelope, error) {
+	meta, result, err := runTypedOperation[model.LargeBlobMutationOutput](s, ctx, req.OperationRequest, model.DeleteLargeBlobOperation{
 		CredentialIDHex:     req.CredentialIDHex,
 		Confirmed:           req.Confirmed,
 		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
+	return LargeBlobMutationEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) GarbageCollectLargeBlobs(ctx context.Context, req LargeBlobGarbageCollectRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req.OperationRequest, model.GarbageCollectLargeBlobsOperation{
+func (s *Service) GarbageCollectLargeBlobs(ctx context.Context, req LargeBlobGarbageCollectRequest) (LargeBlobMutationEnvelope, error) {
+	meta, result, err := runTypedOperation[model.LargeBlobMutationOutput](s, ctx, req.OperationRequest, model.GarbageCollectLargeBlobsOperation{
 		Confirmed:           req.Confirmed,
 		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
+	return LargeBlobMutationEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) ConfigStatus(ctx context.Context, req OperationRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req, model.ConfigStatusOperation{})
+func (s *Service) ConfigStatus(ctx context.Context, req OperationRequest) (ConfigStatusEnvelope, error) {
+	meta, result, err := runTypedOperation[model.ConfigStatusOutput](s, ctx, req, model.ConfigStatusOperation{})
+	return ConfigStatusEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) SetPIN(ctx context.Context, req PINSetRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req.OperationRequest, model.SetPINOperation{
+func (s *Service) SetPIN(ctx context.Context, req PINSetRequest) (PINEnvelope, error) {
+	meta, result, err := runTypedOperation[model.PINOutput](s, ctx, req.OperationRequest, model.SetPINOperation{
 		NewPIN:              req.NewPIN,
 		Confirmed:           req.Confirmed,
 		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
+	return PINEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
 func (req PINSetRequest) MarshalJSON() ([]byte, error) {
@@ -243,14 +254,15 @@ func (req PINSetRequest) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (s *Service) ChangePIN(ctx context.Context, req PINChangeRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req.OperationRequest, model.ChangePINOperation{
+func (s *Service) ChangePIN(ctx context.Context, req PINChangeRequest) (PINEnvelope, error) {
+	meta, result, err := runTypedOperation[model.PINOutput](s, ctx, req.OperationRequest, model.ChangePINOperation{
 		CurrentPIN:          req.CurrentPIN,
 		NewPIN:              req.NewPIN,
 		Confirmed:           req.Confirmed,
 		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
+	return PINEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
 func (req PINChangeRequest) MarshalJSON() ([]byte, error) {
@@ -269,17 +281,18 @@ func (req PINChangeRequest) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (s *Service) SetAlwaysUV(ctx context.Context, req AlwaysUVRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req.OperationRequest, model.SetAlwaysUVOperation{
+func (s *Service) SetAlwaysUV(ctx context.Context, req AlwaysUVRequest) (AuthenticatorConfigEnvelope, error) {
+	meta, result, err := runTypedOperation[model.AuthenticatorConfigOutput](s, ctx, req.OperationRequest, model.SetAlwaysUVOperation{
 		Target:              req.Target,
 		Confirmed:           req.Confirmed,
 		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
+	return AuthenticatorConfigEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) SetMinPINLength(ctx context.Context, req MinPINLengthRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req.OperationRequest, model.SetMinPINLengthOperation{
+func (s *Service) SetMinPINLength(ctx context.Context, req MinPINLengthRequest) (AuthenticatorConfigEnvelope, error) {
+	meta, result, err := runTypedOperation[model.AuthenticatorConfigOutput](s, ctx, req.OperationRequest, model.SetMinPINLengthOperation{
 		Length:              req.NewMinPINLength,
 		RPIDs:               req.MinPinLengthRPIDs,
 		ForceChangePin:      req.ForceChangePin,
@@ -288,63 +301,72 @@ func (s *Service) SetMinPINLength(ctx context.Context, req MinPINLengthRequest) 
 		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
+	return AuthenticatorConfigEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) BioSensorInfo(ctx context.Context, req OperationRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req, model.BioSensorInfoOperation{})
+func (s *Service) BioSensorInfo(ctx context.Context, req OperationRequest) (BioSensorEnvelope, error) {
+	meta, result, err := runTypedOperation[model.BioSensorOutput](s, ctx, req, model.BioSensorInfoOperation{})
+	return BioSensorEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) BioList(ctx context.Context, req OperationRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req, model.BioListOperation{})
+func (s *Service) BioList(ctx context.Context, req OperationRequest) (BioListEnvelope, error) {
+	meta, result, err := runTypedOperation[model.BioListOutput](s, ctx, req, model.BioListOperation{})
+	return BioListEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) BioEnroll(ctx context.Context, req BioEnrollRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req.OperationRequest, model.BioEnrollOperation{
+func (s *Service) BioEnroll(ctx context.Context, req BioEnrollRequest) (BioEnrollEnvelope, error) {
+	meta, result, err := runTypedOperation[model.BioEnrollOutput](s, ctx, req.OperationRequest, model.BioEnrollOperation{
 		TimeoutMilliseconds: req.TimeoutMilliseconds,
 		Confirmed:           req.Confirmed,
 		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
+	return BioEnrollEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) BioRename(ctx context.Context, req BioRenameRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req.OperationRequest, model.BioRenameOperation{
+func (s *Service) BioRename(ctx context.Context, req BioRenameRequest) (BioMutationEnvelope, error) {
+	meta, result, err := runTypedOperation[model.BioMutationOutput](s, ctx, req.OperationRequest, model.BioRenameOperation{
 		TemplateIDHex:       req.TemplateIDHex,
 		FriendlyName:        req.FriendlyName,
 		Confirmed:           req.Confirmed,
 		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
+	return BioMutationEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) BioRemove(ctx context.Context, req BioRemoveRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req.OperationRequest, model.BioRemoveOperation{
+func (s *Service) BioRemove(ctx context.Context, req BioRemoveRequest) (BioMutationEnvelope, error) {
+	meta, result, err := runTypedOperation[model.BioMutationOutput](s, ctx, req.OperationRequest, model.BioRemoveOperation{
 		TemplateIDHex:       req.TemplateIDHex,
 		Confirmed:           req.Confirmed,
 		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
+	return BioMutationEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) ResetFactory(ctx context.Context, req ResetFactoryRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req.OperationRequest, model.ResetFactoryOperation{
+func (s *Service) ResetFactory(ctx context.Context, req ResetFactoryRequest) (ResetFactoryEnvelope, error) {
+	meta, result, err := runTypedOperation[model.ResetFactoryOutput](s, ctx, req.OperationRequest, model.ResetFactoryOperation{
 		Confirmed:           req.Confirmed,
 		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
+	return ResetFactoryEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) MakeCredential(ctx context.Context, req MakeCredentialRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req.OperationRequest, model.MakeCredentialOperation{
+func (s *Service) MakeCredential(ctx context.Context, req MakeCredentialRequest) (MakeCredentialEnvelope, error) {
+	meta, result, err := runTypedOperation[model.MakeCredentialOutput](s, ctx, req.OperationRequest, model.MakeCredentialOperation{
 		MakeCredentialInput: req.MakeCredentialInput,
 		Confirmed:           req.Confirmed,
 		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
+	return MakeCredentialEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) GetAssertion(ctx context.Context, req GetAssertionRequest) (OperationEnvelope, error) {
-	return s.runOperation(ctx, req.OperationRequest, model.GetAssertionOperation{
+func (s *Service) GetAssertion(ctx context.Context, req GetAssertionRequest) (GetAssertionEnvelope, error) {
+	meta, result, err := runTypedOperation[model.GetAssertionOutput](s, ctx, req.OperationRequest, model.GetAssertionOperation{
 		GetAssertionInput: req.GetAssertionInput,
 	})
+	return GetAssertionEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }

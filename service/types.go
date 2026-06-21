@@ -43,12 +43,104 @@ type SessionSnapshot struct {
 	UpdatedAt time.Time         `json:"updatedAt"`
 }
 
-type OperationEnvelope struct {
+type operationEnvelope struct {
 	OperationID OperationID           `json:"operationId"`
 	SessionID   SessionID             `json:"sessionId"`
 	Kind        model.OperationKind   `json:"kind"`
 	Result      model.OperationResult `json:"result,omitempty"`
 	Error       *RuntimeErrorEnvelope `json:"error,omitempty"`
+}
+
+type OperationEnvelopeMeta struct {
+	OperationID OperationID           `json:"operationId"`
+	SessionID   SessionID             `json:"sessionId"`
+	Kind        model.OperationKind   `json:"kind"`
+	Error       *RuntimeErrorEnvelope `json:"error,omitempty"`
+}
+
+type InspectEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.InspectOutput `json:"result,omitempty"`
+}
+
+type CredentialsEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.CredentialsOutput `json:"result,omitempty"`
+}
+
+type CredentialDeleteEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.CredentialDeleteOutput `json:"result,omitempty"`
+}
+
+type CredentialUpdateEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.CredentialUpdateOutput `json:"result,omitempty"`
+}
+
+type LargeBlobReadEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.LargeBlobReadOutput `json:"result,omitempty"`
+}
+
+type LargeBlobListEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.LargeBlobListOutput `json:"result,omitempty"`
+}
+
+type LargeBlobMutationEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.LargeBlobMutationOutput `json:"result,omitempty"`
+}
+
+type ConfigStatusEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.ConfigStatusOutput `json:"result,omitempty"`
+}
+
+type PINEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.PINOutput `json:"result,omitempty"`
+}
+
+type AuthenticatorConfigEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.AuthenticatorConfigOutput `json:"result,omitempty"`
+}
+
+type BioSensorEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.BioSensorOutput `json:"result,omitempty"`
+}
+
+type BioListEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.BioListOutput `json:"result,omitempty"`
+}
+
+type BioEnrollEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.BioEnrollOutput `json:"result,omitempty"`
+}
+
+type BioMutationEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.BioMutationOutput `json:"result,omitempty"`
+}
+
+type ResetFactoryEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.ResetFactoryOutput `json:"result,omitempty"`
+}
+
+type MakeCredentialEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.MakeCredentialOutput `json:"result,omitempty"`
+}
+
+type GetAssertionEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.GetAssertionOutput `json:"result,omitempty"`
 }
 
 type CancelOperationRequest struct {

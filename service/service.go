@@ -237,14 +237,14 @@ func (s *Service) CloseAllSessions(ctx context.Context) ([]SessionSnapshot, erro
 	return snapshots, closeErr
 }
 
-func (s *Service) runOperation(ctx context.Context, req OperationRequest, operation model.Operation) (OperationEnvelope, error) {
+func (s *Service) runOperation(ctx context.Context, req OperationRequest, operation model.Operation) (operationEnvelope, error) {
 	session, ok := s.session(req.SessionID)
 	if !ok {
-		return OperationEnvelope{}, invalidSessionError()
+		return operationEnvelope{}, invalidSessionError()
 	}
 
 	if operation == nil {
-		return OperationEnvelope{}, invalidOperationError("operation is required")
+		return operationEnvelope{}, invalidOperationError("operation is required")
 	}
 
 	operationID := newOperationID()
@@ -269,7 +269,7 @@ func (s *Service) runOperation(ctx context.Context, req OperationRequest, operat
 		operationID: operationID,
 	}, opts...)
 
-	envelope := OperationEnvelope{
+	envelope := operationEnvelope{
 		OperationID: operationID,
 		SessionID:   req.SessionID,
 		Kind:        operation.Kind(),
