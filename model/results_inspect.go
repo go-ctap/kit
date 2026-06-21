@@ -2,12 +2,14 @@ package model
 
 import (
 	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/kit/model/conformance"
 	"github.com/go-ctap/kit/model/report"
 )
 
 type InspectInfo struct {
 	protocol.AuthenticatorGetInfoResponse
-	UVModalityLabel string `json:"uvModalityLabel,omitempty"`
+	UVModalityLabel     string                `json:"uvModalityLabel,omitempty"`
+	ConformanceFindings []conformance.Finding `json:"conformanceFindings"`
 }
 
 type InspectResult struct {
@@ -26,6 +28,7 @@ func NewInspectResult(device report.DeviceReport, info protocol.AuthenticatorGet
 		Device: device,
 		Info: InspectInfo{
 			AuthenticatorGetInfoResponse: info,
+			ConformanceFindings:          conformance.EvaluateGetInfo(info),
 		},
 	}
 	if info.UvModality != nil {

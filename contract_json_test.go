@@ -216,6 +216,7 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 				`"authenticatorConfigCommands":[1,4]`,
 				`"uvModality":2`,
 				`"uvModalityLabel":"fingerprint_internal"`,
+				`"conformanceFindings"`,
 			},
 			reject: []string{
 				`"Result"`,
