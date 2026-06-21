@@ -41,9 +41,10 @@ type managedSession struct {
 }
 
 type operationState struct {
-	id     OperationID
-	cancel context.CancelFunc
-	done   chan struct{}
+	id        OperationID
+	sessionID SessionID
+	cancel    context.CancelFunc
+	done      chan struct{}
 }
 
 type pendingInteraction struct {
@@ -86,12 +87,15 @@ func (s *Service) Close() error {
 		delete(s.sessions, id)
 	}
 
-	for id, operation := range s.operations {
-		operation.cancel()
-		close(operation.done)
-		delete(s.operations, id)
+	operations := make([]*operationState, 0, len(s.operations))
+	for _, operation := range s.operations {
+		operations = append(operations, operation)
 	}
 	s.mu.Unlock()
+
+	for _, operation := range operations {
+		operation.cancel()
+	}
 
 	var closeErr error
 	for _, session := range sessions {
@@ -197,6 +201,7 @@ func (s *Service) CloseSession(ctx context.Context, id SessionID) (SessionSnapsh
 		return SessionSnapshot{}, invalidSessionError()
 	}
 
+	s.cancelSessionOperations(session.id)
 	err := session.session.Close()
 	session.touch()
 
@@ -219,6 +224,7 @@ func (s *Service) CloseAllSessions(ctx context.Context) ([]SessionSnapshot, erro
 	snapshots := make([]SessionSnapshot, 0, len(sessions))
 	var closeErr error
 	for _, session := range sessions {
+		s.cancelSessionOperations(session.id)
 		if err := session.session.Close(); err != nil {
 			closeErr = errors.Join(closeErr, err)
 		}
@@ -244,9 +250,10 @@ func (s *Service) runOperation(ctx context.Context, req OperationRequest, operat
 	operationID := newOperationID()
 	ctx, cancel := context.WithCancel(ctx)
 	state := &operationState{
-		id:     operationID,
-		cancel: cancel,
-		done:   make(chan struct{}),
+		id:        operationID,
+		sessionID: req.SessionID,
+		cancel:    cancel,
+		done:      make(chan struct{}),
 	}
 
 	s.registerOperation(state)
@@ -278,17 +285,38 @@ func (s *Service) CancelOperation(ctx context.Context, req CancelOperationReques
 		return false, err
 	}
 
+	return s.cancelOperation(req.OperationID), nil
+}
+
+func (s *Service) cancelOperation(id OperationID) bool {
 	s.mu.RLock()
-	operation, ok := s.operations[req.OperationID]
+	operation, ok := s.operations[id]
 	s.mu.RUnlock()
 
 	if !ok {
-		return false, nil
+		return false
 	}
 
 	operation.cancel()
 
-	return true, nil
+	return true
+}
+
+func (s *Service) cancelSessionOperations(id SessionID) bool {
+	s.mu.RLock()
+	operations := make([]*operationState, 0, 1)
+	for _, operation := range s.operations {
+		if operation.sessionID == id {
+			operations = append(operations, operation)
+		}
+	}
+	s.mu.RUnlock()
+
+	for _, operation := range operations {
+		operation.cancel()
+	}
+
+	return len(operations) > 0
 }
 
 func (s *Service) ResolveInteraction(ctx context.Context, answer InteractionAnswer) (bool, error) {
