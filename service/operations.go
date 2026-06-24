@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/config"
@@ -238,22 +237,6 @@ func (s *Service) SetPIN(ctx context.Context, req PINSetRequest) (PINEnvelope, e
 	return PINEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (req PINSetRequest) MarshalJSON() ([]byte, error) {
-	type pinSetRequest struct {
-		OperationRequest
-		Confirmed           bool   `json:"confirmed,omitempty"`
-		ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-		DryRun              bool   `json:"dryRun,omitempty"`
-	}
-
-	return json.Marshal(pinSetRequest{
-		OperationRequest:    req.OperationRequest,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
-	})
-}
-
 func (s *Service) ChangePIN(ctx context.Context, req PINChangeRequest) (PINEnvelope, error) {
 	meta, result, err := runTypedOperation[model.PINOutput](s, ctx, req.OperationRequest, model.ChangePINOperation{
 		CurrentPIN:          req.CurrentPIN,
@@ -263,22 +246,6 @@ func (s *Service) ChangePIN(ctx context.Context, req PINChangeRequest) (PINEnvel
 		DryRun:              req.DryRun,
 	})
 	return PINEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
-}
-
-func (req PINChangeRequest) MarshalJSON() ([]byte, error) {
-	type pinChangeRequest struct {
-		OperationRequest
-		Confirmed           bool   `json:"confirmed,omitempty"`
-		ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-		DryRun              bool   `json:"dryRun,omitempty"`
-	}
-
-	return json.Marshal(pinChangeRequest{
-		OperationRequest:    req.OperationRequest,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
-	})
 }
 
 func (s *Service) SetAlwaysUV(ctx context.Context, req AlwaysUVRequest) (AuthenticatorConfigEnvelope, error) {

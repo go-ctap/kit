@@ -3,7 +3,6 @@
 package service
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/go-ctap/kit/model"
@@ -159,20 +158,6 @@ type InteractionAnswer struct {
 	PIN           string        `json:"pin,omitempty"`
 	Confirmed     bool          `json:"confirmed,omitempty"`
 	Canceled      bool          `json:"canceled,omitempty"`
-}
-
-func (a InteractionAnswer) MarshalJSON() ([]byte, error) {
-	type publicInteractionAnswer struct {
-		InteractionID InteractionID `json:"interactionId"`
-		Confirmed     bool          `json:"confirmed,omitempty"`
-		Canceled      bool          `json:"canceled,omitempty"`
-	}
-
-	return json.Marshal(publicInteractionAnswer{
-		InteractionID: a.InteractionID,
-		Confirmed:     a.Confirmed,
-		Canceled:      a.Canceled,
-	})
 }
 
 type OperationEventEnvelope struct {
