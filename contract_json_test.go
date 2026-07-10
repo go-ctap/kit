@@ -216,10 +216,11 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 				`"authenticatorConfigCommands":[1,4]`,
 				`"uvModality":2`,
 				`"uvModalityLabel":"fingerprint_internal"`,
-				`"conformanceFindings"`,
+				`"conformance"`,
 			},
 			reject: []string{
 				`"Result"`,
+				`"conformanceFindings"`,
 				`"forcePinChange"`,
 				`"minPinLength"`,
 				`"maxCredentialIDLength"`,

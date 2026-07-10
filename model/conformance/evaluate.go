@@ -1,287 +1,347 @@
 package conformance
 
 import (
+	"errors"
 	"fmt"
+	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/go-ctap/ctap/credential"
-	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/samber/lo"
 )
 
-// EvaluateGetInfo returns reusable CTAP/FIDO conformance findings for an
-// authenticatorGetInfo response. It intentionally contains no product copy,
-// localization, grouping, or presentation policy.
-func EvaluateGetInfo(info protocol.AuthenticatorGetInfoResponse) []Finding {
-	findings := make([]Finding, 0)
-	add := func(id FindingID, source string, value FindingValue, args map[string]any) {
-		finding := Finding{ID: id, Source: source, Value: value}
-		if len(args) > 0 {
-			finding.Args = args
-		}
-		findings = append(findings, finding)
-	}
+var ErrInvalidTarget = errors.New("conformance: invalid target")
 
-	if len(info.Versions) == 0 {
-		add(FindingVersionsRequired, "versions", CommonValue(CommonValueNotReported), map[string]any{"field": "versions"})
-	}
+type assessmentOutcome uint8
 
-	if lo.Contains(info.Versions, protocol.Version("FIDO_2_2")) {
-		add(FindingFIDO22Forbidden, "versions", LiteralValue("FIDO_2_2"), map[string]any{"field": "versions", "version": "FIDO_2_2"})
-	}
+const (
+	assessmentFinding assessmentOutcome = iota + 1
+	assessmentInconclusive
+)
 
-	if info.PinUvAuthProtocols != nil {
-		findings = validateNonEmptyUniqueList(findings, "pinUvAuthProtocols", info.PinUvAuthProtocols, FindingPinUVAuthProtocolsListEmpty, FindingPinUVAuthProtocolsListDuplicate, pinUVAuthProtocolKey)
-	}
-	if info.Transports != nil {
-		findings = validateNonEmptyUniqueList(findings, "transports", info.Transports, FindingTransportsListEmpty, FindingTransportsListDuplicate, stringKey)
-	}
-	if info.Algorithms != nil {
-		findings = validateNonEmptyUniqueList(findings, "algorithms", info.Algorithms, FindingAlgorithmsListEmpty, FindingAlgorithmsListDuplicate, algorithmKey)
-	}
-	if info.TransportsForReset != nil {
-		findings = validateNonEmptyUniqueList(findings, "transportsForReset", info.TransportsForReset, FindingTransportsForResetListEmpty, FindingTransportsForResetListDuplicate, stringKey)
-	}
-	if info.AttestationFormats != nil {
-		findings = validateNonEmptyUniqueList(findings, "attestationFormats", info.AttestationFormats, FindingAttestationFormatsListEmpty, FindingAttestationFormatsListDuplicate, stringKey)
-	}
-
-	if info.MaxCredentialCountInList != nil && *info.MaxCredentialCountInList == 0 {
-		add(FindingMaxCredentialCountInListPositive, "maxCredentialCountInList", InputValue(*info.MaxCredentialCountInList), map[string]any{"field": "maxCredentialCountInList", "minimum": 1})
-	}
-	if info.MaxCredentialIdLength != nil && *info.MaxCredentialIdLength == 0 {
-		add(FindingMaxCredentialIDLengthPositive, "maxCredentialIdLength", InputValue(*info.MaxCredentialIdLength), map[string]any{"field": "maxCredentialIdLength", "minimum": 1})
-	}
-	if info.MaxMsgSize != nil && *info.MaxMsgSize < 1024 {
-		add(FindingMaxMsgSizeMinimum, "maxMsgSize", InputValue(*info.MaxMsgSize), map[string]any{"field": "maxMsgSize", "minimum": 1024})
-	}
-	if info.PreferredPlatformUvAttempts != nil && *info.PreferredPlatformUvAttempts < 1 {
-		add(FindingPreferredPlatformUVAttemptsMinimum, "preferredPlatformUvAttempts", InputValue(*info.PreferredPlatformUvAttempts), map[string]any{"field": "preferredPlatformUvAttempts", "minimum": 1})
-	}
-
-	extensionsKnown := info.Extensions != nil
-	pinUVAuthProtocolsKnown := info.PinUvAuthProtocols != nil
-	isCTAP23 := lo.Contains(info.Versions, protocol.FIDO_2_3)
-	clientPINSupported := lo.HasKey(info.Options, protocol.OptionClientPIN)
-	uvSupported := lo.HasKey(info.Options, protocol.OptionUserVerification)
-	largeBlobsCommand := optionTrue(info.Options, protocol.OptionLargeBlobs)
-	credBlobListed := lo.Contains(info.Extensions, extension.ExtensionIdentifierCredentialBlob)
-	setMinPINLengthPresent := lo.HasKey(info.Options, protocol.OptionSetMinPINLength)
-	setMinPINLength := optionTrue(info.Options, protocol.OptionSetMinPINLength)
-	setMinPINLengthCommand := lo.Contains(info.AuthenticatorConfigCommands, uint(protocol.ConfigSubCommandSetMinPINLength))
-	setMinPINLengthSupported := setMinPINLength || setMinPINLengthCommand
-	pinComplexityListed := lo.Contains(info.Extensions, extension.ExtensionIdentifierPinComplexityPolicy)
-
-	if lo.Contains(info.AttestationFormats, "none") {
-		add(FindingAttestationFormatsNone, "attestationFormats", LiteralValue("none"), map[string]any{"field": "attestationFormats", "format": "none"})
-	}
-
-	if isCTAP23 && (!extensionsKnown || !lo.Contains(info.Extensions, extension.ExtensionIdentifierHMACSecret)) {
-		add(FindingCTAP23HMACSecret, "extensions.hmac-secret", CommonValue(CommonValueNotListed), map[string]any{"extension": "hmac-secret"})
-	}
-
-	if isCTAP23 && optionTrue(info.Options, protocol.OptionResidentKeys) {
-		if !clientPINSupported && !uvSupported {
-			add(FindingCTAP23RKUVState, "options.rk + options.clientPin/options.uv", LiteralValue("options.rk"), map[string]any{"option": "rk"})
-		}
-	}
-
-	if isCTAP23 && (optionTrue(info.Options, protocol.OptionClientPIN) || optionTrue(info.Options, protocol.OptionUserVerification)) && !optionTrue(info.Options, protocol.OptionPinUvAuthToken) {
-		add(FindingCTAP23PinUVAuthToken, "options.pinUvAuthToken", LiteralValue("options.pinUvAuthToken"), map[string]any{"option": "pinUvAuthToken"})
-	}
-
-	if isCTAP23 && pinUVAuthProtocolsKnown && len(info.PinUvAuthProtocols) > 0 && !lo.Contains(info.PinUvAuthProtocols, protocol.PinUvAuthProtocolTwo) {
-		add(FindingCTAP23PinProtocolTwo, "pinUvAuthProtocols", ListValue(lo.Map(info.PinUvAuthProtocols, func(item protocol.PinUvAuthProtocol, _ int) any {
-			return item
-		})), map[string]any{"field": "pinUvAuthProtocols", "protocol": 2})
-	}
-
-	if credBlobListed && !lo.Contains(info.Extensions, extension.ExtensionIdentifierCredentialProtection) {
-		add(FindingCredBlobRequiresCredProtect, "extensions.credBlob + extensions.credProtect", LiteralValue("credProtect"), map[string]any{"extension": "credProtect"})
-	}
-
-	if credBlobListed && info.MaxCredBlobLength == nil {
-		add(FindingCredBlobRequiresLimit, "maxCredBlobLength", CommonValue(CommonValueNotReported), map[string]any{"field": "maxCredBlobLength"})
-	}
-
-	if info.MaxCredBlobLength != nil {
-		if *info.MaxCredBlobLength < 32 {
-			add(FindingCredBlobLimitInvalid, "maxCredBlobLength", InputValue(*info.MaxCredBlobLength), map[string]any{"field": "maxCredBlobLength", "minimum": 32})
-		}
-		if !credBlobListed {
-			add(FindingCredBlobLimitWithoutExtension, "maxCredBlobLength + extensions.credBlob", InputValue(*info.MaxCredBlobLength), map[string]any{"field": "maxCredBlobLength", "extension": "credBlob"})
-		}
-	}
-
-	largeBlobListed := lo.Contains(info.Extensions, extension.ExtensionIdentifierLargeBlob)
-	largeBlobKeyListed := lo.Contains(info.Extensions, extension.ExtensionIdentifierLargeBlobKey)
-	if largeBlobListed && largeBlobsCommand {
-		add(FindingLargeBlobModeConflict, "extensions.largeBlob + options.largeBlobs", CommonValue(CommonValueMutuallyExclusiveSupportReported), map[string]any{"extension": "largeBlob", "option": "largeBlobs"})
-	}
-
-	if largeBlobListed && largeBlobKeyListed {
-		add(FindingLargeBlobExtensionsConflict, "extensions.largeBlob + extensions.largeBlobKey", CommonValue(CommonValueMutuallyExclusiveSupportReported), map[string]any{"extension": "largeBlobKey"})
-	}
-
-	if largeBlobKeyListed && !largeBlobsCommand {
-		add(FindingLargeBlobKeyIncomplete, "extensions.largeBlobKey + options.largeBlobs", CommonValue(CommonValueExtensionReportedCommandMissing), map[string]any{"extension": "largeBlobKey", "option": "largeBlobs"})
-	}
-
-	if largeBlobsCommand && info.MaxSerializedLargeBlobArray == nil {
-		add(FindingLargeBlobsRequiresLimit, "maxSerializedLargeBlobArray", CommonValue(CommonValueNotReported), map[string]any{"field": "maxSerializedLargeBlobArray"})
-	}
-
-	if info.MaxSerializedLargeBlobArray != nil {
-		if *info.MaxSerializedLargeBlobArray < 1024 {
-			add(FindingLargeBlobsLimitInvalid, "maxSerializedLargeBlobArray", InputValue(*info.MaxSerializedLargeBlobArray), map[string]any{"field": "maxSerializedLargeBlobArray", "minimum": 1024})
-		}
-		if !largeBlobsCommand {
-			add(FindingLargeBlobsLimitWithoutCommand, "maxSerializedLargeBlobArray + options.largeBlobs", InputValue(*info.MaxSerializedLargeBlobArray), map[string]any{"field": "maxSerializedLargeBlobArray", "option": "largeBlobs"})
-		}
-	}
-
-	minPinLengthListed := lo.Contains(info.Extensions, extension.ExtensionIdentifierMinPinLength)
-	if minPinLengthListed && !setMinPINLengthCommand {
-		add(FindingMinPINExtensionWithoutOption, "extensions.minPinLength + authenticatorConfigCommands", LiteralValue("0x03"), map[string]any{"extension": "minPinLength", "command": "setMinPINLength"})
-	}
-
-	if setMinPINLengthPresent && !clientPINSupported && !uvSupported {
-		add(FindingSetMinPINWithoutUV, "options.setMinPINLength + options.clientPin/options.uv", LiteralValue("setMinPINLength"), map[string]any{"option": "setMinPINLength"})
-	}
-
-	if setMinPINLength {
-		if !minPinLengthListed {
-			add(FindingSetMinPINWithoutExtension, "options.setMinPINLength + extensions.minPinLength", LiteralValue("minPinLength"), map[string]any{"extension": "minPinLength", "option": "setMinPINLength"})
-		}
-		if !setMinPINLengthCommand {
-			add(FindingSetMinPINCommandMissing, "authenticatorConfigCommands", LiteralValue("0x03"), map[string]any{"command": "setMinPINLength"})
-		}
-	}
-
-	if info.MaxRPIDsForSetMinPINLength != nil {
-		if !setMinPINLengthSupported {
-			add(FindingMaxRPIDsWithoutSetMinPIN, "maxRPIDsForSetMinPINLength + authenticatorConfigCommands", InputValue(*info.MaxRPIDsForSetMinPINLength), map[string]any{"field": "maxRPIDsForSetMinPINLength", "command": "setMinPINLength"})
-		}
-	} else if setMinPINLengthSupported {
-		add(FindingMaxRPIDsMissingWithSetMinPIN, "maxRPIDsForSetMinPINLength + authenticatorConfigCommands", CommonValue(CommonValueNotReported), map[string]any{"field": "maxRPIDsForSetMinPINLength", "command": "setMinPINLength"})
-	}
-
-	if info.MinPINLength != nil {
-		if *info.MinPINLength < 4 {
-			add(FindingMinPINLengthInvalid, "minPINLength", InputValue(*info.MinPINLength), map[string]any{"field": "minPINLength", "minimum": 4})
-		}
-		if !clientPINSupported {
-			add(FindingMinPINWithoutClientPIN, "minPINLength + options.clientPin", InputValue(*info.MinPINLength), map[string]any{"field": "minPINLength", "option": "clientPin"})
-		}
-	} else if clientPINSupported {
-		add(FindingMinPINMissing, "minPINLength + options.clientPin", CommonValue(CommonValueNotReported), map[string]any{"field": "minPINLength", "option": "clientPin"})
-	}
-
-	if info.MaxPINLength != nil {
-		if *info.MaxPINLength < 8 {
-			add(FindingMaxPINLengthInvalid, "maxPINLength", InputValue(*info.MaxPINLength), map[string]any{"field": "maxPINLength", "minimum": 8})
-		}
-		if !clientPINSupported {
-			add(FindingMaxPINWithoutClientPIN, "maxPINLength + options.clientPin", InputValue(*info.MaxPINLength), map[string]any{"field": "maxPINLength", "option": "clientPin"})
-		}
-	}
-
-	if pinComplexityListed && !setMinPINLengthCommand {
-		add(FindingPinComplexityExtensionWithoutSetPIN, "extensions.pinComplexityPolicy + authenticatorConfigCommands", LiteralValue("0x03"), map[string]any{"extension": "pinComplexityPolicy", "command": "setMinPINLength"})
-	}
-
-	if (pinComplexityListed || info.PinComplexityPolicy != nil) && !clientPINSupported {
-		value := LiteralValue("pinComplexityPolicy")
-		if info.PinComplexityPolicy != nil {
-			value = InputValue(*info.PinComplexityPolicy)
-		}
-		add(FindingPinComplexityWithoutClientPIN, "pinComplexityPolicy + options.clientPin", value, map[string]any{"field": "pinComplexityPolicy", "option": "clientPin"})
-	}
-
-	if lo.HasKey(info.Options, protocol.OptionNoMcGaPermissionsWithClientPin) && !lo.HasKey(info.Options, protocol.OptionClientPIN) {
-		add(FindingNoMCGAWithoutClientPIN, "options.noMcGaPermissionsWithClientPin + options.clientPin", LiteralValue("noMcGaPermissionsWithClientPin"), map[string]any{"option": "clientPin"})
-	}
-
-	if lo.HasKey(info.Options, protocol.OptionUvBioEnroll) && !lo.HasKey(info.Options, protocol.OptionBioEnroll) {
-		add(FindingUVBioEnrollWithoutBioEnroll, "options.uvBioEnroll + options.bioEnroll", LiteralValue("uvBioEnroll"), map[string]any{"option": "bioEnroll"})
-	}
-
-	if lo.HasKey(info.Options, protocol.OptionUvAcfg) && !lo.HasKey(info.Options, protocol.OptionAuthenticatorConfig) {
-		add(FindingUVAcfgWithoutAuthnrCfg, "options.uvAcfg + options.authnrCfg", LiteralValue("uvAcfg"), map[string]any{"option": "authnrCfg"})
-	}
-
-	if info.AuthenticatorConfigCommands != nil && !optionTrue(info.Options, protocol.OptionAuthenticatorConfig) {
-		add(FindingConfigCommandsWithoutAuthnrCfg, "authenticatorConfigCommands + options.authnrCfg", ListValue(lo.Map(info.AuthenticatorConfigCommands, func(item uint, _ int) any {
-			return item
-		})), map[string]any{"field": "authenticatorConfigCommands", "option": "authnrCfg"})
-	}
-
-	if optionTrue(info.Options, protocol.OptionAlwaysUv) && optionTrue(info.Options, protocol.OptionMakeCredentialUvNotRequired) {
-		add(FindingAlwaysUVConflict, "options.alwaysUv + options.makeCredUvNotRqd", LiteralValue("alwaysUv + makeCredUvNotRqd"), map[string]any{"option": "alwaysUv"})
-	}
-
-	if lo.HasKey(info.Options, protocol.OptionAlwaysUv) && !lo.Contains(info.AuthenticatorConfigCommands, uint(protocol.ConfigSubCommandToggleAlwaysUv)) {
-		add(FindingAlwaysUVCommandMissing, "options.alwaysUv + authenticatorConfigCommands", LiteralValue("0x02"), map[string]any{"command": "toggleAlwaysUv"})
-	}
-
-	if lo.HasKey(info.Options, protocol.OptionEnterpriseAttestation) && !lo.Contains(info.AuthenticatorConfigCommands, uint(protocol.ConfigSubCommandEnableEnterpriseAttestation)) {
-		add(FindingEnterpriseAttestationCommandMissing, "options.ep + authenticatorConfigCommands", LiteralValue("0x01"), map[string]any{"command": "enableEnterpriseAttestation"})
-	}
-
-	if info.VendorPrototypeConfigCommands != nil && !lo.Contains(info.AuthenticatorConfigCommands, uint(protocol.ConfigSubCommandVendorPrototype)) {
-		add(FindingVendorPrototypeCommandMissing, "authenticatorConfigCommands + vendorPrototypeConfigCommands", LiteralValue("0xFF"), map[string]any{"command": "vendorPrototype"})
-	}
-
-	if info.LongTouchForReset != nil && !lo.Contains(info.AuthenticatorConfigCommands, uint(protocol.ConfigSubCommandEnableLongTouchForReset)) {
-		add(FindingLongTouchCommandMissing, "authenticatorConfigCommands + longTouchForReset", LiteralValue("0x04"), map[string]any{"command": "enableLongTouchForReset"})
-	}
-
-	return findings
+type assessment struct {
+	outcome      assessmentOutcome
+	expectations []Expectation
+	evidence     []Evidence
+	gap          EvidenceGapID
+	references   []RequirementRef
 }
 
-func validateNonEmptyUniqueList[T any](findings []Finding, source string, input []T, emptyID FindingID, duplicateID FindingID, key func(T) string) []Finding {
-	if len(input) == 0 {
-		return append(findings, Finding{
-			ID:     emptyID,
-			Source: source,
-			Value:  CommonValue(CommonValueEmptyList),
-			Args:   map[string]any{"field": source},
-		})
-	}
-
-	if len(lo.FindDuplicatesBy(input, key)) > 0 {
-		return append(findings, Finding{
-			ID:     duplicateID,
-			Source: source,
-			Value: ListValue(lo.Map(input, func(item T, _ int) any {
-				return item
-			})),
-			Args: map[string]any{"field": source},
-		})
-	}
-
-	return findings
+type getInfoContext struct {
+	info             protocol.AuthenticatorGetInfoResponse
+	target           Target
+	advertised       []Profile
+	commandsKnown    bool
+	inventoryApplies bool
 }
 
-func optionTrue(options map[protocol.Option]bool, option protocol.Option) bool {
-	value, ok := options[option]
+type getInfoRule struct {
+	id         RuleID
+	selector   func(*getInfoContext) bool
+	references func(*getInfoContext) []RequirementRef
+	evaluate   func(*getInfoContext) []assessment
+}
+
+// EvaluateGetInfo resolves the highest stable advertised profile and evaluates
+// the response against the immutable specification edition owned by that
+// profile.
+func EvaluateGetInfo(info protocol.AuthenticatorGetInfoResponse) Report {
+	target, resolved := resolveTarget(info.Versions)
+	if !resolved {
+		return Report{
+			AdvertisedProfiles: advertisedProfiles(info.Versions),
+			Findings:           make([]Finding, 0),
+			Inconclusive:       make([]Inconclusive, 0),
+		}
+	}
+
+	return evaluateGetInfo(info, target)
+}
+
+// EvaluateGetInfoAgainst evaluates against an explicit canonical profile and
+// specification pair. It rejects mixed-edition targets rather than producing
+// findings whose rules and references come from different documents.
+func EvaluateGetInfoAgainst(info protocol.AuthenticatorGetInfoResponse, target Target) (Report, error) {
+	if !isCanonicalTarget(target) {
+		return Report{}, fmt.Errorf(
+			"%w: specification %q with profile %q",
+			ErrInvalidTarget,
+			target.Specification,
+			target.Profile,
+		)
+	}
+
+	return evaluateGetInfo(info, target), nil
+}
+
+func evaluateGetInfo(info protocol.AuthenticatorGetInfoResponse, target Target) Report {
+	context := getInfoContext{
+		info:       info,
+		target:     target,
+		advertised: advertisedProfiles(info.Versions),
+	}
+	context.inventoryApplies = target.Specification == SpecificationCTAP23
+	context.commandsKnown = context.inventoryApplies && info.AuthenticatorConfigCommands != nil
+
+	report := Report{
+		Target:             &target,
+		AdvertisedProfiles: context.advertised,
+		Findings:           make([]Finding, 0),
+		Inconclusive:       make([]Inconclusive, 0),
+	}
+	activeRules := make(map[RuleID]bool)
+	seen := make(map[string]bool)
+
+	for _, rule := range getInfoRules {
+		if !rule.selector(&context) {
+			continue
+		}
+		if activeRules[rule.id] {
+			panic("conformance: multiple rule variants selected for " + string(rule.id))
+		}
+		activeRules[rule.id] = true
+
+		baseReferences := rule.references(&context)
+		for _, result := range rule.evaluate(&context) {
+			references := lo.UniqBy(
+				append(slices.Clone(baseReferences), result.references...),
+				func(reference RequirementRef) RequirementID { return reference.ID },
+			)
+			validateAssessmentReferences(target, references)
+			key := assessmentKey(rule.id, result)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+
+			switch result.outcome {
+			case assessmentFinding:
+				report.Findings = append(report.Findings, Finding{
+					RuleID:       rule.id,
+					Profile:      target.Profile,
+					Expectations: nonNil(result.expectations),
+					Evidence:     nonNil(result.evidence),
+					References:   nonNil(references),
+				})
+			case assessmentInconclusive:
+				report.Inconclusive = append(report.Inconclusive, Inconclusive{
+					RuleID:       rule.id,
+					Profile:      target.Profile,
+					Reason:       result.gap,
+					Expectations: nonNil(result.expectations),
+					Evidence:     nonNil(result.evidence),
+					References:   nonNil(references),
+				})
+			}
+		}
+	}
+
+	return report
+}
+
+func validateAssessmentReferences(target Target, references []RequirementRef) {
+	for _, reference := range references {
+		if reference.Specification != target.Specification {
+			panic(fmt.Sprintf(
+				"conformance: reference %q uses %q for target %q",
+				reference.ID,
+				reference.Specification,
+				target.Specification,
+			))
+		}
+	}
+}
+
+func assessmentKey(id RuleID, result assessment) string {
+	parts := []string{string(id), string(result.outcome), string(result.gap)}
+	for _, expectation := range result.expectations {
+		parts = append(parts, string(expectation.Quantifier), string(expectation.Kind))
+		for _, subject := range expectation.Subjects {
+			parts = append(parts, string(subject))
+		}
+		parts = append(parts, expectation.Values...)
+	}
+
+	return strings.Join(parts, "\x00")
+}
+
+func finding(subjects []FieldPath, expectation Expectation, evidence ...Evidence) []assessment {
+	expectation.Subjects = nonNil(subjects)
+	return []assessment{{
+		outcome:      assessmentFinding,
+		expectations: []Expectation{expectation},
+		evidence:     evidence,
+	}}
+}
+
+func findingWithReferences(subjects []FieldPath, expectation Expectation, evidence []Evidence, references ...RequirementRef) assessment {
+	expectation.Subjects = nonNil(subjects)
+	return assessment{
+		outcome:      assessmentFinding,
+		expectations: []Expectation{expectation},
+		evidence:     evidence,
+		references:   references,
+	}
+}
+
+func findingWithExpectations(expectations []Expectation, evidence []Evidence, references ...RequirementRef) []assessment {
+	return []assessment{{
+		outcome:      assessmentFinding,
+		expectations: nonNil(expectations),
+		evidence:     evidence,
+		references:   references,
+	}}
+}
+
+func inconclusive(subjects []FieldPath, expectation Expectation, gap EvidenceGapID, evidence ...Evidence) []assessment {
+	expectation.Subjects = nonNil(subjects)
+	return []assessment{{
+		outcome:      assessmentInconclusive,
+		expectations: []Expectation{expectation},
+		gap:          gap,
+		evidence:     evidence,
+	}}
+}
+
+func expected(kind ExpectationKind, values ...string) Expectation {
+	return Expectation{Quantifier: ExpectationAll, Kind: kind, Values: nonNil(values)}
+}
+
+func expectedAny(kind ExpectationKind, values ...string) Expectation {
+	return Expectation{Quantifier: ExpectationAny, Kind: kind, Values: nonNil(values)}
+}
+
+func expectedFor(subjects []FieldPath, kind ExpectationKind, values ...string) Expectation {
+	expectation := expected(kind, values...)
+	expectation.Subjects = nonNil(subjects)
+
+	return expectation
+}
+
+func observed(path FieldPath, state EvidenceState, values ...string) Evidence {
+	return Evidence{Path: path, State: state, Values: nonNil(values)}
+}
+
+func observedOption(info protocol.AuthenticatorGetInfoResponse, option protocol.Option) Evidence {
+	path := FieldPath("options." + string(option))
+	value, ok := info.Options[option]
+	if !ok {
+		return observed(path, EvidenceAbsent)
+	}
+	if value {
+		return observed(path, EvidenceTrue)
+	}
+
+	return observed(path, EvidenceFalse)
+}
+
+func observedStrings(path FieldPath, known bool, values []string) Evidence {
+	if !known {
+		return observed(path, EvidenceAbsent)
+	}
+	if len(values) == 0 {
+		return observed(path, EvidencePresentEmpty)
+	}
+
+	return observed(path, EvidencePresent, values...)
+}
+
+func observedUnsigned(path FieldPath, value uint) Evidence {
+	return observed(path, EvidenceValue, strconv.FormatUint(uint64(value), 10))
+}
+
+func optionPresent(info protocol.AuthenticatorGetInfoResponse, option protocol.Option) bool {
+	_, ok := info.Options[option]
+
+	return ok
+}
+
+func optionTrue(info protocol.AuthenticatorGetInfoResponse, option protocol.Option) bool {
+	value, ok := info.Options[option]
 
 	return ok && value
 }
 
-func pinUVAuthProtocolKey(input protocol.PinUvAuthProtocol) string {
-	return fmt.Sprint(uint(input))
-}
-
-func stringKey(input string) string {
-	return input
-}
-
-func algorithmKey(input credential.PublicKeyCredentialParameters) string {
-	typ := input.Type
-	if typ == "" {
-		typ = credential.PublicKeyCredentialTypePublicKey
+func extensionValues(info protocol.AuthenticatorGetInfoResponse) []string {
+	values := make([]string, 0, len(info.Extensions))
+	for _, value := range info.Extensions {
+		values = append(values, string(value))
 	}
 
-	return fmt.Sprintf("%s:%d", typ, input.Algorithm)
+	return values
 }
+
+func pinProtocolValues(info protocol.AuthenticatorGetInfoResponse) []string {
+	values := make([]string, 0, len(info.PinUvAuthProtocols))
+	for _, value := range info.PinUvAuthProtocols {
+		values = append(values, strconv.FormatUint(uint64(value), 10))
+	}
+
+	return values
+}
+
+func unsignedValues(values []uint) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		result = append(result, fmt.Sprintf("0x%02X", value))
+	}
+
+	return result
+}
+
+func algorithmValues(values []credential.PublicKeyCredentialParameters) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		typ := value.Type
+		if typ == "" {
+			typ = credential.PublicKeyCredentialTypePublicKey
+		}
+		result = append(result, fmt.Sprintf("%s:%d", typ, value.Algorithm))
+	}
+
+	return result
+}
+
+func hasDuplicates(values []string) bool {
+	seen := make(map[string]bool, len(values))
+	for _, value := range values {
+		if seen[value] {
+			return true
+		}
+		seen[value] = true
+	}
+
+	return false
+}
+
+func nonNil[T any](values []T) []T {
+	if values == nil {
+		return make([]T, 0)
+	}
+
+	return values
+}
+
+func selectAny(*getInfoContext) bool { return true }
+
+func selectCTAP21OrLater(context *getInfoContext) bool {
+	return context.target.Profile == ProfileFIDO21 || context.target.Profile == ProfileFIDO23
+}
+
+func selectFIDO21(context *getInfoContext) bool { return context.target.Profile == ProfileFIDO21 }
+
+func selectFIDO23(context *getInfoContext) bool { return context.target.Profile == ProfileFIDO23 }
+
+func selectCTAP21Document(context *getInfoContext) bool {
+	return context.target.Specification == SpecificationCTAP21
+}
+
+func selectCTAP23Document(context *getInfoContext) bool {
+	return context.target.Specification == SpecificationCTAP23
+}
+
+func selectConfigInventory(context *getInfoContext) bool { return context.inventoryApplies }
+
+func selectCommandsKnown(context *getInfoContext) bool { return context.commandsKnown }

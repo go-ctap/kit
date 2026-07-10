@@ -1,109 +1,183 @@
 package conformance
 
-type FindingID string
+// Profile is an authenticator protocol profile advertised in GetInfo. A
+// profile is deliberately distinct from SpecificationID: the former is a
+// runtime claim while the latter identifies an immutable normative document.
+type Profile string
 
 const (
-	FindingVersionsRequired                    FindingID = "versions_required"
-	FindingFIDO22Forbidden                     FindingID = "fido22_forbidden"
-	FindingPinUVAuthProtocolsListEmpty         FindingID = "pin_uv_auth_protocols_list_empty"
-	FindingPinUVAuthProtocolsListDuplicate     FindingID = "pin_uv_auth_protocols_list_duplicate"
-	FindingTransportsListEmpty                 FindingID = "transports_list_empty"
-	FindingTransportsListDuplicate             FindingID = "transports_list_duplicate"
-	FindingAlgorithmsListEmpty                 FindingID = "algorithms_list_empty"
-	FindingAlgorithmsListDuplicate             FindingID = "algorithms_list_duplicate"
-	FindingTransportsForResetListEmpty         FindingID = "transports_for_reset_list_empty"
-	FindingTransportsForResetListDuplicate     FindingID = "transports_for_reset_list_duplicate"
-	FindingAttestationFormatsListEmpty         FindingID = "attestation_formats_list_empty"
-	FindingAttestationFormatsListDuplicate     FindingID = "attestation_formats_list_duplicate"
-	FindingAttestationFormatsNone              FindingID = "attestation_formats_none"
-	FindingMaxCredentialCountInListPositive    FindingID = "max_credential_count_in_list_positive"
-	FindingMaxCredentialIDLengthPositive       FindingID = "max_credential_id_length_positive"
-	FindingMaxMsgSizeMinimum                   FindingID = "max_msg_size_minimum"
-	FindingPreferredPlatformUVAttemptsMinimum  FindingID = "preferred_platform_uv_attempts_minimum"
-	FindingCTAP23HMACSecret                    FindingID = "ctap23_hmac_secret"
-	FindingCTAP23RKUVState                     FindingID = "ctap23_rk_uv_state"
-	FindingCTAP23PinUVAuthToken                FindingID = "ctap23_pin_uv_auth_token"
-	FindingCTAP23PinProtocolTwo                FindingID = "ctap23_pin_protocol_two"
-	FindingCredBlobRequiresCredProtect         FindingID = "credblob_requires_credprotect"
-	FindingCredBlobRequiresLimit               FindingID = "credblob_requires_limit"
-	FindingCredBlobLimitInvalid                FindingID = "credblob_limit_invalid"
-	FindingCredBlobLimitWithoutExtension       FindingID = "credblob_limit_without_extension"
-	FindingLargeBlobModeConflict               FindingID = "largeblob_mode_conflict"
-	FindingLargeBlobExtensionsConflict         FindingID = "largeblob_extensions_conflict"
-	FindingLargeBlobKeyIncomplete              FindingID = "largeblob_key_incomplete"
-	FindingLargeBlobsRequiresLimit             FindingID = "largeblobs_requires_limit"
-	FindingLargeBlobsLimitInvalid              FindingID = "largeblobs_limit_invalid"
-	FindingLargeBlobsLimitWithoutCommand       FindingID = "largeblobs_limit_without_command"
-	FindingMinPINExtensionWithoutOption        FindingID = "min_pin_extension_without_option"
-	FindingSetMinPINWithoutExtension           FindingID = "set_min_pin_without_extension"
-	FindingSetMinPINWithoutUV                  FindingID = "set_min_pin_without_uv"
-	FindingSetMinPINCommandMissing             FindingID = "set_min_pin_command_missing"
-	FindingMaxRPIDsWithoutSetMinPIN            FindingID = "max_rpids_without_set_min_pin"
-	FindingMaxRPIDsMissingWithSetMinPIN        FindingID = "max_rpids_missing_with_set_min_pin"
-	FindingMinPINLengthInvalid                 FindingID = "min_pin_length_invalid"
-	FindingMinPINWithoutClientPIN              FindingID = "min_pin_without_client_pin"
-	FindingMinPINMissing                       FindingID = "min_pin_missing"
-	FindingMaxPINLengthInvalid                 FindingID = "max_pin_length_invalid"
-	FindingMaxPINWithoutClientPIN              FindingID = "max_pin_without_client_pin"
-	FindingPinComplexityExtensionWithoutSetPIN FindingID = "pin_complexity_extension_without_set_min_pin"
-	FindingPinComplexityWithoutClientPIN       FindingID = "pin_complexity_without_client_pin"
-	FindingNoMCGAWithoutClientPIN              FindingID = "no_mc_ga_without_client_pin"
-	FindingUVBioEnrollWithoutBioEnroll         FindingID = "uv_bio_enroll_without_bio_enroll"
-	FindingUVAcfgWithoutAuthnrCfg              FindingID = "uv_acfg_without_authnr_cfg"
-	FindingConfigCommandsWithoutAuthnrCfg      FindingID = "config_commands_without_authnr_cfg"
-	FindingAlwaysUVConflict                    FindingID = "always_uv_conflict"
-	FindingAlwaysUVCommandMissing              FindingID = "always_uv_command_missing"
-	FindingEnterpriseAttestationCommandMissing FindingID = "enterprise_attestation_command_missing"
-	FindingVendorPrototypeCommandMissing       FindingID = "vendor_prototype_command_missing"
-	FindingLongTouchCommandMissing             FindingID = "long_touch_command_missing"
+	ProfileFIDO20    Profile = "FIDO_2_0"
+	ProfileFIDO21Pre Profile = "FIDO_2_1_PRE"
+	ProfileFIDO21    Profile = "FIDO_2_1"
+	ProfileFIDO23    Profile = "FIDO_2_3"
+	ProfileU2FV2     Profile = "U2F_V2"
 )
 
-type CommonValueID string
+type SpecificationID string
 
 const (
-	CommonValueEmptyList                        CommonValueID = "empty_list"
-	CommonValueExtensionReportedCommandMissing  CommonValueID = "extension_reported_command_missing"
-	CommonValueMutuallyExclusiveSupportReported CommonValueID = "mutually_exclusive_support_reported"
-	CommonValueNotListed                        CommonValueID = "not_listed"
-	CommonValueNotReported                      CommonValueID = "not_reported"
+	SpecificationCTAP20 SpecificationID = "ctap-2.0-ps-20190130"
+	SpecificationCTAP21 SpecificationID = "ctap-2.1-ps-20210615"
+	SpecificationCTAP23 SpecificationID = "ctap-2.3-ps-20260226"
 )
 
-type FindingValueKind string
+type Target struct {
+	Specification SpecificationID `json:"specification"`
+	Profile       Profile         `json:"profile"`
+}
+
+type RuleID string
 
 const (
-	FindingValueCommon  FindingValueKind = "common"
-	FindingValueLiteral FindingValueKind = "literal"
-	FindingValueInput   FindingValueKind = "input"
-	FindingValueList    FindingValueKind = "list"
+	RuleVersionsRequired                      RuleID = "ctap.get_info.versions.required"
+	RulePinUVAuthProtocolsNonEmpty            RuleID = "ctap.get_info.pin_uv_auth_protocols.nonempty"
+	RulePinUVAuthProtocolsUnique              RuleID = "ctap.get_info.pin_uv_auth_protocols.unique"
+	RuleTransportsNonEmpty                    RuleID = "ctap.get_info.transports.nonempty"
+	RuleTransportsUnique                      RuleID = "ctap.get_info.transports.unique"
+	RuleAlgorithmsNonEmpty                    RuleID = "ctap.get_info.algorithms.nonempty"
+	RuleAlgorithmsUnique                      RuleID = "ctap.get_info.algorithms.unique"
+	RuleTransportsForResetNonEmpty            RuleID = "ctap.get_info.transports_for_reset.nonempty"
+	RuleTransportsForResetUnique              RuleID = "ctap.get_info.transports_for_reset.unique"
+	RuleAttestationFormatsNonEmpty            RuleID = "ctap.get_info.attestation_formats.nonempty"
+	RuleAttestationFormatsUnique              RuleID = "ctap.get_info.attestation_formats.unique"
+	RuleAttestationFormatsNoneOmitted         RuleID = "ctap.get_info.attestation_formats.none_omitted"
+	RuleCertificationLevelRange               RuleID = "ctap.get_info.certifications.level_range"
+	RuleMaxCredentialCountPositive            RuleID = "ctap.get_info.max_credential_count_in_list.positive"
+	RuleMaxCredentialIDLengthPositive         RuleID = "ctap.get_info.max_credential_id_length.positive"
+	RulePreferredPlatformUVAttemptsPositive   RuleID = "ctap.get_info.preferred_platform_uv_attempts.positive"
+	RuleProfileHMACSecretRequired             RuleID = "ctap.profile.hmac_secret.required"
+	RuleProfileRKUVCapabilityRequired         RuleID = "ctap.profile.rk.user_verification_capability_required"
+	RuleProfileRKCredentialManagementRequired RuleID = "ctap.profile.rk.credential_management_required"
+	RuleProfileCredentialProtectionRequired   RuleID = "ctap.profile.user_verification.cred_protect_required"
+	RuleProfilePinUVAuthTokenRequired         RuleID = "ctap.profile.pin_uv_auth_token.required"
+	RuleProfilePinUVProtocolTwoRequired       RuleID = "ctap.profile.pin_uv_protocol_2.required"
+	RuleCredBlobRequiresCredProtect           RuleID = "ctap.get_info.cred_blob.cred_protect_required"
+	RuleCredBlobRequiresMaxLength             RuleID = "ctap.get_info.cred_blob.max_length_required"
+	RuleCredBlobMaxLengthMinimum              RuleID = "ctap.get_info.cred_blob.max_length_minimum"
+	RuleCredBlobMaxLengthRequiresExtension    RuleID = "ctap.get_info.cred_blob.max_length_requires_extension"
+	RuleLargeBlobModesMutuallyExclusive       RuleID = "ctap.get_info.large_blob.modes_mutually_exclusive"
+	RuleLargeBlobExtensionsMutuallyExclusive  RuleID = "ctap.get_info.large_blob.extensions_mutually_exclusive"
+	RuleLargeBlobKeyRequiresCommand           RuleID = "ctap.get_info.large_blob_key.command_required"
+	RuleLargeBlobsRequiresCapacity            RuleID = "ctap.get_info.large_blobs.capacity_required"
+	RuleLargeBlobsCapacityMinimum             RuleID = "ctap.get_info.large_blobs.capacity_minimum"
+	RuleLargeBlobsCapacityRequiresCommand     RuleID = "ctap.get_info.large_blobs.capacity_requires_command"
+	RuleSetMinPINRequiresPINCapability        RuleID = "ctap.get_info.set_min_pin_length.pin_capability_required"
+	RuleSetMinPINSupportConsistency           RuleID = "ctap.get_info.set_min_pin_length.support_consistency"
+	RuleAuthenticatorConfigSupportConsistency RuleID = "ctap.get_info.authenticator_config.support_consistency"
+	RuleConfigCommandRequired                 RuleID = "ctap.get_info.authenticator_config.command_required"
+	RuleConfigCommandPrerequisite             RuleID = "ctap.get_info.authenticator_config.command_prerequisite"
+	RuleMinPINLengthMinimum                   RuleID = "ctap.get_info.min_pin_length.minimum"
+	RuleMinPINLengthRequiresClientPIN         RuleID = "ctap.get_info.min_pin_length.requires_client_pin"
+	RuleClientPINRequiresMinPINLength         RuleID = "ctap.get_info.client_pin.min_pin_length_required"
+	RuleMaxPINLengthMinimum                   RuleID = "ctap.get_info.max_pin_length.minimum"
+	RuleMaxPINLengthRequiresClientPIN         RuleID = "ctap.get_info.max_pin_length.requires_client_pin"
+	RulePinComplexityRequiresClientPIN        RuleID = "ctap.get_info.pin_complexity.requires_client_pin"
+	RuleNoMCGARequiresClientPIN               RuleID = "ctap.get_info.no_mc_ga_permissions.requires_client_pin"
+	RuleUVBioEnrollRequiresBioEnroll          RuleID = "ctap.get_info.uv_bio_enroll.requires_bio_enroll"
+	RuleUVAcfgRequiresAuthnrCfg               RuleID = "ctap.get_info.uv_acfg.requires_authnr_cfg"
+	RuleAlwaysUVConflictsWithMakeCredUVNotRqd RuleID = "ctap.get_info.always_uv.conflicts_with_make_cred_uv_not_required"
+	RuleAlwaysUVU2FRequiresBuiltInUV          RuleID = "ctap.get_info.always_uv.u2f_requires_built_in_uv"
 )
 
-type FindingValue struct {
-	Kind  FindingValueKind `json:"kind"`
-	ID    CommonValueID    `json:"id,omitempty"`
-	Value string           `json:"value,omitempty"`
-	Input any              `json:"input,omitempty"`
-	Items []any            `json:"items,omitempty"`
+type FieldPath string
+
+type ExpectationKind string
+
+const (
+	ExpectationRequired ExpectationKind = "required"
+	ExpectationAbsent   ExpectationKind = "absent"
+	ExpectationNonEmpty ExpectationKind = "non_empty"
+	ExpectationUnique   ExpectationKind = "unique"
+	ExpectationMinimum  ExpectationKind = "minimum"
+	ExpectationRange    ExpectationKind = "range"
+	ExpectationContains ExpectationKind = "contains"
+	ExpectationExcludes ExpectationKind = "excludes"
+	ExpectationTrue     ExpectationKind = "true"
+	ExpectationNotBoth  ExpectationKind = "not_both"
+)
+
+type ExpectationQuantifier string
+
+const (
+	ExpectationAll ExpectationQuantifier = "all"
+	ExpectationAny ExpectationQuantifier = "any"
+)
+
+type EvidenceState string
+
+const (
+	EvidenceAbsent       EvidenceState = "absent"
+	EvidencePresentEmpty EvidenceState = "present_empty"
+	EvidencePresent      EvidenceState = "present"
+	EvidenceFalse        EvidenceState = "false"
+	EvidenceTrue         EvidenceState = "true"
+	EvidenceValue        EvidenceState = "value"
+)
+
+type EvidenceGapID string
+
+const (
+	EvidenceGapAuthenticatorUIUnknown     EvidenceGapID = "authenticator_ui_unknown"
+	EvidenceGapImplicitCredProtectUnknown EvidenceGapID = "implicit_cred_protect_unknown"
+	EvidenceGapBuiltInPINEntryUnknown     EvidenceGapID = "built_in_pin_entry_unknown"
+)
+
+type RequirementID string
+
+type RequirementLevel string
+
+const (
+	RequirementConstraint RequirementLevel = "CONSTRAINT"
+	RequirementMust       RequirementLevel = "MUST"
+	RequirementMustNot    RequirementLevel = "MUST_NOT"
+)
+
+type Expectation struct {
+	Subjects   []FieldPath           `json:"subjects"`
+	Quantifier ExpectationQuantifier `json:"quantifier"`
+	Kind       ExpectationKind       `json:"kind"`
+	Values     []string              `json:"values"`
+}
+
+type Evidence struct {
+	Path   FieldPath     `json:"path"`
+	State  EvidenceState `json:"state"`
+	Values []string      `json:"values"`
+}
+
+type RequirementRef struct {
+	ID            RequirementID    `json:"id"`
+	Specification SpecificationID  `json:"specification"`
+	Section       string           `json:"section"`
+	Clause        string           `json:"clause"`
+	URL           string           `json:"url"`
+	Level         RequirementLevel `json:"level"`
 }
 
 type Finding struct {
-	ID     FindingID      `json:"id"`
-	Source string         `json:"source"`
-	Value  FindingValue   `json:"value"`
-	Args   map[string]any `json:"args,omitempty"`
+	RuleID       RuleID           `json:"ruleId"`
+	Profile      Profile          `json:"profile"`
+	Expectations []Expectation    `json:"expectations"`
+	Evidence     []Evidence       `json:"evidence"`
+	References   []RequirementRef `json:"references"`
 }
 
-func CommonValue(id CommonValueID) FindingValue {
-	return FindingValue{Kind: FindingValueCommon, ID: id}
+type Inconclusive struct {
+	RuleID       RuleID           `json:"ruleId"`
+	Profile      Profile          `json:"profile"`
+	Reason       EvidenceGapID    `json:"reason"`
+	Expectations []Expectation    `json:"expectations"`
+	Evidence     []Evidence       `json:"evidence"`
+	References   []RequirementRef `json:"references"`
 }
 
-func LiteralValue(value string) FindingValue {
-	return FindingValue{Kind: FindingValueLiteral, Value: value}
-}
-
-func InputValue(input any) FindingValue {
-	return FindingValue{Kind: FindingValueInput, Input: input}
-}
-
-func ListValue(items []any) FindingValue {
-	return FindingValue{Kind: FindingValueList, Items: items}
+// Report is a static assessment of the information observable in one
+// authenticatorGetInfo response. Target is nil and no normative rules are run
+// when the response does not advertise a stable supported FIDO2 profile. A
+// report is not a replacement for protocol-level certification testing.
+type Report struct {
+	Target             *Target        `json:"target"`
+	AdvertisedProfiles []Profile      `json:"advertisedProfiles"`
+	Findings           []Finding      `json:"findings"`
+	Inconclusive       []Inconclusive `json:"inconclusive"`
 }

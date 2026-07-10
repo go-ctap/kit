@@ -8,8 +8,8 @@ import (
 
 type InspectInfo struct {
 	protocol.AuthenticatorGetInfoResponse
-	UVModalityLabel     string                `json:"uvModalityLabel,omitempty"`
-	ConformanceFindings []conformance.Finding `json:"conformanceFindings"`
+	UVModalityLabel string             `json:"uvModalityLabel,omitempty"`
+	Conformance     conformance.Report `json:"conformance"`
 }
 
 type InspectResult struct {
@@ -28,7 +28,7 @@ func NewInspectResult(device report.DeviceReport, info protocol.AuthenticatorGet
 		Device: device,
 		Info: InspectInfo{
 			AuthenticatorGetInfoResponse: info,
-			ConformanceFindings:          conformance.EvaluateGetInfo(info),
+			Conformance:                  conformance.EvaluateGetInfo(info),
 		},
 	}
 	if info.UvModality != nil {
