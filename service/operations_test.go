@@ -2,11 +2,10 @@ package service
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 )
 
-func TestPINRequestsDecodeSecretsButDoNotMarshalThem(t *testing.T) {
+func TestPINRequestsRoundTripSecrets(t *testing.T) {
 	var setPIN PINSetRequest
 	if err := json.Unmarshal([]byte(`{"sessionId":"session-1","newPIN":"123456","confirmed":true}`), &setPIN); err != nil {
 		t.Fatalf("unmarshal set PIN request: %v", err)
@@ -19,8 +18,12 @@ func TestPINRequestsDecodeSecretsButDoNotMarshalThem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal set PIN request: %v", err)
 	}
-	if strings.Contains(string(raw), "123456") || strings.Contains(string(raw), "newPIN") {
-		t.Fatalf("set PIN request marshaled secret: %s", raw)
+	var setPINRoundTrip PINSetRequest
+	if err := json.Unmarshal(raw, &setPINRoundTrip); err != nil {
+		t.Fatalf("unmarshal marshaled set PIN request: %v", err)
+	}
+	if setPINRoundTrip != setPIN {
+		t.Fatalf("set PIN request round trip = %#v, want %#v", setPINRoundTrip, setPIN)
 	}
 
 	var changePIN PINChangeRequest
@@ -35,8 +38,11 @@ func TestPINRequestsDecodeSecretsButDoNotMarshalThem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal change PIN request: %v", err)
 	}
-	if strings.Contains(string(raw), "123456") || strings.Contains(string(raw), "654321") ||
-		strings.Contains(string(raw), "currentPIN") || strings.Contains(string(raw), "newPIN") {
-		t.Fatalf("change PIN request marshaled secret: %s", raw)
+	var changePINRoundTrip PINChangeRequest
+	if err := json.Unmarshal(raw, &changePINRoundTrip); err != nil {
+		t.Fatalf("unmarshal marshaled change PIN request: %v", err)
+	}
+	if changePINRoundTrip != changePIN {
+		t.Fatalf("change PIN request round trip = %#v, want %#v", changePINRoundTrip, changePIN)
 	}
 }

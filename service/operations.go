@@ -60,8 +60,8 @@ type LargeBlobGarbageCollectRequest struct {
 
 type PINSetRequest struct {
 	OperationRequest
-	// NewPIN is accepted from JSON for UI/service input, but MarshalJSON omits
-	// it so request values cannot accidentally expose PINs in logs or events.
+	// NewPIN participates in JSON transport. Consumers own redaction at the
+	// application boundary and must not log or persist serialized requests.
 	NewPIN              string `json:"newPIN"`
 	Confirmed           bool   `json:"confirmed,omitempty"`
 	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
@@ -70,8 +70,8 @@ type PINSetRequest struct {
 
 type PINChangeRequest struct {
 	OperationRequest
-	// CurrentPIN and NewPIN are accepted from JSON for UI/service input, but
-	// MarshalJSON omits them so request values cannot accidentally expose PINs.
+	// CurrentPIN and NewPIN participate in JSON transport. Consumers own
+	// redaction at the application boundary and must not log or persist them.
 	CurrentPIN          string `json:"currentPIN"`
 	NewPIN              string `json:"newPIN"`
 	Confirmed           bool   `json:"confirmed,omitempty"`

@@ -71,7 +71,10 @@ func lookupMDS(
 		HTTPClient: config.httpClient,
 		CacheDir:   config.cacheDir,
 	}
-	result, err := client.Lookup(ctx, aaguid, rtmds.LookupOptions{Refresh: config.refresh})
+	result, err := client.Lookup(ctx, aaguid, rtmds.LookupOptions{
+		Refresh:                config.refresh,
+		AllowStaleOnFetchError: true,
+	})
 	if err != nil {
 		return appmds.LookupResult{}, runtimeMDSError(err)
 	}

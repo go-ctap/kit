@@ -141,14 +141,13 @@ func (c *Client) blob(ctx context.Context, source string, opts LookupOptions) (*
 			return nil, false, fmt.Errorf("%w: server returned 304 without a local blob", ErrFetch)
 		}
 
-		checked := *local
-		checked.CachedAt = c.now()
-		c.cache().Set(cacheKey, &checked)
-
-		return &checked, true, nil
+		return c.markLocalFresh(source, cacheKey, local), true, nil
 	}
 
-	if local != nil && remote.Number <= local.Number {
+	if local != nil && remote.Number == local.Number {
+		return c.markLocalFresh(source, cacheKey, local), true, nil
+	}
+	if local != nil && remote.Number < local.Number {
 		c.cache().Set(cacheKey, local)
 		return local, true, nil
 	}
@@ -164,6 +163,19 @@ func (c *Client) blob(ctx context.Context, source string, opts LookupOptions) (*
 
 	c.cache().Set(cacheKey, remote)
 	return remote, false, nil
+}
+
+func (c *Client) markLocalFresh(source, cacheKey string, local *Blob) *Blob {
+	checked := *local
+	checked.CachedAt = c.now()
+	c.cache().Set(cacheKey, &checked)
+
+	path, err := c.diskCachePath(source)
+	if err == nil {
+		_ = os.Chtimes(path, checked.CachedAt, checked.CachedAt)
+	}
+
+	return &checked
 }
 
 func (c *Client) loadLocal(ctx context.Context, source, cacheKey string) *Blob {
@@ -376,8 +388,9 @@ func metadataFetchURL(source string, local *Blob) (string, error) {
 }
 
 func (c *Client) cacheKey(source string) string {
+	cacheDir := c.cacheDir()
 	if len(c.TrustAnchors) == 0 {
-		return source + "\x00anchors=default"
+		return source + "\x00anchors=default\x00cache-dir=" + cacheDir
 	}
 
 	fingerprints := make([]string, 0, len(c.TrustAnchors))
@@ -390,7 +403,7 @@ func (c *Client) cacheKey(source string) string {
 	}
 	sort.Strings(fingerprints)
 
-	return source + "\x00anchors=" + strings.Join(fingerprints, ",")
+	return source + "\x00anchors=" + strings.Join(fingerprints, ",") + "\x00cache-dir=" + cacheDir
 }
 
 func (c *Client) source() string {
