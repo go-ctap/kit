@@ -18,8 +18,17 @@ type OperationID string
 type InteractionID string
 
 const (
+	EventDiscoveryChanged     = "ctapkit:discovery-changed"
 	EventOperationEvent       = "ctapkit:operation-event"
 	EventInteractionRequested = "ctapkit:interaction-requested"
+)
+
+type DiscoveryTrigger string
+
+const (
+	DiscoveryTriggerMonitor DiscoveryTrigger = "monitor"
+	DiscoveryTriggerHotplug DiscoveryTrigger = "hotplug"
+	DiscoveryTriggerManual  DiscoveryTrigger = "manual"
 )
 
 type DiscoverRequest struct {
@@ -28,6 +37,12 @@ type DiscoverRequest struct {
 
 type DiscoverySnapshot struct {
 	Devices []report.DeviceReport `json:"devices"`
+}
+
+type DiscoveryChangedEnvelope struct {
+	Trigger  DiscoveryTrigger      `json:"trigger"`
+	Snapshot *DiscoverySnapshot    `json:"snapshot,omitempty"`
+	Error    *RuntimeErrorEnvelope `json:"error,omitempty"`
 }
 
 type OpenSessionRequest struct {

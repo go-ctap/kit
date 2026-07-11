@@ -14,7 +14,7 @@ func runtimeErrorEnvelope(err error) *RuntimeErrorEnvelope {
 	if runtimeErr, ok := errors.AsType[model.RuntimeError](err); ok {
 		return &RuntimeErrorEnvelope{
 			Category: runtimeErr.Category,
-			Message:  runtimeErr.Error(),
+			Message:  err.Error(),
 		}
 	}
 
