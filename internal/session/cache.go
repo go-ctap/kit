@@ -78,6 +78,7 @@ func (c *Cache) SetCredential(report appcredentials.InventoryReport) {
 	defer c.mu.Unlock()
 
 	c.wipeCredentialInventoryLocked()
+	c.largeBlobLists = nil
 
 	cloned := cloneCredentialReport(report)
 	c.credentialInventory = &cloned

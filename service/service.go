@@ -289,11 +289,8 @@ func (s *Service) CloseAllSessions(ctx context.Context) ([]SessionSnapshot, erro
 func (s *Service) runOperation(ctx context.Context, req OperationRequest, operation model.Operation) (operationEnvelope, error) {
 	session, ok := s.session(req.SessionID)
 	if !ok {
-		return operationEnvelope{}, invalidSessionError()
-	}
-
-	if operation == nil {
-		return operationEnvelope{}, invalidOperationError("operation is required")
+		err := invalidSessionError()
+		return failedOperationEnvelope(req, operation, err), nil
 	}
 
 	operationID := newOperationID()
@@ -308,7 +305,8 @@ func (s *Service) runOperation(ctx context.Context, req OperationRequest, operat
 	if !s.registerSessionOperation(session, state) {
 		cancel()
 
-		return operationEnvelope{}, invalidSessionError()
+		err := invalidSessionError()
+		return failedOperationEnvelope(req, operation, err), nil
 	}
 	defer cancel()
 	defer s.unregisterOperation(operationID)
@@ -328,7 +326,20 @@ func (s *Service) runOperation(ctx context.Context, req OperationRequest, operat
 		Error:       runtimeErrorEnvelope(err),
 	}
 
-	return envelope, err
+	return envelope, nil
+}
+
+func failedOperationEnvelope(req OperationRequest, operation model.Operation, err error) operationEnvelope {
+	kind := model.OperationKind("")
+	if operation != nil {
+		kind = operation.Kind()
+	}
+
+	return operationEnvelope{
+		SessionID: req.SessionID,
+		Kind:      kind,
+		Error:     runtimeErrorEnvelope(err),
+	}
 }
 
 func (s *Service) CancelOperation(ctx context.Context, req CancelOperationRequest) (bool, error) {

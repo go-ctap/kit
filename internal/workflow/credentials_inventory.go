@@ -17,25 +17,28 @@ import (
 	"github.com/samber/lo"
 )
 
-func (r Runner) listCredentials(ctx context.Context) (appcredentials.InventoryReport, error) {
+func (r Runner) listCredentials(
+	ctx context.Context,
+	req model.ListCredentialsOperation,
+) (appcredentials.InventoryReport, error) {
+	if !req.Refresh {
+		if report, ok := r.env.Cache.Credential(); ok {
+			return report, nil
+		}
+	}
+
+	return r.fetchCredentialInventoryReport(ctx)
+}
+
+func (r Runner) readCredentialInventoryReport(ctx context.Context) (appcredentials.InventoryReport, error) {
 	if report, ok := r.env.Cache.Credential(); ok {
 		return report, nil
 	}
 
-	report, err := r.readCredentialInventoryReport(ctx)
-	if err != nil {
-		return appcredentials.InventoryReport{}, err
-	}
-
-	return report, nil
+	return r.fetchCredentialInventoryReport(ctx)
 }
 
-func (r Runner) readCredentialInventoryReport(ctx context.Context) (appcredentials.InventoryReport, error) {
-	report, ok := r.env.Cache.Credential()
-	if ok {
-		return report, nil
-	}
-
+func (r Runner) fetchCredentialInventoryReport(ctx context.Context) (appcredentials.InventoryReport, error) {
 	permission, err := inventoryPermission(r.infoProvider().GetInfo())
 	if err != nil {
 		return appcredentials.InventoryReport{}, err
@@ -47,8 +50,12 @@ func (r Runner) readCredentialInventoryReport(ctx context.Context) (appcredentia
 	}
 	defer secret.Zero(token)
 
-	report, err = r.buildCredentialInventoryReport(token, permission)
+	report, err := r.buildCredentialInventoryReport(ctx, token, permission)
 	if err != nil {
+		return appcredentials.InventoryReport{}, err
+	}
+	if err := ctx.Err(); err != nil {
+		zeroCredentialInventoryReport(&report)
 		return appcredentials.InventoryReport{}, err
 	}
 
@@ -56,7 +63,15 @@ func (r Runner) readCredentialInventoryReport(ctx context.Context) (appcredentia
 	return report, nil
 }
 
-func (r Runner) buildCredentialInventoryReport(token []byte, permission protocol.Permission) (appcredentials.InventoryReport, error) {
+func (r Runner) buildCredentialInventoryReport(
+	ctx context.Context,
+	token []byte,
+	permission protocol.Permission,
+) (appcredentials.InventoryReport, error) {
+	if err := ctx.Err(); err != nil {
+		return appcredentials.InventoryReport{}, err
+	}
+
 	authenticator := r.credentialManager()
 	info := authenticator.GetInfo()
 
@@ -67,6 +82,9 @@ func (r Runner) buildCredentialInventoryReport(token []byte, permission protocol
 			credentialManagementCommand(info),
 			protocol.CredentialManagementSubCommandGetCredsMetadata,
 		))
+	}
+	if err := ctx.Err(); err != nil {
+		return appcredentials.InventoryReport{}, err
 	}
 
 	report := appcredentials.InventoryReport{
@@ -81,11 +99,20 @@ func (r Runner) buildCredentialInventoryReport(token []byte, permission protocol
 			MaxPossibleRemainingResidentCredentialsCount: metadata.MaxPossibleRemainingResidentCredentialsCount,
 		},
 	}
+	completed := false
+	defer func() {
+		if !completed {
+			zeroCredentialInventoryReport(&report)
+		}
+	}()
 
 	rpResponses := make([]protocol.AuthenticatorCredentialManagementResponse, 0)
 	var rpTotal uint64
 
 	for rpResponse, err := range authenticator.EnumerateRPs(token) {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return appcredentials.InventoryReport{}, ctxErr
+		}
 		if err != nil {
 			return appcredentials.InventoryReport{}, ctaperrors.Annotate(err, ctaperrors.WithCredentialManagementSubCommand(
 				model.OperationListCredentials,
@@ -107,17 +134,25 @@ func (r Runner) buildCredentialInventoryReport(token []byte, permission protocol
 		})
 	}
 
-	groups := make([]appcredentials.CredentialGroup, 0, len(rpResponses))
+	report.Groups = make([]appcredentials.CredentialGroup, 0, len(rpResponses))
 	credentialsTotal := uint64(metadata.ExistingResidentCredentialsCount)
 
 	for _, rpResponse := range rpResponses {
-		group := appcredentials.CredentialGroup{
+		if err := ctx.Err(); err != nil {
+			return appcredentials.InventoryReport{}, err
+		}
+
+		report.Groups = append(report.Groups, appcredentials.CredentialGroup{
 			RPID:        strings.TrimSpace(rpResponse.RP.ID),
 			RPName:      strings.TrimSpace(rpResponse.RP.Name),
 			RPIDHashHex: hex.EncodeToString(rpResponse.RPIDHash),
-		}
+		})
+		group := &report.Groups[len(report.Groups)-1]
 
 		for credentialResponse, err := range authenticator.EnumerateCredentials(token, rpResponse.RPIDHash) {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return appcredentials.InventoryReport{}, ctxErr
+			}
 			if err != nil {
 				return appcredentials.InventoryReport{}, ctaperrors.Annotate(err, ctaperrors.WithCredentialManagementSubCommand(
 					model.OperationListCredentials,
@@ -153,13 +188,12 @@ func (r Runner) buildCredentialInventoryReport(token []byte, permission protocol
 			})
 		}
 
-		groups = append(groups, group)
 	}
 
-	sortInventoryGroups(groups)
-	report.Groups = groups
-	report.Summary.TotalRPs = uint(len(groups))
+	sortInventoryGroups(report.Groups)
+	report.Summary.TotalRPs = uint(len(report.Groups))
 
+	completed = true
 	return report, nil
 }
 

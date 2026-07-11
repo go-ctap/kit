@@ -6,6 +6,7 @@ import (
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/secret"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
+	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 )
 
 func TestCacheSetTokenInvalidatesReplacedSecret(t *testing.T) {
@@ -136,6 +137,17 @@ func TestCacheInvalidateCredentialsWipesCachedLargeBlobKey(t *testing.T) {
 	}
 	if got := cached.Groups[0].Credentials[0].LargeBlobKey; got != nil {
 		t.Fatalf("cached largeBlobKey = %v, want nil after wipe", got)
+	}
+}
+
+func TestCacheSetCredentialInvalidatesDependentLargeBlobList(t *testing.T) {
+	cache := NewCache()
+	cache.SetLargeBlobList(applargeblobs.ListReport{})
+
+	cache.SetCredential(appcredentials.InventoryReport{})
+
+	if _, ok := cache.LargeBlobList(); ok {
+		t.Fatal("large blob list remained cached after credential inventory replacement")
 	}
 }
 

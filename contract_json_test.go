@@ -55,6 +55,24 @@ func TestWebAuthnOperationKindStrings(t *testing.T) {
 	}
 }
 
+func TestListCredentialsOperationRefreshJSONContract(t *testing.T) {
+	legacy, err := json.Marshal(model.ListCredentialsOperation{})
+	if err != nil {
+		t.Fatalf("marshal legacy list credentials operation: %v", err)
+	}
+	if string(legacy) != `{}` {
+		t.Fatalf("legacy list credentials operation JSON = %s, want {}", legacy)
+	}
+
+	refreshed, err := json.Marshal(model.ListCredentialsOperation{Refresh: true})
+	if err != nil {
+		t.Fatalf("marshal refreshed list credentials operation: %v", err)
+	}
+	if string(refreshed) != `{"refresh":true}` {
+		t.Fatalf("refreshed list credentials operation JSON = %s", refreshed)
+	}
+}
+
 func TestUserVerificationInteractionJSON(t *testing.T) {
 	raw, err := json.Marshal(model.InteractionRequest{
 		Kind:       model.InteractionKindUserVerification,

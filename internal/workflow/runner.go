@@ -72,7 +72,7 @@ func (r Runner) runOperationBody(ctx context.Context, operation model.Operation)
 
 		return outputOnly(model.InspectOutput{Result: result}), err
 	case model.ListCredentialsOperation:
-		result, err := r.listCredentials(ctx)
+		result, err := r.listCredentials(ctx, req)
 
 		return outputOnly(model.CredentialsOutput{Report: result}), err
 	case model.ReadLargeBlobOperation:

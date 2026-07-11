@@ -23,13 +23,17 @@ func runTypedOperation[T model.OperationResult](
 	operation model.Operation,
 ) (OperationEnvelopeMeta, *T, error) {
 	envelope, err := service.runOperation(ctx, req, operation)
-	meta := operationEnvelopeMeta(envelope)
-	result, typeErr := typedOperationResult[T](envelope)
 	if err != nil {
-		return meta, result, err
+		return OperationEnvelopeMeta{}, nil, err
 	}
 
-	return meta, result, typeErr
+	meta := operationEnvelopeMeta(envelope)
+	result, typeErr := typedOperationResult[T](envelope)
+	if typeErr != nil {
+		return OperationEnvelopeMeta{}, nil, typeErr
+	}
+
+	return meta, result, nil
 }
 
 func typedOperationResult[T model.OperationResult](envelope operationEnvelope) (*T, error) {

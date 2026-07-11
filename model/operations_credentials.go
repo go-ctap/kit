@@ -1,6 +1,8 @@
 package model
 
-type ListCredentialsOperation struct{}
+type ListCredentialsOperation struct {
+	Refresh bool `json:"refresh,omitempty"`
+}
 
 func (ListCredentialsOperation) Kind() OperationKind { return OperationListCredentials }
 func (ListCredentialsOperation) IsDryRun() bool      { return false }

@@ -14,6 +14,11 @@ type OperationRequest struct {
 	VerificationFlow model.VerificationFlow `json:"verificationFlow,omitempty"`
 }
 
+type CredentialListRequest struct {
+	OperationRequest
+	Refresh bool `json:"refresh,omitempty"`
+}
+
 type CredentialDeleteRequest struct {
 	OperationRequest
 	CredentialIDHex     string `json:"credentialIdHex"`
@@ -148,8 +153,10 @@ func (s *Service) Inspect(ctx context.Context, req OperationRequest) (InspectEnv
 	return InspectEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) ListCredentials(ctx context.Context, req OperationRequest) (CredentialsEnvelope, error) {
-	meta, result, err := runTypedOperation[model.CredentialsOutput](s, ctx, req, model.ListCredentialsOperation{})
+func (s *Service) ListCredentials(ctx context.Context, req CredentialListRequest) (CredentialsEnvelope, error) {
+	meta, result, err := runTypedOperation[model.CredentialsOutput](s, ctx, req.OperationRequest, model.ListCredentialsOperation{
+		Refresh: req.Refresh,
+	})
 	return CredentialsEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
