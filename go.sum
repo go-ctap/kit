@@ -8,8 +8,8 @@ github.com/fxamacker/cbor/v2 v2.9.2 h1:X4Ksno9+x3cz0TZv69ec1hxP/+tymuR8PXQJyDwfh
 github.com/fxamacker/cbor/v2 v2.9.2/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
 github.com/go-ctap/ctap v0.13.0 h1:/AB1zdQWpi1uVJ69c+857Pbdb0czj6PAO9SU3TYBi6E=
 github.com/go-ctap/ctap v0.13.0/go.mod h1:j8Y6WxSqxEfIhqbHz0ibWLzwXlojhTX4L/tgBp92NYM=
-github.com/go-ctap/hid v0.6.0 h1:TOlH7pRJXO3J6K2YdxR6ck5gnk500oiL0VolOsxmOTA=
-github.com/go-ctap/hid v0.6.0/go.mod h1:lKZQ9CBFxbKF4nTXaqtlZydk/IqkTAOLigTj6KRm86A=
+github.com/go-ctap/hid v0.7.0 h1:9yHwrMdz3ZiZh+WHw/oTURU7ek0bKK4fpc0B98zfZ9U=
+github.com/go-ctap/hid v0.7.0/go.mod h1:lKZQ9CBFxbKF4nTXaqtlZydk/IqkTAOLigTj6KRm86A=
 github.com/goforj/godump v1.9.1 h1:9OGpb978Ytz3B59d5Yi2PzRYYLid6UkmhYDIDNiF15Y=
 github.com/goforj/godump v1.9.1/go.mod h1:JsuL6AEZfKIU+iR5ewL6iQ2fIuhvLtPmJDH47M9Ptrc=
 github.com/gofrs/flock v0.13.0 h1:95JolYOvGMqeH31+FC7D2+uULf6mG61mEZ/A8dRYMzw=
