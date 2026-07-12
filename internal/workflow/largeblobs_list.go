@@ -14,12 +14,22 @@ import (
 	"github.com/go-ctap/kit/model/report"
 )
 
-func (r Runner) listLargeBlobs(ctx context.Context, _ model.ListLargeBlobsOperation) (applargeblobs.ListReport, error) {
-	if rep, ok := r.env.Cache.LargeBlobList(); ok {
-		return rep, nil
+func (r Runner) listLargeBlobs(ctx context.Context, req model.ListLargeBlobsOperation) (applargeblobs.ListReport, error) {
+	if !req.Refresh {
+		if rep, ok := r.env.Cache.LargeBlobList(); ok {
+			return rep, nil
+		}
 	}
 
-	inventory, err := r.readCredentialInventoryReport(ctx)
+	var (
+		inventory appcredentials.InventoryReport
+		err       error
+	)
+	if req.Refresh {
+		inventory, err = r.freshCredentialInventoryReport(ctx)
+	} else {
+		inventory, err = r.readCredentialInventoryReport(ctx)
+	}
 	if err != nil {
 		return applargeblobs.ListReport{}, err
 	}
@@ -29,7 +39,15 @@ func (r Runner) listLargeBlobs(ctx context.Context, _ model.ListLargeBlobsOperat
 	if err != nil {
 		return applargeblobs.ListReport{}, err
 	}
+	if err := ctx.Err(); err != nil {
+		return applargeblobs.ListReport{}, err
+	}
 
+	if req.Refresh {
+		r.env.Cache.SetCredential(inventory)
+		r.env.Cache.SetLargeBlobList(rep)
+		return rep, nil
+	}
 	r.env.Cache.SetLargeBlobList(rep)
 
 	return rep, nil

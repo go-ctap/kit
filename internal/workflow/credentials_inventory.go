@@ -39,6 +39,17 @@ func (r Runner) readCredentialInventoryReport(ctx context.Context) (appcredentia
 }
 
 func (r Runner) fetchCredentialInventoryReport(ctx context.Context) (appcredentials.InventoryReport, error) {
+	report, err := r.freshCredentialInventoryReport(ctx)
+	if err != nil {
+		return appcredentials.InventoryReport{}, err
+	}
+
+	r.env.Cache.SetCredential(report)
+
+	return report, nil
+}
+
+func (r Runner) freshCredentialInventoryReport(ctx context.Context) (appcredentials.InventoryReport, error) {
 	permission, err := inventoryPermission(r.infoProvider().GetInfo())
 	if err != nil {
 		return appcredentials.InventoryReport{}, err
@@ -59,7 +70,6 @@ func (r Runner) fetchCredentialInventoryReport(ctx context.Context) (appcredenti
 		return appcredentials.InventoryReport{}, err
 	}
 
-	r.env.Cache.SetCredential(report)
 	return report, nil
 }
 

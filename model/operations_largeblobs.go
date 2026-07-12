@@ -11,7 +11,9 @@ func (ReadLargeBlobOperation) Kind() OperationKind { return OperationReadLargeBl
 func (ReadLargeBlobOperation) IsDryRun() bool      { return false }
 func (ReadLargeBlobOperation) ctapkitOperation()   {}
 
-type ListLargeBlobsOperation struct{}
+type ListLargeBlobsOperation struct {
+	Refresh bool `json:"refresh,omitempty"`
+}
 
 func (ListLargeBlobsOperation) Kind() OperationKind { return OperationListLargeBlobs }
 func (ListLargeBlobsOperation) IsDryRun() bool      { return false }

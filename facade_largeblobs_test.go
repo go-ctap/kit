@@ -214,6 +214,160 @@ func TestLargeBlobListUsesCachedReport(t *testing.T) {
 	}
 }
 
+func TestLargeBlobListRefreshBypassesCredentialAndBlobCaches(t *testing.T) {
+	a := &largeBlobWriteEventAuthenticator{}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	if _, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t)); err != nil {
+		t.Fatalf("first ListLargeBlobs: %v", err)
+	}
+
+	added, err := crypto.EncryptLargeBlob(bytes.Repeat([]byte{0x01}, 32), []byte("refreshed"))
+	if err != nil {
+		t.Fatalf("encrypt refreshed blob: %v", err)
+	}
+	a.largeBlobs = []protocol.LargeBlob{added}
+
+	result, err := session.Run(context.Background(), model.ListLargeBlobsOperation{Refresh: true}, userVerificationHandler(t))
+	if err != nil {
+		t.Fatalf("refreshed ListLargeBlobs: %v", err)
+	}
+	output, ok := result.(model.LargeBlobListOutput)
+	if !ok || len(output.Report.Credentials) != 1 || !output.Report.Credentials[0].BlobPresent {
+		t.Fatalf("refreshed large blob output = %#v, want one present credential blob", result)
+	}
+
+	cached, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t))
+	if err != nil {
+		t.Fatalf("cached ListLargeBlobs after refresh: %v", err)
+	}
+	cachedOutput, ok := cached.(model.LargeBlobListOutput)
+	if !ok || len(cachedOutput.Report.Credentials) != 1 || !cachedOutput.Report.Credentials[0].BlobPresent {
+		t.Fatalf("cached large blob output = %#v, want refreshed report", cached)
+	}
+
+	if got := a.rpEnumerations.Load(); got != 2 {
+		t.Fatalf("RP enumerations = %d, want 2", got)
+	}
+	if got := a.credentialEnumerations.Load(); got != 2 {
+		t.Fatalf("credential enumerations = %d, want 2", got)
+	}
+	if got := a.tokenCalls.Load(); got != 1 {
+		t.Fatalf("token calls = %d, want 1", got)
+	}
+	if got := a.largeBlobReads.Load(); got != 2 {
+		t.Fatalf("large blob reads = %d, want 2", got)
+	}
+}
+
+func TestLargeBlobListRefreshFailurePreservesLastSuccessfulCaches(t *testing.T) {
+	tests := []struct {
+		name               string
+		fail               func(*largeBlobWriteEventAuthenticator)
+		clear              func(*largeBlobWriteEventAuthenticator)
+		wantRPs            int32
+		wantCredentials    int32
+		wantLargeBlobReads int32
+	}{
+		{
+			name:    "credential enumeration",
+			fail:    func(a *largeBlobWriteEventAuthenticator) { a.rpErr = context.Canceled },
+			clear:   func(a *largeBlobWriteEventAuthenticator) { a.rpErr = nil },
+			wantRPs: 2, wantCredentials: 1, wantLargeBlobReads: 1,
+		},
+		{
+			name:    "large blob array read",
+			fail:    func(a *largeBlobWriteEventAuthenticator) { a.largeBlobReadErr = context.Canceled },
+			clear:   func(a *largeBlobWriteEventAuthenticator) { a.largeBlobReadErr = nil },
+			wantRPs: 2, wantCredentials: 2, wantLargeBlobReads: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := &largeBlobWriteEventAuthenticator{}
+			session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+				return a, nil
+			})
+			defer func() { _ = session.Close() }()
+
+			if _, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t)); err != nil {
+				t.Fatalf("prime ListLargeBlobs: %v", err)
+			}
+
+			tt.fail(a)
+			if _, err := session.Run(context.Background(), model.ListLargeBlobsOperation{Refresh: true}, userVerificationHandler(t)); !errors.Is(err, context.Canceled) {
+				t.Fatalf("refreshed ListLargeBlobs error = %v, want canceled", err)
+			}
+			tt.clear(a)
+
+			if _, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t)); err != nil {
+				t.Fatalf("cached ListLargeBlobs after failed refresh: %v", err)
+			}
+
+			if got := a.rpEnumerations.Load(); got != tt.wantRPs {
+				t.Fatalf("RP enumerations = %d, want %d", got, tt.wantRPs)
+			}
+			if got := a.credentialEnumerations.Load(); got != tt.wantCredentials {
+				t.Fatalf("credential enumerations = %d, want %d", got, tt.wantCredentials)
+			}
+			if got := a.largeBlobReads.Load(); got != tt.wantLargeBlobReads {
+				t.Fatalf("large blob reads = %d, want %d", got, tt.wantLargeBlobReads)
+			}
+		})
+	}
+}
+
+func TestLargeBlobListCanceledContextAfterFreshArrayReadPreservesLastSuccessfulCaches(t *testing.T) {
+	a := &largeBlobWriteEventAuthenticator{}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	initial, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t))
+	if err != nil {
+		t.Fatalf("prime ListLargeBlobs: %v", err)
+	}
+	initialOutput := initial.(model.LargeBlobListOutput)
+	if initialOutput.Report.Credentials[0].BlobPresent {
+		t.Fatal("initial cached blob present = true, want false")
+	}
+
+	added, err := crypto.EncryptLargeBlob(bytes.Repeat([]byte{0x01}, 32), []byte("not-committed"))
+	if err != nil {
+		t.Fatalf("encrypt added blob: %v", err)
+	}
+	a.largeBlobs = []protocol.LargeBlob{added}
+	ctx, cancel := context.WithCancel(context.Background())
+	a.cancelLargeBlobRead = cancel
+	if _, err := session.Run(ctx, model.ListLargeBlobsOperation{Refresh: true}, userVerificationHandler(t)); !model.IsErrorCategory(err, model.ErrorCanceled) {
+		t.Fatalf("refreshed ListLargeBlobs error = %v, want canceled", err)
+	}
+	a.cancelLargeBlobRead = nil
+
+	cached, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t))
+	if err != nil {
+		t.Fatalf("cached ListLargeBlobs after canceled refresh: %v", err)
+	}
+	cachedOutput := cached.(model.LargeBlobListOutput)
+	if cachedOutput.Report.Credentials[0].BlobPresent {
+		t.Fatal("cached blob present after canceled refresh = true, want last-known-good false")
+	}
+	if got := a.rpEnumerations.Load(); got != 2 {
+		t.Fatalf("RP enumerations = %d, want 2", got)
+	}
+	if got := a.credentialEnumerations.Load(); got != 2 {
+		t.Fatalf("credential enumerations = %d, want 2", got)
+	}
+	if got := a.largeBlobReads.Load(); got != 2 {
+		t.Fatalf("large blob reads = %d, want 2", got)
+	}
+}
+
 func TestLargeBlobDeleteLastBlobWritesEmptyArray(t *testing.T) {
 	current, err := crypto.EncryptLargeBlob(bytes.Repeat([]byte{0x01}, 32), []byte("current"))
 	if err != nil {

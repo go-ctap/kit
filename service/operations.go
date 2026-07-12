@@ -47,6 +47,11 @@ type LargeBlobReadRequest struct {
 	DecodeMode      largeblobs.DecodeMode `json:"decodeMode,omitempty"`
 }
 
+type LargeBlobListRequest struct {
+	OperationRequest
+	Refresh bool `json:"refresh,omitempty"`
+}
+
 type LargeBlobMutationRequest struct {
 	OperationRequest
 	CredentialIDHex     string `json:"credentialIdHex"`
@@ -194,8 +199,10 @@ func (s *Service) ReadLargeBlob(ctx context.Context, req LargeBlobReadRequest) (
 	return LargeBlobReadEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
-func (s *Service) ListLargeBlobs(ctx context.Context, req OperationRequest) (LargeBlobListEnvelope, error) {
-	meta, result, err := runTypedOperation[model.LargeBlobListOutput](s, ctx, req, model.ListLargeBlobsOperation{})
+func (s *Service) ListLargeBlobs(ctx context.Context, req LargeBlobListRequest) (LargeBlobListEnvelope, error) {
+	meta, result, err := runTypedOperation[model.LargeBlobListOutput](s, ctx, req.OperationRequest, model.ListLargeBlobsOperation{
+		Refresh: req.Refresh,
+	})
 	return LargeBlobListEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 

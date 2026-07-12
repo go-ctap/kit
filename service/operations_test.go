@@ -65,6 +65,61 @@ func TestListCredentialsMapsRefreshToRuntimeOperation(t *testing.T) {
 	}
 }
 
+func TestLargeBlobListRequestRefreshJSONContract(t *testing.T) {
+	var legacy LargeBlobListRequest
+	if err := json.Unmarshal([]byte(`{"sessionId":"session-1"}`), &legacy); err != nil {
+		t.Fatalf("unmarshal legacy large blob list request: %v", err)
+	}
+	if legacy.SessionID != "session-1" || legacy.Refresh {
+		t.Fatalf("legacy large blob list request = %#v", legacy)
+	}
+
+	raw, err := json.Marshal(legacy)
+	if err != nil {
+		t.Fatalf("marshal legacy large blob list request: %v", err)
+	}
+	if strings.Contains(string(raw), "refresh") {
+		t.Fatalf("legacy large blob list request included refresh: %s", raw)
+	}
+
+	refreshed := LargeBlobListRequest{
+		OperationRequest: OperationRequest{SessionID: "session-1"},
+		Refresh:          true,
+	}
+	raw, err = json.Marshal(refreshed)
+	if err != nil {
+		t.Fatalf("marshal refreshed large blob list request: %v", err)
+	}
+	if !strings.Contains(string(raw), `"refresh":true`) {
+		t.Fatalf("refreshed large blob list request omitted refresh: %s", raw)
+	}
+}
+
+func TestListLargeBlobsMapsRefreshToRuntimeOperation(t *testing.T) {
+	runtime := &recordingOperationSession{result: model.LargeBlobListOutput{}}
+	service := New()
+	service.sessions["session-1"] = &managedSession{
+		id:      "session-1",
+		session: runtime,
+	}
+
+	_, err := service.ListLargeBlobs(context.Background(), LargeBlobListRequest{
+		OperationRequest: OperationRequest{SessionID: "session-1"},
+		Refresh:          true,
+	})
+	if err != nil {
+		t.Fatalf("ListLargeBlobs: %v", err)
+	}
+
+	operation, ok := runtime.operation.(model.ListLargeBlobsOperation)
+	if !ok {
+		t.Fatalf("runtime operation = %T, want ListLargeBlobsOperation", runtime.operation)
+	}
+	if !operation.Refresh {
+		t.Fatal("runtime list large blobs operation refresh = false, want true")
+	}
+}
+
 func TestListCredentialsInvalidSessionReturnsTypedErrorEnvelope(t *testing.T) {
 	service := New()
 

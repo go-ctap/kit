@@ -73,6 +73,24 @@ func TestListCredentialsOperationRefreshJSONContract(t *testing.T) {
 	}
 }
 
+func TestListLargeBlobsOperationRefreshJSONContract(t *testing.T) {
+	legacy, err := json.Marshal(model.ListLargeBlobsOperation{})
+	if err != nil {
+		t.Fatalf("marshal legacy list large blobs operation: %v", err)
+	}
+	if string(legacy) != `{}` {
+		t.Fatalf("legacy list large blobs operation JSON = %s, want {}", legacy)
+	}
+
+	refreshed, err := json.Marshal(model.ListLargeBlobsOperation{Refresh: true})
+	if err != nil {
+		t.Fatalf("marshal refreshed list large blobs operation: %v", err)
+	}
+	if string(refreshed) != `{"refresh":true}` {
+		t.Fatalf("refreshed list large blobs operation JSON = %s", refreshed)
+	}
+}
+
 func TestUserVerificationInteractionJSON(t *testing.T) {
 	raw, err := json.Marshal(model.InteractionRequest{
 		Kind:       model.InteractionKindUserVerification,

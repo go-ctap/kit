@@ -2,6 +2,7 @@ package ctapkit
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"iter"
 	"sync/atomic"
@@ -237,11 +238,16 @@ func (a *uvTokenAuthenticator) ToggleAlwaysUV([]byte) error {
 type largeBlobWriteEventAuthenticator struct {
 	contractAuthenticator
 	setErr                      error
+	rpErr                       error
+	largeBlobReadErr            error
+	cancelLargeBlobRead         context.CancelFunc
+	omitLargeBlobKey            bool
 	largeBlobs                  []protocol.LargeBlob
 	lastSetLargeBlobs           []protocol.LargeBlob
 	maxSerializedLargeBlobArray *uint
 	rpEnumerations              atomic.Int32
 	credentialEnumerations      atomic.Int32
+	tokenCalls                  atomic.Int32
 	largeBlobReads              atomic.Int32
 	largeBlobWrites             atomic.Int32
 }
@@ -259,6 +265,8 @@ func (a *largeBlobWriteEventAuthenticator) GetInfo() protocol.AuthenticatorGetIn
 }
 
 func (a *largeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingUV(protocol.Permission, string) ([]byte, error) {
+	a.tokenCalls.Add(1)
+
 	return []byte("token"), nil
 }
 
@@ -272,6 +280,11 @@ func (a *largeBlobWriteEventAuthenticator) GetCredsMetadata([]byte) (protocol.Au
 func (a *largeBlobWriteEventAuthenticator) EnumerateRPs([]byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
 	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
 		a.rpEnumerations.Add(1)
+		if a.rpErr != nil {
+			yield(protocol.AuthenticatorCredentialManagementResponse{}, a.rpErr)
+
+			return
+		}
 		yield(protocol.AuthenticatorCredentialManagementResponse{
 			RP:       credential.PublicKeyCredentialRpEntity{ID: "id.example", Name: "Example"},
 			RPIDHash: []byte("rp-hash"),
@@ -283,6 +296,10 @@ func (a *largeBlobWriteEventAuthenticator) EnumerateRPs([]byte) iter.Seq2[protoc
 func (a *largeBlobWriteEventAuthenticator) EnumerateCredentials([]byte, []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
 	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
 		a.credentialEnumerations.Add(1)
+		var largeBlobKey []byte
+		if !a.omitLargeBlobKey {
+			largeBlobKey = bytes.Repeat([]byte{0x01}, 32)
+		}
 		yield(protocol.AuthenticatorCredentialManagementResponse{
 			User: credential.PublicKeyCredentialUserEntity{
 				ID:          []byte("user"),
@@ -293,13 +310,19 @@ func (a *largeBlobWriteEventAuthenticator) EnumerateCredentials([]byte, []byte) 
 				Type: credential.PublicKeyCredentialTypePublicKey,
 				ID:   []byte{0xc0, 0x5e},
 			},
-			LargeBlobKey: bytes.Repeat([]byte{0x01}, 32),
+			LargeBlobKey: largeBlobKey,
 		}, nil)
 	}
 }
 
 func (a *largeBlobWriteEventAuthenticator) GetLargeBlobs() ([]protocol.LargeBlob, error) {
 	a.largeBlobReads.Add(1)
+	if a.cancelLargeBlobRead != nil {
+		a.cancelLargeBlobRead()
+	}
+	if a.largeBlobReadErr != nil {
+		return nil, a.largeBlobReadErr
+	}
 
 	return cloneTestLargeBlobs(a.largeBlobs), nil
 }
