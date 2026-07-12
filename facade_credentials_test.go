@@ -58,6 +58,25 @@ func TestCredentialInventoryRefreshBypassesCacheAndReusesToken(t *testing.T) {
 	})
 }
 
+func TestCredentialInventoryReturnsEmptyReportWithoutEnumeratingRPs(t *testing.T) {
+	a := &emptyCredentialAuthenticator{}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	output := runCredentialList(t, session, model.ListCredentialsOperation{})
+	if output.Report.Summary.ExistingResidentCredentialsCount != 0 {
+		t.Fatalf("existing credential count = %d, want 0", output.Report.Summary.ExistingResidentCredentialsCount)
+	}
+	if output.Report.Summary.TotalCredentials != 0 || len(output.Report.Groups) != 0 {
+		t.Fatalf("empty inventory = %#v, want no groups or credentials", output.Report)
+	}
+	if got := a.rpEnumerations.Load(); got != 0 {
+		t.Fatalf("RP enumerations = %d, want 0", got)
+	}
+}
+
 func TestCredentialInventoryFailedRefreshPreservesLastKnownGoodCache(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -371,6 +390,41 @@ func TestCredentialMutationCTAPStatusMapsSentinel(t *testing.T) {
 
 type progressCredentialAuthenticator struct {
 	contractAuthenticator
+}
+
+type emptyCredentialAuthenticator struct {
+	contractAuthenticator
+	rpEnumerations atomic.Int32
+}
+
+func (a *emptyCredentialAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	return protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionCredentialManagement: true,
+			protocol.OptionPinUvAuthToken:       true,
+			protocol.OptionUserVerification:     true,
+		},
+	}
+}
+
+func (a *emptyCredentialAuthenticator) GetPinUvAuthTokenUsingUV(protocol.Permission, string) ([]byte, error) {
+	return []byte("token"), nil
+}
+
+func (a *emptyCredentialAuthenticator) GetCredsMetadata([]byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
+	return protocol.AuthenticatorCredentialManagementResponse{
+		MaxPossibleRemainingResidentCredentialsCount: 25,
+	}, nil
+}
+
+func (a *emptyCredentialAuthenticator) EnumerateRPs([]byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+	a.rpEnumerations.Add(1)
+	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
+		yield(protocol.AuthenticatorCredentialManagementResponse{}, &ctaphid.CTAPError{
+			Command:    protocol.AuthenticatorCredentialManagement,
+			StatusCode: ctaphid.CTAP2_ERR_NO_CREDENTIALS,
+		})
+	}
 }
 
 type refreshCredentialAuthenticator struct {

@@ -116,6 +116,12 @@ func (r Runner) buildCredentialInventoryReport(
 		}
 	}()
 
+	if metadata.ExistingResidentCredentialsCount == 0 {
+		report.Groups = []appcredentials.CredentialGroup{}
+		completed = true
+		return report, nil
+	}
+
 	rpResponses := make([]protocol.AuthenticatorCredentialManagementResponse, 0)
 	var rpTotal uint64
 
