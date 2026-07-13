@@ -41,7 +41,7 @@ func (r Runner) setPIN(ctx context.Context, req model.SetPINOperation) (model.Op
 		return output, err
 	}
 
-	err = r.configManager().SetPIN(req.NewPIN)
+	err = r.configManager().SetPIN(ctx, req.NewPIN)
 	if err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithClientPINSubCommand(
 			model.OperationSetPIN,
@@ -84,7 +84,7 @@ func (r Runner) changePIN(ctx context.Context, req model.ChangePINOperation) (mo
 		return output, err
 	}
 
-	err = r.configManager().ChangePIN(req.CurrentPIN, req.NewPIN)
+	err = r.configManager().ChangePIN(ctx, req.CurrentPIN, req.NewPIN)
 	if err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithClientPINSubCommand(
 			model.OperationChangePIN,

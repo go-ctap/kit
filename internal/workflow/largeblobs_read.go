@@ -71,7 +71,7 @@ func (r Runner) readLargeBlobFromInventory(
 	key := slices.Clone(target.Record.LargeBlobKey)
 	defer secret.Zero(key)
 
-	blobs, err := r.readLargeBlobArray()
+	blobs, err := r.readLargeBlobArray(ctx)
 	if err != nil {
 		return applargeblobs.ReadReport{}, err
 	}

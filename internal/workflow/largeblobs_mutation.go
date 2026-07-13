@@ -19,7 +19,7 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 		return output, err
 	}
 
-	state, err := r.loadTargetBlobState(inventory, req.CredentialIDHex)
+	state, err := r.loadTargetBlobState(ctx, inventory, req.CredentialIDHex)
 	zeroCredentialInventoryReport(&inventory)
 
 	if err != nil {
@@ -66,7 +66,7 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 	}
 	defer secret.Zero(token)
 
-	if err := r.largeBlobManager().SetLargeBlobs(token, replacement); err != nil {
+	if err := r.largeBlobManager().SetLargeBlobs(ctx, token, replacement); err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithLargeBlobsSubCommand(
 			model.OperationWriteLargeBlob,
 			ctaperrors.LargeBlobsSubCommandSet,
@@ -86,7 +86,7 @@ func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOp
 		return output, err
 	}
 
-	state, err := r.loadTargetBlobState(inventory, req.CredentialIDHex)
+	state, err := r.loadTargetBlobState(ctx, inventory, req.CredentialIDHex)
 	zeroCredentialInventoryReport(&inventory)
 
 	if err != nil {
@@ -136,7 +136,7 @@ func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOp
 	}
 	defer secret.Zero(token)
 
-	if err := r.largeBlobManager().SetLargeBlobs(token, replacement); err != nil {
+	if err := r.largeBlobManager().SetLargeBlobs(ctx, token, replacement); err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithLargeBlobsSubCommand(
 			model.OperationDeleteLargeBlob,
 			ctaperrors.LargeBlobsSubCommandSet,

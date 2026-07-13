@@ -3,6 +3,7 @@ package workflow
 import (
 	"context"
 	"encoding/hex"
+	"time"
 
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/ctaperrors"
@@ -11,6 +12,8 @@ import (
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/safety"
 )
+
+const bioEnrollmentCancelTimeout = 2 * time.Second
 
 func (r Runner) enrollBio(ctx context.Context, req model.BioEnrollOperation) (model.OperationResult, error) {
 	var output model.BioEnrollOutput
@@ -98,7 +101,10 @@ func (r Runner) runBioEnrollment(
 
 	cancelAfterFailure := func(cause error) (appconfig.BioEnrollResult, error) {
 		result.CancelAttempted = true
-		if err := authenticator.CancelCurrentEnrollment(); err == nil {
+
+		cancelCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), bioEnrollmentCancelTimeout)
+		defer cancel()
+		if err := authenticator.CancelCurrentEnrollment(cancelCtx); err == nil {
 			result.CancelSucceeded = true
 		}
 
@@ -127,7 +133,7 @@ func (r Runner) runBioEnrollment(
 		return nil
 	}
 
-	begin, err := authenticator.EnrollBegin(token, req.TimeoutMilliseconds)
+	begin, err := authenticator.EnrollBegin(ctx, token, req.TimeoutMilliseconds)
 	if err != nil {
 		return appconfig.BioEnrollResult{}, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
 			model.OperationBioEnroll,
@@ -145,7 +151,7 @@ func (r Runner) runBioEnrollment(
 			return cancelAfterFailure(err)
 		}
 
-		next, err := authenticator.EnrollCaptureNextSample(token, begin.TemplateID, req.TimeoutMilliseconds)
+		next, err := authenticator.EnrollCaptureNextSample(ctx, token, begin.TemplateID, req.TimeoutMilliseconds)
 		if err != nil {
 			return cancelAfterFailure(ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
 				model.OperationBioEnroll,

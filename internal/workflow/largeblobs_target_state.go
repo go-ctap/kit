@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"context"
 	"fmt"
 	"slices"
 
@@ -24,6 +25,7 @@ type targetBlobState struct {
 }
 
 func (r Runner) loadTargetBlobState(
+	ctx context.Context,
 	inventory appcredentials.InventoryReport,
 	credentialIDHex string,
 ) (targetBlobState, error) {
@@ -44,7 +46,7 @@ func (r Runner) loadTargetBlobState(
 
 	key := slices.Clone(target.Record.LargeBlobKey)
 
-	blobs, err := r.readLargeBlobArray()
+	blobs, err := r.readLargeBlobArray(ctx)
 	if err != nil {
 		secret.Zero(key)
 

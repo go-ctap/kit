@@ -82,7 +82,7 @@ func (r Runner) listLargeBlobsFromInventory(
 	)
 
 	if support.LargeBlobs {
-		blobs, err = r.readLargeBlobArray()
+		blobs, err = r.readLargeBlobArray(ctx)
 		if err != nil {
 			return applargeblobs.ListReport{}, ctaperrors.Annotate(err, ctaperrors.WithLargeBlobsSubCommand(
 				model.OperationListLargeBlobs,

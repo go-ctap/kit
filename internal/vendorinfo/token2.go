@@ -24,6 +24,12 @@ type token2Candidate struct {
 	metadata report.DeviceMetadata
 }
 
+type token2PCSCDevice interface {
+	token2.ATRDevice
+	token2.SerialNumberDevice
+	Config(context.Context) (token2.Config, error)
+}
+
 func probeToken2(
 	ctx context.Context,
 	device report.DeviceReport,
@@ -64,27 +70,34 @@ func token2PCSCCandidates(ctx context.Context, productID uint16) []token2Candida
 			continue
 		}
 
-		atr, atrErr := device.ATRInfo()
-		if atrErr != nil || atr.ProductID != productID {
-			_ = device.Close()
-			continue
-		}
-
-		serialNumber, serialErr := device.SerialNumber()
-		config, configErr := device.Config()
+		candidate, ok := token2PCSCCandidate(ctx, device, productID)
 		_ = device.Close()
-		if serialErr != nil {
+		if !ok {
 			continue
 		}
-
-		metadata := token2IdentityMetadata(serialNumber)
-		if configErr == nil {
-			addToken2Config(&metadata, config)
-		}
-		candidates = append(candidates, token2Candidate{metadata: metadata})
+		candidates = append(candidates, candidate)
 	}
 
 	return deduplicateToken2Candidates(candidates)
+}
+
+func token2PCSCCandidate(ctx context.Context, device token2PCSCDevice, productID uint16) (token2Candidate, bool) {
+	atr, err := device.ATRInfo(ctx)
+	if err != nil || atr.ProductID != productID {
+		return token2Candidate{}, false
+	}
+
+	serialNumber, err := device.SerialNumber(ctx)
+	if err != nil {
+		return token2Candidate{}, false
+	}
+
+	metadata := token2IdentityMetadata(serialNumber)
+	if config, err := device.Config(ctx); err == nil {
+		addToken2Config(&metadata, config)
+	}
+
+	return token2Candidate{metadata: metadata}, true
 }
 
 func token2CTAPHIDSerialSuffix(ctx context.Context, path string) string {
@@ -92,12 +105,12 @@ func token2CTAPHIDSerialSuffix(ctx context.Context, path string) string {
 		return ""
 	}
 
-	device, err := token2ctaphid.Open(path)
+	device, err := token2ctaphid.Open(ctx, path)
 	if err != nil {
 		return ""
 	}
 
-	info, infoErr := device.ATRInfo()
+	info, infoErr := device.ATRInfo(ctx)
 	_ = device.Close()
 	if infoErr != nil {
 		return ""
@@ -130,7 +143,7 @@ func token2FeatureHIDMetadata(
 		if err != nil {
 			continue
 		}
-		serialNumber, serialErr := device.SerialNumber()
+		serialNumber, serialErr := device.SerialNumber(ctx)
 		_ = device.Close()
 		if serialErr != nil {
 			continue

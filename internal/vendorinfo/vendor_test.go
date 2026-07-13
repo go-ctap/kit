@@ -1,6 +1,7 @@
 package vendorinfo
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -48,7 +49,7 @@ func TestEnrichYubicoNormalizesMetadata(t *testing.T) {
 		EnabledNFCCapabilities:   &enabledNFC,
 	}}
 
-	metadata, err := Enrich(report.DeviceReport{
+	metadata, err := Enrich(context.Background(), report.DeviceReport{
 		Vendor:  report.VendorYubico,
 		Product: "YubiKey 5C NFC",
 	}, provider)
@@ -75,6 +76,20 @@ func TestEnrichYubicoNormalizesMetadata(t *testing.T) {
 		report.CapabilityCTAP2,
 	})
 	assertCapabilities(t, metadata.Interfaces[1].Enabled, []report.Capability{report.CapabilityCTAP2})
+}
+
+func TestEnrichYubicoPropagatesContext(t *testing.T) {
+	type contextKey struct{}
+
+	marker := new(int)
+	ctx := context.WithValue(context.Background(), contextKey{}, marker)
+	provider := &fakeYubicoProvider{}
+	if _, err := Enrich(ctx, report.DeviceReport{Vendor: report.VendorYubico}, provider); err != nil {
+		t.Fatalf("Enrich: %v", err)
+	}
+	if got := provider.ctx.Value(contextKey{}); got != marker {
+		t.Fatalf("provider context value = %v, want marker", got)
+	}
 }
 
 func TestYubicoModelName(t *testing.T) {
@@ -254,7 +269,7 @@ func TestEnrichYubicoIgnoresKnownInvalidNFCMetadata(t *testing.T) {
 		EnabledNFCCapabilities:   &nfc,
 	}}
 
-	metadata, err := Enrich(report.DeviceReport{
+	metadata, err := Enrich(context.Background(), report.DeviceReport{
 		Vendor:  report.VendorYubico,
 		Product: "Yubico Authenticator",
 	}, provider)
@@ -269,7 +284,7 @@ func TestEnrichYubicoIgnoresKnownInvalidNFCMetadata(t *testing.T) {
 func TestEnrichDoesNotCallToken2Provider(t *testing.T) {
 	provider := &fakeYubicoProvider{err: errors.New("unexpected call")}
 
-	metadata, err := Enrich(report.DeviceReport{Vendor: report.VendorToken2}, provider)
+	metadata, err := Enrich(context.Background(), report.DeviceReport{Vendor: report.VendorToken2}, provider)
 	if err != nil || metadata != nil || provider.called {
 		t.Fatalf("metadata = %#v, err = %v, called = %v", metadata, err, provider.called)
 	}
@@ -279,10 +294,12 @@ type fakeYubicoProvider struct {
 	info   yubico.DeviceInfo
 	err    error
 	called bool
+	ctx    context.Context
 }
 
-func (p *fakeYubicoProvider) GetYubiKeyDeviceInfo() (yubico.DeviceInfo, error) {
+func (p *fakeYubicoProvider) GetYubiKeyDeviceInfo(ctx context.Context) (yubico.DeviceInfo, error) {
 	p.called = true
+	p.ctx = ctx
 
 	return p.info, p.err
 }

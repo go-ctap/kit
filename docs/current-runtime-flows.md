@@ -304,6 +304,20 @@ warnings that describe this behavior.
 
 ## Cross-Cutting Behavior
 
+### Context Propagation
+
+Contexts supplied to `DiscoverDevices`, `OpenSession`, and `Session.Run` flow
+through discovery, authenticator opening, token acquisition, vendor metadata
+probing, and every context-aware CTAP command. This allows cancellation and
+deadlines to interrupt transport I/O instead of only stopping between workflow
+steps.
+
+Biometric enrollment cleanup is the exception to direct propagation. If the
+main enrollment fails or its context is canceled, the runtime attempts
+`CancelCurrentEnrollment` with a context derived using `WithoutCancel` and a
+two-second timeout. The cleanup context preserves values from the operation but
+can outlive its cancellation without blocking session shutdown indefinitely.
+
 ### Workflow Serialization
 
 `internal/session.Core.RunSerializedWorkflow` serializes complete logical

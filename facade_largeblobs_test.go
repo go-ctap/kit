@@ -10,7 +10,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/go-ctap/ctap/crypto"
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/ctap/transport/ctaphid"
+	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
@@ -684,9 +684,9 @@ func TestLargeBlobWritePINOnlyFlowDoesNotRequestUserVerification(t *testing.T) {
 func TestLargeBlobWritePINTokenCTAPStatusMapsSentinel(t *testing.T) {
 	a := &pinOnlyLargeBlobWriteEventAuthenticator{
 		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
-		pinErr: &ctaphid.CTAPError{
+		pinErr: &ctaptransport.CTAPError{
 			Command:    protocol.AuthenticatorClientPIN,
-			StatusCode: ctaphid.CTAP2_ERR_PIN_INVALID,
+			StatusCode: ctaptransport.CTAP2_ERR_PIN_INVALID,
 		},
 	}
 	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
@@ -769,17 +769,17 @@ func TestLargeBlobWritePINVerificationFlowSkipsUVForUVCapableAuthenticator(t *te
 func TestLargeBlobWriteCTAPStatusMapsSentinel(t *testing.T) {
 	tests := []struct {
 		name   string
-		status ctaphid.StatusCode
+		status ctaptransport.StatusCode
 		want   error
 	}{
 		{
 			name:   "storage full",
-			status: ctaphid.CTAP2_ERR_LARGE_BLOB_STORAGE_FULL,
+			status: ctaptransport.CTAP2_ERR_LARGE_BLOB_STORAGE_FULL,
 			want:   applargeblobs.ErrLargeBlobStorageFull,
 		},
 		{
 			name:   "integrity failure",
-			status: ctaphid.CTAP2_ERR_INTEGRITY_FAILURE,
+			status: ctaptransport.CTAP2_ERR_INTEGRITY_FAILURE,
 			want:   applargeblobs.ErrLargeBlobIntegrity,
 		},
 	}
@@ -787,7 +787,7 @@ func TestLargeBlobWriteCTAPStatusMapsSentinel(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := &largeBlobWriteEventAuthenticator{
-				setErr: &ctaphid.CTAPError{
+				setErr: &ctaptransport.CTAPError{
 					Command:    protocol.AuthenticatorLargeBlobs,
 					StatusCode: tt.status,
 				},

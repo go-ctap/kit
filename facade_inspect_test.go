@@ -76,7 +76,7 @@ type yubicoContractAuthenticator struct {
 	err  error
 }
 
-func (a *yubicoContractAuthenticator) GetYubiKeyDeviceInfo() (yubico.DeviceInfo, error) {
+func (a *yubicoContractAuthenticator) GetYubiKeyDeviceInfo(context.Context) (yubico.DeviceInfo, error) {
 	return a.info, a.err
 }
 

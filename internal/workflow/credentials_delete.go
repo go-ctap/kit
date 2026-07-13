@@ -61,7 +61,7 @@ func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredential
 	}
 	defer secret.Zero(token)
 
-	if err := r.credentialManager().DeleteCredential(token, descriptor); err != nil {
+	if err := r.credentialManager().DeleteCredential(ctx, token, descriptor); err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithCredentialManagementSubCommand(
 			model.OperationDeleteCredential,
 			credentialManagementCommand(r.infoProvider().GetInfo()),

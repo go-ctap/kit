@@ -57,7 +57,7 @@ func (hidProvider) Check(context.Context) error {
 }
 
 func (hidProvider) List(ctx context.Context) ([]Descriptor, error) {
-	infos, err := discover.EnumerateFIDODevices(options.WithContext(ctx))
+	infos, err := discover.EnumerateFIDODevices(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (proxyProvider) List(ctx context.Context) ([]Descriptor, error) {
 
 func proxyDescriptors(ctx context.Context) ([]Descriptor, error) {
 	infos, err := discover.EnumerateFIDODevices(
-		options.WithContext(ctx),
+		ctx,
 		options.WithUseNamedPipes(),
 	)
 	if err != nil {

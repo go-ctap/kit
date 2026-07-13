@@ -1,6 +1,7 @@
 package authenticator
 
 import (
+	"context"
 	"iter"
 
 	"github.com/go-ctap/ctap/attestation"
@@ -19,22 +20,23 @@ type InfoProvider interface {
 
 type TokenProvider interface {
 	InfoProvider
-	GetPinUvAuthTokenUsingPIN(pin string, permission protocol.Permission, rpID string) ([]byte, error)
-	GetPinUvAuthTokenUsingUV(permission protocol.Permission, rpID string) ([]byte, error)
+	GetPinUvAuthTokenUsingPIN(ctx context.Context, pin string, permission protocol.Permission, rpID string) ([]byte, error)
+	GetPinUvAuthTokenUsingUV(ctx context.Context, permission protocol.Permission, rpID string) ([]byte, error)
 }
 
 type CredentialManager interface {
 	InfoProvider
-	GetCredsMetadata(pinUvAuthToken []byte) (protocol.AuthenticatorCredentialManagementResponse, error)
-	EnumerateRPs(pinUvAuthToken []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error]
-	EnumerateCredentials(pinUvAuthToken []byte, rpIDHash []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error]
-	DeleteCredential(pinUvAuthToken []byte, credentialID credential.PublicKeyCredentialDescriptor) error
-	UpdateUserInformation(pinUvAuthToken []byte, credentialID credential.PublicKeyCredentialDescriptor, user credential.PublicKeyCredentialUserEntity) error
+	GetCredsMetadata(ctx context.Context, pinUvAuthToken []byte) (protocol.AuthenticatorCredentialManagementResponse, error)
+	EnumerateRPs(ctx context.Context, pinUvAuthToken []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error]
+	EnumerateCredentials(ctx context.Context, pinUvAuthToken []byte, rpIDHash []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error]
+	DeleteCredential(ctx context.Context, pinUvAuthToken []byte, credentialID credential.PublicKeyCredentialDescriptor) error
+	UpdateUserInformation(ctx context.Context, pinUvAuthToken []byte, credentialID credential.PublicKeyCredentialDescriptor, user credential.PublicKeyCredentialUserEntity) error
 }
 
 type WebAuthnManager interface {
 	InfoProvider
 	MakeCredential(
+		ctx context.Context,
 		pinUvAuthToken []byte,
 		clientData []byte,
 		rp credential.PublicKeyCredentialRpEntity,
@@ -47,6 +49,7 @@ type WebAuthnManager interface {
 		attestationFormatsPreference []attestation.AttestationStatementFormatIdentifier,
 	) (protocol.AuthenticatorMakeCredentialResponse, error)
 	GetAssertion(
+		ctx context.Context,
 		pinUvAuthToken []byte,
 		rpID string,
 		clientData []byte,
@@ -58,29 +61,29 @@ type WebAuthnManager interface {
 
 type LargeBlobManager interface {
 	InfoProvider
-	GetLargeBlobs() ([]protocol.LargeBlob, error)
-	SetLargeBlobs(pinUvAuthToken []byte, blobs []protocol.LargeBlob) error
+	GetLargeBlobs(ctx context.Context) ([]protocol.LargeBlob, error)
+	SetLargeBlobs(ctx context.Context, pinUvAuthToken []byte, blobs []protocol.LargeBlob) error
 }
 
 type ConfigManager interface {
-	GetPINRetries() (uint, *bool, error)
-	GetUVRetries() (uint, error)
-	SetPIN(pin string) error
-	ChangePIN(currentPin, newPin string) error
-	Reset() error
-	ToggleAlwaysUV(pinUvAuthToken []byte) error
-	SetMinPINLength(pinUvAuthToken []byte, newMinPINLength uint, minPinLengthRPIDs []string, forceChangePin bool, pinComplexityPolicy bool) error
+	GetPINRetries(ctx context.Context) (uint, *bool, error)
+	GetUVRetries(ctx context.Context) (uint, error)
+	SetPIN(ctx context.Context, pin string) error
+	ChangePIN(ctx context.Context, currentPin, newPin string) error
+	Reset(ctx context.Context) error
+	ToggleAlwaysUV(ctx context.Context, pinUvAuthToken []byte) error
+	SetMinPINLength(ctx context.Context, pinUvAuthToken []byte, newMinPINLength uint, minPinLengthRPIDs []string, forceChangePin bool, pinComplexityPolicy bool) error
 }
 
 type BioEnrollmentManager interface {
-	GetBioModality() (protocol.AuthenticatorBioEnrollmentResponse, error)
-	GetFingerprintSensorInfo() (protocol.AuthenticatorBioEnrollmentResponse, error)
-	EnrollBegin(pinUvAuthToken []byte, timeoutMilliseconds uint) (protocol.AuthenticatorBioEnrollmentResponse, error)
-	EnrollCaptureNextSample(pinUvAuthToken []byte, templateID []byte, timeoutMilliseconds uint) (protocol.AuthenticatorBioEnrollmentResponse, error)
-	CancelCurrentEnrollment() error
-	EnumerateEnrollments(pinUvAuthToken []byte) (protocol.AuthenticatorBioEnrollmentResponse, error)
-	SetFriendlyName(pinUvAuthToken []byte, templateID []byte, name string) error
-	RemoveEnrollment(pinUvAuthToken []byte, templateID []byte) error
+	GetBioModality(ctx context.Context) (protocol.AuthenticatorBioEnrollmentResponse, error)
+	GetFingerprintSensorInfo(ctx context.Context) (protocol.AuthenticatorBioEnrollmentResponse, error)
+	EnrollBegin(ctx context.Context, pinUvAuthToken []byte, timeoutMilliseconds uint) (protocol.AuthenticatorBioEnrollmentResponse, error)
+	EnrollCaptureNextSample(ctx context.Context, pinUvAuthToken []byte, templateID []byte, timeoutMilliseconds uint) (protocol.AuthenticatorBioEnrollmentResponse, error)
+	CancelCurrentEnrollment(ctx context.Context) error
+	EnumerateEnrollments(ctx context.Context, pinUvAuthToken []byte) (protocol.AuthenticatorBioEnrollmentResponse, error)
+	SetFriendlyName(ctx context.Context, pinUvAuthToken []byte, templateID []byte, name string) error
+	RemoveEnrollment(ctx context.Context, pinUvAuthToken []byte, templateID []byte) error
 }
 
 type Device interface {

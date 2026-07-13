@@ -43,7 +43,7 @@ func (r Runner) bioSensorReport(ctx context.Context) (appconfig.BioSensorReport,
 		return appconfig.BioSensorReport{}, fmt.Errorf("%w: device does not report bioEnroll support", appconfig.ErrBioUnsupported)
 	}
 
-	modality, err := authenticator.GetBioModality()
+	modality, err := authenticator.GetBioModality(ctx)
 	if err != nil {
 		return appconfig.BioSensorReport{}, ctaperrors.Annotate(err, ctaperrors.WithCommand(
 			model.OperationBioSensorInfo,
@@ -52,7 +52,7 @@ func (r Runner) bioSensorReport(ctx context.Context) (appconfig.BioSensorReport,
 		))
 	}
 
-	sensor, err := authenticator.GetFingerprintSensorInfo()
+	sensor, err := authenticator.GetFingerprintSensorInfo(ctx)
 	if err != nil {
 		return appconfig.BioSensorReport{}, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
 			model.OperationBioSensorInfo,
@@ -111,7 +111,7 @@ func (r Runner) bioListReport(ctx context.Context, status appconfig.StatusReport
 		return appconfig.BioListReport{}, fmt.Errorf("%w: device does not report bioEnroll support", appconfig.ErrBioUnsupported)
 	}
 
-	resp, err := r.bioEnrollmentManager().EnumerateEnrollments(token)
+	resp, err := r.bioEnrollmentManager().EnumerateEnrollments(ctx, token)
 	if err != nil {
 		return appconfig.BioListReport{}, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
 			model.OperationBioList,

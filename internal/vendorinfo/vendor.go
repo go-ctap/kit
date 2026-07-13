@@ -19,7 +19,7 @@ const (
 )
 
 type yubicoInfoProvider interface {
-	GetYubiKeyDeviceInfo() (yubico.DeviceInfo, error)
+	GetYubiKeyDeviceInfo(context.Context) (yubico.DeviceInfo, error)
 }
 
 func Classify(vendorID uint16) report.Vendor {
@@ -38,7 +38,7 @@ func CanProbe(device report.DeviceReport) bool {
 	return device.Vendor == report.VendorYubico || device.Vendor == report.VendorToken2
 }
 
-func Enrich(device report.DeviceReport, authenticator any) (*report.DeviceMetadata, error) {
+func Enrich(ctx context.Context, device report.DeviceReport, authenticator any) (*report.DeviceMetadata, error) {
 	switch device.Vendor {
 	case report.VendorYubico:
 		provider, ok := authenticator.(yubicoInfoProvider)
@@ -46,7 +46,7 @@ func Enrich(device report.DeviceReport, authenticator any) (*report.DeviceMetada
 			return nil, fmt.Errorf("ctapkit: Yubico device information is unsupported")
 		}
 
-		info, err := provider.GetYubiKeyDeviceInfo()
+		info, err := provider.GetYubiKeyDeviceInfo(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -70,7 +70,7 @@ func EnrichOpen(
 		return probeToken2(ctx, device, false)
 	}
 
-	return Enrich(device, authenticator)
+	return Enrich(ctx, device, authenticator)
 }
 
 // Probe acquires temporary ownership of a discovered device and obtains its
@@ -92,7 +92,7 @@ func Probe(ctx context.Context, device report.DeviceReport) (*report.DeviceMetad
 		var auth authenticator.Device
 		auth, probeErr = authenticator.Open(ctx, device.Transport, device.Path)
 		if probeErr == nil {
-			metadata, probeErr = Enrich(device, auth)
+			metadata, probeErr = Enrich(ctx, device, auth)
 			probeErr = errors.Join(probeErr, auth.Close())
 		}
 	case report.VendorToken2:

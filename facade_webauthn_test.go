@@ -13,7 +13,7 @@ import (
 	"github.com/go-ctap/ctap/attestation"
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/ctap/transport/ctaphid"
+	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/ctap/webauthn"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
@@ -243,9 +243,9 @@ func TestWebAuthnCTAPStatusMapsSentinels(t *testing.T) {
 				Confirmed:           true,
 			},
 			setupErr: func(a *webauthnTestAuthenticator) {
-				a.makeCredentialErr = &ctaphid.CTAPError{
+				a.makeCredentialErr = &ctaptransport.CTAPError{
 					Command:    protocol.AuthenticatorMakeCredential,
-					StatusCode: ctaphid.CTAP2_ERR_CREDENTIAL_EXCLUDED,
+					StatusCode: ctaptransport.CTAP2_ERR_CREDENTIAL_EXCLUDED,
 				}
 			},
 			want: appcredentials.ErrCredentialExcluded,
@@ -259,9 +259,9 @@ func TestWebAuthnCTAPStatusMapsSentinels(t *testing.T) {
 				},
 			},
 			setupErr: func(a *webauthnTestAuthenticator) {
-				a.getAssertionErr = &ctaphid.CTAPError{
+				a.getAssertionErr = &ctaptransport.CTAPError{
 					Command:    protocol.AuthenticatorGetAssertion,
-					StatusCode: ctaphid.CTAP2_ERR_NO_CREDENTIALS,
+					StatusCode: ctaptransport.CTAP2_ERR_NO_CREDENTIALS,
 				}
 			},
 			want: appcredentials.ErrCredentialNotFound,
@@ -361,6 +361,7 @@ func (a *webauthnTestAuthenticator) GetInfo() protocol.AuthenticatorGetInfoRespo
 }
 
 func (a *webauthnTestAuthenticator) GetPinUvAuthTokenUsingUV(
+	_ context.Context,
 	_ protocol.Permission,
 	rpID string,
 ) ([]byte, error) {
@@ -370,6 +371,7 @@ func (a *webauthnTestAuthenticator) GetPinUvAuthTokenUsingUV(
 }
 
 func (a *webauthnTestAuthenticator) MakeCredential(
+	_ context.Context,
 	pinUvAuthToken []byte,
 	clientData []byte,
 	rp credential.PublicKeyCredentialRpEntity,
@@ -399,6 +401,7 @@ func (a *webauthnTestAuthenticator) MakeCredential(
 }
 
 func (a *webauthnTestAuthenticator) GetAssertion(
+	_ context.Context,
 	pinUvAuthToken []byte,
 	_ string,
 	clientData []byte,
@@ -423,6 +426,7 @@ func (a *webauthnTestAuthenticator) GetAssertion(
 }
 
 func (a *webauthnTestAuthenticator) GetCredsMetadata(
+	context.Context,
 	[]byte,
 ) (protocol.AuthenticatorCredentialManagementResponse, error) {
 	a.metadataCalls++
@@ -434,6 +438,7 @@ func (a *webauthnTestAuthenticator) GetCredsMetadata(
 }
 
 func (a *webauthnTestAuthenticator) EnumerateRPs(
+	context.Context,
 	[]byte,
 ) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
 	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
@@ -446,6 +451,7 @@ func (a *webauthnTestAuthenticator) EnumerateRPs(
 }
 
 func (a *webauthnTestAuthenticator) EnumerateCredentials(
+	context.Context,
 	[]byte,
 	[]byte,
 ) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {

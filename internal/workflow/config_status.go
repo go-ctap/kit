@@ -39,14 +39,14 @@ func (r Runner) statusWithRetries(ctx context.Context) (appconfig.StatusReport, 
 	authenticator := r.configManager()
 	rep := r.statusReport()
 	if rep.PIN.Supported {
-		retries, powerCycle, err := authenticator.GetPINRetries()
+		retries, powerCycle, err := authenticator.GetPINRetries(ctx)
 		rep.PIN.Retries = retryState(retries, powerCycle, err)
 	}
 
 	if rep.UV.Supported &&
 		rep.UV.Configured != nil &&
 		*rep.UV.Configured {
-		retries, err := authenticator.GetUVRetries()
+		retries, err := authenticator.GetUVRetries(ctx)
 		rep.UV.Retries = retryState(retries, nil, err)
 	}
 

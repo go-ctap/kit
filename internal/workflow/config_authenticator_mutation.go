@@ -51,7 +51,7 @@ func (r Runner) setAlwaysUV(ctx context.Context, req model.SetAlwaysUVOperation)
 	}
 	defer secret.Zero(token)
 
-	if err := r.configManager().ToggleAlwaysUV(token); err != nil {
+	if err := r.configManager().ToggleAlwaysUV(ctx, token); err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithConfigSubCommand(
 			model.OperationSetAlwaysUV,
 			protocol.ConfigSubCommandToggleAlwaysUv,
@@ -114,6 +114,7 @@ func (r Runner) setMinPINLength(ctx context.Context, req model.SetMinPINLengthOp
 	defer secret.Zero(token)
 
 	if err := r.configManager().SetMinPINLength(
+		ctx,
 		token,
 		req.Length,
 		req.RPIDs,

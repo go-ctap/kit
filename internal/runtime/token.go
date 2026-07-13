@@ -6,7 +6,7 @@ import (
 
 	ctapdevice "github.com/go-ctap/ctap/authenticator"
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/ctap/transport/ctaphid"
+	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/ctaperrors"
 	"github.com/go-ctap/kit/internal/secret"
@@ -76,7 +76,7 @@ func (s *TokenService) Acquire(
 			return nil, err
 		}
 
-		token, err = authenticator.GetPinUvAuthTokenUsingUV(permission, key.RPID)
+		token, err = authenticator.GetPinUvAuthTokenUsingUV(ctx, permission, key.RPID)
 		if err == nil {
 			return s.storeToken(key, token), nil
 		}
@@ -98,7 +98,7 @@ func (s *TokenService) Acquire(
 	}
 	defer secret.Zero(response.PIN)
 
-	token, err = authenticator.GetPinUvAuthTokenUsingPIN(string(response.PIN), permission, key.RPID)
+	token, err = authenticator.GetPinUvAuthTokenUsingPIN(ctx, string(response.PIN), permission, key.RPID)
 	if err != nil {
 		return nil, ctaperrors.Annotate(err, ctaperrors.WithClientPINSubCommand(
 			"",
@@ -142,6 +142,6 @@ func fallbackToPIN(err error) bool {
 		return true
 	}
 
-	ctapErr, ok := errors.AsType[*ctaphid.CTAPError](err)
-	return ok && ctapErr.StatusCode == ctaphid.CTAP2_ERR_UNAUTHORIZED_PERMISSION
+	ctapErr, ok := errors.AsType[*ctaptransport.CTAPError](err)
+	return ok && ctapErr.StatusCode == ctaptransport.CTAP2_ERR_UNAUTHORIZED_PERMISSION
 }

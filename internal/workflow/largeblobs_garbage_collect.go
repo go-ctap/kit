@@ -65,7 +65,7 @@ func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageC
 	}
 	defer secret.Zero(token)
 
-	if err := r.largeBlobManager().SetLargeBlobs(token, state.replacement); err != nil {
+	if err := r.largeBlobManager().SetLargeBlobs(ctx, token, state.replacement); err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithLargeBlobsSubCommand(
 			model.OperationGarbageCollectLargeBlobs,
 			ctaperrors.LargeBlobsSubCommandSet,
@@ -89,7 +89,7 @@ func (r Runner) loadGarbageCollectState(ctx context.Context) (garbageCollectStat
 		return garbageCollectState{}, applargeblobs.ErrUnsupportedLargeBlobs
 	}
 
-	blobs, err := r.readLargeBlobArray()
+	blobs, err := r.readLargeBlobArray(ctx)
 	if err != nil {
 		return garbageCollectState{}, ctaperrors.Annotate(err, ctaperrors.WithLargeBlobsSubCommand(
 			model.OperationGarbageCollectLargeBlobs,

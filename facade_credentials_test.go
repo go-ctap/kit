@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/ctap/transport/ctaphid"
+	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
@@ -348,9 +348,9 @@ func TestCredentialMutationCTAPStatusMapsSentinel(t *testing.T) {
 			name:      "delete missing credential",
 			operation: model.DeleteCredentialOperation{CredentialIDHex: "c05e", Confirmed: true},
 			setupErr: func(a *credentialMutationTokenAuthenticator) {
-				a.deleteErr = &ctaphid.CTAPError{
+				a.deleteErr = &ctaptransport.CTAPError{
 					Command:    protocol.AuthenticatorCredentialManagement,
-					StatusCode: ctaphid.CTAP2_ERR_NO_CREDENTIALS,
+					StatusCode: ctaptransport.CTAP2_ERR_NO_CREDENTIALS,
 				}
 			},
 			want: appcredentials.ErrCredentialNotFound,
@@ -359,9 +359,9 @@ func TestCredentialMutationCTAPStatusMapsSentinel(t *testing.T) {
 			name:      "update credential store full",
 			operation: model.UpdateCredentialUserOperation{CredentialIDHex: "c05e", Name: "updated", NameProvided: true, Confirmed: true},
 			setupErr: func(a *credentialMutationTokenAuthenticator) {
-				a.updateErr = &ctaphid.CTAPError{
+				a.updateErr = &ctaptransport.CTAPError{
 					Command:    protocol.AuthenticatorCredentialManagement,
-					StatusCode: ctaphid.CTAP2_ERR_KEY_STORE_FULL,
+					StatusCode: ctaptransport.CTAP2_ERR_KEY_STORE_FULL,
 				}
 			},
 			want: appcredentials.ErrCredentialStoreFull,
@@ -407,22 +407,22 @@ func (a *emptyCredentialAuthenticator) GetInfo() protocol.AuthenticatorGetInfoRe
 	}
 }
 
-func (a *emptyCredentialAuthenticator) GetPinUvAuthTokenUsingUV(protocol.Permission, string) ([]byte, error) {
+func (a *emptyCredentialAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
 	return []byte("token"), nil
 }
 
-func (a *emptyCredentialAuthenticator) GetCredsMetadata([]byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
+func (a *emptyCredentialAuthenticator) GetCredsMetadata(context.Context, []byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
 	return protocol.AuthenticatorCredentialManagementResponse{
 		MaxPossibleRemainingResidentCredentialsCount: 25,
 	}, nil
 }
 
-func (a *emptyCredentialAuthenticator) EnumerateRPs([]byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+func (a *emptyCredentialAuthenticator) EnumerateRPs(context.Context, []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
 	a.rpEnumerations.Add(1)
 	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
-		yield(protocol.AuthenticatorCredentialManagementResponse{}, &ctaphid.CTAPError{
+		yield(protocol.AuthenticatorCredentialManagementResponse{}, &ctaptransport.CTAPError{
 			Command:    protocol.AuthenticatorCredentialManagement,
-			StatusCode: ctaphid.CTAP2_ERR_NO_CREDENTIALS,
+			StatusCode: ctaptransport.CTAP2_ERR_NO_CREDENTIALS,
 		})
 	}
 }
@@ -447,13 +447,13 @@ func (a *refreshCredentialAuthenticator) GetInfo() protocol.AuthenticatorGetInfo
 	}
 }
 
-func (a *refreshCredentialAuthenticator) GetPinUvAuthTokenUsingUV(protocol.Permission, string) ([]byte, error) {
+func (a *refreshCredentialAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
 	a.tokenCalls.Add(1)
 
 	return []byte("token"), nil
 }
 
-func (a *refreshCredentialAuthenticator) GetCredsMetadata([]byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
+func (a *refreshCredentialAuthenticator) GetCredsMetadata(context.Context, []byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
 	a.metadataCalls.Add(1)
 	if a.metadataErr != nil {
 		return protocol.AuthenticatorCredentialManagementResponse{}, a.metadataErr
@@ -465,7 +465,7 @@ func (a *refreshCredentialAuthenticator) GetCredsMetadata([]byte) (protocol.Auth
 	}, nil
 }
 
-func (a *refreshCredentialAuthenticator) EnumerateRPs([]byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+func (a *refreshCredentialAuthenticator) EnumerateRPs(context.Context, []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
 	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
 		if a.cancelEnumeration != nil {
 			a.cancelEnumeration()
@@ -479,6 +479,7 @@ func (a *refreshCredentialAuthenticator) EnumerateRPs([]byte) iter.Seq2[protocol
 }
 
 func (a *refreshCredentialAuthenticator) DeleteCredential(
+	_ context.Context,
 	_ []byte,
 	descriptor credential.PublicKeyCredentialDescriptor,
 ) error {
@@ -487,6 +488,7 @@ func (a *refreshCredentialAuthenticator) DeleteCredential(
 }
 
 func (a *refreshCredentialAuthenticator) EnumerateCredentials(
+	context.Context,
 	[]byte,
 	[]byte,
 ) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
@@ -541,18 +543,18 @@ func (a *progressCredentialAuthenticator) GetInfo() protocol.AuthenticatorGetInf
 	}
 }
 
-func (a *progressCredentialAuthenticator) GetPinUvAuthTokenUsingUV(protocol.Permission, string) ([]byte, error) {
+func (a *progressCredentialAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
 	return []byte("token"), nil
 }
 
-func (a *progressCredentialAuthenticator) GetCredsMetadata([]byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
+func (a *progressCredentialAuthenticator) GetCredsMetadata(context.Context, []byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
 	return protocol.AuthenticatorCredentialManagementResponse{
 		ExistingResidentCredentialsCount:             3,
 		MaxPossibleRemainingResidentCredentialsCount: 10,
 	}, nil
 }
 
-func (a *progressCredentialAuthenticator) EnumerateRPs([]byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+func (a *progressCredentialAuthenticator) EnumerateRPs(context.Context, []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
 	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
 		if !yield(protocol.AuthenticatorCredentialManagementResponse{
 			RP:       credential.PublicKeyCredentialRpEntity{ID: "alpha.example", Name: "Alpha"},
@@ -570,6 +572,7 @@ func (a *progressCredentialAuthenticator) EnumerateRPs([]byte) iter.Seq2[protoco
 }
 
 func (a *progressCredentialAuthenticator) EnumerateCredentials(
+	_ context.Context,
 	_ []byte,
 	rpIDHash []byte,
 ) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
@@ -627,6 +630,7 @@ func (a *credentialMutationTokenAuthenticator) GetInfo() protocol.AuthenticatorG
 }
 
 func (a *credentialMutationTokenAuthenticator) GetPinUvAuthTokenUsingUV(
+	_ context.Context,
 	_ protocol.Permission,
 	rpID string,
 ) ([]byte, error) {
@@ -636,6 +640,7 @@ func (a *credentialMutationTokenAuthenticator) GetPinUvAuthTokenUsingUV(
 }
 
 func (a *credentialMutationTokenAuthenticator) GetCredsMetadata(
+	context.Context,
 	[]byte,
 ) (protocol.AuthenticatorCredentialManagementResponse, error) {
 	return protocol.AuthenticatorCredentialManagementResponse{
@@ -645,6 +650,7 @@ func (a *credentialMutationTokenAuthenticator) GetCredsMetadata(
 }
 
 func (a *credentialMutationTokenAuthenticator) EnumerateRPs(
+	context.Context,
 	[]byte,
 ) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
 	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
@@ -657,6 +663,7 @@ func (a *credentialMutationTokenAuthenticator) EnumerateRPs(
 }
 
 func (a *credentialMutationTokenAuthenticator) EnumerateCredentials(
+	context.Context,
 	[]byte,
 	[]byte,
 ) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
@@ -677,6 +684,7 @@ func (a *credentialMutationTokenAuthenticator) EnumerateCredentials(
 }
 
 func (a *credentialMutationTokenAuthenticator) DeleteCredential(
+	_ context.Context,
 	token []byte,
 	_ credential.PublicKeyCredentialDescriptor,
 ) error {
@@ -686,6 +694,7 @@ func (a *credentialMutationTokenAuthenticator) DeleteCredential(
 }
 
 func (a *credentialMutationTokenAuthenticator) UpdateUserInformation(
+	_ context.Context,
 	token []byte,
 	_ credential.PublicKeyCredentialDescriptor,
 	_ credential.PublicKeyCredentialUserEntity,

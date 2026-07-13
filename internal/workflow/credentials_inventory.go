@@ -85,7 +85,7 @@ func (r Runner) buildCredentialInventoryReport(
 	authenticator := r.credentialManager()
 	info := authenticator.GetInfo()
 
-	metadata, err := authenticator.GetCredsMetadata(token)
+	metadata, err := authenticator.GetCredsMetadata(ctx, token)
 	if err != nil {
 		return appcredentials.InventoryReport{}, ctaperrors.Annotate(err, ctaperrors.WithCredentialManagementSubCommand(
 			model.OperationListCredentials,
@@ -125,7 +125,7 @@ func (r Runner) buildCredentialInventoryReport(
 	rpResponses := make([]protocol.AuthenticatorCredentialManagementResponse, 0)
 	var rpTotal uint64
 
-	for rpResponse, err := range authenticator.EnumerateRPs(token) {
+	for rpResponse, err := range authenticator.EnumerateRPs(ctx, token) {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return appcredentials.InventoryReport{}, ctxErr
 		}
@@ -165,7 +165,7 @@ func (r Runner) buildCredentialInventoryReport(
 		})
 		group := &report.Groups[len(report.Groups)-1]
 
-		for credentialResponse, err := range authenticator.EnumerateCredentials(token, rpResponse.RPIDHash) {
+		for credentialResponse, err := range authenticator.EnumerateCredentials(ctx, token, rpResponse.RPIDHash) {
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return appcredentials.InventoryReport{}, ctxErr
 			}

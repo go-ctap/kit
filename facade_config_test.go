@@ -6,9 +6,10 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/ctap/transport/ctaphid"
+	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
@@ -208,9 +209,9 @@ func TestResetRequestsTouchInteractionBeforeReset(t *testing.T) {
 }
 
 func TestResetWindowExpiredMapsNotAllowed(t *testing.T) {
-	err := runConfirmedResetWithError(t, &ctaphid.CTAPError{
+	err := runConfirmedResetWithError(t, &ctaptransport.CTAPError{
 		Command:    protocol.AuthenticatorReset,
-		StatusCode: ctaphid.CTAP2_ERR_NOT_ALLOWED,
+		StatusCode: ctaptransport.CTAP2_ERR_NOT_ALLOWED,
 	})
 
 	if !model.IsErrorCategory(err, model.ErrorInvalidState) {
@@ -223,14 +224,14 @@ func TestResetWindowExpiredMapsNotAllowed(t *testing.T) {
 }
 
 func TestResetTimeoutStatusMapsTimeout(t *testing.T) {
-	tests := []ctaphid.StatusCode{
-		ctaphid.CTAP2_ERR_USER_ACTION_TIMEOUT,
-		ctaphid.CTAP2_ERR_ACTION_TIMEOUT,
+	tests := []ctaptransport.StatusCode{
+		ctaptransport.CTAP2_ERR_USER_ACTION_TIMEOUT,
+		ctaptransport.CTAP2_ERR_ACTION_TIMEOUT,
 	}
 
 	for _, status := range tests {
 		t.Run(status.String(), func(t *testing.T) {
-			err := runConfirmedResetWithError(t, &ctaphid.CTAPError{
+			err := runConfirmedResetWithError(t, &ctaptransport.CTAPError{
 				Command:    protocol.AuthenticatorReset,
 				StatusCode: status,
 			})
@@ -243,9 +244,9 @@ func TestResetTimeoutStatusMapsTimeout(t *testing.T) {
 }
 
 func TestResetNotAllowedForOtherCommandDoesNotMapWindowExpired(t *testing.T) {
-	err := runConfirmedResetWithError(t, &ctaphid.CTAPError{
+	err := runConfirmedResetWithError(t, &ctaptransport.CTAPError{
 		Command:    protocol.AuthenticatorMakeCredential,
-		StatusCode: ctaphid.CTAP2_ERR_NOT_ALLOWED,
+		StatusCode: ctaptransport.CTAP2_ERR_NOT_ALLOWED,
 	})
 
 	if errors.Is(err, appconfig.ErrResetWindowExpired) {
@@ -259,16 +260,16 @@ func TestResetNotAllowedForOtherCommandDoesNotMapWindowExpired(t *testing.T) {
 
 func TestRunReturnsNormalizedCTAPErrorCategory(t *testing.T) {
 	events := &recordingEventSink{}
-	err := runConfirmedResetWithErrorAndEvents(t, events, &ctaphid.CTAPError{
+	err := runConfirmedResetWithErrorAndEvents(t, events, &ctaptransport.CTAPError{
 		Command:    protocol.AuthenticatorReset,
-		StatusCode: ctaphid.CTAP2_ERR_ACTION_TIMEOUT,
+		StatusCode: ctaptransport.CTAP2_ERR_ACTION_TIMEOUT,
 	})
 
 	if !model.IsErrorCategory(err, model.ErrorTimeout) {
 		t.Fatalf("Run error = %v, want timeout", err)
 	}
 
-	if _, ok := errors.AsType[*ctaphid.CTAPError](err); !ok {
+	if _, ok := errors.AsType[*ctaptransport.CTAPError](err); !ok {
 		t.Fatalf("Run error = %v, want original CTAPError in chain", err)
 	}
 }
@@ -284,9 +285,9 @@ func TestPINMutationCTAPStatusMapsSentinel(t *testing.T) {
 			name:      "set PIN policy violation",
 			operation: model.SetPINOperation{NewPIN: "1234", Confirmed: true},
 			auth: &pinMutationCountingAuthenticator{
-				setErr: &ctaphid.CTAPError{
+				setErr: &ctaptransport.CTAPError{
 					Command:    protocol.AuthenticatorClientPIN,
-					StatusCode: ctaphid.CTAP2_ERR_PIN_POLICY_VIOLATION,
+					StatusCode: ctaptransport.CTAP2_ERR_PIN_POLICY_VIOLATION,
 				},
 			},
 			want: appconfig.ErrPINPolicyViolation,
@@ -296,9 +297,9 @@ func TestPINMutationCTAPStatusMapsSentinel(t *testing.T) {
 			operation: model.ChangePINOperation{CurrentPIN: "1234", NewPIN: "5678", Confirmed: true},
 			auth: &pinMutationCountingAuthenticator{
 				configured: true,
-				changeErr: &ctaphid.CTAPError{
+				changeErr: &ctaptransport.CTAPError{
 					Command:    protocol.AuthenticatorClientPIN,
-					StatusCode: ctaphid.CTAP2_ERR_PIN_INVALID,
+					StatusCode: ctaptransport.CTAP2_ERR_PIN_INVALID,
 				},
 			},
 			want: appconfig.ErrPINInvalid,
@@ -334,9 +335,9 @@ func TestBioEnrollmentCTAPStatusMapsSentinel(t *testing.T) {
 			name:      "database full",
 			operation: model.BioEnrollOperation{Confirmed: true},
 			auth: &bioErrorAuthenticator{
-				beginErr: &ctaphid.CTAPError{
+				beginErr: &ctaptransport.CTAPError{
 					Command:    protocol.AuthenticatorBioEnrollment,
-					StatusCode: ctaphid.CTAP2_ERR_FP_DATABASE_FULL,
+					StatusCode: ctaptransport.CTAP2_ERR_FP_DATABASE_FULL,
 				},
 			},
 			want: appconfig.ErrBioDatabaseFull,
@@ -345,9 +346,9 @@ func TestBioEnrollmentCTAPStatusMapsSentinel(t *testing.T) {
 			name:      "template missing",
 			operation: model.BioRemoveOperation{TemplateIDHex: "c05e", Confirmed: true},
 			auth: &bioErrorAuthenticator{
-				removeErr: &ctaphid.CTAPError{
+				removeErr: &ctaptransport.CTAPError{
 					Command:    protocol.AuthenticatorBioEnrollment,
-					StatusCode: ctaphid.CTAP2_ERR_INVALID_OPTION,
+					StatusCode: ctaptransport.CTAP2_ERR_INVALID_OPTION,
 				},
 			},
 			want: appconfig.ErrBioEnrollmentNotFound,
@@ -369,6 +370,90 @@ func TestBioEnrollmentCTAPStatusMapsSentinel(t *testing.T) {
 				t.Fatalf("Run category = %v, want invalid-state", err)
 			}
 		})
+	}
+}
+
+func TestRunContextReachesTokenAndAuthenticatorCommand(t *testing.T) {
+	type contextKey struct{}
+
+	a := &contextRecordingConfigAuthenticator{}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	marker := new(int)
+	ctx := context.WithValue(context.Background(), contextKey{}, marker)
+	if _, err := session.Run(ctx, model.SetAlwaysUVOperation{Target: appconfig.AlwaysUVTargetEnable, Confirmed: true}, userVerificationHandler(t)); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	if got := a.tokenCtx.Value(contextKey{}); got != marker {
+		t.Fatalf("token context value = %v, want marker", got)
+	}
+	if got := a.commandCtx.Value(contextKey{}); got != marker {
+		t.Fatalf("command context value = %v, want marker", got)
+	}
+}
+
+func TestBioEnrollmentCleanupUsesBoundedIndependentContext(t *testing.T) {
+	type contextKey struct{}
+
+	operationErr := errors.New("capture failed")
+	cleanupErr := context.DeadlineExceeded
+	ctx, cancel := context.WithCancel(context.WithValue(context.Background(), contextKey{}, "marker"))
+	a := &bioCleanupAuthenticator{
+		cancelOperation: cancel,
+		captureErr:      operationErr,
+		cleanupErr:      cleanupErr,
+	}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	result, err := session.Run(ctx, model.BioEnrollOperation{Confirmed: true}, userVerificationHandler(t))
+	if !errors.Is(err, operationErr) {
+		t.Fatalf("Run error = %v, want original capture error", err)
+	}
+	output := result.(model.BioEnrollOutput)
+	if output.Result == nil || !output.Result.CancelAttempted || output.Result.CancelSucceeded {
+		t.Fatalf("bio result = %#v, want failed cleanup attempt", output.Result)
+	}
+	if a.cleanupCtx == nil {
+		t.Fatal("cleanup context was not recorded")
+	}
+	if err := a.cleanupContextErr; err != nil {
+		t.Fatalf("cleanup context was already canceled during command: %v", err)
+	}
+	if got := a.cleanupCtx.Value(contextKey{}); got != "marker" {
+		t.Fatalf("cleanup context value = %v, want marker", got)
+	}
+	deadline, ok := a.cleanupCtx.Deadline()
+	if !ok {
+		t.Fatal("cleanup context has no deadline")
+	}
+	remaining := time.Until(deadline)
+	if remaining <= 0 || remaining > 2*time.Second {
+		t.Fatalf("cleanup deadline remaining = %v, want within two seconds", remaining)
+	}
+}
+
+func TestBioEnrollmentSuccessfulCleanupIsReported(t *testing.T) {
+	operationErr := errors.New("capture failed")
+	a := &bioCleanupAuthenticator{captureErr: operationErr}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	result, err := session.Run(context.Background(), model.BioEnrollOperation{Confirmed: true}, userVerificationHandler(t))
+	if !errors.Is(err, operationErr) {
+		t.Fatalf("Run error = %v, want original capture error", err)
+	}
+	output := result.(model.BioEnrollOutput)
+	if output.Result == nil || !output.Result.CancelAttempted || !output.Result.CancelSucceeded {
+		t.Fatalf("bio result = %#v, want successful cleanup", output.Result)
 	}
 }
 
@@ -410,6 +495,84 @@ type bioErrorAuthenticator struct {
 	removeErr error
 }
 
+type contextRecordingConfigAuthenticator struct {
+	contractAuthenticator
+	tokenCtx   context.Context
+	commandCtx context.Context
+}
+
+func (a *contextRecordingConfigAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	return protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{
+		protocol.OptionAuthenticatorConfig: true,
+		protocol.OptionPinUvAuthToken:      true,
+		protocol.OptionUserVerification:    true,
+		protocol.OptionUvAcfg:              true,
+		protocol.OptionAlwaysUv:            false,
+	}}
+}
+
+func (a *contextRecordingConfigAuthenticator) GetPinUvAuthTokenUsingUV(
+	ctx context.Context,
+	_ protocol.Permission,
+	_ string,
+) ([]byte, error) {
+	a.tokenCtx = ctx
+
+	return []byte("token"), nil
+}
+
+func (a *contextRecordingConfigAuthenticator) ToggleAlwaysUV(ctx context.Context, _ []byte) error {
+	a.commandCtx = ctx
+
+	return nil
+}
+
+type bioCleanupAuthenticator struct {
+	contractAuthenticator
+	cancelOperation   context.CancelFunc
+	captureErr        error
+	cleanupErr        error
+	cleanupCtx        context.Context
+	cleanupContextErr error
+}
+
+func (a *bioCleanupAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	return protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{
+		protocol.OptionBioEnroll:        true,
+		protocol.OptionUvBioEnroll:      true,
+		protocol.OptionPinUvAuthToken:   true,
+		protocol.OptionUserVerification: true,
+	}}
+}
+
+func (a *bioCleanupAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
+	return []byte("token"), nil
+}
+
+func (a *bioCleanupAuthenticator) EnrollBegin(context.Context, []byte, uint) (protocol.AuthenticatorBioEnrollmentResponse, error) {
+	remaining := uint(1)
+
+	return protocol.AuthenticatorBioEnrollmentResponse{
+		TemplateID:       []byte("template"),
+		RemainingSamples: &remaining,
+	}, nil
+}
+
+func (a *bioCleanupAuthenticator) EnrollCaptureNextSample(context.Context, []byte, []byte, uint) (protocol.AuthenticatorBioEnrollmentResponse, error) {
+	if a.cancelOperation != nil {
+		a.cancelOperation()
+	}
+
+	return protocol.AuthenticatorBioEnrollmentResponse{}, a.captureErr
+}
+
+func (a *bioCleanupAuthenticator) CancelCurrentEnrollment(ctx context.Context) error {
+	a.cleanupCtx = ctx
+	a.cleanupContextErr = ctx.Err()
+
+	return a.cleanupErr
+}
+
 func (a *bioErrorAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
 	return protocol.AuthenticatorGetInfoResponse{
 		Options: map[protocol.Option]bool{
@@ -421,15 +584,15 @@ func (a *bioErrorAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse 
 	}
 }
 
-func (a *bioErrorAuthenticator) GetPinUvAuthTokenUsingUV(protocol.Permission, string) ([]byte, error) {
+func (a *bioErrorAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
 	return []byte("token"), nil
 }
 
-func (a *bioErrorAuthenticator) EnrollBegin([]byte, uint) (protocol.AuthenticatorBioEnrollmentResponse, error) {
+func (a *bioErrorAuthenticator) EnrollBegin(context.Context, []byte, uint) (protocol.AuthenticatorBioEnrollmentResponse, error) {
 	return protocol.AuthenticatorBioEnrollmentResponse{}, a.beginErr
 }
 
-func (a *bioErrorAuthenticator) RemoveEnrollment([]byte, []byte) error {
+func (a *bioErrorAuthenticator) RemoveEnrollment(context.Context, []byte, []byte) error {
 	return a.removeErr
 }
 
@@ -447,11 +610,11 @@ func (a *bioSensorAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse
 	}
 }
 
-func (a *bioSensorAuthenticator) GetBioModality() (protocol.AuthenticatorBioEnrollmentResponse, error) {
+func (a *bioSensorAuthenticator) GetBioModality(context.Context) (protocol.AuthenticatorBioEnrollmentResponse, error) {
 	return protocol.AuthenticatorBioEnrollmentResponse{Modality: &a.modality}, nil
 }
 
-func (a *bioSensorAuthenticator) GetFingerprintSensorInfo() (protocol.AuthenticatorBioEnrollmentResponse, error) {
+func (a *bioSensorAuthenticator) GetFingerprintSensorInfo(context.Context) (protocol.AuthenticatorBioEnrollmentResponse, error) {
 	return protocol.AuthenticatorBioEnrollmentResponse{FingerprintKind: &a.fingerprintKind}, nil
 }
 

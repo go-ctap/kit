@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
+	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/transport"
 )
 
@@ -33,6 +34,7 @@ func TestSessionCloseClosesAuthenticatorOnce(t *testing.T) {
 	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
+	defer func() { _ = session.Close() }()
 
 	firstErr := make(chan error, 1)
 	secondErr := make(chan error, 1)
@@ -198,6 +200,43 @@ func TestSessionCloseDoesNotWaitForStuckInteractionHandler(t *testing.T) {
 	}
 
 	close(unblockHandler)
+}
+
+func TestSessionCloseCancelsBlockedAuthenticatorCommand(t *testing.T) {
+	a := &blockingConfigAuthenticator{commandEntered: make(chan struct{})}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	runDone := make(chan error, 1)
+	go func() {
+		_, err := session.Run(
+			context.Background(),
+			model.SetAlwaysUVOperation{Target: appconfig.AlwaysUVTargetEnable, Confirmed: true},
+			userVerificationHandler(t),
+		)
+		runDone <- err
+	}()
+
+	select {
+	case <-a.commandEntered:
+	case <-time.After(time.Second):
+		t.Fatal("Run did not reach authenticator command")
+	}
+
+	if err := session.Close(); err != nil {
+		t.Fatalf("Session.Close: %v", err)
+	}
+
+	select {
+	case err := <-runDone:
+		if !model.IsErrorCategory(err, model.ErrorCanceled) {
+			t.Fatalf("Run error = %v, want canceled", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("blocked authenticator command did not observe cancellation")
+	}
 }
 
 func TestRunAfterSessionCloseIsRejected(t *testing.T) {

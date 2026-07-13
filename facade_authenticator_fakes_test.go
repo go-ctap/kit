@@ -22,35 +22,36 @@ func (a *contractAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse 
 
 func (a *contractAuthenticator) Close() error { return nil }
 
-func (a *contractAuthenticator) GetPinUvAuthTokenUsingPIN(string, protocol.Permission, string) ([]byte, error) {
+func (a *contractAuthenticator) GetPinUvAuthTokenUsingPIN(context.Context, string, protocol.Permission, string) ([]byte, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) GetPinUvAuthTokenUsingUV(protocol.Permission, string) ([]byte, error) {
+func (a *contractAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) GetCredsMetadata([]byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
+func (a *contractAuthenticator) GetCredsMetadata(context.Context, []byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
 	return protocol.AuthenticatorCredentialManagementResponse{}, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) EnumerateRPs([]byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+func (a *contractAuthenticator) EnumerateRPs(context.Context, []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
 	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {}
 }
 
-func (a *contractAuthenticator) EnumerateCredentials([]byte, []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+func (a *contractAuthenticator) EnumerateCredentials(context.Context, []byte, []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
 	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {}
 }
 
-func (a *contractAuthenticator) DeleteCredential([]byte, credential.PublicKeyCredentialDescriptor) error {
+func (a *contractAuthenticator) DeleteCredential(context.Context, []byte, credential.PublicKeyCredentialDescriptor) error {
 	return errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) UpdateUserInformation([]byte, credential.PublicKeyCredentialDescriptor, credential.PublicKeyCredentialUserEntity) error {
+func (a *contractAuthenticator) UpdateUserInformation(context.Context, []byte, credential.PublicKeyCredentialDescriptor, credential.PublicKeyCredentialUserEntity) error {
 	return errors.New("not implemented")
 }
 
 func (a *contractAuthenticator) MakeCredential(
+	context.Context,
 	[]byte,
 	[]byte,
 	credential.PublicKeyCredentialRpEntity,
@@ -66,6 +67,7 @@ func (a *contractAuthenticator) MakeCredential(
 }
 
 func (a *contractAuthenticator) GetAssertion(
+	context.Context,
 	[]byte,
 	string,
 	[]byte,
@@ -76,54 +78,62 @@ func (a *contractAuthenticator) GetAssertion(
 	return func(yield func(protocol.AuthenticatorGetAssertionResponse, error) bool) {}
 }
 
-func (a *contractAuthenticator) GetLargeBlobs() ([]protocol.LargeBlob, error) {
+func (a *contractAuthenticator) GetLargeBlobs(context.Context) ([]protocol.LargeBlob, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) SetLargeBlobs([]byte, []protocol.LargeBlob) error {
+func (a *contractAuthenticator) SetLargeBlobs(context.Context, []byte, []protocol.LargeBlob) error {
 	return errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) GetPINRetries() (uint, *bool, error) { return 0, nil, nil }
-func (a *contractAuthenticator) GetUVRetries() (uint, error)         { return 0, nil }
-func (a *contractAuthenticator) SetPIN(string) error                 { return errors.New("not implemented") }
-func (a *contractAuthenticator) ChangePIN(string, string) error      { return errors.New("not implemented") }
-func (a *contractAuthenticator) Reset() error                        { return errors.New("not implemented") }
-func (a *contractAuthenticator) ToggleAlwaysUV([]byte) error         { return errors.New("not implemented") }
-
-func (a *contractAuthenticator) SetMinPINLength([]byte, uint, []string, bool, bool) error {
+func (a *contractAuthenticator) GetPINRetries(context.Context) (uint, *bool, error) {
+	return 0, nil, nil
+}
+func (a *contractAuthenticator) GetUVRetries(context.Context) (uint, error) { return 0, nil }
+func (a *contractAuthenticator) SetPIN(context.Context, string) error {
+	return errors.New("not implemented")
+}
+func (a *contractAuthenticator) ChangePIN(context.Context, string, string) error {
+	return errors.New("not implemented")
+}
+func (a *contractAuthenticator) Reset(context.Context) error { return errors.New("not implemented") }
+func (a *contractAuthenticator) ToggleAlwaysUV(context.Context, []byte) error {
 	return errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) GetBioModality() (protocol.AuthenticatorBioEnrollmentResponse, error) {
-	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
-}
-
-func (a *contractAuthenticator) GetFingerprintSensorInfo() (protocol.AuthenticatorBioEnrollmentResponse, error) {
-	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
-}
-
-func (a *contractAuthenticator) EnrollBegin([]byte, uint) (protocol.AuthenticatorBioEnrollmentResponse, error) {
-	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
-}
-
-func (a *contractAuthenticator) EnrollCaptureNextSample([]byte, []byte, uint) (protocol.AuthenticatorBioEnrollmentResponse, error) {
-	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
-}
-
-func (a *contractAuthenticator) CancelCurrentEnrollment() error {
+func (a *contractAuthenticator) SetMinPINLength(context.Context, []byte, uint, []string, bool, bool) error {
 	return errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) EnumerateEnrollments([]byte) (protocol.AuthenticatorBioEnrollmentResponse, error) {
+func (a *contractAuthenticator) GetBioModality(context.Context) (protocol.AuthenticatorBioEnrollmentResponse, error) {
 	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) SetFriendlyName([]byte, []byte, string) error {
+func (a *contractAuthenticator) GetFingerprintSensorInfo(context.Context) (protocol.AuthenticatorBioEnrollmentResponse, error) {
+	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
+}
+
+func (a *contractAuthenticator) EnrollBegin(context.Context, []byte, uint) (protocol.AuthenticatorBioEnrollmentResponse, error) {
+	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
+}
+
+func (a *contractAuthenticator) EnrollCaptureNextSample(context.Context, []byte, []byte, uint) (protocol.AuthenticatorBioEnrollmentResponse, error) {
+	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
+}
+
+func (a *contractAuthenticator) CancelCurrentEnrollment(context.Context) error {
 	return errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) RemoveEnrollment([]byte, []byte) error {
+func (a *contractAuthenticator) EnumerateEnrollments(context.Context, []byte) (protocol.AuthenticatorBioEnrollmentResponse, error) {
+	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
+}
+
+func (a *contractAuthenticator) SetFriendlyName(context.Context, []byte, []byte, string) error {
+	return errors.New("not implemented")
+}
+
+func (a *contractAuthenticator) RemoveEnrollment(context.Context, []byte, []byte) error {
 	return errors.New("not implemented")
 }
 
@@ -168,19 +178,19 @@ func (a *pinMutationCountingAuthenticator) GetInfo() protocol.AuthenticatorGetIn
 	}
 }
 
-func (a *pinMutationCountingAuthenticator) SetPIN(string) error {
+func (a *pinMutationCountingAuthenticator) SetPIN(context.Context, string) error {
 	a.setCalls.Add(1)
 
 	return a.setErr
 }
 
-func (a *pinMutationCountingAuthenticator) ChangePIN(string, string) error {
+func (a *pinMutationCountingAuthenticator) ChangePIN(context.Context, string, string) error {
 	a.changeCalls.Add(1)
 
 	return a.changeErr
 }
 
-func (a *resetCountingAuthenticator) Reset() error {
+func (a *resetCountingAuthenticator) Reset(context.Context) error {
 	if a.events != nil {
 		for _, event := range a.events.Events() {
 			if event.Stage == model.OperationStageInteractionRequired &&
@@ -216,7 +226,7 @@ func (a *uvTokenAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
 	}
 }
 
-func (a *uvTokenAuthenticator) GetPinUvAuthTokenUsingUV(protocol.Permission, string) ([]byte, error) {
+func (a *uvTokenAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
 	for _, event := range a.events.Events() {
 		if event.Stage == model.OperationStageInteractionRequired &&
 			event.Kind == model.InteractionKindUserVerification {
@@ -231,7 +241,7 @@ func (a *uvTokenAuthenticator) GetPinUvAuthTokenUsingUV(protocol.Permission, str
 	return []byte("token"), nil
 }
 
-func (a *uvTokenAuthenticator) ToggleAlwaysUV([]byte) error {
+func (a *uvTokenAuthenticator) ToggleAlwaysUV(context.Context, []byte) error {
 	return nil
 }
 
@@ -264,20 +274,20 @@ func (a *largeBlobWriteEventAuthenticator) GetInfo() protocol.AuthenticatorGetIn
 	}
 }
 
-func (a *largeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingUV(protocol.Permission, string) ([]byte, error) {
+func (a *largeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
 	a.tokenCalls.Add(1)
 
 	return []byte("token"), nil
 }
 
-func (a *largeBlobWriteEventAuthenticator) GetCredsMetadata([]byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
+func (a *largeBlobWriteEventAuthenticator) GetCredsMetadata(context.Context, []byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
 	return protocol.AuthenticatorCredentialManagementResponse{
 		ExistingResidentCredentialsCount:             1,
 		MaxPossibleRemainingResidentCredentialsCount: 10,
 	}, nil
 }
 
-func (a *largeBlobWriteEventAuthenticator) EnumerateRPs([]byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+func (a *largeBlobWriteEventAuthenticator) EnumerateRPs(context.Context, []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
 	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
 		a.rpEnumerations.Add(1)
 		if a.rpErr != nil {
@@ -293,7 +303,7 @@ func (a *largeBlobWriteEventAuthenticator) EnumerateRPs([]byte) iter.Seq2[protoc
 	}
 }
 
-func (a *largeBlobWriteEventAuthenticator) EnumerateCredentials([]byte, []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+func (a *largeBlobWriteEventAuthenticator) EnumerateCredentials(context.Context, []byte, []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
 	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
 		a.credentialEnumerations.Add(1)
 		var largeBlobKey []byte
@@ -315,7 +325,7 @@ func (a *largeBlobWriteEventAuthenticator) EnumerateCredentials([]byte, []byte) 
 	}
 }
 
-func (a *largeBlobWriteEventAuthenticator) GetLargeBlobs() ([]protocol.LargeBlob, error) {
+func (a *largeBlobWriteEventAuthenticator) GetLargeBlobs(context.Context) ([]protocol.LargeBlob, error) {
 	a.largeBlobReads.Add(1)
 	if a.cancelLargeBlobRead != nil {
 		a.cancelLargeBlobRead()
@@ -327,7 +337,7 @@ func (a *largeBlobWriteEventAuthenticator) GetLargeBlobs() ([]protocol.LargeBlob
 	return cloneTestLargeBlobs(a.largeBlobs), nil
 }
 
-func (a *largeBlobWriteEventAuthenticator) SetLargeBlobs(_ []byte, blobs []protocol.LargeBlob) error {
+func (a *largeBlobWriteEventAuthenticator) SetLargeBlobs(_ context.Context, _ []byte, blobs []protocol.LargeBlob) error {
 	a.largeBlobWrites.Add(1)
 	a.lastSetLargeBlobs = cloneTestLargeBlobs(blobs)
 
@@ -370,6 +380,7 @@ func (a *pinOnlyLargeBlobWriteEventAuthenticator) GetInfo() protocol.Authenticat
 }
 
 func (a *pinOnlyLargeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingPIN(
+	context.Context,
 	string,
 	protocol.Permission,
 	string,
@@ -384,6 +395,7 @@ func (a *pinOnlyLargeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingPIN(
 }
 
 func (a *pinOnlyLargeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingUV(
+	context.Context,
 	protocol.Permission,
 	string,
 ) ([]byte, error) {
@@ -399,6 +411,7 @@ type pinPreferredLargeBlobWriteEventAuthenticator struct {
 }
 
 func (a *pinPreferredLargeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingPIN(
+	context.Context,
 	string,
 	protocol.Permission,
 	string,
@@ -409,6 +422,7 @@ func (a *pinPreferredLargeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingPIN
 }
 
 func (a *pinPreferredLargeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingUV(
+	context.Context,
 	protocol.Permission,
 	string,
 ) ([]byte, error) {
@@ -421,6 +435,36 @@ type cancelablePINAuthenticator struct {
 	pinOnlyLargeBlobWriteEventAuthenticator
 	closeStarted chan struct{}
 	closeCount   atomic.Int32
+}
+
+type blockingConfigAuthenticator struct {
+	contractAuthenticator
+	commandEntered chan struct{}
+}
+
+func (a *blockingConfigAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	return protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{
+		protocol.OptionAuthenticatorConfig: true,
+		protocol.OptionPinUvAuthToken:      true,
+		protocol.OptionUserVerification:    true,
+		protocol.OptionUvAcfg:              true,
+		protocol.OptionAlwaysUv:            false,
+	}}
+}
+
+func (a *blockingConfigAuthenticator) GetPinUvAuthTokenUsingUV(
+	context.Context,
+	protocol.Permission,
+	string,
+) ([]byte, error) {
+	return []byte("token"), nil
+}
+
+func (a *blockingConfigAuthenticator) ToggleAlwaysUV(ctx context.Context, _ []byte) error {
+	close(a.commandEntered)
+	<-ctx.Done()
+
+	return ctx.Err()
 }
 
 func (a *cancelablePINAuthenticator) Close() error {

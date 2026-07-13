@@ -49,7 +49,7 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 		}
 		defer secret.Zero(token)
 
-		response, err := r.callMakeCredential(token, input)
+		response, err := r.callMakeCredential(ctx, token, input)
 		if err != nil {
 			return output, annotateMakeCredentialError(err)
 		}
@@ -63,7 +63,7 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 		return output, nil
 	}
 
-	response, err := r.callMakeCredential(nil, input)
+	response, err := r.callMakeCredential(ctx, nil, input)
 	if err != nil {
 		return output, annotateMakeCredentialError(err)
 	}
@@ -98,6 +98,7 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 	readAssertions := func(token []byte) error {
 		var index uint
 		for response, err := range r.webAuthnManager().GetAssertion(
+			ctx,
 			token,
 			input.RPID,
 			input.ClientDataJSON,
@@ -135,10 +136,12 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 }
 
 func (r Runner) callMakeCredential(
+	ctx context.Context,
 	token []byte,
 	input appwebauthn.MakeCredentialInput,
 ) (protocol.AuthenticatorMakeCredentialResponse, error) {
 	return r.webAuthnManager().MakeCredential(
+		ctx,
 		token,
 		input.ClientDataJSON,
 		input.RP,

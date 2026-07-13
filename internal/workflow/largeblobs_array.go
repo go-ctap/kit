@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"context"
 	"fmt"
 	"slices"
 
@@ -50,8 +51,8 @@ func checkSerializedArrayLimit(limit *uint, size int) error {
 	return model.NewRuntimeError(model.ErrorInvalidState, "large blob array capacity would be exceeded", cause)
 }
 
-func (r Runner) readLargeBlobArray() ([]protocol.LargeBlob, error) {
-	blobs, err := r.largeBlobManager().GetLargeBlobs()
+func (r Runner) readLargeBlobArray(ctx context.Context) ([]protocol.LargeBlob, error) {
+	blobs, err := r.largeBlobManager().GetLargeBlobs(ctx)
 	if err != nil {
 		return nil, err
 	}

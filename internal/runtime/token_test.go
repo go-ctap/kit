@@ -296,6 +296,7 @@ func (d *recordingTokenDevice) GetInfo() protocol.AuthenticatorGetInfoResponse {
 }
 
 func (d *recordingTokenDevice) GetPinUvAuthTokenUsingPIN(
+	_ context.Context,
 	_ string,
 	_ protocol.Permission,
 	rpID string,
@@ -305,7 +306,7 @@ func (d *recordingTokenDevice) GetPinUvAuthTokenUsingPIN(
 	return []byte("pin-token-" + rpID), nil
 }
 
-func (d *recordingTokenDevice) GetPinUvAuthTokenUsingUV(_ protocol.Permission, rpID string) ([]byte, error) {
+func (d *recordingTokenDevice) GetPinUvAuthTokenUsingUV(_ context.Context, _ protocol.Permission, rpID string) ([]byte, error) {
 	if d.requests != nil && len(*d.requests) > 0 {
 		last := (*d.requests)[len(*d.requests)-1]
 		d.uvSawInteraction = last.Kind == model.InteractionKindUserVerification

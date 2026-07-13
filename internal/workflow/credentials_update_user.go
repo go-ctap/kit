@@ -92,7 +92,7 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 	}
 	defer secret.Zero(token)
 
-	if err := r.credentialManager().UpdateUserInformation(token, descriptor, updatedUser); err != nil {
+	if err := r.credentialManager().UpdateUserInformation(ctx, token, descriptor, updatedUser); err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithCredentialManagementSubCommand(
 			model.OperationUpdateCredentialUser,
 			credentialManagementCommand(r.infoProvider().GetInfo()),

@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/ctap/transport/ctaphid"
+	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
@@ -123,7 +123,7 @@ func Annotate(err error, ctx Context) error {
 		return err
 	}
 
-	if _, ok := errors.AsType[*ctaphid.CTAPError](err); !ok {
+	if _, ok := errors.AsType[*ctaptransport.CTAPError](err); !ok {
 		return err
 	}
 
@@ -139,7 +139,7 @@ func Normalize(err error) error {
 		return err
 	}
 
-	ctapErr, ok := errors.AsType[*ctaphid.CTAPError](err)
+	ctapErr, ok := errors.AsType[*ctaptransport.CTAPError](err)
 	if !ok {
 		return err
 	}
@@ -170,7 +170,7 @@ type rule struct {
 	sentinel error
 }
 
-func commandRule(status ctaphid.StatusCode, ctx Context) (rule, bool) {
+func commandRule(status ctaptransport.StatusCode, ctx Context) (rule, bool) {
 	switch ctx.Command {
 	case protocol.AuthenticatorMakeCredential:
 		return makeCredentialRule(status, ctx)
@@ -199,73 +199,73 @@ func commandRule(status ctaphid.StatusCode, ctx Context) (rule, bool) {
 	}
 }
 
-func makeCredentialRule(status ctaphid.StatusCode, _ Context) (rule, bool) {
+func makeCredentialRule(status ctaptransport.StatusCode, _ Context) (rule, bool) {
 	switch status {
-	case ctaphid.CTAP2_ERR_CREDENTIAL_EXCLUDED:
+	case ctaptransport.CTAP2_ERR_CREDENTIAL_EXCLUDED:
 		return invalidState("credential is excluded by the authenticator", appcredentials.ErrCredentialExcluded), true
-	case ctaphid.CTAP2_ERR_KEY_STORE_FULL:
+	case ctaptransport.CTAP2_ERR_KEY_STORE_FULL:
 		return invalidState("authenticator credential storage is full", appcredentials.ErrCredentialStoreFull), true
-	case ctaphid.CTAP2_ERR_OPERATION_DENIED:
+	case ctaptransport.CTAP2_ERR_OPERATION_DENIED:
 		return invalidState("authenticator denied credential creation", appconfig.ErrOperationDenied), true
 	}
 
 	return rule{}, false
 }
 
-func getAssertionRule(status ctaphid.StatusCode, _ Context) (rule, bool) {
+func getAssertionRule(status ctaptransport.StatusCode, _ Context) (rule, bool) {
 	switch status {
-	case ctaphid.CTAP2_ERR_NO_CREDENTIALS, ctaphid.CTAP2_ERR_INVALID_CREDENTIAL:
+	case ctaptransport.CTAP2_ERR_NO_CREDENTIALS, ctaptransport.CTAP2_ERR_INVALID_CREDENTIAL:
 		return invalidState("authenticator found no matching credentials", appcredentials.ErrCredentialNotFound), true
-	case ctaphid.CTAP2_ERR_OPERATION_DENIED:
+	case ctaptransport.CTAP2_ERR_OPERATION_DENIED:
 		return invalidState("authenticator denied assertion", appconfig.ErrOperationDenied), true
 	}
 
 	return rule{}, false
 }
 
-func getNextAssertionRule(status ctaphid.StatusCode, _ Context) (rule, bool) {
+func getNextAssertionRule(status ctaptransport.StatusCode, _ Context) (rule, bool) {
 	switch status {
-	case ctaphid.CTAP2_ERR_NOT_ALLOWED:
+	case ctaptransport.CTAP2_ERR_NOT_ALLOWED:
 		return invalidState("authenticator has no pending assertion continuation", nil), true
 	}
 
 	return rule{}, false
 }
 
-func getInfoRule(status ctaphid.StatusCode, _ Context) (rule, bool) {
+func getInfoRule(status ctaptransport.StatusCode, _ Context) (rule, bool) {
 	switch status {
-	case ctaphid.CTAP1_ERR_INVALID_COMMAND:
+	case ctaptransport.CTAP1_ERR_INVALID_COMMAND:
 		return unsupported("authenticator does not support CTAP getInfo", nil), true
 	}
 
 	return rule{}, false
 }
 
-func clientPINRule(status ctaphid.StatusCode, ctx Context) (rule, bool) {
+func clientPINRule(status ctaptransport.StatusCode, ctx Context) (rule, bool) {
 	switch status {
-	case ctaphid.CTAP2_ERR_PIN_INVALID:
+	case ctaptransport.CTAP2_ERR_PIN_INVALID:
 		return invalidState("PIN is invalid", appconfig.ErrPINInvalid), true
-	case ctaphid.CTAP2_ERR_PIN_BLOCKED:
+	case ctaptransport.CTAP2_ERR_PIN_BLOCKED:
 		return invalidState("PIN is blocked", appconfig.ErrPINBlocked), true
-	case ctaphid.CTAP2_ERR_PIN_AUTH_INVALID:
+	case ctaptransport.CTAP2_ERR_PIN_AUTH_INVALID:
 		return clientPINAuthInvalidRule(ctx), true
-	case ctaphid.CTAP2_ERR_PIN_AUTH_BLOCKED:
+	case ctaptransport.CTAP2_ERR_PIN_AUTH_BLOCKED:
 		return invalidState("PIN/UV auth is temporarily blocked; power-cycle the authenticator before retrying", appconfig.ErrPINAuthBlocked), true
-	case ctaphid.CTAP2_ERR_PIN_NOT_SET:
+	case ctaptransport.CTAP2_ERR_PIN_NOT_SET:
 		return invalidState("PIN is not configured", appconfig.ErrPINNotConfigured), true
-	case ctaphid.CTAP2_ERR_PUAT_REQUIRED:
+	case ctaptransport.CTAP2_ERR_PUAT_REQUIRED:
 		return invalidState("pinUvAuthToken is required", appconfig.ErrPinUvAuthRequired), true
-	case ctaphid.CTAP2_ERR_PIN_POLICY_VIOLATION:
+	case ctaptransport.CTAP2_ERR_PIN_POLICY_VIOLATION:
 		return invalidState("PIN policy violation", appconfig.ErrPINPolicyViolation), true
-	case ctaphid.CTAP2_ERR_UV_BLOCKED:
+	case ctaptransport.CTAP2_ERR_UV_BLOCKED:
 		return invalidState("user verification is blocked", appconfig.ErrUserVerificationBlocked), true
-	case ctaphid.CTAP2_ERR_UV_INVALID:
+	case ctaptransport.CTAP2_ERR_UV_INVALID:
 		return invalidState("user verification failed", appconfig.ErrUserVerificationInvalid), true
-	case ctaphid.CTAP2_ERR_UP_REQUIRED:
+	case ctaptransport.CTAP2_ERR_UP_REQUIRED:
 		return invalidState("user presence is required", appconfig.ErrUserPresenceRequired), true
-	case ctaphid.CTAP2_ERR_UNAUTHORIZED_PERMISSION:
+	case ctaptransport.CTAP2_ERR_UNAUTHORIZED_PERMISSION:
 		return invalidState("pinUvAuthToken permission is unauthorized", appconfig.ErrPINAuthInvalid), true
-	case ctaphid.CTAP2_ERR_OPERATION_DENIED:
+	case ctaptransport.CTAP2_ERR_OPERATION_DENIED:
 		return invalidState("authenticator denied PIN/UV operation", appconfig.ErrOperationDenied), true
 	}
 
@@ -284,36 +284,36 @@ func clientPINAuthInvalidRule(ctx Context) rule {
 	}
 }
 
-func resetRule(status ctaphid.StatusCode, _ Context) (rule, bool) {
+func resetRule(status ctaptransport.StatusCode, _ Context) (rule, bool) {
 	switch status {
-	case ctaphid.CTAP2_ERR_NOT_ALLOWED:
+	case ctaptransport.CTAP2_ERR_NOT_ALLOWED:
 		return rule{
 			category: model.ErrorInvalidState,
 			message:  "factory reset must be requested shortly after authenticator power-up; power-cycle or reconnect the authenticator and retry promptly",
 			sentinel: appconfig.ErrResetWindowExpired,
 		}, true
-	case ctaphid.CTAP2_ERR_USER_ACTION_TIMEOUT, ctaphid.CTAP2_ERR_ACTION_TIMEOUT:
+	case ctaptransport.CTAP2_ERR_USER_ACTION_TIMEOUT, ctaptransport.CTAP2_ERR_ACTION_TIMEOUT:
 		return timeout("timed out waiting for authenticator touch during factory reset", nil), true
-	case ctaphid.CTAP2_ERR_OPERATION_DENIED:
+	case ctaptransport.CTAP2_ERR_OPERATION_DENIED:
 		return invalidState("authenticator denied factory reset", appconfig.ErrOperationDenied), true
 	}
 
 	return rule{}, false
 }
 
-func bioEnrollmentRule(status ctaphid.StatusCode, ctx Context) (rule, bool) {
+func bioEnrollmentRule(status ctaptransport.StatusCode, ctx Context) (rule, bool) {
 	switch status {
-	case ctaphid.CTAP2_ERR_FP_DATABASE_FULL:
+	case ctaptransport.CTAP2_ERR_FP_DATABASE_FULL:
 		return invalidState("biometric enrollment database is full", appconfig.ErrBioDatabaseFull), true
-	case ctaphid.CTAP2_ERR_INVALID_OPTION:
+	case ctaptransport.CTAP2_ERR_INVALID_OPTION:
 		return bioInvalidOptionRule(ctx), true
-	case ctaphid.CTAP2_ERR_PUAT_REQUIRED:
+	case ctaptransport.CTAP2_ERR_PUAT_REQUIRED:
 		return invalidState("pinUvAuthToken is required for biometric enrollment", appconfig.ErrPinUvAuthRequired), true
-	case ctaphid.CTAP2_ERR_PIN_AUTH_INVALID:
+	case ctaptransport.CTAP2_ERR_PIN_AUTH_INVALID:
 		return invalidState("biometric enrollment token is invalid or unauthorized", appconfig.ErrPINAuthInvalid), true
-	case ctaphid.CTAP2_ERR_OPERATION_DENIED:
+	case ctaptransport.CTAP2_ERR_OPERATION_DENIED:
 		return invalidState("authenticator denied biometric enrollment operation", appconfig.ErrOperationDenied), true
-	case ctaphid.CTAP2_ERR_USER_ACTION_TIMEOUT, ctaphid.CTAP2_ERR_ACTION_TIMEOUT:
+	case ctaptransport.CTAP2_ERR_USER_ACTION_TIMEOUT, ctaptransport.CTAP2_ERR_ACTION_TIMEOUT:
 		return timeout("timed out waiting for biometric enrollment interaction", nil), true
 	}
 
@@ -332,128 +332,128 @@ func bioInvalidOptionRule(ctx Context) rule {
 	}
 }
 
-func credentialManagementRule(status ctaphid.StatusCode, _ Context) (rule, bool) {
+func credentialManagementRule(status ctaptransport.StatusCode, _ Context) (rule, bool) {
 	switch status {
-	case ctaphid.CTAP2_ERR_NO_CREDENTIALS, ctaphid.CTAP2_ERR_INVALID_CREDENTIAL:
+	case ctaptransport.CTAP2_ERR_NO_CREDENTIALS, ctaptransport.CTAP2_ERR_INVALID_CREDENTIAL:
 		return invalidState("authenticator found no matching resident credentials", appcredentials.ErrCredentialNotFound), true
-	case ctaphid.CTAP2_ERR_KEY_STORE_FULL:
+	case ctaptransport.CTAP2_ERR_KEY_STORE_FULL:
 		return invalidState("authenticator credential storage is full", appcredentials.ErrCredentialStoreFull), true
-	case ctaphid.CTAP2_ERR_PUAT_REQUIRED:
+	case ctaptransport.CTAP2_ERR_PUAT_REQUIRED:
 		return invalidState("pinUvAuthToken is required for credential management", appconfig.ErrPinUvAuthRequired), true
-	case ctaphid.CTAP2_ERR_PIN_AUTH_INVALID:
+	case ctaptransport.CTAP2_ERR_PIN_AUTH_INVALID:
 		return invalidState("credential management token is invalid or unauthorized", appconfig.ErrPINAuthInvalid), true
 	}
 
 	return rule{}, false
 }
 
-func selectionRule(status ctaphid.StatusCode, _ Context) (rule, bool) {
+func selectionRule(status ctaptransport.StatusCode, _ Context) (rule, bool) {
 	switch status {
-	case ctaphid.CTAP2_ERR_KEEPALIVE_CANCEL:
+	case ctaptransport.CTAP2_ERR_KEEPALIVE_CANCEL:
 		return canceled("authenticator selection was canceled", nil), true
-	case ctaphid.CTAP2_ERR_USER_ACTION_TIMEOUT, ctaphid.CTAP2_ERR_ACTION_TIMEOUT:
+	case ctaptransport.CTAP2_ERR_USER_ACTION_TIMEOUT, ctaptransport.CTAP2_ERR_ACTION_TIMEOUT:
 		return timeout("timed out waiting for authenticator selection", nil), true
 	}
 
 	return rule{}, false
 }
 
-func largeBlobsRule(status ctaphid.StatusCode, _ Context) (rule, bool) {
+func largeBlobsRule(status ctaptransport.StatusCode, _ Context) (rule, bool) {
 	switch status {
-	case ctaphid.CTAP2_ERR_LARGE_BLOB_STORAGE_FULL:
+	case ctaptransport.CTAP2_ERR_LARGE_BLOB_STORAGE_FULL:
 		return invalidState("authenticator large blob storage is full", applargeblobs.ErrLargeBlobStorageFull), true
-	case ctaphid.CTAP1_ERR_INVALID_SEQ:
+	case ctaptransport.CTAP1_ERR_INVALID_SEQ:
 		return invalidOperation("invalid large blob write sequence", applargeblobs.ErrLargeBlobWriteSequence), true
-	case ctaphid.CTAP2_ERR_INTEGRITY_FAILURE:
+	case ctaptransport.CTAP2_ERR_INTEGRITY_FAILURE:
 		return invalidState("large blob array integrity check failed", applargeblobs.ErrLargeBlobIntegrity), true
-	case ctaphid.CTAP2_ERR_PIN_AUTH_INVALID:
+	case ctaptransport.CTAP2_ERR_PIN_AUTH_INVALID:
 		return invalidState("large blob write token is invalid or unauthorized", appconfig.ErrPINAuthInvalid), true
-	case ctaphid.CTAP2_ERR_PUAT_REQUIRED:
+	case ctaptransport.CTAP2_ERR_PUAT_REQUIRED:
 		return invalidState("pinUvAuthToken is required for large blob write", appconfig.ErrPinUvAuthRequired), true
 	}
 
 	return rule{}, false
 }
 
-func configRule(status ctaphid.StatusCode, ctx Context) (rule, bool) {
+func configRule(status ctaptransport.StatusCode, ctx Context) (rule, bool) {
 	switch status {
-	case ctaphid.CTAP2_ERR_OPERATION_DENIED:
+	case ctaptransport.CTAP2_ERR_OPERATION_DENIED:
 		if protocol.ConfigSubCommand(ctx.SubCommand) == protocol.ConfigSubCommandToggleAlwaysUv {
 			return invalidState("authenticator does not allow disabling alwaysUv", appconfig.ErrOperationDenied), true
 		}
 
 		return invalidState("authenticator denied configuration operation", appconfig.ErrOperationDenied), true
-	case ctaphid.CTAP2_ERR_PIN_POLICY_VIOLATION:
+	case ctaptransport.CTAP2_ERR_PIN_POLICY_VIOLATION:
 		return invalidState("PIN policy violation", appconfig.ErrPINPolicyViolation), true
-	case ctaphid.CTAP2_ERR_PIN_NOT_SET:
+	case ctaptransport.CTAP2_ERR_PIN_NOT_SET:
 		return invalidState("PIN is not configured", appconfig.ErrPINNotConfigured), true
-	case ctaphid.CTAP2_ERR_KEY_STORE_FULL:
+	case ctaptransport.CTAP2_ERR_KEY_STORE_FULL:
 		return invalidState("authenticator configuration storage is full", appconfig.ErrAuthenticatorConfigStorageFull), true
-	case ctaphid.CTAP2_ERR_PUAT_REQUIRED:
+	case ctaptransport.CTAP2_ERR_PUAT_REQUIRED:
 		return invalidState("pinUvAuthToken is required for authenticator configuration", appconfig.ErrPinUvAuthRequired), true
-	case ctaphid.CTAP2_ERR_PIN_AUTH_INVALID:
+	case ctaptransport.CTAP2_ERR_PIN_AUTH_INVALID:
 		return invalidState("authenticator configuration token is invalid or unauthorized", appconfig.ErrPINAuthInvalid), true
 	}
 
 	return rule{}, false
 }
 
-func genericRule(status ctaphid.StatusCode, _ Context) rule {
+func genericRule(status ctaptransport.StatusCode, _ Context) rule {
 	switch status {
-	case ctaphid.CTAP1_ERR_INVALID_COMMAND,
-		ctaphid.CTAP2_ERR_UNSUPPORTED_ALGORITHM,
-		ctaphid.CTAP2_ERR_UNSUPPORTED_OPTION,
-		ctaphid.CTAP2_ERR_INVALID_SUBCOMMAND:
+	case ctaptransport.CTAP1_ERR_INVALID_COMMAND,
+		ctaptransport.CTAP2_ERR_UNSUPPORTED_ALGORITHM,
+		ctaptransport.CTAP2_ERR_UNSUPPORTED_OPTION,
+		ctaptransport.CTAP2_ERR_INVALID_SUBCOMMAND:
 		return unsupported("authenticator does not support the requested CTAP command or option", nil)
-	case ctaphid.CTAP1_ERR_INVALID_PARAMETER,
-		ctaphid.CTAP1_ERR_INVALID_LENGTH,
-		ctaphid.CTAP2_ERR_CBOR_UNEXPECTED_TYPE,
-		ctaphid.CTAP2_ERR_INVALID_CBOR,
-		ctaphid.CTAP2_ERR_MISSING_PARAMETER,
-		ctaphid.CTAP2_ERR_LIMIT_EXCEEDED,
-		ctaphid.CTAP2_ERR_REQUEST_TOO_LARGE,
-		ctaphid.CTAP2_ERR_INVALID_OPTION:
+	case ctaptransport.CTAP1_ERR_INVALID_PARAMETER,
+		ctaptransport.CTAP1_ERR_INVALID_LENGTH,
+		ctaptransport.CTAP2_ERR_CBOR_UNEXPECTED_TYPE,
+		ctaptransport.CTAP2_ERR_INVALID_CBOR,
+		ctaptransport.CTAP2_ERR_MISSING_PARAMETER,
+		ctaptransport.CTAP2_ERR_LIMIT_EXCEEDED,
+		ctaptransport.CTAP2_ERR_REQUEST_TOO_LARGE,
+		ctaptransport.CTAP2_ERR_INVALID_OPTION:
 		return invalidOperation("authenticator rejected invalid CTAP request parameters", nil)
-	case ctaphid.CTAP1_ERR_TIMEOUT,
-		ctaphid.CTAP2_ERR_USER_ACTION_TIMEOUT,
-		ctaphid.CTAP2_ERR_ACTION_TIMEOUT:
+	case ctaptransport.CTAP1_ERR_TIMEOUT,
+		ctaptransport.CTAP2_ERR_USER_ACTION_TIMEOUT,
+		ctaptransport.CTAP2_ERR_ACTION_TIMEOUT:
 		return timeout("CTAP operation timed out", nil)
-	case ctaphid.CTAP1_ERR_CHANNEL_BUSY,
-		ctaphid.CTAP2_ERR_PROCESSING,
-		ctaphid.CTAP2_ERR_USER_ACTION_PENDING,
-		ctaphid.CTAP2_ERR_OPERATION_PENDING:
+	case ctaptransport.CTAP1_ERR_CHANNEL_BUSY,
+		ctaptransport.CTAP2_ERR_PROCESSING,
+		ctaptransport.CTAP2_ERR_USER_ACTION_PENDING,
+		ctaptransport.CTAP2_ERR_OPERATION_PENDING:
 		return busy("authenticator is busy processing another operation", nil)
-	case ctaphid.CTAP2_ERR_KEEPALIVE_CANCEL:
+	case ctaptransport.CTAP2_ERR_KEEPALIVE_CANCEL:
 		return canceled("CTAP operation was canceled", nil)
-	case ctaphid.CTAP2_ERR_NO_OPERATIONS,
-		ctaphid.CTAP2_ERR_NOT_ALLOWED,
-		ctaphid.CTAP2_ERR_OPERATION_DENIED,
-		ctaphid.CTAP2_ERR_INVALID_CREDENTIAL,
-		ctaphid.CTAP2_ERR_PIN_INVALID,
-		ctaphid.CTAP2_ERR_PIN_BLOCKED,
-		ctaphid.CTAP2_ERR_PIN_AUTH_INVALID,
-		ctaphid.CTAP2_ERR_PIN_AUTH_BLOCKED,
-		ctaphid.CTAP2_ERR_PIN_NOT_SET,
-		ctaphid.CTAP2_ERR_PUAT_REQUIRED,
-		ctaphid.CTAP2_ERR_PIN_POLICY_VIOLATION,
-		ctaphid.CTAP2_ERR_UP_REQUIRED,
-		ctaphid.CTAP2_ERR_UV_BLOCKED,
-		ctaphid.CTAP2_ERR_UV_INVALID,
-		ctaphid.CTAP2_ERR_UNAUTHORIZED_PERMISSION,
-		ctaphid.CTAP2_ERR_CREDENTIAL_EXCLUDED,
-		ctaphid.CTAP2_ERR_NO_CREDENTIALS,
-		ctaphid.CTAP2_ERR_KEY_STORE_FULL,
-		ctaphid.CTAP2_ERR_FP_DATABASE_FULL,
-		ctaphid.CTAP2_ERR_LARGE_BLOB_STORAGE_FULL:
+	case ctaptransport.CTAP2_ERR_NO_OPERATIONS,
+		ctaptransport.CTAP2_ERR_NOT_ALLOWED,
+		ctaptransport.CTAP2_ERR_OPERATION_DENIED,
+		ctaptransport.CTAP2_ERR_INVALID_CREDENTIAL,
+		ctaptransport.CTAP2_ERR_PIN_INVALID,
+		ctaptransport.CTAP2_ERR_PIN_BLOCKED,
+		ctaptransport.CTAP2_ERR_PIN_AUTH_INVALID,
+		ctaptransport.CTAP2_ERR_PIN_AUTH_BLOCKED,
+		ctaptransport.CTAP2_ERR_PIN_NOT_SET,
+		ctaptransport.CTAP2_ERR_PUAT_REQUIRED,
+		ctaptransport.CTAP2_ERR_PIN_POLICY_VIOLATION,
+		ctaptransport.CTAP2_ERR_UP_REQUIRED,
+		ctaptransport.CTAP2_ERR_UV_BLOCKED,
+		ctaptransport.CTAP2_ERR_UV_INVALID,
+		ctaptransport.CTAP2_ERR_UNAUTHORIZED_PERMISSION,
+		ctaptransport.CTAP2_ERR_CREDENTIAL_EXCLUDED,
+		ctaptransport.CTAP2_ERR_NO_CREDENTIALS,
+		ctaptransport.CTAP2_ERR_KEY_STORE_FULL,
+		ctaptransport.CTAP2_ERR_FP_DATABASE_FULL,
+		ctaptransport.CTAP2_ERR_LARGE_BLOB_STORAGE_FULL:
 		return invalidState("authenticator rejected the CTAP operation in its current state", nil)
-	case ctaphid.CTAP1_ERR_INVALID_SEQ,
-		ctaphid.CTAP1_ERR_LOCK_REQUIRED,
-		ctaphid.CTAP1_ERR_INVALID_CHANNEL,
-		ctaphid.CTAP1_ERR_OTHER,
-		ctaphid.CTAP2_ERR_INTEGRITY_FAILURE:
+	case ctaptransport.CTAP1_ERR_INVALID_SEQ,
+		ctaptransport.CTAP1_ERR_LOCK_REQUIRED,
+		ctaptransport.CTAP1_ERR_INVALID_CHANNEL,
+		ctaptransport.CTAP1_ERR_OTHER,
+		ctaptransport.CTAP2_ERR_INTEGRITY_FAILURE:
 		return transportFailure("CTAP transport or framing failure", nil)
 	default:
-		if status >= ctaphid.CTAP2_ERR_SPEC_LAST {
+		if status >= ctaptransport.CTAP2_ERR_SPEC_LAST {
 			return transportFailure("CTAP command failed with reserved or vendor status", nil)
 		}
 

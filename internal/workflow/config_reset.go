@@ -44,7 +44,7 @@ func (r Runner) resetFactory(ctx context.Context, req model.ResetFactoryOperatio
 		return output, err
 	}
 
-	if err := r.configManager().Reset(); err != nil {
+	if err := r.configManager().Reset(ctx); err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithCommand(
 			model.OperationResetFactory,
 			protocol.AuthenticatorReset,

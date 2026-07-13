@@ -1,12 +1,66 @@
 package vendorinfo
 
 import (
+	"context"
 	"slices"
 	"testing"
 
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/token2"
 )
+
+func TestToken2PCSCCandidatePropagatesContext(t *testing.T) {
+	type contextKey struct{}
+
+	marker := new(int)
+	ctx := context.WithValue(context.Background(), contextKey{}, marker)
+	device := &recordingToken2PCSCDevice{
+		atr:    token2.ATRInfo{ProductID: 0x0102},
+		serial: "72103654095303",
+	}
+
+	candidate, ok := token2PCSCCandidate(ctx, device, 0x0102)
+	if !ok || candidate.metadata.Serial != device.serial {
+		t.Fatalf("candidate = %#v, ok = %v", candidate, ok)
+	}
+	for name, recorded := range map[string]context.Context{
+		"ATRInfo":      device.atrCtx,
+		"SerialNumber": device.serialCtx,
+		"Config":       device.configCtx,
+	} {
+		if got := recorded.Value(contextKey{}); got != marker {
+			t.Fatalf("%s context value = %v, want marker", name, got)
+		}
+	}
+}
+
+type recordingToken2PCSCDevice struct {
+	atr       token2.ATRInfo
+	serial    string
+	atrCtx    context.Context
+	serialCtx context.Context
+	configCtx context.Context
+}
+
+func (d *recordingToken2PCSCDevice) Close() error { return nil }
+
+func (d *recordingToken2PCSCDevice) ATRInfo(ctx context.Context) (token2.ATRInfo, error) {
+	d.atrCtx = ctx
+
+	return d.atr, nil
+}
+
+func (d *recordingToken2PCSCDevice) SerialNumber(ctx context.Context) (string, error) {
+	d.serialCtx = ctx
+
+	return d.serial, nil
+}
+
+func (d *recordingToken2PCSCDevice) Config(ctx context.Context) (token2.Config, error) {
+	d.configCtx = ctx
+
+	return token2.Config{}, nil
+}
 
 func TestToken2IdentityMetadata(t *testing.T) {
 	tests := []struct {

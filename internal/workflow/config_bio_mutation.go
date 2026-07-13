@@ -57,7 +57,7 @@ func (r Runner) renameBio(ctx context.Context, req model.BioRenameOperation) (mo
 	}
 	defer secret.Zero(token)
 
-	if err := r.bioEnrollmentManager().SetFriendlyName(token, templateID, req.FriendlyName); err != nil {
+	if err := r.bioEnrollmentManager().SetFriendlyName(ctx, token, templateID, req.FriendlyName); err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
 			model.OperationBioRename,
 			bioEnrollmentCommand(status),
@@ -123,7 +123,7 @@ func (r Runner) removeBio(ctx context.Context, req model.BioRemoveOperation) (mo
 	}
 	defer secret.Zero(token)
 
-	if err := r.bioEnrollmentManager().RemoveEnrollment(token, templateID); err != nil {
+	if err := r.bioEnrollmentManager().RemoveEnrollment(ctx, token, templateID); err != nil {
 		return output, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
 			model.OperationBioRemove,
 			bioEnrollmentCommand(status),
