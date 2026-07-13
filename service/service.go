@@ -30,6 +30,7 @@ type Service struct {
 	monitorDone       chan struct{}
 	scanDevices       func(context.Context, ...ctapkit.DiscoverOption) ([]ctapkit.Device, error)
 	openMonitor       func() (ghid.EventReceiver, error)
+	enrichment        discoveryEnrichment
 
 	devices      []ctapkit.Device
 	sessions     map[SessionID]*managedSession
@@ -71,6 +72,7 @@ func New(opts ...Option) *Service {
 		lastDiscoverMode: transport.ModeAuto,
 		scanDevices:      ctapkit.DiscoverDevices,
 		openMonitor:      ghid.Events,
+		enrichment:       newDiscoveryEnrichment(),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -103,6 +105,8 @@ func (s *Service) Close() error {
 	s.closed = true
 	receiver := s.monitor
 	monitorDone := s.monitorDone
+	enrichmentCancel := s.enrichment.cancel
+	enrichmentDone := s.enrichment.done
 	s.monitor = nil
 	s.monitorDone = nil
 
@@ -117,6 +121,13 @@ func (s *Service) Close() error {
 	}
 	s.mu.Unlock()
 
+	if enrichmentCancel != nil {
+		enrichmentCancel()
+	}
+	for _, operation := range operations {
+		operation.cancel()
+	}
+
 	var monitorErr error
 	if receiver != nil {
 		monitorErr = receiver.Close()
@@ -124,10 +135,9 @@ func (s *Service) Close() error {
 	if monitorDone != nil {
 		<-monitorDone
 	}
-	for _, operation := range operations {
-		operation.cancel()
+	if enrichmentDone != nil {
+		<-enrichmentDone
 	}
-
 	var sessionErr error
 	for _, session := range sessions {
 		if err := session.session.Close(); err != nil {
@@ -156,7 +166,6 @@ func (s *Service) OpenSession(ctx context.Context, req OpenSessionRequest) (Sess
 	if err != nil {
 		return SessionSnapshot{}, err
 	}
-
 	sessionID := newSessionID()
 	opts := []ctapkit.OpenSessionOption{
 		ctapkit.WithEventSink(sessionEventSink{service: s, sessionID: sessionID}),
@@ -174,7 +183,7 @@ func (s *Service) OpenSession(ctx context.Context, req OpenSessionRequest) (Sess
 	managed := &managedSession{
 		id:        sessionID,
 		session:   session,
-		device:    device.Report(),
+		device:    s.reportWithMetadata(device.Report()),
 		openedAt:  now,
 		updatedAt: now,
 	}
@@ -252,6 +261,7 @@ func (s *Service) CloseSession(ctx context.Context, id SessionID) (SessionSnapsh
 	err := session.session.Close()
 	s.waitForSessionOperations(session.id)
 	session.updatedAt = time.Now().UTC()
+	s.startEnrichment()
 
 	return session.snapshot(false), err
 }
@@ -282,6 +292,7 @@ func (s *Service) CloseAllSessions(ctx context.Context) ([]SessionSnapshot, erro
 		snapshot := session.snapshot(false)
 		snapshots = append(snapshots, snapshot)
 	}
+	s.startEnrichment()
 
 	return snapshots, closeErr
 }
@@ -536,9 +547,12 @@ func (s *Service) emit(name string, payload any) {
 }
 
 func (m *managedSession) snapshot(running bool) SessionSnapshot {
+	info := m.session.Info()
+	info.Device = m.device
+
 	return SessionSnapshot{
 		ID:        m.id,
-		Info:      m.session.Info(),
+		Info:      info,
 		Running:   running,
 		OpenedAt:  m.openedAt,
 		UpdatedAt: m.updatedAt,

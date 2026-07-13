@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"slices"
 	"time"
 
 	ctapkit "github.com/go-ctap/kit"
@@ -48,6 +47,9 @@ func (s *Service) reconcileTopology(
 	if force || result.changed || envelope.Error != nil {
 		s.emit(EventDiscoveryChanged, envelope)
 	}
+	if result.snapshot != nil {
+		s.startEnrichment()
+	}
 
 	return nil
 }
@@ -74,7 +76,7 @@ func (s *Service) updateDiscovery(
 	s.mu.Lock()
 	previousDevices := append([]ctapkit.Device(nil), s.devices...)
 	s.mu.Unlock()
-	previousReports := deviceReports(previousDevices)
+	previousReports := s.deviceReportsWithMetadata(previousDevices)
 
 	devices, scanErr := s.scanDevices(ctx, discoverOptions(req)...)
 	if scanErr != nil && ctx.Err() != nil {
@@ -84,7 +86,7 @@ func (s *Service) updateDiscovery(
 	var nextReports []report.DeviceReport
 	authoritative := scanErr == nil
 	if authoritative {
-		nextReports = deviceReports(devices)
+		nextReports = s.deviceReportsWithMetadata(devices)
 	}
 
 	s.mu.Lock()
@@ -95,6 +97,7 @@ func (s *Service) updateDiscovery(
 	}
 	var affected []*managedSession
 	if authoritative {
+		s.pruneEnrichmentCacheLocked(devices)
 		s.devices = devices
 		s.lastDiscoverMode = normalizedDiscoverMode(req.Mode)
 		affected = s.detachMissingSessionsLocked(nextReports)
@@ -106,7 +109,7 @@ func (s *Service) updateDiscovery(
 	if authoritative {
 		snapshot := DiscoverySnapshot{Devices: nextReports}
 		result.snapshot = &snapshot
-		result.changed = !slices.Equal(previousReports, nextReports)
+		result.changed = !deviceReportsEqual(previousReports, nextReports)
 	}
 
 	return result, nil

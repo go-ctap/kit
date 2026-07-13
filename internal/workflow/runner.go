@@ -68,7 +68,7 @@ func outputOnly(output model.OperationResult) operationResult {
 func (r Runner) runOperationBody(ctx context.Context, operation model.Operation) (operationResult, error) {
 	switch req := operation.(type) {
 	case model.InspectOperation:
-		result, err := r.inspect()
+		result, err := r.inspect(ctx)
 
 		return outputOnly(model.InspectOutput{Result: result}), err
 	case model.ListCredentialsOperation:

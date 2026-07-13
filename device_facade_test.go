@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-ctap/kit/model"
+	modelreport "github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 )
 
@@ -67,6 +68,9 @@ func TestDiscoverDevicesReturnsOpaqueDevicesWithReports(t *testing.T) {
 	report := devices[0].Report()
 	if report.DeviceID == "" || report.OrdinalAlias != "1" || report.Transport != transport.ModeHID || report.Path != "hid://one" || report.Manufacturer != "Yubico" || report.Product != "YubiKey 5C NFC" || report.Serial != "12345678" || report.VendorID != 0x1050 || report.ProductID != 0x0407 {
 		t.Fatalf("unexpected report: %+v", report)
+	}
+	if report.Vendor != modelreport.VendorYubico {
+		t.Fatalf("vendor = %q, want %q", report.Vendor, modelreport.VendorYubico)
 	}
 }
 

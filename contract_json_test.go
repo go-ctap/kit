@@ -721,3 +721,39 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 		})
 	}
 }
+
+func TestDeviceReportVendorMetadataJSON(t *testing.T) {
+	value := report.DeviceReport{
+		Vendor: report.VendorYubico,
+		Metadata: &report.DeviceMetadata{
+			Model:    "YubiKey 5C NFC",
+			Serial:   "12345678",
+			Firmware: "5.7.1",
+			Interfaces: []report.InterfaceReport{{
+				Interface: report.InterfaceUSB,
+				Supported: []report.Capability{report.CapabilityU2F, report.CapabilityCTAP2},
+				Enabled:   []report.Capability{report.CapabilityCTAP2},
+			}},
+		},
+	}
+
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	text := string(encoded)
+	for _, want := range []string{
+		`"vendor":"yubico"`,
+		`"metadata"`,
+		`"model":"YubiKey 5C NFC"`,
+		`"serial":"12345678"`,
+		`"firmware":"5.7.1"`,
+		`"interface":"usb"`,
+		`"supported":["u2f","ctap2"]`,
+		`"enabled":["ctap2"]`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("JSON %s does not contain %s", text, want)
+		}
+	}
+}

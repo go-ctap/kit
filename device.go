@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	rtdevice "github.com/go-ctap/kit/internal/device"
+	"github.com/go-ctap/kit/internal/vendorinfo"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 	"github.com/samber/lo"
@@ -108,6 +109,7 @@ func newDevice(index int, mode transport.Mode, descriptor transport.Descriptor) 
 			Serial:       descriptor.Serial,
 			VendorID:     descriptor.VendorID,
 			ProductID:    descriptor.ProductID,
+			Vendor:       vendorinfo.Classify(descriptor.VendorID),
 		},
 		valid: true,
 	}

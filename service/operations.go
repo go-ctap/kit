@@ -155,6 +155,13 @@ type GetAssertionRequest struct {
 
 func (s *Service) Inspect(ctx context.Context, req OperationRequest) (InspectEnvelope, error) {
 	meta, result, err := runTypedOperation[model.InspectOutput](s, ctx, req, model.InspectOperation{})
+	if snapshot := s.mergeInspectMetadata(req.SessionID, result); snapshot != nil {
+		s.emit(EventDiscoveryChanged, DiscoveryChangedEnvelope{
+			Trigger:  DiscoveryTriggerEnriched,
+			Snapshot: snapshot,
+		})
+	}
+
 	return InspectEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 

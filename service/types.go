@@ -26,9 +26,10 @@ const (
 type DiscoveryTrigger string
 
 const (
-	DiscoveryTriggerMonitor DiscoveryTrigger = "monitor"
-	DiscoveryTriggerHotplug DiscoveryTrigger = "hotplug"
-	DiscoveryTriggerManual  DiscoveryTrigger = "manual"
+	DiscoveryTriggerMonitor  DiscoveryTrigger = "monitor"
+	DiscoveryTriggerHotplug  DiscoveryTrigger = "hotplug"
+	DiscoveryTriggerManual   DiscoveryTrigger = "manual"
+	DiscoveryTriggerEnriched DiscoveryTrigger = "enriched"
 )
 
 type DiscoverRequest struct {
