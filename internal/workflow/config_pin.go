@@ -34,7 +34,7 @@ func (r Runner) setPIN(ctx context.Context, req model.SetPINOperation) (model.Op
 	if err := r.confirmMutation(ctx, confirmationRequest{
 		confirmed:       req.Confirmed,
 		message:         req.ConfirmationMessage,
-		fallbackMessage: "Set PIN on authenticator " + r.env.Selected.DeviceID + "?",
+		fallbackMessage: "Set PIN on authenticator " + r.env.Selected.Fingerprint + "?",
 		destructive:     false,
 		preview:         preview,
 	}); err != nil {
@@ -49,7 +49,7 @@ func (r Runner) setPIN(ctx context.Context, req model.SetPINOperation) (model.Op
 		))
 	}
 
-	output.Result = new(appconfig.PINSetResult(r.env.Selected.DeviceID))
+	output.Result = new(appconfig.PINSetResult(r.env.Selected.Fingerprint))
 	return output, nil
 }
 
@@ -76,7 +76,7 @@ func (r Runner) changePIN(ctx context.Context, req model.ChangePINOperation) (mo
 	if err := r.confirmMutation(ctx, confirmationRequest{
 		confirmed:       req.Confirmed,
 		message:         req.ConfirmationMessage,
-		fallbackMessage: "Change PIN on authenticator " + r.env.Selected.DeviceID + "?",
+		fallbackMessage: "Change PIN on authenticator " + r.env.Selected.Fingerprint + "?",
 		destructive:     false,
 		preview:         preview,
 	}); err != nil {
@@ -91,6 +91,6 @@ func (r Runner) changePIN(ctx context.Context, req model.ChangePINOperation) (mo
 		))
 	}
 
-	output.Result = new(appconfig.PINChangeResult(r.env.Selected.DeviceID))
+	output.Result = new(appconfig.PINChangeResult(r.env.Selected.Fingerprint))
 	return output, nil
 }

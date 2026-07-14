@@ -101,12 +101,12 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 	}
 
 	result := appcredentials.UpdateUserResult{
-		DeviceID:        r.env.Selected.DeviceID,
-		CredentialIDHex: publicTarget.Record.CredentialIDHex,
-		RPID:            publicTarget.RP.ID,
-		RPName:          publicTarget.RP.Name,
-		Previous:        publicTarget.User,
-		Current:         proposed,
+		DeviceFingerprint: r.env.Selected.Fingerprint,
+		CredentialIDHex:   publicTarget.Record.CredentialIDHex,
+		RPID:              publicTarget.RP.ID,
+		RPName:            publicTarget.RP.Name,
+		Previous:          publicTarget.User,
+		Current:           proposed,
 	}
 
 	output.Result = &result

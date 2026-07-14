@@ -29,12 +29,12 @@ type UpdateUserPreview struct {
 }
 
 type UpdateUserResult struct {
-	DeviceID        string       `json:"deviceId"`
-	CredentialIDHex string       `json:"credentialIDHex"`
-	RPID            string       `json:"rpID"`
-	RPName          string       `json:"rpName,omitempty"`
-	Previous        UserIdentity `json:"previous"`
-	Current         UserIdentity `json:"current"`
+	DeviceFingerprint string       `json:"deviceFingerprint"`
+	CredentialIDHex   string       `json:"credentialIDHex"`
+	RPID              string       `json:"rpID"`
+	RPName            string       `json:"rpName,omitempty"`
+	Previous          UserIdentity `json:"previous"`
+	Current           UserIdentity `json:"current"`
 }
 
 func BuildUpdateUserPreview(report InventoryReport, req UpdateUserRequest) (UpdateUserPreview, error) {

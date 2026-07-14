@@ -13,6 +13,6 @@ type ResetPreview struct {
 }
 
 type ResetResult struct {
-	DeviceID string `json:"deviceId"`
-	Reset    bool   `json:"reset"`
+	DeviceFingerprint string `json:"deviceFingerprint"`
+	Reset             bool   `json:"reset"`
 }

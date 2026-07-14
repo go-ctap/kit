@@ -160,7 +160,7 @@ func (r Runner) buildGarbageCollectPreview(state garbageCollectState) applargebl
 func (r Runner) buildGarbageCollectResult(state garbageCollectState) applargeblobs.MutationResult {
 	return applargeblobs.MutationResult{
 		Operation:                          applargeblobs.MutationGC,
-		DeviceID:                           r.env.Selected.DeviceID,
+		DeviceFingerprint:                  r.env.Selected.Fingerprint,
 		SerializedLargeBlobArraySizeBefore: state.sizeBefore,
 		SerializedLargeBlobArraySizeAfter:  state.sizeAfter,
 		SerializedLargeBlobArrayLimit:      state.support.MaxSerializedLargeBlobArray,

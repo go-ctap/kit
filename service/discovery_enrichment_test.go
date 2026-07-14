@@ -10,23 +10,23 @@ import (
 func TestTakeEnrichmentCandidateAttemptsAvailableKnownVendors(t *testing.T) {
 	cache := make(map[string]report.DeviceMetadata)
 	attempted := make(map[string]struct{})
-	busyID := "busy"
+	busyFingerprint := "busy"
 	devices := []report.DeviceReport{
-		{DeviceID: "unknown", Vendor: report.VendorUnknown},
-		{DeviceID: "token2", Vendor: report.VendorToken2},
-		{DeviceID: busyID, Vendor: report.VendorYubico},
-		{DeviceID: "ready", Vendor: report.VendorYubico},
+		{Fingerprint: "unknown", Vendor: report.VendorUnknown},
+		{Fingerprint: "token2", Vendor: report.VendorToken2},
+		{Fingerprint: busyFingerprint, Vendor: report.VendorYubico},
+		{Fingerprint: "ready", Vendor: report.VendorYubico},
 	}
 
 	busy := func(device report.DeviceReport) bool {
-		return device.DeviceID == busyID
+		return device.Fingerprint == busyFingerprint
 	}
 	first, ok := takeEnrichmentCandidate(devices, cache, attempted, busy)
-	if !ok || first.DeviceID != "token2" {
+	if !ok || first.Fingerprint != "token2" {
 		t.Fatalf("first candidate = %#v, ok = %v", first, ok)
 	}
 	second, ok := takeEnrichmentCandidate(devices, cache, attempted, busy)
-	if !ok || second.DeviceID != "ready" {
+	if !ok || second.Fingerprint != "ready" {
 		t.Fatalf("second candidate = %#v, ok = %v", second, ok)
 	}
 	if _, ok := attempted[enrichmentKey(first)]; !ok {
@@ -39,7 +39,7 @@ func TestTakeEnrichmentCandidateAttemptsAvailableKnownVendors(t *testing.T) {
 	if _, ok := takeEnrichmentCandidate(devices, cache, attempted, busy); ok {
 		t.Fatal("already attempted device was selected again")
 	}
-	if got, ok := takeEnrichmentCandidate(devices, cache, make(map[string]struct{}), busy); !ok || got.DeviceID != "token2" {
+	if got, ok := takeEnrichmentCandidate(devices, cache, make(map[string]struct{}), busy); !ok || got.Fingerprint != "token2" {
 		t.Fatalf("new pass candidate = %#v, ok = %v", got, ok)
 	}
 }
@@ -65,8 +65,8 @@ func TestCloneDeviceMetadataCopiesCapabilitySlices(t *testing.T) {
 }
 
 func TestEnrichmentKeyIncludesTransport(t *testing.T) {
-	hid := enrichmentKey(report.DeviceReport{DeviceID: "device", Transport: transport.ModeHID})
-	proxy := enrichmentKey(report.DeviceReport{DeviceID: "device", Transport: transport.ModeWindowsProxy})
+	hid := enrichmentKey(report.DeviceReport{Fingerprint: "fingerprint", Transport: transport.ModeHID})
+	proxy := enrichmentKey(report.DeviceReport{Fingerprint: "fingerprint", Transport: transport.ModeWindowsProxy})
 	if hid == proxy {
 		t.Fatalf("keys collide: %q", hid)
 	}
@@ -74,7 +74,7 @@ func TestEnrichmentKeyIncludesTransport(t *testing.T) {
 
 func TestDeviceReportsEqualComparesMetadataValues(t *testing.T) {
 	first := []report.DeviceReport{{
-		DeviceID: "device",
+		Fingerprint: "fingerprint",
 		Metadata: &report.DeviceMetadata{
 			Model: "YubiKey",
 			Interfaces: []report.InterfaceReport{{
@@ -84,7 +84,7 @@ func TestDeviceReportsEqualComparesMetadataValues(t *testing.T) {
 		},
 	}}
 	second := []report.DeviceReport{{
-		DeviceID: "device",
+		Fingerprint: "fingerprint",
 		Metadata: &report.DeviceMetadata{
 			Model: "YubiKey",
 			Interfaces: []report.InterfaceReport{{

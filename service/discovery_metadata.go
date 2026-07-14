@@ -91,7 +91,7 @@ func (s *Service) pruneEnrichmentCacheLocked(devices []ctapkit.Device) {
 }
 
 func enrichmentKey(device report.DeviceReport) string {
-	return string(device.Transport) + "\x00" + device.DeviceID
+	return string(device.Transport) + "\x00" + device.Fingerprint
 }
 
 func cloneDeviceMetadata(metadata report.DeviceMetadata) report.DeviceMetadata {

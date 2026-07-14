@@ -149,7 +149,7 @@ func (s *Service) applyEnrichment(device report.DeviceReport, metadata report.De
 
 func (s *Service) hasSessionForDeviceLocked(device report.DeviceReport) bool {
 	for _, session := range s.sessions {
-		if session.device.Transport == device.Transport && session.device.DeviceID == device.DeviceID {
+		if session.device.Transport == device.Transport && session.device.Fingerprint == device.Fingerprint {
 			return true
 		}
 	}

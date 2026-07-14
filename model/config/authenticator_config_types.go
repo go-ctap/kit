@@ -45,11 +45,11 @@ type AuthenticatorConfigPreview struct {
 }
 
 type AuthenticatorConfigResult struct {
-	Operation       AuthenticatorConfigOperation `json:"operation"`
-	DeviceID        string                       `json:"deviceId"`
-	Target          AlwaysUVTarget               `json:"target,omitempty"`
-	NewMinPINLength uint                         `json:"newMinPINLength,omitempty"`
-	State           StateValue                   `json:"state"`
+	Operation         AuthenticatorConfigOperation `json:"operation"`
+	DeviceFingerprint string                       `json:"deviceFingerprint"`
+	Target            AlwaysUVTarget               `json:"target,omitempty"`
+	NewMinPINLength   uint                         `json:"newMinPINLength,omitempty"`
+	State             StateValue                   `json:"state"`
 }
 
 type AuthenticatorConfigStatus struct {

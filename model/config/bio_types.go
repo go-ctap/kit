@@ -66,7 +66,7 @@ type BioEnrollSample struct {
 }
 
 type BioEnrollResult struct {
-	DeviceID               string            `json:"deviceId"`
+	DeviceFingerprint      string            `json:"deviceFingerprint"`
 	PreviewOnly            bool              `json:"previewOnly"`
 	TemplateIDHex          string            `json:"templateIDHex"`
 	Samples                []BioEnrollSample `json:"samples,omitempty"`
@@ -87,9 +87,9 @@ type BioMutationPreview struct {
 }
 
 type BioMutationResult struct {
-	Operation     BioMutationOperation `json:"operation"`
-	DeviceID      string               `json:"deviceId"`
-	PreviewOnly   bool                 `json:"previewOnly"`
-	TemplateIDHex string               `json:"templateIDHex"`
-	FriendlyName  string               `json:"friendlyName,omitempty"`
+	Operation         BioMutationOperation `json:"operation"`
+	DeviceFingerprint string               `json:"deviceFingerprint"`
+	PreviewOnly       bool                 `json:"previewOnly"`
+	TemplateIDHex     string               `json:"templateIDHex"`
+	FriendlyName      string               `json:"friendlyName,omitempty"`
 }

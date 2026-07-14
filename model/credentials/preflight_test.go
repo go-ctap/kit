@@ -126,7 +126,7 @@ func TestBuildUpdateUserPreviewEmptyProvidedUserIDFallsBack(t *testing.T) {
 
 func sampleInventoryReport() InventoryReport {
 	return InventoryReport{
-		Device: report.DeviceReport{DeviceID: "cred01"},
+		Device: report.DeviceReport{Fingerprint: "cred01"},
 		Support: SupportReport{
 			CredentialManagement: true,
 		},

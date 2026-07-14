@@ -62,11 +62,11 @@ func (r Runner) renameBio(ctx context.Context, req model.BioRenameOperation) (mo
 	}
 
 	result := appconfig.BioMutationResult{
-		Operation:     appconfig.BioMutationRename,
-		DeviceID:      r.env.Selected.DeviceID,
-		PreviewOnly:   preview.PreviewOnly,
-		TemplateIDHex: req.TemplateIDHex,
-		FriendlyName:  req.FriendlyName,
+		Operation:         appconfig.BioMutationRename,
+		DeviceFingerprint: r.env.Selected.Fingerprint,
+		PreviewOnly:       preview.PreviewOnly,
+		TemplateIDHex:     req.TemplateIDHex,
+		FriendlyName:      req.FriendlyName,
 	}
 
 	output.Result = &result
@@ -123,10 +123,10 @@ func (r Runner) removeBio(ctx context.Context, req model.BioRemoveOperation) (mo
 	}
 
 	result := appconfig.BioMutationResult{
-		Operation:     appconfig.BioMutationRemove,
-		DeviceID:      r.env.Selected.DeviceID,
-		PreviewOnly:   preview.PreviewOnly,
-		TemplateIDHex: req.TemplateIDHex,
+		Operation:         appconfig.BioMutationRemove,
+		DeviceFingerprint: r.env.Selected.Fingerprint,
+		PreviewOnly:       preview.PreviewOnly,
+		TemplateIDHex:     req.TemplateIDHex,
 	}
 
 	output.Result = &result

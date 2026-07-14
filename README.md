@@ -33,7 +33,7 @@ This repository does not own terminal UX, command parsing, output rendering, MDS
 - `model/report`: shared report DTOs used across model domains.
 - `model/safety`: shared safety/confirmation DTOs.
 - `transport`: HID and Windows proxy transport boundary.
-- `internal/device`: stable device identity derived from discovery descriptors.
+- `internal/device`: runtime attachment fingerprints derived from transport descriptors.
 - `internal/runtime`: event, interaction, and token policies.
 - `internal/session`: opened-session core, lifecycle, serialization, and cache boundary.
 - `internal/workflow`: operation dispatch and domain workflow bodies over an explicit execution environment.

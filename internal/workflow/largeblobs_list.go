@@ -131,8 +131,8 @@ func buildListCredentialRow(
 	record appcredentials.CredentialRecord,
 ) (applargeblobs.ListCredential, error) {
 	row := applargeblobs.ListCredential{
-		DeviceID:        ctx.selected.DeviceID,
-		CredentialIDHex: record.CredentialIDHex,
+		DeviceFingerprint: ctx.selected.Fingerprint,
+		CredentialIDHex:   record.CredentialIDHex,
 		RP: appcredentials.RelyingParty{
 			ID:        group.RPID,
 			Name:      group.RPName,

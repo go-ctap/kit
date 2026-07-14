@@ -156,11 +156,11 @@ func TestTouchInteractionJSON(t *testing.T) {
 func TestInteractionRequestJSONIncludesPreviewAndResponseOmitsPIN(t *testing.T) {
 	request := model.InteractionRequest{
 		Kind:        model.InteractionKindConfirm,
-		Message:     "Factory reset device-1?",
+		Message:     "Factory reset fingerprint-1?",
 		Destructive: true,
 		Preview: map[string]any{
-			"deviceId": "device-1",
-			"warnings": []string{"factory reset erases authenticator state"},
+			"deviceFingerprint": "fingerprint-1",
+			"warnings":          []string{"factory reset erases authenticator state"},
 		},
 	}
 
@@ -314,15 +314,16 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 					UserIDHex:       "0102",
 				},
 				Result: &credentials.DeleteResult{
-					DeviceID:        "device-1",
-					CredentialIDHex: "beef",
-					RPID:            "example.com",
-					UserIDHex:       "0102",
+					DeviceFingerprint: "fingerprint-1",
+					CredentialIDHex:   "beef",
+					RPID:              "example.com",
+					UserIDHex:         "0102",
 				},
 			},
 			want: []string{
 				`"preview"`,
 				`"result"`,
+				`"deviceFingerprint":"fingerprint-1"`,
 				`"credentialIDHex":"beef"`,
 				`"rpID":"example.com"`,
 				`"userIDHex":"0102"`,
@@ -330,6 +331,7 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 			reject: []string{
 				`"Preview"`,
 				`"Result"`,
+				`"deviceId"`,
 				`"credentialIdHex"`,
 				`"rpId"`,
 				`"userIdHex"`,
@@ -345,19 +347,21 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 					Proposed:        credentials.UserIdentity{UserIDHex: "0304"},
 				},
 				Result: &credentials.UpdateUserResult{
-					DeviceID:        "device-1",
-					CredentialIDHex: "beef",
-					RPID:            "example.com",
-					Previous:        credentials.UserIdentity{UserIDHex: "0102"},
-					Current:         credentials.UserIdentity{UserIDHex: "0304"},
+					DeviceFingerprint: "fingerprint-1",
+					CredentialIDHex:   "beef",
+					RPID:              "example.com",
+					Previous:          credentials.UserIdentity{UserIDHex: "0102"},
+					Current:           credentials.UserIdentity{UserIDHex: "0304"},
 				},
 			},
 			want: []string{
+				`"deviceFingerprint":"fingerprint-1"`,
 				`"credentialIDHex":"beef"`,
 				`"rpID":"example.com"`,
 				`"userIDHex":"0304"`,
 			},
 			reject: []string{
+				`"deviceId"`,
 				`"credentialIdHex"`,
 				`"rpId"`,
 				`"userIdHex"`,
@@ -397,7 +401,7 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 			name: "WebAuthn outputs include CTAP artifact spellings",
 			value: model.MakeCredentialOutput{
 				Result: &webauthn2.MakeCredentialResult{
-					DeviceID:                 "device-1",
+					DeviceFingerprint:        "fingerprint-1",
 					RPID:                     "example.com",
 					Format:                   "packed",
 					CredentialIDHex:          "beef",
@@ -407,6 +411,7 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 				},
 			},
 			want: []string{
+				`"deviceFingerprint":"fingerprint-1"`,
 				`"rpID":"example.com"`,
 				`"credentialIDHex":"beef"`,
 				`"publicKeyCOSEHex":"a50102"`,
@@ -414,6 +419,7 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 				`"attestationObjectCBORHex":"a30102"`,
 			},
 			reject: []string{
+				`"deviceId"`,
 				`"rpId"`,
 				`"credentialIdHex"`,
 				`"publicKeyCoseHex"`,
@@ -724,7 +730,9 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 
 func TestDeviceReportVendorMetadataJSON(t *testing.T) {
 	value := report.DeviceReport{
-		Vendor: report.VendorYubico,
+		Fingerprint: "attachment-1",
+		Path:        "hid://one",
+		Vendor:      report.VendorYubico,
 		Metadata: &report.DeviceMetadata{
 			Model:    "YubiKey 5C NFC",
 			Serial:   "12345678",
@@ -743,6 +751,8 @@ func TestDeviceReportVendorMetadataJSON(t *testing.T) {
 	}
 	text := string(encoded)
 	for _, want := range []string{
+		`"fingerprint":"attachment-1"`,
+		`"path":"hid://one"`,
 		`"vendor":"yubico"`,
 		`"metadata"`,
 		`"model":"YubiKey 5C NFC"`,
@@ -754,6 +764,11 @@ func TestDeviceReportVendorMetadataJSON(t *testing.T) {
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("JSON %s does not contain %s", text, want)
+		}
+	}
+	for _, obsolete := range []string{`"deviceId"`, `"deviceFingerprint"`, `"stableId"`, `"location"`} {
+		if strings.Contains(text, obsolete) {
+			t.Fatalf("JSON retained obsolete field %s: %s", obsolete, text)
 		}
 	}
 }

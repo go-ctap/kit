@@ -253,28 +253,33 @@ func TestServiceDoesNotEmitAfterClose(t *testing.T) {
 	}
 }
 
-func TestDeviceReportPresentUsesTransportAndDeviceID(t *testing.T) {
-	first := testDevice("hid://old", "serial-1")
-	second := first
-	second.Path = "hid://new"
-	if !deviceReportPresent([]report.DeviceReport{first}, second) {
-		t.Fatal("stable device did not survive path change")
+func TestDeviceReportPresentUsesTransportAndFingerprint(t *testing.T) {
+	first := testDevice("hid://one", "fingerprint-1")
+	sameAttachment := first
+	sameAttachment.Product = "refreshed metadata"
+	if !deviceReportPresent([]report.DeviceReport{first}, sameAttachment) {
+		t.Fatal("matching fingerprint was not present")
 	}
-	second.Transport = transport.ModeWindowsProxy
-	if deviceReportPresent([]report.DeviceReport{first}, second) {
+
+	reinserted := testDevice("hid://two", "fingerprint-2")
+	if deviceReportPresent([]report.DeviceReport{first}, reinserted) {
+		t.Fatal("changed attachment fingerprint was still present")
+	}
+
+	otherTransport := first
+	otherTransport.Transport = transport.ModeWindowsProxy
+	if deviceReportPresent([]report.DeviceReport{first}, otherTransport) {
 		t.Fatal("devices on different transports matched")
 	}
 }
 
-func testDevice(path string, serial string) report.DeviceReport {
+func testDevice(path string, fingerprint string) report.DeviceReport {
 	return report.DeviceReport{
-		DeviceID:  serial,
-		StableID:  serial != "",
-		Transport: transport.ModeHID,
-		Path:      path,
-		Serial:    serial,
-		VendorID:  1,
-		ProductID: 2,
+		Fingerprint: fingerprint,
+		Transport:   transport.ModeHID,
+		Path:        path,
+		VendorID:    1,
+		ProductID:   2,
 	}
 }
 

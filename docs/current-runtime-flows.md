@@ -192,8 +192,8 @@ cancel point; it does not assert that UV succeeded.
 
 ### Inspect, Status, And Read-Only Operations
 
-- `InspectOperation` reads selected device identity and authenticator info, and
-  returns an inspect result.
+- `InspectOperation` reads the selected attachment fingerprint, device metadata,
+  and authenticator info, then returns an inspect result.
 - `ConfigStatusOperation` returns cached config status when available.
   Otherwise it builds status from authenticator info and augments it with PIN
   and UV retry state where supported.

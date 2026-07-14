@@ -19,7 +19,7 @@ func TestToken2PCSCCandidatePropagatesContext(t *testing.T) {
 		serial: "72103654095303",
 	}
 
-	candidate, ok := token2PCSCCandidate(ctx, device, 0x0102)
+	candidate, ok := token2PCSCCandidate(ctx, device)
 	if !ok || candidate.metadata.Serial != device.serial {
 		t.Fatalf("candidate = %#v, ok = %v", candidate, ok)
 	}

@@ -39,7 +39,7 @@ func (r Runner) enrollBio(ctx context.Context, req model.BioEnrollOperation) (mo
 	if err := r.confirmMutation(ctx, confirmationRequest{
 		confirmed:       req.Confirmed,
 		message:         req.ConfirmationMessage,
-		fallbackMessage: "Start biometric enrollment on authenticator " + r.env.Selected.DeviceID + "?",
+		fallbackMessage: "Start biometric enrollment on authenticator " + r.env.Selected.Fingerprint + "?",
 		destructive:     false,
 		preview:         preview,
 	}); err != nil {
@@ -95,8 +95,8 @@ func (r Runner) runBioEnrollment(
 	authenticator := r.bioEnrollmentManager()
 	progress := r.bioEnrollmentProgress()
 	result := appconfig.BioEnrollResult{
-		DeviceID:    preview.Device.DeviceID,
-		PreviewOnly: preview.PreviewOnly,
+		DeviceFingerprint: preview.Device.Fingerprint,
+		PreviewOnly:       preview.PreviewOnly,
 	}
 
 	cancelAfterFailure := func(cause error) (appconfig.BioEnrollResult, error) {

@@ -200,7 +200,7 @@ func normalizedDiscoverMode(mode transport.Mode) transport.Mode {
 
 func deviceReportPresent(devices []report.DeviceReport, selected report.DeviceReport) bool {
 	for _, device := range devices {
-		if device.Transport == selected.Transport && device.DeviceID == selected.DeviceID {
+		if device.Transport == selected.Transport && device.Fingerprint == selected.Fingerprint {
 			return true
 		}
 	}

@@ -35,7 +35,7 @@ func (r Runner) setAlwaysUV(ctx context.Context, req model.SetAlwaysUVOperation)
 	if err := r.confirmMutation(ctx, confirmationRequest{
 		confirmed:       req.Confirmed,
 		message:         req.ConfirmationMessage,
-		fallbackMessage: "Set alwaysUv " + string(req.Target) + " on authenticator " + r.env.Selected.DeviceID + "?",
+		fallbackMessage: "Set alwaysUv " + string(req.Target) + " on authenticator " + r.env.Selected.Fingerprint + "?",
 		destructive:     false,
 		preview:         preview,
 	}); err != nil {
@@ -56,7 +56,7 @@ func (r Runner) setAlwaysUV(ctx context.Context, req model.SetAlwaysUVOperation)
 	}
 
 	output.Result = new(appconfig.AlwaysUVResult(
-		r.env.Selected.DeviceID,
+		r.env.Selected.Fingerprint,
 		req.Target,
 		preview.RequestedAlwaysUV,
 	))
@@ -93,7 +93,7 @@ func (r Runner) setMinPINLength(ctx context.Context, req model.SetMinPINLengthOp
 	if err := r.confirmMutation(ctx, confirmationRequest{
 		confirmed:       req.Confirmed,
 		message:         req.ConfirmationMessage,
-		fallbackMessage: "Set minimum PIN length on authenticator " + r.env.Selected.DeviceID + "?",
+		fallbackMessage: "Set minimum PIN length on authenticator " + r.env.Selected.Fingerprint + "?",
 		destructive:     false,
 		preview:         preview,
 	}); err != nil {
@@ -120,6 +120,6 @@ func (r Runner) setMinPINLength(ctx context.Context, req model.SetMinPINLengthOp
 		))
 	}
 
-	output.Result = new(appconfig.MinPINLengthResult(r.env.Selected.DeviceID, req.Length))
+	output.Result = new(appconfig.MinPINLengthResult(r.env.Selected.Fingerprint, req.Length))
 	return output, nil
 }

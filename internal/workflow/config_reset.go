@@ -28,7 +28,7 @@ func (r Runner) resetFactory(ctx context.Context, req model.ResetFactoryOperatio
 	if err := r.confirmMutation(ctx, confirmationRequest{
 		confirmed:       req.Confirmed,
 		message:         req.ConfirmationMessage,
-		fallbackMessage: "Factory reset authenticator " + preview.Device.DeviceID + "?",
+		fallbackMessage: "Factory reset authenticator " + preview.Device.Fingerprint + "?",
 		destructive:     true,
 		preview:         preview,
 	}); err != nil {
@@ -37,7 +37,7 @@ func (r Runner) resetFactory(ctx context.Context, req model.ResetFactoryOperatio
 
 	if _, err := r.env.Interactions.RequestInteraction(ctx, model.InteractionRequest{
 		Kind:        model.InteractionKindTouch,
-		Message:     "Touch authenticator " + r.env.Selected.DeviceID + " to factory reset.",
+		Message:     "Touch authenticator " + r.env.Selected.Fingerprint + " to factory reset.",
 		Destructive: true,
 		Preview:     preview,
 	}); err != nil {
@@ -51,6 +51,6 @@ func (r Runner) resetFactory(ctx context.Context, req model.ResetFactoryOperatio
 		))
 	}
 
-	output.Result = new(appconfig.ResetResultForDevice(r.env.Selected.DeviceID))
+	output.Result = new(appconfig.ResetResultForDevice(r.env.Selected.Fingerprint))
 	return output, nil
 }

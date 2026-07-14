@@ -34,7 +34,7 @@ type PINMutationPreview struct {
 }
 
 type PINMutationResult struct {
-	Operation PINMutationOperation `json:"operation"`
-	DeviceID  string               `json:"deviceId"`
-	PINState  StateValue           `json:"pinState"`
+	Operation         PINMutationOperation `json:"operation"`
+	DeviceFingerprint string               `json:"deviceFingerprint"`
+	PINState          StateValue           `json:"pinState"`
 }

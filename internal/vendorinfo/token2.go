@@ -70,7 +70,7 @@ func token2PCSCCandidates(ctx context.Context, productID uint16) []token2Candida
 			continue
 		}
 
-		candidate, ok := token2PCSCCandidate(ctx, device, productID)
+		candidate, ok := token2PCSCCandidate(ctx, device)
 		_ = device.Close()
 		if !ok {
 			continue
@@ -81,12 +81,7 @@ func token2PCSCCandidates(ctx context.Context, productID uint16) []token2Candida
 	return deduplicateToken2Candidates(candidates)
 }
 
-func token2PCSCCandidate(ctx context.Context, device token2PCSCDevice, productID uint16) (token2Candidate, bool) {
-	atr, err := device.ATRInfo(ctx)
-	if err != nil || atr.ProductID != productID {
-		return token2Candidate{}, false
-	}
-
+func token2PCSCCandidate(ctx context.Context, device token2PCSCDevice) (token2Candidate, bool) {
 	serialNumber, err := device.SerialNumber(ctx)
 	if err != nil {
 		return token2Candidate{}, false

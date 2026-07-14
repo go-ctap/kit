@@ -70,13 +70,13 @@ func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredential
 	}
 
 	result := appcredentials.DeleteResult{
-		DeviceID:        r.env.Selected.DeviceID,
-		CredentialIDHex: publicTarget.Record.CredentialIDHex,
-		RPID:            publicTarget.RP.ID,
-		RPName:          publicTarget.RP.Name,
-		UserIDHex:       publicTarget.User.UserIDHex,
-		UserName:        publicTarget.User.Name,
-		DisplayName:     publicTarget.User.DisplayName,
+		DeviceFingerprint: r.env.Selected.Fingerprint,
+		CredentialIDHex:   publicTarget.Record.CredentialIDHex,
+		RPID:              publicTarget.RP.ID,
+		RPName:            publicTarget.RP.Name,
+		UserIDHex:         publicTarget.User.UserIDHex,
+		UserName:          publicTarget.User.Name,
+		DisplayName:       publicTarget.User.DisplayName,
 	}
 
 	output.Result = &result

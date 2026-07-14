@@ -22,7 +22,7 @@ func TestSessionTypedOperationContract(t *testing.T) {
 	}
 
 	typed, ok := output.(model.ConfigStatusOutput)
-	if !ok || typed.Report.Device.DeviceID == "" {
+	if !ok || typed.Report.Device.Fingerprint == "" {
 		t.Fatalf("unexpected output: %#v", output)
 	}
 }

@@ -65,11 +65,45 @@ func TestDiscoverDevicesReturnsOpaqueDevicesWithReports(t *testing.T) {
 	}
 
 	report := devices[0].Report()
-	if report.DeviceID == "" || report.OrdinalAlias != "1" || report.Transport != transport.ModeHID || report.Path != "hid://one" || report.Manufacturer != "Yubico" || report.Product != "YubiKey 5C NFC" || report.Serial != "12345678" || report.VendorID != 0x1050 || report.ProductID != 0x0407 {
+	if report.Fingerprint == "" || report.OrdinalAlias != "1" || report.Transport != transport.ModeHID || report.Path != "hid://one" || report.Manufacturer != "Yubico" || report.Product != "YubiKey 5C NFC" || report.Serial != "12345678" || report.VendorID != 0x1050 || report.ProductID != 0x0407 {
 		t.Fatalf("unexpected report: %+v", report)
 	}
 	if report.Vendor != modelreport.VendorYubico {
 		t.Fatalf("vendor = %q, want %q", report.Vendor, modelreport.VendorYubico)
+	}
+}
+
+func TestDiscoverDevicesFingerprintTracksTransportAttachment(t *testing.T) {
+	descriptors := []transport.Descriptor{
+		{
+			Path:      "hid://one",
+			Serial:    "duplicate",
+			VendorID:  0x1050,
+			ProductID: 0x0407,
+		},
+		{
+			Path:      "hid://two",
+			Serial:    "duplicate",
+			VendorID:  0x1050,
+			ProductID: 0x0407,
+		},
+	}
+
+	devices, err := discoverDevices(context.Background(), newFakeDiscoveryResolver(descriptors))
+	if err != nil {
+		t.Fatalf("DiscoverDevices: %v", err)
+	}
+	if first, second := devices[0].Report().Fingerprint, devices[1].Report().Fingerprint; first == second {
+		t.Fatalf("fingerprints for different transport paths collide: %q", first)
+	}
+
+	descriptors[0].Path = "hid://renumbered"
+	repeated, err := discoverDevices(context.Background(), newFakeDiscoveryResolver(descriptors[:1]))
+	if err != nil {
+		t.Fatalf("DiscoverDevices after path change: %v", err)
+	}
+	if got, previous := repeated[0].Report().Fingerprint, devices[0].Report().Fingerprint; got == previous {
+		t.Fatalf("fingerprint did not change with transport path: %q", got)
 	}
 }
 
@@ -107,12 +141,12 @@ func TestSelectDeviceUsesDiscoverySnapshot(t *testing.T) {
 		t.Fatalf("DiscoverDevices: %v", err)
 	}
 
-	selected, err := SelectDevice(devices, devices[0].Report().DeviceID)
+	selected, err := SelectDevice(devices, devices[0].Report().Fingerprint)
 	if err != nil {
-		t.Fatalf("SelectDevice(id): %v", err)
+		t.Fatalf("SelectDevice(fingerprint): %v", err)
 	}
 	if selected.Report().Path != "hid://one" {
-		t.Fatalf("selected by id path = %q, want hid://one", selected.Report().Path)
+		t.Fatalf("selected by fingerprint path = %q, want hid://one", selected.Report().Path)
 	}
 
 	selected, err = SelectDevice(devices, devices[1].Report().OrdinalAlias)

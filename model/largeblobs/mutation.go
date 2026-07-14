@@ -38,7 +38,7 @@ type MutationPreview struct {
 
 type MutationResult struct {
 	Operation                          MutationOperation `json:"operation"`
-	DeviceID                           string            `json:"deviceId"`
+	DeviceFingerprint                  string            `json:"deviceFingerprint"`
 	CredentialIDHex                    string            `json:"credentialIDHex"`
 	RPID                               string            `json:"rpID"`
 	RPName                             string            `json:"rpName,omitempty"`

@@ -54,7 +54,7 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 			return output, annotateMakeCredentialError(err)
 		}
 
-		result, err := makeCredentialResult(r.env.Selected.DeviceID, input.RP.ID, response)
+		result, err := makeCredentialResult(r.env.Selected.Fingerprint, input.RP.ID, response)
 		if err != nil {
 			return output, err
 		}
@@ -67,7 +67,7 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 	if err != nil {
 		return output, annotateMakeCredentialError(err)
 	}
-	result, err := makeCredentialResult(r.env.Selected.DeviceID, input.RP.ID, response)
+	result, err := makeCredentialResult(r.env.Selected.Fingerprint, input.RP.ID, response)
 	if err != nil {
 		return output, err
 	}
@@ -88,8 +88,8 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 		r.infoProvider().GetInfo().Options[protocol.OptionAlwaysUv]
 
 	result := appwebauthn.GetAssertionResult{
-		DeviceID: r.env.Selected.DeviceID,
-		RPID:     input.RPID,
+		DeviceFingerprint: r.env.Selected.Fingerprint,
+		RPID:              input.RPID,
 	}
 
 	readAssertions := func(token []byte) error {
@@ -180,7 +180,7 @@ func makeCredentialNeedsToken(
 }
 
 func makeCredentialResult(
-	deviceID string,
+	fingerprint string,
 	rpID string,
 	response protocol.AuthenticatorMakeCredentialResponse,
 ) (appwebauthn.MakeCredentialResult, error) {
@@ -207,7 +207,7 @@ func makeCredentialResult(
 	}
 
 	return appwebauthn.MakeCredentialResult{
-		DeviceID:                 deviceID,
+		DeviceFingerprint:        fingerprint,
 		RPID:                     rpID,
 		Format:                   response.Format,
 		CredentialIDHex:          hex.EncodeToString(response.AuthData.AttestedCredentialData.CredentialID),

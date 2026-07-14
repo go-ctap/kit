@@ -48,10 +48,11 @@ type DeviceMetadata struct {
 	Interfaces []InterfaceReport `json:"interfaces,omitempty"`
 }
 
+// DeviceReport describes a discovered authenticator. Fingerprint identifies the
+// current transport attachment and may change after device reinsertion.
 type DeviceReport struct {
-	DeviceID     string          `json:"deviceId"`
+	Fingerprint  string          `json:"fingerprint"`
 	OrdinalAlias string          `json:"ordinalAlias,omitempty"`
-	StableID     bool            `json:"stableId"`
 	Transport    transport.Mode  `json:"transport"`
 	Path         string          `json:"path"`
 	Manufacturer string          `json:"manufacturer,omitempty"`

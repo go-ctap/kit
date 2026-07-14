@@ -1,2 +1,2 @@
-// Package device owns stable runtime device identity.
+// Package device owns runtime attachment fingerprints.
 package device

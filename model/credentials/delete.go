@@ -13,13 +13,13 @@ type DeletePreview struct {
 }
 
 type DeleteResult struct {
-	DeviceID        string `json:"deviceId"`
-	CredentialIDHex string `json:"credentialIDHex"`
-	RPID            string `json:"rpID"`
-	RPName          string `json:"rpName,omitempty"`
-	UserIDHex       string `json:"userIDHex,omitempty"`
-	UserName        string `json:"userName,omitempty"`
-	DisplayName     string `json:"displayName,omitempty"`
+	DeviceFingerprint string `json:"deviceFingerprint"`
+	CredentialIDHex   string `json:"credentialIDHex"`
+	RPID              string `json:"rpID"`
+	RPName            string `json:"rpName,omitempty"`
+	UserIDHex         string `json:"userIDHex,omitempty"`
+	UserName          string `json:"userName,omitempty"`
+	DisplayName       string `json:"displayName,omitempty"`
 }
 
 func BuildDeletePreview(report InventoryReport, credentialIDHex string) (DeletePreview, error) {

@@ -57,7 +57,7 @@ func SelectDevice(devices []Device, selector string) (Device, error) {
 
 	device, ok := lo.Find(devices, func(device Device) bool {
 		r := device.Report()
-		return r.DeviceID == selector || r.OrdinalAlias == selector
+		return r.Fingerprint == selector || r.OrdinalAlias == selector
 	})
 	if ok {
 		return device, nil
@@ -105,9 +105,8 @@ func discoverDevices(ctx context.Context, resolver transport.ProviderResolver, o
 func newDevice(index int, mode transport.Mode, descriptor transport.Descriptor) Device {
 	return Device{
 		report: report.DeviceReport{
-			DeviceID:     rtdevice.ID(descriptor.VendorID, descriptor.ProductID, descriptor.Serial, descriptor.Path),
+			Fingerprint:  rtdevice.Fingerprint(mode, descriptor.Path),
 			OrdinalAlias: strconv.Itoa(index + 1),
-			StableID:     rtdevice.Stable(descriptor.VendorID, descriptor.ProductID, descriptor.Serial, descriptor.Path),
 			Transport:    mode,
 			Path:         descriptor.Path,
 			Manufacturer: descriptor.Manufacturer,
