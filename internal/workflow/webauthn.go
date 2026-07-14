@@ -84,10 +84,8 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 		return output, err
 	}
 
-	var tokenRequired bool
-	if lo.FromPtr(input.Options.UserVerification) {
-		tokenRequired = true
-	}
+	tokenRequired := lo.FromPtr(input.Options.UserVerification) ||
+		r.infoProvider().GetInfo().Options[protocol.OptionAlwaysUv]
 
 	result := appwebauthn.GetAssertionResult{
 		DeviceID: r.env.Selected.DeviceID,
@@ -103,7 +101,7 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 			input.ClientDataJSON,
 			input.AllowList,
 			nil,
-			ctapAuthenticatorOptions(input.Options),
+			ctapAuthenticatorOptions(input.Options, token != nil),
 		) {
 			if err != nil {
 				return annotateGetAssertionError(err)
@@ -148,7 +146,7 @@ func (r Runner) callMakeCredential(
 		input.PubKeyCredParams,
 		input.ExcludeList,
 		nil,
-		ctapAuthenticatorOptions(input.Options),
+		ctapAuthenticatorOptions(input.Options, token != nil),
 		0,
 		nil,
 	)
@@ -271,7 +269,7 @@ func assertionResult(index uint, response protocol.AuthenticatorGetAssertionResp
 	return assertion
 }
 
-func ctapAuthenticatorOptions(options appwebauthn.AuthenticatorOptions) map[protocol.Option]bool {
+func ctapAuthenticatorOptions(options appwebauthn.AuthenticatorOptions, withToken bool) map[protocol.Option]bool {
 	out := make(map[protocol.Option]bool)
 	if options.ResidentKey != nil {
 		out[protocol.OptionResidentKeys] = lo.FromPtr(options.ResidentKey)
@@ -279,7 +277,7 @@ func ctapAuthenticatorOptions(options appwebauthn.AuthenticatorOptions) map[prot
 	if options.UserPresence != nil {
 		out[protocol.OptionUserPresence] = lo.FromPtr(options.UserPresence)
 	}
-	if options.UserVerification != nil {
+	if options.UserVerification != nil && !withToken {
 		out[protocol.OptionUserVerification] = lo.FromPtr(options.UserVerification)
 	}
 
