@@ -2,10 +2,10 @@ package webauthn
 
 import (
 	"bytes"
-	"errors"
 	"testing"
 
 	"github.com/go-ctap/ctap/credential"
+	"github.com/go-ctap/kit/model/failure"
 )
 
 func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {
@@ -19,11 +19,13 @@ func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {
 	}
 
 	tests := []struct {
-		name  string
-		input MakeCredentialInput
+		name     string
+		input    MakeCredentialInput
+		wantCode failure.Code
 	}{
 		{
-			name: "rp id",
+			name:     "rp id",
+			wantCode: failure.CodeRelyingPartyIDRequired,
 			input: MakeCredentialInput{
 				User:             base.User,
 				ClientDataJSON:   base.ClientDataJSON,
@@ -31,7 +33,8 @@ func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {
 			},
 		},
 		{
-			name: "user id",
+			name:     "user id",
+			wantCode: failure.CodeUserIDRequired,
 			input: MakeCredentialInput{
 				RP:               base.RP,
 				ClientDataJSON:   base.ClientDataJSON,
@@ -39,7 +42,8 @@ func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {
 			},
 		},
 		{
-			name: "client data",
+			name:     "client data",
+			wantCode: failure.CodeClientDataJSONRequired,
 			input: MakeCredentialInput{
 				RP:               base.RP,
 				User:             base.User,
@@ -47,7 +51,8 @@ func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {
 			},
 		},
 		{
-			name: "params",
+			name:     "params",
+			wantCode: failure.CodePublicKeyCredentialParametersRequired,
 			input: MakeCredentialInput{
 				RP:             base.RP,
 				User:           base.User,
@@ -55,7 +60,8 @@ func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {
 			},
 		},
 		{
-			name: "algorithm",
+			name:     "algorithm",
+			wantCode: failure.CodePublicKeyCredentialAlgorithmRequired,
 			input: MakeCredentialInput{
 				RP:               base.RP,
 				User:             base.User,
@@ -68,8 +74,11 @@ func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := NormalizeMakeCredentialInput(tt.input)
-			if !errors.Is(err, ErrInvalidInput) {
-				t.Fatalf("NormalizeMakeCredentialInput error = %v, want invalid input", err)
+			if !failure.IsCode(err, tt.wantCode) {
+				t.Fatalf("NormalizeMakeCredentialInput error = %v, want %s", err, tt.wantCode)
+			}
+			if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
+				t.Fatalf("NormalizeMakeCredentialInput phase = %q, want %q", got, failure.PhaseValidation)
 			}
 		})
 	}
@@ -120,7 +129,45 @@ func TestNormalizeGetAssertionInputValidatesAllowListID(t *testing.T) {
 			{},
 		},
 	})
-	if !errors.Is(err, ErrInvalidInput) {
-		t.Fatalf("NormalizeGetAssertionInput error = %v, want invalid input", err)
+	if !failure.IsCode(err, failure.CodeCredentialIDRequired) {
+		t.Fatalf("NormalizeGetAssertionInput error = %v, want %s", err, failure.CodeCredentialIDRequired)
+	}
+	if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
+		t.Fatalf("NormalizeGetAssertionInput phase = %q, want %q", got, failure.PhaseValidation)
+	}
+}
+
+func TestNormalizeGetAssertionInputRequiresCoreFields(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    GetAssertionInput
+		wantCode failure.Code
+	}{
+		{
+			name: "rp id",
+			input: GetAssertionInput{
+				ClientDataJSON: []byte("client-data"),
+			},
+			wantCode: failure.CodeRelyingPartyIDRequired,
+		},
+		{
+			name: "client data",
+			input: GetAssertionInput{
+				RPID: "example.com",
+			},
+			wantCode: failure.CodeClientDataJSONRequired,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NormalizeGetAssertionInput(tt.input)
+			if !failure.IsCode(err, tt.wantCode) {
+				t.Fatalf("NormalizeGetAssertionInput error = %v, want %s", err, tt.wantCode)
+			}
+			if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
+				t.Fatalf("NormalizeGetAssertionInput phase = %q, want %q", got, failure.PhaseValidation)
+			}
+		})
 	}
 }

@@ -18,7 +18,7 @@ events, and optional interaction handling.
   public session facade.
 - `(*ctapkit.Session).Run` validates root operation input, emits operation
   lifecycle events, runs exactly one typed operation through the serialized
-  internal workflow path, normalizes cancellation errors, and returns a typed
+  internal workflow path, normalizes every failure, and returns a typed
   `model.OperationResult`.
 - `(*ctapkit.Session).Close` closes the internal session. Close is designed to
   tolerate duplicate or racing calls.
@@ -64,17 +64,16 @@ whole internal session object.
 
 ```mermaid
 flowchart TD
-  A["ctapkit.OpenSession(ctx, request, options)"] --> B["Apply options and default NoopEventSink"]
-  B --> C["Resolve transport and selector"]
+  A["ctapkit.OpenSession(ctx, dev, options)"] --> B["Apply options and default NoopEventSink"]
+  B --> C["Validate device handle"]
   C --> D["Acquire device lease"]
-  D --> E["Read leased device identity"]
-  E --> F["Open authenticator through private opener"]
+  D --> F["Open authenticator through private opener"]
   F --> G["Create internal/session.Core"]
   G --> H["Return public *ctapkit.Session facade"]
 
-  C -->|resolve error| X["Map device/transport errors where known"]
-  D -->|lease error| X
-  F -->|open error| Y["Release lease and join release error"]
+  C -->|invalid handle| X["Return DEVICE_HANDLE_INVALID"]
+  D -->|lease error| Z["Normalize lease failure"]
+  F -->|open error| Y["Release lease and return open error"]
 ```
 
 Important ordering:
@@ -102,7 +101,7 @@ flowchart TD
   L -->|no| N["Skip cache invalidation"]
   M --> O["Return result/error to facade"]
   N --> O
-  O --> P["Normalize cancellation errors"]
+  O --> P["Normalize code, operation, phase, and CTAP detail"]
   P --> Q["Emit completed, failed, or canceled"]
   Q --> R["Return typed OperationResult and error"]
 ```
@@ -134,8 +133,8 @@ for the workflow lock. This allows close to return even when an interaction
 handler is stuck. The actual authenticator and lease close path is protected by
 `sync.Once`, so duplicate or racing close calls share the same result.
 
-After close, `RunSerializedWorkflow` rejects new work with an
-`invalid-session` runtime error.
+After close, `RunSerializedWorkflow` rejects new work with the stable
+`SESSION_CLOSED` failure code.
 
 ## Interaction Flow
 
@@ -144,16 +143,16 @@ flowchart TD
   A["Workflow requests interaction"] --> B["Validate interaction kind"]
   B --> C["Emit interaction-required event"]
   C --> D{"Handler provided?"}
-  D -->|no| X["Return invalid-state runtime error"]
+  D -->|no| X["Return INTERACTION_HANDLER_REQUIRED"]
   D -->|yes| E["Call handler in goroutine"]
   E --> F["Copy PIN bytes if present"]
   F --> G["Wipe caller-owned PIN buffer"]
   G --> H{"Handler returns before ctx done?"}
   H -->|yes| I["Validate response"]
-  H -->|no| Y["Return canceled runtime error"]
+  H -->|no| Y["Return OPERATION_CANCELED or OPERATION_TIMEOUT"]
   I --> J{"Response valid?"}
   J -->|yes| K["Return response to workflow"]
-  J -->|no| L["Wipe copied PIN bytes and return error"]
+  J -->|no| L["Wipe copied PIN bytes and return INTERACTION_CANCELED or PIN_REQUIRED"]
 ```
 
 Interaction requests carry prompt payload only: kind, message, expected phrase,
@@ -356,8 +355,10 @@ Workflows request tokens from `internal/runtime.TokenService`, receive byte
 copies, and defer wiping those copies. PIN bytes received from handlers are
 copied and the caller-owned slice is wiped at the interaction boundary.
 
-Public operation DTOs avoid JSON exposure for PIN and reset phrase fields, and
-public result DTOs do not expose `pinUvAuthToken` values.
+Root `model` PIN operation DTOs omit PIN fields when marshaled, and public
+result DTOs never expose `pinUvAuthToken` values. The Wails-oriented `service`
+request DTOs deliberately keep typed PIN fields in JSON; the adapter and client
+own transport protection and must redact those fields from logs and persistence.
 
 ### Dry-Run And Confirmation Semantics
 
@@ -385,18 +386,26 @@ error.
 
 ### Error Normalization
 
-Open-session device and transport errors are mapped to public runtime error
-categories where the facade recognizes them. Run cancellation errors are
-normalized to `ErrorCanceled`.
+Every public runtime boundary converts a non-nil failure into a
+`*failure.Error` with a stable machine-readable `Code`. Device, transport,
+session, interaction, cancellation, timeout, and workflow failures all use the
+same registry. `Session.Run` also records the public operation and the phase in
+which the failure occurred. Consumers match a specific condition with
+`failure.IsCode`; `Category` is only a coarse recovery hint.
 
-Workflow and token code attach private CTAP context to raw `ctaphid.CTAPError`
-values when a command, subcommand, or operation changes the public meaning of a
-status. `Session.Run` performs the final run-level normalization after the
-workflow returns. Known CTAP statuses are returned as `model.RuntimeError`
-values with coarse `ErrorCategory` values and,
-where domain-owned, public sentinels for `errors.Is`. Public DTOs and events do
-not expose CTAP commands or status codes. The original `ctaphid.CTAPError`
-remains available through the error chain for callers that need diagnostics.
+Authenticator failures include a transport-safe `failure.CTAPDetail`. It
+preserves the numeric command, optional subcommand, and status returned by the
+authenticator. Numeric values remain authoritative, and symbolic names are
+omitted when the kit does not know them. Command-aware normalization maps the
+same raw CTAP status to the appropriate semantic code; for example,
+`CTAP2_ERR_NO_CREDENTIALS` during GetAssertion becomes
+`CREDENTIAL_NOT_FOUND` without losing command `2` or status `46`.
+
+The original low-level cause remains reachable only through the in-process Go
+error chain. It is excluded from snapshots and JSON. Service envelopes expose
+`failure.Snapshot` under their `error` field. See the
+[machine-readable error contract](error-contract.md) for the complete Go and
+JSON rules and exact CTAP examples.
 
 ### Close And Race Behavior
 

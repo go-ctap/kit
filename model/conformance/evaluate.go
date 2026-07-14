@@ -1,7 +1,6 @@
 package conformance
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -9,10 +8,9 @@ import (
 
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/samber/lo"
 )
-
-var ErrInvalidTarget = errors.New("conformance: invalid target")
 
 type assessmentOutcome uint8
 
@@ -65,11 +63,12 @@ func EvaluateGetInfo(info protocol.AuthenticatorGetInfoResponse) Report {
 // findings whose rules and references come from different documents.
 func EvaluateGetInfoAgainst(info protocol.AuthenticatorGetInfoResponse, target Target) (Report, error) {
 	if !isCanonicalTarget(target) {
-		return Report{}, fmt.Errorf(
-			"%w: specification %q with profile %q",
-			ErrInvalidTarget,
-			target.Specification,
-			target.Profile,
+		return Report{}, failure.New(failure.CodeConformanceTargetInvalid,
+			failure.WithParams(map[string]string{
+				"specification": string(target.Specification),
+				"profile":       string(target.Profile),
+			}),
+			failure.WithPhase(failure.PhaseValidation),
 		)
 	}
 

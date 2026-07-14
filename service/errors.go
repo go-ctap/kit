@@ -1,32 +1,14 @@
 package service
 
 import (
-	"errors"
-
-	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/internal/errornorm"
+	"github.com/go-ctap/kit/model/failure"
 )
 
-func runtimeErrorEnvelope(err error) *RuntimeErrorEnvelope {
-	if err == nil {
-		return nil
-	}
-
-	if runtimeErr, ok := errors.AsType[model.RuntimeError](err); ok {
-		return &RuntimeErrorEnvelope{
-			Category: runtimeErr.Category,
-			Message:  err.Error(),
-		}
-	}
-
-	return &RuntimeErrorEnvelope{
-		Message: err.Error(),
-	}
-}
-
 func invalidSessionError() error {
-	return model.NewRuntimeError(model.ErrorInvalidSession, "session not found", nil)
+	return failure.New(failure.CodeSessionInvalid, failure.WithPhase(failure.PhaseSession))
 }
 
-func invalidOperationError(message string) error {
-	return model.NewRuntimeError(model.ErrorInvalidOperation, message, nil)
+func normalizeServicePhaseError(err error, phase failure.Phase) error {
+	return errornorm.Normalize(errornorm.Annotate(err, errornorm.WithPhase(phase)), "")
 }

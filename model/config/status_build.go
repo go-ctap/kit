@@ -192,18 +192,6 @@ func buildAuthenticatorConfigStatus(capability CapabilityState) AuthenticatorCon
 	}
 }
 
-func retryState(retries uint, powerCycle *bool, err error) RetryState {
-	if err != nil {
-		return RetryState{State: StateUnknown, Error: err.Error()}
-	}
-
-	return RetryState{
-		State:           StateSupported,
-		Remaining:       new(retries),
-		PowerCycleState: powerCycle,
-	}
-}
-
 func boolConfiguredState(value *bool) StateValue {
 	if value == nil {
 		return StateUnknown

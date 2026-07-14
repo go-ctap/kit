@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/samber/lo"
 )
 
@@ -19,13 +20,13 @@ const (
 )
 
 type DecodeStatus struct {
-	Requested    bool       `json:"requested"`
-	Mode         DecodeMode `json:"mode"`
-	Label        string     `json:"label,omitempty"`
-	Success      bool       `json:"success"`
-	DecodedText  string     `json:"decodedText,omitempty"`
-	DecodedValue any        `json:"decodedValue,omitempty"`
-	Failure      string     `json:"failure,omitempty"`
+	Requested    bool             `json:"requested"`
+	Mode         DecodeMode       `json:"mode"`
+	Label        string           `json:"label,omitempty"`
+	Success      bool             `json:"success"`
+	DecodedText  string           `json:"decodedText,omitempty"`
+	DecodedValue any              `json:"decodedValue,omitempty"`
+	Failure      *failure.Failure `json:"failure,omitempty"`
 }
 
 func DecodeLargeBlob(raw []byte, blobPresent bool, mode DecodeMode) DecodeStatus {
@@ -43,7 +44,7 @@ func DecodeLargeBlob(raw []byte, blobPresent bool, mode DecodeMode) DecodeStatus
 
 	status.Label = "user-requested interpretation of opaque RP-defined bytes"
 	if !blobPresent {
-		status.Failure = "no blob present"
+		status.Failure = decodeFailure(failure.CodeLargeBlobMissing)
 
 		return status
 	}
@@ -51,7 +52,7 @@ func DecodeLargeBlob(raw []byte, blobPresent bool, mode DecodeMode) DecodeStatus
 	switch mode {
 	case DecodeModeUTF8:
 		if !utf8.Valid(raw) {
-			status.Failure = "payload is not valid UTF-8"
+			status.Failure = decodeFailure(failure.CodeLargeBlobUTF8Invalid)
 
 			return status
 		}
@@ -63,7 +64,7 @@ func DecodeLargeBlob(raw []byte, blobPresent bool, mode DecodeMode) DecodeStatus
 	case DecodeModeJSON:
 		var value any
 		if err := json.Unmarshal(raw, &value); err != nil {
-			status.Failure = "payload is not valid JSON: " + err.Error()
+			status.Failure = decodeFailure(failure.CodeLargeBlobJSONInvalid)
 
 			return status
 		}
@@ -75,7 +76,7 @@ func DecodeLargeBlob(raw []byte, blobPresent bool, mode DecodeMode) DecodeStatus
 	case DecodeModeCBOR:
 		var value any
 		if err := cbor.Unmarshal(raw, &value); err != nil {
-			status.Failure = "payload is not valid CBOR: " + err.Error()
+			status.Failure = decodeFailure(failure.CodeLargeBlobCBORInvalid)
 
 			return status
 		}
@@ -85,10 +86,17 @@ func DecodeLargeBlob(raw []byte, blobPresent bool, mode DecodeMode) DecodeStatus
 
 		return status
 	default:
-		status.Failure = "unsupported decode mode"
+		status.Failure = decodeFailure(failure.CodeLargeBlobDecodeModeUnsupported)
 
 		return status
 	}
+}
+
+func decodeFailure(code failure.Code) *failure.Failure {
+	err := failure.New(code, failure.WithPhase(failure.PhaseDecode))
+	snapshot := err.Failure
+
+	return &snapshot
 }
 
 func jsonFriendlyDecodedValue(value any) any {

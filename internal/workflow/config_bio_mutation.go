@@ -4,10 +4,11 @@ import (
 	"context"
 
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/ctaperrors"
+	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/safety"
 )
 
@@ -36,7 +37,6 @@ func (r Runner) renameBio(ctx context.Context, req model.BioRenameOperation) (mo
 		message:         req.ConfirmationMessage,
 		fallbackMessage: "Rename biometric enrollment " + req.TemplateIDHex + "?",
 		destructive:     false,
-		declinedErr:     appconfig.ErrConfirmationRequired,
 		preview:         preview,
 	}); err != nil {
 		return output, err
@@ -49,17 +49,13 @@ func (r Runner) renameBio(ctx context.Context, req model.BioRenameOperation) (mo
 
 	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionBioEnrollment, "")
 	if err != nil {
-		return output, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
-			model.OperationBioRename,
-			bioEnrollmentCommand(status),
-			protocol.BioEnrollmentSubCommandSetFriendlyName,
-		))
+		return output, err
 	}
 	defer secret.Zero(token)
 
 	if err := r.bioEnrollmentManager().SetFriendlyName(ctx, token, templateID, req.FriendlyName); err != nil {
-		return output, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
-			model.OperationBioRename,
+		return output, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
+			failure.PhaseAuthenticatorCommand,
 			bioEnrollmentCommand(status),
 			protocol.BioEnrollmentSubCommandSetFriendlyName,
 		))
@@ -102,7 +98,6 @@ func (r Runner) removeBio(ctx context.Context, req model.BioRemoveOperation) (mo
 		message:         req.ConfirmationMessage,
 		fallbackMessage: "Remove biometric enrollment " + req.TemplateIDHex + "?",
 		destructive:     true,
-		declinedErr:     appconfig.ErrConfirmationRequired,
 		preview:         preview,
 	}); err != nil {
 		return output, err
@@ -115,17 +110,13 @@ func (r Runner) removeBio(ctx context.Context, req model.BioRemoveOperation) (mo
 
 	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionBioEnrollment, "")
 	if err != nil {
-		return output, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
-			model.OperationBioRemove,
-			bioEnrollmentCommand(status),
-			protocol.BioEnrollmentSubCommandRemoveEnrollment,
-		))
+		return output, err
 	}
 	defer secret.Zero(token)
 
 	if err := r.bioEnrollmentManager().RemoveEnrollment(ctx, token, templateID); err != nil {
-		return output, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
-			model.OperationBioRemove,
+		return output, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
+			failure.PhaseAuthenticatorCommand,
 			bioEnrollmentCommand(status),
 			protocol.BioEnrollmentSubCommandRemoveEnrollment,
 		))

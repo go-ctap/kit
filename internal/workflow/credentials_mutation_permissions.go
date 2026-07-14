@@ -4,8 +4,8 @@ import (
 	"encoding/hex"
 
 	"github.com/go-ctap/ctap/credential"
-	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
+	"github.com/go-ctap/kit/model/failure"
 )
 
 func (r Runner) credentialMutationRPID(target appcredentials.CredentialTarget) string {
@@ -19,10 +19,10 @@ func (r Runner) credentialMutationRPID(target appcredentials.CredentialTarget) s
 func credentialDescriptor(record appcredentials.CredentialRecord) (credential.PublicKeyCredentialDescriptor, error) {
 	id, err := hex.DecodeString(record.CredentialIDHex)
 	if err != nil {
-		return credential.PublicKeyCredentialDescriptor{}, model.NewRuntimeError(
-			model.ErrorInvalidState,
-			"cached credential has invalid credential id",
+		return credential.PublicKeyCredentialDescriptor{}, failure.Wrap(
+			failure.CodeInternalError,
 			err,
+			failure.WithPhase(failure.PhaseDecode),
 		)
 	}
 

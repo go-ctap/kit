@@ -6,9 +6,10 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/ctaperrors"
+	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/failure"
 	appwebauthn "github.com/go-ctap/kit/model/webauthn"
 	"github.com/samber/lo"
 )
@@ -36,7 +37,6 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 		message:         req.ConfirmationMessage,
 		fallbackMessage: "Create WebAuthn credential for " + input.RP.ID + "?",
 		destructive:     false,
-		declinedErr:     appwebauthn.ErrConfirmationRequired,
 		preview:         preview,
 	}); err != nil {
 		return output, err
@@ -45,7 +45,7 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 	if makeCredentialNeedsToken(r.infoProvider().GetInfo(), input) {
 		token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionMakeCredential, input.RP.ID)
 		if err != nil {
-			return output, annotateMakeCredentialError(err)
+			return output, err
 		}
 		defer secret.Zero(token)
 
@@ -67,7 +67,6 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 	if err != nil {
 		return output, annotateMakeCredentialError(err)
 	}
-
 	result, err := makeCredentialResult(r.env.Selected.DeviceID, input.RP.ID, response)
 	if err != nil {
 		return output, err
@@ -156,18 +155,16 @@ func (r Runner) callMakeCredential(
 }
 
 func annotateMakeCredentialError(err error) error {
-	return ctaperrors.Annotate(err, ctaperrors.WithCommand(
-		model.OperationMakeCredential,
+	return errornorm.Annotate(err, errornorm.WithCommand(
+		failure.PhaseAuthenticatorCommand,
 		protocol.AuthenticatorMakeCredential,
-		ctaperrors.DomainCredentials,
 	))
 }
 
 func annotateGetAssertionError(err error) error {
-	return ctaperrors.Annotate(err, ctaperrors.WithCommand(
-		model.OperationGetAssertion,
+	return errornorm.Annotate(err, errornorm.WithCommand(
+		failure.PhaseAuthenticatorCommand,
 		protocol.AuthenticatorGetAssertion,
-		ctaperrors.DomainCredentials,
 	))
 }
 
@@ -190,17 +187,25 @@ func makeCredentialResult(
 	response protocol.AuthenticatorMakeCredentialResponse,
 ) (appwebauthn.MakeCredentialResult, error) {
 	if response.AuthData == nil || response.AuthData.AttestedCredentialData == nil {
-		return appwebauthn.MakeCredentialResult{}, appwebauthn.ErrAttestedCredentialDataMissing
+		return appwebauthn.MakeCredentialResult{}, failure.New(failure.CodeAttestedCredentialDataMissing,
+			failure.WithPhase(failure.PhaseDecode),
+		)
 	}
 
 	publicKeyCOSE, err := cbor.Marshal(response.AuthData.AttestedCredentialData.CredentialPublicKey)
 	if err != nil {
-		return appwebauthn.MakeCredentialResult{}, err
+		return appwebauthn.MakeCredentialResult{}, errornorm.Annotate(
+			err,
+			errornorm.WithPhase(failure.PhaseDecode),
+		)
 	}
 
 	attestationObjectCBOR, err := attestationObjectCBOR(response)
 	if err != nil {
-		return appwebauthn.MakeCredentialResult{}, err
+		return appwebauthn.MakeCredentialResult{}, errornorm.Annotate(
+			err,
+			errornorm.WithPhase(failure.PhaseDecode),
+		)
 	}
 
 	return appwebauthn.MakeCredentialResult{

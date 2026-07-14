@@ -8,6 +8,7 @@ import (
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/transport"
 )
 
@@ -23,6 +24,41 @@ func TestSessionTypedOperationContract(t *testing.T) {
 	typed, ok := output.(model.ConfigStatusOutput)
 	if !ok || typed.Report.Device.DeviceID == "" {
 		t.Fatalf("unexpected output: %#v", output)
+	}
+}
+
+func TestSessionPreCompletedContextHasSessionPhase(t *testing.T) {
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	deadline, deadlineCancel := context.WithDeadline(t.Context(), time.Unix(0, 0))
+	defer deadlineCancel()
+
+	tests := []struct {
+		name string
+		ctx  context.Context
+		code failure.Code
+	}{
+		{name: "canceled", ctx: canceled, code: failure.CodeOperationCanceled},
+		{name: "deadline", ctx: deadline, code: failure.CodeOperationTimeout},
+	}
+
+	session := openContractSession(t, nil, nil)
+	defer func() { _ = session.Close() }()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := session.Run(tt.ctx, model.ConfigStatusOperation{}, nil)
+			requireFailureCode(t, err, tt.code)
+
+			snapshot := failure.Snapshot(err)
+			if snapshot.Operation != string(model.OperationConfigStatus) {
+				t.Fatalf("operation = %q, want %q", snapshot.Operation, model.OperationConfigStatus)
+			}
+			if snapshot.Phase != failure.PhaseSession {
+				t.Fatalf("phase = %q, want %q", snapshot.Phase, failure.PhaseSession)
+			}
+		})
 	}
 }
 
@@ -122,9 +158,7 @@ func TestSessionCloseCancelsActiveRunAndClosesAuthenticatorOnce(t *testing.T) {
 
 	select {
 	case err := <-runDone:
-		if !model.IsErrorCategory(err, model.ErrorCanceled) {
-			t.Fatalf("Run error = %v, want canceled", err)
-		}
+		requireFailureCode(t, err, failure.CodeOperationCanceled)
 	case <-time.After(time.Second):
 		t.Fatal("Run was not canceled by Session.Close")
 	}
@@ -188,9 +222,7 @@ func TestSessionCloseDoesNotWaitForStuckInteractionHandler(t *testing.T) {
 
 	select {
 	case err := <-runDone:
-		if !model.IsErrorCategory(err, model.ErrorCanceled) {
-			t.Fatalf("Run error = %v, want canceled", err)
-		}
+		requireFailureCode(t, err, failure.CodeOperationCanceled)
 	case <-time.After(time.Second):
 		t.Fatal("Run was not canceled by Session.Close")
 	}
@@ -231,9 +263,7 @@ func TestSessionCloseCancelsBlockedAuthenticatorCommand(t *testing.T) {
 
 	select {
 	case err := <-runDone:
-		if !model.IsErrorCategory(err, model.ErrorCanceled) {
-			t.Fatalf("Run error = %v, want canceled", err)
-		}
+		requireFailureCode(t, err, failure.CodeOperationCanceled)
 	case <-time.After(time.Second):
 		t.Fatal("blocked authenticator command did not observe cancellation")
 	}
@@ -247,9 +277,7 @@ func TestRunAfterSessionCloseIsRejected(t *testing.T) {
 	}
 
 	result, err := session.Run(context.Background(), model.ConfigStatusOperation{}, nil)
-	if !model.IsErrorCategory(err, model.ErrorInvalidSession) {
-		t.Fatalf("Run error = %v, want invalid-session", err)
-	}
+	requireFailureCode(t, err, failure.CodeSessionClosed)
 
 	if result != nil {
 		t.Fatalf("result = %#v, want nil", result)

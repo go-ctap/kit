@@ -6,10 +6,11 @@ import (
 	"time"
 
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/ctaperrors"
+	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/safety"
 )
 
@@ -40,7 +41,6 @@ func (r Runner) enrollBio(ctx context.Context, req model.BioEnrollOperation) (mo
 		message:         req.ConfirmationMessage,
 		fallbackMessage: "Start biometric enrollment on authenticator " + r.env.Selected.DeviceID + "?",
 		destructive:     false,
-		declinedErr:     appconfig.ErrConfirmationRequired,
 		preview:         preview,
 	}); err != nil {
 		return output, err
@@ -104,11 +104,12 @@ func (r Runner) runBioEnrollment(
 
 		cancelCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), bioEnrollmentCancelTimeout)
 		defer cancel()
-		if err := authenticator.CancelCurrentEnrollment(cancelCtx); err == nil {
+		cancelErr := authenticator.CancelCurrentEnrollment(cancelCtx)
+		if cancelErr == nil {
 			result.CancelSucceeded = true
 		}
 
-		return result, appconfig.BioEnrollError{Result: result, Err: cause}
+		return result, cause
 	}
 
 	recordSample := func(resp protocol.AuthenticatorBioEnrollmentResponse) error {
@@ -135,8 +136,8 @@ func (r Runner) runBioEnrollment(
 
 	begin, err := authenticator.EnrollBegin(ctx, token, req.TimeoutMilliseconds)
 	if err != nil {
-		return appconfig.BioEnrollResult{}, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
-			model.OperationBioEnroll,
+		return appconfig.BioEnrollResult{}, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
+			failure.PhaseAuthenticatorCommand,
 			bioEnrollmentCommand(r.statusReport()),
 			protocol.BioEnrollmentSubCommandEnrollBegin,
 		))
@@ -148,13 +149,17 @@ func (r Runner) runBioEnrollment(
 
 	for result.RemainingSamples != nil && *result.RemainingSamples > 0 {
 		if err := ctx.Err(); err != nil {
-			return cancelAfterFailure(err)
+			return cancelAfterFailure(errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
+				failure.PhaseAuthenticatorCommand,
+				bioEnrollmentCommand(r.statusReport()),
+				protocol.BioEnrollmentSubCommandEnrollCaptureNextSample,
+			)))
 		}
 
 		next, err := authenticator.EnrollCaptureNextSample(ctx, token, begin.TemplateID, req.TimeoutMilliseconds)
 		if err != nil {
-			return cancelAfterFailure(ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
-				model.OperationBioEnroll,
+			return cancelAfterFailure(errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
+				failure.PhaseAuthenticatorCommand,
 				bioEnrollmentCommand(r.statusReport()),
 				protocol.BioEnrollmentSubCommandEnrollCaptureNextSample,
 			)))

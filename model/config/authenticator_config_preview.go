@@ -1,8 +1,9 @@
 package config
 
 import (
-	"fmt"
+	"strconv"
 
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/safety"
 	"github.com/samber/lo"
 )
@@ -18,20 +19,20 @@ func BuildAlwaysUVPreview(status StatusReport, target AlwaysUVTarget, mode safet
 	requested := target == AlwaysUVTargetEnable
 
 	if !status.AuthenticatorConfig.Supported {
-		return AuthenticatorConfigPreview{}, fmt.Errorf("%w: device does not report authnrCfg support", ErrAuthenticatorConfigUnsupported)
+		return AuthenticatorConfigPreview{}, failure.New(failure.CodeAuthenticatorConfigUnsupported, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	alwaysUV := status.AuthenticatorConfig.AlwaysUV
 	if !alwaysUV.Supported {
-		return AuthenticatorConfigPreview{}, fmt.Errorf("%w: device does not report alwaysUv support", ErrAuthenticatorConfigUnsupported)
+		return AuthenticatorConfigPreview{}, failure.New(failure.CodeAuthenticatorConfigUnsupported, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	if alwaysUV.Configured == nil || alwaysUV.State == StateUnknown {
-		return AuthenticatorConfigPreview{}, fmt.Errorf("%w: current state is unknown", ErrAlwaysUVStateUnknown)
+		return AuthenticatorConfigPreview{}, failure.New(failure.CodeAlwaysUVStateUnknown, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	if *alwaysUV.Configured == requested {
-		return AuthenticatorConfigPreview{}, fmt.Errorf("%w: current state already matches %s", ErrAlwaysUVAlreadyTarget, target)
+		return AuthenticatorConfigPreview{}, failure.New(failure.CodeAlwaysUVAlreadyTarget, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	return AuthenticatorConfigPreview{
@@ -52,15 +53,21 @@ func BuildAlwaysUVPreview(status StatusReport, target AlwaysUVTarget, mode safet
 
 func BuildMinPINLengthPreview(status StatusReport, req MinPINLengthRequest, mode safety.PreviewMode) (AuthenticatorConfigPreview, error) {
 	if !status.AuthenticatorConfig.Supported {
-		return AuthenticatorConfigPreview{}, fmt.Errorf("%w: device does not report authnrCfg support", ErrAuthenticatorConfigUnsupported)
+		return AuthenticatorConfigPreview{}, failure.New(failure.CodeAuthenticatorConfigUnsupported, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	if !status.AuthenticatorConfig.SetMinPINLength.Supported {
-		return AuthenticatorConfigPreview{}, fmt.Errorf("%w: device does not report setMinPINLength support", ErrMinPINLengthUnsupported)
+		return AuthenticatorConfigPreview{}, failure.New(failure.CodeMinPINLengthUnsupported, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	if status.PIN.MinPINLength != nil && req.Length < *status.PIN.MinPINLength {
-		return AuthenticatorConfigPreview{}, fmt.Errorf("%w: requested %d current %d", ErrMinPINLengthLowering, req.Length, *status.PIN.MinPINLength)
+		return AuthenticatorConfigPreview{}, failure.New(failure.CodeMinPINLengthDecreaseNotAllowed,
+			failure.WithParams(map[string]string{
+				"requested": strconv.FormatUint(uint64(req.Length), 10),
+				"current":   strconv.FormatUint(uint64(*status.PIN.MinPINLength), 10),
+			}),
+			failure.WithPhase(failure.PhaseValidation),
+		)
 	}
 
 	warnings := []safety.Warning{

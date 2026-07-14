@@ -40,6 +40,21 @@ var (
 	defaultCache = NewCache()
 )
 
+// HTTPStatusError reports a non-success response from the configured MDS
+// endpoint. It is internal to the kit module; public normalization exposes
+// only StatusCode as the allowlisted httpStatus parameter.
+type HTTPStatusError struct {
+	StatusCode int
+}
+
+func (e *HTTPStatusError) Error() string {
+	return fmt.Sprintf("%s: HTTP status %d", ErrFetch, e.StatusCode)
+}
+
+func (e *HTTPStatusError) Unwrap() error {
+	return ErrFetch
+}
+
 // Client fetches, caches, and looks up verified FIDO Metadata Service blobs.
 // Signature, x5u/x5c, certificate-chain and CRL validation live in internal/mdsverify.
 type Client struct {
@@ -233,7 +248,7 @@ func (c *Client) fetchAndVerify(ctx context.Context, source string, local *Blob)
 		return nil, nil, true, nil
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return nil, nil, false, fmt.Errorf("%w: unexpected HTTP status %s", ErrFetch, resp.Status)
+		return nil, nil, false, &HTTPStatusError{StatusCode: resp.StatusCode}
 	}
 
 	body, err := readLimited(resp.Body, c.maxBlobBytes())

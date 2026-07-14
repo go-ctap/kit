@@ -6,10 +6,11 @@ import (
 
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/ctaperrors"
+	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
+	"github.com/go-ctap/kit/model/failure"
 )
 
 func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCredentialUserOperation) (model.OperationResult, error) {
@@ -47,7 +48,6 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 		message:         req.ConfirmationMessage,
 		fallbackMessage: "Update resident credential " + req.CredentialIDHex + "?",
 		destructive:     false,
-		declinedErr:     appcredentials.ErrConfirmationRequired,
 		preview:         preview,
 	}); err != nil {
 		return output, err
@@ -93,8 +93,8 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 	defer secret.Zero(token)
 
 	if err := r.credentialManager().UpdateUserInformation(ctx, token, descriptor, updatedUser); err != nil {
-		return output, ctaperrors.Annotate(err, ctaperrors.WithCredentialManagementSubCommand(
-			model.OperationUpdateCredentialUser,
+		return output, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
+			failure.PhaseAuthenticatorCommand,
 			credentialManagementCommand(r.infoProvider().GetInfo()),
 			protocol.CredentialManagementSubCommandUpdateUserInformation,
 		))
@@ -117,7 +117,11 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 func decodeCredentialHex(value string) ([]byte, error) {
 	decoded, err := hex.DecodeString(value)
 	if err != nil {
-		return nil, appcredentials.ErrInvalidUserIDHex
+		return nil, failure.Wrap(
+			failure.CodeUserIDHexInvalid,
+			err,
+			failure.WithPhase(failure.PhaseDecode),
+		)
 	}
 
 	return decoded, nil

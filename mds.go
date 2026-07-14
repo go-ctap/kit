@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 
 	rtmds "github.com/go-ctap/kit/internal/mds"
-	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/failure"
 	appmds "github.com/go-ctap/kit/model/mds"
 	"github.com/google/uuid"
 )
@@ -85,14 +86,19 @@ func lookupMDS(
 func runtimeMDSError(err error) error {
 	switch {
 	case errors.Is(err, rtmds.ErrInvalidAAGUID):
-		return model.NewRuntimeError(model.ErrorInvalidOperation, err.Error(), err)
-	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
-		return model.NewRuntimeError(model.ErrorCanceled, "MDS lookup canceled", err)
+		return failure.Wrap(failure.CodeMDSAAGUIDInvalid, err, failure.WithPhase(failure.PhaseMetadata))
 	case errors.Is(err, rtmds.ErrFetch):
-		return model.NewRuntimeError(model.ErrorTransportFailure, err.Error(), err)
+		opts := []failure.Option{failure.WithPhase(failure.PhaseMetadata)}
+		if statusErr, ok := errors.AsType[*rtmds.HTTPStatusError](err); ok {
+			opts = append(opts, failure.WithParams(map[string]string{
+				"httpStatus": strconv.Itoa(statusErr.StatusCode),
+			}))
+		}
+
+		return failure.Wrap(failure.CodeMDSFetchFailed, err, opts...)
 	case errors.Is(err, rtmds.ErrVerify):
-		return model.NewRuntimeError(model.ErrorInvalidState, err.Error(), err)
+		return failure.Wrap(failure.CodeMDSVerificationFailed, err, failure.WithPhase(failure.PhaseMetadata))
 	default:
-		return err
+		return normalizeBoundaryError(err, failure.PhaseMetadata)
 	}
 }

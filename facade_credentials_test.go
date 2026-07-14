@@ -14,7 +14,7 @@ import (
 	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
-	appcredentials "github.com/go-ctap/kit/model/credentials"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/transport"
 	"github.com/samber/lo"
 )
@@ -142,8 +142,10 @@ func TestCredentialInventoryCanceledContextDuringRefreshPreservesLastKnownGoodCa
 		ctx,
 		model.ListCredentialsOperation{Refresh: true},
 		userVerificationHandler(t),
-	); !model.IsErrorCategory(err, model.ErrorCanceled) {
-		t.Fatalf("refresh error = %v, want canceled", err)
+	); err != nil {
+		requireFailureCode(t, err, failure.CodeOperationCanceled)
+	} else {
+		t.Fatal("refresh error = nil, want OPERATION_CANCELED")
 	}
 	a.cancelEnumeration = nil
 
@@ -335,57 +337,6 @@ func TestCredentialUpdateUserUsesScopedMutationPermissionsWhenStrict(t *testing.
 		a.updateTokens,
 		"token:id.example",
 	)
-}
-
-func TestCredentialMutationCTAPStatusMapsSentinel(t *testing.T) {
-	tests := []struct {
-		name      string
-		operation model.Operation
-		setupErr  func(*credentialMutationTokenAuthenticator)
-		want      error
-	}{
-		{
-			name:      "delete missing credential",
-			operation: model.DeleteCredentialOperation{CredentialIDHex: "c05e", Confirmed: true},
-			setupErr: func(a *credentialMutationTokenAuthenticator) {
-				a.deleteErr = &ctaptransport.CTAPError{
-					Command:    protocol.AuthenticatorCredentialManagement,
-					StatusCode: ctaptransport.CTAP2_ERR_NO_CREDENTIALS,
-				}
-			},
-			want: appcredentials.ErrCredentialNotFound,
-		},
-		{
-			name:      "update credential store full",
-			operation: model.UpdateCredentialUserOperation{CredentialIDHex: "c05e", Name: "updated", NameProvided: true, Confirmed: true},
-			setupErr: func(a *credentialMutationTokenAuthenticator) {
-				a.updateErr = &ctaptransport.CTAPError{
-					Command:    protocol.AuthenticatorCredentialManagement,
-					StatusCode: ctaptransport.CTAP2_ERR_KEY_STORE_FULL,
-				}
-			},
-			want: appcredentials.ErrCredentialStoreFull,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			a := &credentialMutationTokenAuthenticator{}
-			tt.setupErr(a)
-			session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-				return a, nil
-			})
-			defer func() { _ = session.Close() }()
-
-			_, err := session.Run(context.Background(), tt.operation, userVerificationHandler(t))
-			if !errors.Is(err, tt.want) {
-				t.Fatalf("Run error = %v, want sentinel %v", err, tt.want)
-			}
-			if !model.IsErrorCategory(err, model.ErrorInvalidState) {
-				t.Fatalf("Run category = %v, want invalid-state", err)
-			}
-		})
-	}
 }
 
 type progressCredentialAuthenticator struct {

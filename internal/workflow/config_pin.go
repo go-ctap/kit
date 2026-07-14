@@ -4,9 +4,10 @@ import (
 	"context"
 
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/ctaperrors"
+	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/safety"
 )
 
@@ -35,7 +36,6 @@ func (r Runner) setPIN(ctx context.Context, req model.SetPINOperation) (model.Op
 		message:         req.ConfirmationMessage,
 		fallbackMessage: "Set PIN on authenticator " + r.env.Selected.DeviceID + "?",
 		destructive:     false,
-		declinedErr:     appconfig.ErrConfirmationRequired,
 		preview:         preview,
 	}); err != nil {
 		return output, err
@@ -43,8 +43,8 @@ func (r Runner) setPIN(ctx context.Context, req model.SetPINOperation) (model.Op
 
 	err = r.configManager().SetPIN(ctx, req.NewPIN)
 	if err != nil {
-		return output, ctaperrors.Annotate(err, ctaperrors.WithClientPINSubCommand(
-			model.OperationSetPIN,
+		return output, errornorm.Annotate(err, errornorm.WithClientPINSubCommand(
+			failure.PhaseAuthenticatorCommand,
 			protocol.ClientPINSubCommandSetPIN,
 		))
 	}
@@ -78,7 +78,6 @@ func (r Runner) changePIN(ctx context.Context, req model.ChangePINOperation) (mo
 		message:         req.ConfirmationMessage,
 		fallbackMessage: "Change PIN on authenticator " + r.env.Selected.DeviceID + "?",
 		destructive:     false,
-		declinedErr:     appconfig.ErrConfirmationRequired,
 		preview:         preview,
 	}); err != nil {
 		return output, err
@@ -86,8 +85,8 @@ func (r Runner) changePIN(ctx context.Context, req model.ChangePINOperation) (mo
 
 	err = r.configManager().ChangePIN(ctx, req.CurrentPIN, req.NewPIN)
 	if err != nil {
-		return output, ctaperrors.Annotate(err, ctaperrors.WithClientPINSubCommand(
-			model.OperationChangePIN,
+		return output, errornorm.Annotate(err, errornorm.WithClientPINSubCommand(
+			failure.PhaseAuthenticatorCommand,
 			protocol.ClientPINSubCommandChangePIN,
 		))
 	}

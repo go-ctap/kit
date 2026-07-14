@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/failure"
 	appmds "github.com/go-ctap/kit/model/mds"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
@@ -41,9 +42,9 @@ type DiscoverySnapshot struct {
 }
 
 type DiscoveryChangedEnvelope struct {
-	Trigger  DiscoveryTrigger      `json:"trigger"`
-	Snapshot *DiscoverySnapshot    `json:"snapshot,omitempty"`
-	Error    *RuntimeErrorEnvelope `json:"error,omitempty"`
+	Trigger  DiscoveryTrigger   `json:"trigger"`
+	Snapshot *DiscoverySnapshot `json:"snapshot,omitempty"`
+	Error    *failure.Failure   `json:"error,omitempty"`
 }
 
 type OpenSessionRequest struct {
@@ -63,14 +64,14 @@ type operationEnvelope struct {
 	SessionID   SessionID             `json:"sessionId"`
 	Kind        model.OperationKind   `json:"kind"`
 	Result      model.OperationResult `json:"result,omitempty"`
-	Error       *RuntimeErrorEnvelope `json:"error,omitempty"`
+	Error       *failure.Failure      `json:"error,omitempty"`
 }
 
 type OperationEnvelopeMeta struct {
-	OperationID OperationID           `json:"operationId"`
-	SessionID   SessionID             `json:"sessionId"`
-	Kind        model.OperationKind   `json:"kind"`
-	Error       *RuntimeErrorEnvelope `json:"error,omitempty"`
+	OperationID OperationID         `json:"operationId"`
+	SessionID   SessionID           `json:"sessionId"`
+	Kind        model.OperationKind `json:"kind"`
+	Error       *failure.Failure    `json:"error,omitempty"`
 }
 
 type InspectEnvelope struct {
@@ -191,9 +192,4 @@ type MDSLookupRequest struct {
 
 type MDSLookupEnvelope struct {
 	Result appmds.LookupResult `json:"result"`
-}
-
-type RuntimeErrorEnvelope struct {
-	Category model.ErrorCategory `json:"category,omitempty"`
-	Message  string              `json:"message"`
 }

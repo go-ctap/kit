@@ -3,6 +3,9 @@ package transport
 import (
 	"context"
 	"errors"
+	"io/fs"
+
+	"github.com/go-ctap/kit/model/failure"
 )
 
 type Mode string
@@ -11,12 +14,6 @@ const (
 	ModeAuto         Mode = "auto"
 	ModeHID          Mode = "hid"
 	ModeWindowsProxy Mode = "windows-proxy"
-)
-
-var (
-	ErrUnsupportedMode  = errors.New("ctapkit: unsupported transport mode")
-	ErrPermissionDenied = errors.New("ctapkit: transport permission denied")
-	ErrProxyUnavailable = errors.New("ctapkit: transport proxy unavailable")
 )
 
 // Descriptor is the transport-layer view of a reachable authenticator.
@@ -47,4 +44,37 @@ type ProviderResolver interface {
 type ResolvedProvider struct {
 	Mode     Mode
 	Provider Provider
+}
+
+func unsupportedModeError() error {
+	return failure.New(failure.CodeTransportModeUnsupported,
+		failure.WithPhase(failure.PhaseDiscovery),
+	)
+}
+
+func transportError(err error) error {
+	return normalizeTransportError(err, failure.CodeTransportFailure)
+}
+
+func proxyUnavailableError(err error) error {
+	return normalizeTransportError(err, failure.CodeTransportProxyUnavailable)
+}
+
+func normalizeTransportError(err error, fallback failure.Code) error {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return failure.Wrap(failure.CodeOperationCanceled, err, failure.WithPhase(failure.PhaseDiscovery))
+	case errors.Is(err, context.DeadlineExceeded):
+		return failure.Wrap(failure.CodeOperationTimeout, err, failure.WithPhase(failure.PhaseDiscovery))
+	}
+
+	if errors.Is(err, fs.ErrPermission) {
+		return failure.Wrap(
+			failure.CodeTransportPermissionDenied,
+			err,
+			failure.WithPhase(failure.PhaseDiscovery),
+		)
+	}
+
+	return failure.Wrap(fallback, err, failure.WithPhase(failure.PhaseDiscovery))
 }

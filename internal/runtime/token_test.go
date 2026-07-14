@@ -9,6 +9,7 @@ import (
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/samber/lo"
 )
 
@@ -87,8 +88,8 @@ func TestTokenServiceDefaultFlowCanceledUVInteractionSkipsUVCommand(t *testing.T
 		t.Fatalf("token = %q, want nil", token)
 	}
 
-	if !model.IsErrorCategory(err, model.ErrorCanceled) {
-		t.Fatalf("Acquire error = %v, want canceled runtime error", err)
+	if !failure.IsCode(err, failure.CodeInteractionCanceled) {
+		t.Fatalf("Acquire error = %v, want %s", err, failure.CodeInteractionCanceled)
 	}
 
 	if len(authenticator.uvRPIDs) != 0 {
@@ -192,8 +193,8 @@ func TestTokenServiceMissingHandlerForUVReturnsInvalidStateBeforeUVCommand(t *te
 		t.Fatalf("token = %q, want nil", token)
 	}
 
-	if !model.IsErrorCategory(err, model.ErrorInvalidState) {
-		t.Fatalf("Acquire error = %v, want invalid-state runtime error", err)
+	if !failure.IsCode(err, failure.CodeInteractionHandlerRequired) {
+		t.Fatalf("Acquire error = %v, want %s", err, failure.CodeInteractionHandlerRequired)
 	}
 
 	if len(authenticator.uvRPIDs) != 0 {

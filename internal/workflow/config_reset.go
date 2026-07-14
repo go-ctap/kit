@@ -4,9 +4,10 @@ import (
 	"context"
 
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/ctaperrors"
+	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/safety"
 )
 
@@ -29,7 +30,6 @@ func (r Runner) resetFactory(ctx context.Context, req model.ResetFactoryOperatio
 		message:         req.ConfirmationMessage,
 		fallbackMessage: "Factory reset authenticator " + preview.Device.DeviceID + "?",
 		destructive:     true,
-		declinedErr:     appconfig.ErrConfirmationRequired,
 		preview:         preview,
 	}); err != nil {
 		return output, err
@@ -45,10 +45,9 @@ func (r Runner) resetFactory(ctx context.Context, req model.ResetFactoryOperatio
 	}
 
 	if err := r.configManager().Reset(ctx); err != nil {
-		return output, ctaperrors.Annotate(err, ctaperrors.WithCommand(
-			model.OperationResetFactory,
+		return output, errornorm.Annotate(err, errornorm.WithCommand(
+			failure.PhaseAuthenticatorCommand,
 			protocol.AuthenticatorReset,
-			ctaperrors.DomainConfig,
 		))
 	}
 

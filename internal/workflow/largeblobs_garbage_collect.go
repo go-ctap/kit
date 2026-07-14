@@ -6,10 +6,11 @@ import (
 
 	"github.com/go-ctap/ctap/crypto"
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/ctaperrors"
+	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
+	"github.com/go-ctap/kit/model/failure"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/safety"
 )
@@ -43,7 +44,6 @@ func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageC
 		message:         req.ConfirmationMessage,
 		fallbackMessage: "Garbage collect unmatched large blob entries?",
 		destructive:     true,
-		declinedErr:     applargeblobs.ErrConfirmationRequired,
 		preview:         preview,
 	}); err != nil {
 		return output, err
@@ -58,17 +58,14 @@ func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageC
 
 	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionLargeBlobWrite, "")
 	if err != nil {
-		return output, ctaperrors.Annotate(err, ctaperrors.WithLargeBlobsSubCommand(
-			model.OperationGarbageCollectLargeBlobs,
-			ctaperrors.LargeBlobsSubCommandSet,
-		))
+		return output, err
 	}
 	defer secret.Zero(token)
 
 	if err := r.largeBlobManager().SetLargeBlobs(ctx, token, state.replacement); err != nil {
-		return output, ctaperrors.Annotate(err, ctaperrors.WithLargeBlobsSubCommand(
-			model.OperationGarbageCollectLargeBlobs,
-			ctaperrors.LargeBlobsSubCommandSet,
+		return output, errornorm.Annotate(err, errornorm.WithCommand(
+			failure.PhaseAuthenticatorCommand,
+			protocol.AuthenticatorLargeBlobs,
 		))
 	}
 
@@ -86,15 +83,14 @@ func (r Runner) loadGarbageCollectState(ctx context.Context) (garbageCollectStat
 
 	support := buildLargeBlobSupportReport(r.largeBlobManager().GetInfo())
 	if !support.LargeBlobs {
-		return garbageCollectState{}, applargeblobs.ErrUnsupportedLargeBlobs
+		return garbageCollectState{}, failure.New(failure.CodeLargeBlobUnsupported,
+			failure.WithPhase(failure.PhaseDiscovery),
+		)
 	}
 
 	blobs, err := r.readLargeBlobArray(ctx)
 	if err != nil {
-		return garbageCollectState{}, ctaperrors.Annotate(err, ctaperrors.WithLargeBlobsSubCommand(
-			model.OperationGarbageCollectLargeBlobs,
-			ctaperrors.LargeBlobsSubCommandGet,
-		))
+		return garbageCollectState{}, err
 	}
 
 	sizeBefore, err := serializedLargeBlobArraySize(blobs)

@@ -1,17 +1,15 @@
 package credentials
 
 import (
-	"errors"
 	"testing"
 
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/model/safety"
 )
 
 func TestFindCredentialByHexID(t *testing.T) {
-	report := sampleInventoryReport()
-
-	target, err := FindCredentialByHexID(report, "deadbeef")
+	target, err := FindCredentialByHexID(sampleInventoryReport(), "deadbeef")
 	if err != nil {
 		t.Fatalf("FindCredentialByHexID: %v", err)
 	}
@@ -55,8 +53,12 @@ func TestBuildDeletePreview(t *testing.T) {
 }
 
 func TestBuildDeletePreviewMissingCredential(t *testing.T) {
-	if _, err := BuildDeletePreview(sampleInventoryReport(), ""); err == nil {
-		t.Fatal("BuildDeletePreview(empty) error = nil, want failure")
+	_, err := BuildDeletePreview(sampleInventoryReport(), "")
+	if !failure.IsCode(err, failure.CodeCredentialIDRequired) {
+		t.Fatalf("BuildDeletePreview(empty) error = %v, want %s", err, failure.CodeCredentialIDRequired)
+	}
+	if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
+		t.Fatalf("BuildDeletePreview(empty) phase = %q, want %q", got, failure.PhaseValidation)
 	}
 }
 
@@ -67,9 +69,26 @@ func TestBuildUpdateUserPreviewRejectsInvalidUserIDHex(t *testing.T) {
 			UserIDHex:       userIDHex,
 			UserIDProvided:  true,
 		})
-		if !errors.Is(err, ErrInvalidUserIDHex) {
-			t.Fatalf("BuildUpdateUserPreview(%q) error = %v, want ErrInvalidUserIDHex", userIDHex, err)
+		if !failure.IsCode(err, failure.CodeUserIDHexInvalid) {
+			t.Fatalf("BuildUpdateUserPreview(%q) error = %v, want %s", userIDHex, err, failure.CodeUserIDHexInvalid)
 		}
+		if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
+			t.Fatalf("BuildUpdateUserPreview(%q) phase = %q, want %q", userIDHex, got, failure.PhaseValidation)
+		}
+	}
+}
+
+func TestBuildUpdateUserPreviewRequiresSupportedChange(t *testing.T) {
+	report := sampleInventoryReport()
+	report.Support.PreviewOnly = true
+	_, err := BuildUpdateUserPreview(report, UpdateUserRequest{CredentialIDHex: "deadbeef"})
+	if !failure.IsCode(err, failure.CodeCredentialManagementUnsupported) {
+		t.Fatalf("BuildUpdateUserPreview(preview-only) error = %v, want %s", err, failure.CodeCredentialManagementUnsupported)
+	}
+
+	_, err = ResolveUpdatedUser(CredentialTarget{}, UpdateUserRequest{})
+	if !failure.IsCode(err, failure.CodeCredentialChangesRequired) {
+		t.Fatalf("ResolveUpdatedUser(no changes) error = %v, want %s", err, failure.CodeCredentialChangesRequired)
 	}
 }
 

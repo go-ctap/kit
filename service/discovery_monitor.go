@@ -2,23 +2,23 @@ package service
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	ghid "github.com/go-ctap/hid"
+	"github.com/go-ctap/kit/model/failure"
 )
 
 const discoveryEventSettleTime = 100 * time.Millisecond
 
 func (s *Service) StartDiscoveryMonitoring(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
-		return err
+		return normalizeServicePhaseError(err, failure.PhaseDiscovery)
 	}
 
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
-		return closedServiceError()
+		return closedServiceError(failure.PhaseDiscovery)
 	}
 	if s.monitor != nil {
 		s.mu.Unlock()
@@ -28,7 +28,11 @@ func (s *Service) StartDiscoveryMonitoring(ctx context.Context) error {
 
 	receiver, err := s.openMonitor()
 	if err != nil {
-		return err
+		return failure.Wrap(
+			failure.CodeTransportFailure,
+			err,
+			failure.WithPhase(failure.PhaseDiscovery),
+		)
 	}
 	done := make(chan struct{})
 
@@ -37,7 +41,7 @@ func (s *Service) StartDiscoveryMonitoring(ctx context.Context) error {
 		s.mu.Unlock()
 		_ = receiver.Close()
 
-		return closedServiceError()
+		return closedServiceError(failure.PhaseDiscovery)
 	}
 	if s.monitor != nil {
 		s.mu.Unlock()
@@ -56,10 +60,10 @@ func (s *Service) StartDiscoveryMonitoring(ctx context.Context) error {
 		s.monitor = nil
 		s.monitorDone = nil
 		s.mu.Unlock()
-		closeErr := receiver.Close()
+		_ = receiver.Close()
 		<-done
 
-		return errors.Join(reconcileErr, closeErr)
+		return reconcileErr
 	}
 
 	return nil

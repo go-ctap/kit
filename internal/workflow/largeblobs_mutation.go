@@ -2,13 +2,12 @@ package workflow
 
 import (
 	"context"
-	"errors"
 
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/ctaperrors"
+	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
-	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
+	"github.com/go-ctap/kit/model/failure"
 )
 
 func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOperation) (model.OperationResult, error) {
@@ -43,14 +42,13 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 		message:         req.ConfirmationMessage,
 		fallbackMessage: "Write large blob for credential " + req.CredentialIDHex + "?",
 		destructive:     false,
-		declinedErr:     applargeblobs.ErrConfirmationRequired,
 		preview:         preview,
 	}); err != nil {
 		return output, err
 	}
 
 	replacement, result, err := buildWriteMutation(state, req.Payload)
-	if err != nil && errors.Is(err, applargeblobs.ErrLargeBlobArrayTooBig) && result.CredentialIDHex != "" {
+	if err != nil && failure.IsCode(err, failure.CodeLargeBlobArrayTooLarge) && result.CredentialIDHex != "" {
 		output.Result = &result
 	}
 	if err != nil {
@@ -59,17 +57,14 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 
 	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionLargeBlobWrite, "")
 	if err != nil {
-		return output, ctaperrors.Annotate(err, ctaperrors.WithLargeBlobsSubCommand(
-			model.OperationWriteLargeBlob,
-			ctaperrors.LargeBlobsSubCommandSet,
-		))
+		return output, err
 	}
 	defer secret.Zero(token)
 
 	if err := r.largeBlobManager().SetLargeBlobs(ctx, token, replacement); err != nil {
-		return output, ctaperrors.Annotate(err, ctaperrors.WithLargeBlobsSubCommand(
-			model.OperationWriteLargeBlob,
-			ctaperrors.LargeBlobsSubCommandSet,
+		return output, errornorm.Annotate(err, errornorm.WithCommand(
+			failure.PhaseAuthenticatorCommand,
+			protocol.AuthenticatorLargeBlobs,
 		))
 	}
 
@@ -110,7 +105,6 @@ func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOp
 		message:         req.ConfirmationMessage,
 		fallbackMessage: "Delete large blob for credential " + req.CredentialIDHex + "?",
 		destructive:     true,
-		declinedErr:     applargeblobs.ErrConfirmationRequired,
 		preview:         preview,
 	}); err != nil {
 		return output, err
@@ -129,17 +123,14 @@ func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOp
 
 	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionLargeBlobWrite, "")
 	if err != nil {
-		return output, ctaperrors.Annotate(err, ctaperrors.WithLargeBlobsSubCommand(
-			model.OperationDeleteLargeBlob,
-			ctaperrors.LargeBlobsSubCommandSet,
-		))
+		return output, err
 	}
 	defer secret.Zero(token)
 
 	if err := r.largeBlobManager().SetLargeBlobs(ctx, token, replacement); err != nil {
-		return output, ctaperrors.Annotate(err, ctaperrors.WithLargeBlobsSubCommand(
-			model.OperationDeleteLargeBlob,
-			ctaperrors.LargeBlobsSubCommandSet,
+		return output, errornorm.Annotate(err, errornorm.WithCommand(
+			failure.PhaseAuthenticatorCommand,
+			protocol.AuthenticatorLargeBlobs,
 		))
 	}
 

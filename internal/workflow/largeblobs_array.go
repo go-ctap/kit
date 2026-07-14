@@ -2,13 +2,14 @@ package workflow
 
 import (
 	"context"
-	"fmt"
 	"slices"
+	"strconv"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/internal/errornorm"
+	"github.com/go-ctap/kit/model/failure"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 	"github.com/samber/lo"
 )
@@ -26,12 +27,12 @@ func buildLargeBlobSupportReport(info protocol.AuthenticatorGetInfoResponse) app
 func serializedLargeBlobArraySize(blobs []protocol.LargeBlob) (int, error) {
 	encMode, err := cbor.CTAP2EncOptions().EncMode()
 	if err != nil {
-		return 0, err
+		return 0, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseDecode))
 	}
 
 	data, err := encMode.Marshal(blobs)
 	if err != nil {
-		return 0, err
+		return 0, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseDecode))
 	}
 
 	return len(data) + 16, nil
@@ -42,19 +43,22 @@ func checkSerializedArrayLimit(limit *uint, size int) error {
 		return nil
 	}
 
-	cause := fmt.Errorf(
-		"%w: serialized large-blob array would be %d bytes, limit is %d",
-		applargeblobs.ErrLargeBlobArrayTooBig,
-		size,
-		*limit,
+	return failure.New(failure.CodeLargeBlobArrayTooLarge,
+		failure.WithPhase(failure.PhaseValidation),
+		failure.WithParams(map[string]string{
+			"requested": strconv.FormatUint(uint64(size), 10),
+			"limit":     strconv.FormatUint(uint64(*limit), 10),
+		}),
 	)
-	return model.NewRuntimeError(model.ErrorInvalidState, "large blob array capacity would be exceeded", cause)
 }
 
 func (r Runner) readLargeBlobArray(ctx context.Context) ([]protocol.LargeBlob, error) {
 	blobs, err := r.largeBlobManager().GetLargeBlobs(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errornorm.Annotate(err, errornorm.WithCommand(
+			failure.PhaseAuthenticatorCommand,
+			protocol.AuthenticatorLargeBlobs,
+		))
 	}
 
 	return cloneLargeBlobs(blobs), nil

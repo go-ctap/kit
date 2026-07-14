@@ -3,11 +3,11 @@ package authenticator
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/fs"
 
 	ctapdevice "github.com/go-ctap/ctap/authenticator"
 	"github.com/go-ctap/ctap/options"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/transport"
 )
 
@@ -20,18 +20,44 @@ func Open(ctx context.Context, mode transport.Mode, path string) (Device, error)
 	case transport.ModeWindowsProxy:
 		opts = append(opts, options.WithUseNamedPipes())
 	default:
-		return nil, fmt.Errorf("%w: %s", transport.ErrUnsupportedMode, mode)
+		return nil, failure.New(failure.CodeTransportModeUnsupported,
+			failure.WithPhase(failure.PhaseSession),
+		)
 	}
 
 	device, err := ctapdevice.OpenHID(ctx, path, opts...)
 	if err != nil {
 		switch {
+		case errors.Is(err, context.Canceled):
+			return nil, failure.Wrap(
+				failure.CodeOperationCanceled,
+				err,
+				failure.WithPhase(failure.PhaseSession),
+			)
+		case errors.Is(err, context.DeadlineExceeded):
+			return nil, failure.Wrap(
+				failure.CodeOperationTimeout,
+				err,
+				failure.WithPhase(failure.PhaseSession),
+			)
 		case errors.Is(err, fs.ErrPermission):
-			return nil, fmt.Errorf("%w: %v", transport.ErrPermissionDenied, err)
+			return nil, failure.Wrap(
+				failure.CodeTransportPermissionDenied,
+				err,
+				failure.WithPhase(failure.PhaseSession),
+			)
 		case mode == transport.ModeWindowsProxy:
-			return nil, fmt.Errorf("%w: %v", transport.ErrProxyUnavailable, err)
+			return nil, failure.Wrap(
+				failure.CodeTransportProxyUnavailable,
+				err,
+				failure.WithPhase(failure.PhaseSession),
+			)
 		default:
-			return nil, err
+			return nil, failure.Wrap(
+				failure.CodeTransportFailure,
+				err,
+				failure.WithPhase(failure.PhaseSession),
+			)
 		}
 	}
 

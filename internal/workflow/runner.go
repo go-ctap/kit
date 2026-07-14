@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/failure"
 )
 
 type Runner struct {
@@ -156,6 +157,8 @@ func (r Runner) runOperationBody(ctx context.Context, operation model.Operation)
 
 		return operationResult{Output: result, Effects: authenticatorConfigEffects(req)}, err
 	default:
-		return operationResult{}, model.NewRuntimeError(model.ErrorInvalidOperation, "unsupported operation kind "+string(operation.Kind()), nil)
+		return operationResult{}, failure.New(failure.CodeOperationUnsupported,
+			failure.WithPhase(failure.PhaseValidation),
+		)
 	}
 }

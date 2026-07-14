@@ -3,7 +3,6 @@ package mds
 import (
 	"context"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -12,28 +11,44 @@ import (
 	"github.com/google/uuid"
 )
 
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return f(request)
+}
+
+func statusTransport(status int) http.RoundTripper {
+	return roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: status,
+			Body:       http.NoBody,
+			Header:     make(http.Header),
+			Request:    request,
+		}, nil
+	})
+}
+
 func TestLookupRevalidationMarksDiskCacheFresh(t *testing.T) {
+	const source = "https://mds.example.test/revalidation"
+
 	now := time.Date(2026, time.July, 10, 12, 0, 0, 0, time.UTC)
 	old := now.Add(-48 * time.Hour)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNotModified)
-	}))
-	t.Cleanup(server.Close)
 
 	client := &Client{
-		Source:   server.URL,
-		Cache:    NewCache(),
-		CacheDir: t.TempDir(),
-		Now:      func() time.Time { return now },
+		Source:     source,
+		HTTPClient: &http.Client{Transport: statusTransport(http.StatusNotModified)},
+		Cache:      NewCache(),
+		CacheDir:   t.TempDir(),
+		Now:        func() time.Time { return now },
 	}
 	aaguid := uuid.New()
-	client.Cache.Set(client.cacheKey(server.URL), &Blob{
+	client.Cache.Set(client.cacheKey(source), &Blob{
 		Number:   1,
 		Entries:  map[uuid.UUID]appmds.PayloadEntry{},
 		CachedAt: old,
 	})
 
-	path, err := client.diskCachePath(server.URL)
+	path, err := client.diskCachePath(source)
 	if err != nil {
 		t.Fatalf("disk cache path: %v", err)
 	}
@@ -58,19 +73,17 @@ func TestLookupRevalidationMarksDiskCacheFresh(t *testing.T) {
 }
 
 func TestLookupAllowsVerifiedStaleCacheOnRateLimit(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusTooManyRequests)
-	}))
-	t.Cleanup(server.Close)
+	const source = "https://mds.example.test/rate-limit"
 
 	now := time.Date(2026, time.July, 10, 12, 0, 0, 0, time.UTC)
 	client := &Client{
-		Source: server.URL,
-		Cache:  NewCache(),
-		Now:    func() time.Time { return now },
+		Source:     source,
+		HTTPClient: &http.Client{Transport: statusTransport(http.StatusTooManyRequests)},
+		Cache:      NewCache(),
+		Now:        func() time.Time { return now },
 	}
 	aaguid := uuid.New()
-	client.Cache.Set(client.cacheKey(server.URL), &Blob{
+	client.Cache.Set(client.cacheKey(source), &Blob{
 		Number:   1,
 		Entries:  map[uuid.UUID]appmds.PayloadEntry{},
 		CachedAt: now.Add(-48 * time.Hour),

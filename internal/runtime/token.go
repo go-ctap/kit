@@ -8,9 +8,10 @@ import (
 	"github.com/go-ctap/ctap/protocol"
 	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/kit/internal/authenticator"
-	"github.com/go-ctap/kit/internal/ctaperrors"
+	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/failure"
 )
 
 type TokenKey struct {
@@ -82,8 +83,8 @@ func (s *TokenService) Acquire(
 		}
 
 		if !fallbackToPIN(err) {
-			return nil, ctaperrors.Annotate(err, ctaperrors.WithClientPINSubCommand(
-				"",
+			return nil, errornorm.Annotate(err, errornorm.WithClientPINSubCommand(
+				failure.PhaseTokenAcquisition,
 				protocol.ClientPINSubCommandGetPinUvAuthTokenUsingUvWithPermissions,
 			))
 		}
@@ -100,8 +101,8 @@ func (s *TokenService) Acquire(
 
 	token, err = authenticator.GetPinUvAuthTokenUsingPIN(ctx, string(response.PIN), permission, key.RPID)
 	if err != nil {
-		return nil, ctaperrors.Annotate(err, ctaperrors.WithClientPINSubCommand(
-			"",
+		return nil, errornorm.Annotate(err, errornorm.WithClientPINSubCommand(
+			failure.PhaseTokenAcquisition,
 			protocol.ClientPINSubCommandGetPinUvAuthTokenUsingPinWithPermissions,
 		))
 	}

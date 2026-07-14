@@ -2,11 +2,11 @@ package config
 
 import (
 	"encoding/json"
-	"errors"
 	"strings"
 	"testing"
 
 	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/safety"
 )
 
@@ -33,11 +33,11 @@ func TestBioMutationPreviewRejectsKnownEmptyEnrollmentSet(t *testing.T) {
 		},
 	})
 
-	if _, err := BuildBioRenamePreview(status, "01", "left thumb", safety.PreviewModeDryRun); !errors.Is(err, ErrBioNoEnrollments) {
-		t.Fatalf("BuildBioRenamePreview error = %v, want ErrBioNoEnrollments", err)
+	if _, err := BuildBioRenamePreview(status, "01", "left thumb", safety.PreviewModeDryRun); !failure.IsCode(err, failure.CodeBioNoEnrollments) {
+		t.Fatalf("BuildBioRenamePreview error = %v, want %s", err, failure.CodeBioNoEnrollments)
 	}
-	if _, err := BuildBioRemovePreview(status, "01", safety.PreviewModeDryRun); !errors.Is(err, ErrBioNoEnrollments) {
-		t.Fatalf("BuildBioRemovePreview error = %v, want ErrBioNoEnrollments", err)
+	if _, err := BuildBioRemovePreview(status, "01", safety.PreviewModeDryRun); !failure.IsCode(err, failure.CodeBioNoEnrollments) {
+		t.Fatalf("BuildBioRemovePreview error = %v, want %s", err, failure.CodeBioNoEnrollments)
 	}
 }
 

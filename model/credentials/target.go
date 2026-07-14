@@ -1,8 +1,9 @@
 package credentials
 
 import (
-	"fmt"
 	"strings"
+
+	"github.com/go-ctap/kit/model/failure"
 )
 
 type CredentialTarget struct {
@@ -26,9 +27,8 @@ type UserIdentity struct {
 func FindCredentialByHexID(report InventoryReport, credentialIDHex string) (CredentialTarget, error) {
 	credentialIDHex = strings.TrimSpace(credentialIDHex)
 	if credentialIDHex == "" {
-		return CredentialTarget{}, fmt.Errorf("%w: credential id is required", ErrCredentialNotFound)
+		return CredentialTarget{}, failure.New(failure.CodeCredentialIDRequired, failure.WithPhase(failure.PhaseValidation))
 	}
-
 	for _, group := range report.Groups {
 		for _, record := range group.Credentials {
 			if record.CredentialIDHex != credentialIDHex {
@@ -51,5 +51,5 @@ func FindCredentialByHexID(report InventoryReport, credentialIDHex string) (Cred
 		}
 	}
 
-	return CredentialTarget{}, fmt.Errorf("%w: %s", ErrCredentialNotFound, credentialIDHex)
+	return CredentialTarget{}, failure.New(failure.CodeCredentialNotFound, failure.WithPhase(failure.PhaseValidation))
 }

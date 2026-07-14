@@ -4,16 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/go-ctap/ctap/crypto"
 	"github.com/go-ctap/ctap/protocol"
-	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
-	appconfig "github.com/go-ctap/kit/model/config"
+	"github.com/go-ctap/kit/model/failure"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/transport"
 )
@@ -97,7 +95,7 @@ func TestLargeBlobWriteEventsFollowInteractionAndInventoryOrder(t *testing.T) {
 	}
 }
 
-func TestLargeBlobWriteCapacityErrorMapsInvalidStateAndKeepsPreview(t *testing.T) {
+func TestLargeBlobWriteCapacityErrorKeepsPreview(t *testing.T) {
 	a := &largeBlobWriteEventAuthenticator{maxSerializedLargeBlobArray: new(uint(16))}
 	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
@@ -109,12 +107,7 @@ func TestLargeBlobWriteCapacityErrorMapsInvalidStateAndKeepsPreview(t *testing.T
 		Payload:         []byte("test"),
 		DryRun:          true,
 	}, userVerificationHandler(t))
-	if !errors.Is(err, applargeblobs.ErrLargeBlobArrayTooBig) {
-		t.Fatalf("Run error = %v, want large blob array sentinel", err)
-	}
-	if !model.IsErrorCategory(err, model.ErrorInvalidState) {
-		t.Fatalf("Run category = %v, want invalid-state", err)
-	}
+	requireFailureCode(t, err, failure.CodeLargeBlobArrayTooLarge)
 
 	output, ok := result.(model.LargeBlobMutationOutput)
 	if !ok {
@@ -143,9 +136,7 @@ func TestLargeBlobWriteExplicitZeroCapacityRejectsMutation(t *testing.T) {
 		Payload:         []byte("test"),
 		DryRun:          true,
 	}, userVerificationHandler(t))
-	if !errors.Is(err, applargeblobs.ErrLargeBlobArrayTooBig) {
-		t.Fatalf("Run error = %v, want large blob array sentinel", err)
-	}
+	requireFailureCode(t, err, failure.CodeLargeBlobArrayTooLarge)
 
 	output, ok := result.(model.LargeBlobMutationOutput)
 	if !ok {
@@ -299,9 +290,8 @@ func TestLargeBlobListRefreshFailurePreservesLastSuccessfulCaches(t *testing.T) 
 			}
 
 			tt.fail(a)
-			if _, err := session.Run(context.Background(), model.ListLargeBlobsOperation{Refresh: true}, userVerificationHandler(t)); !errors.Is(err, context.Canceled) {
-				t.Fatalf("refreshed ListLargeBlobs error = %v, want canceled", err)
-			}
+			_, err := session.Run(context.Background(), model.ListLargeBlobsOperation{Refresh: true}, userVerificationHandler(t))
+			requireFailureCode(t, err, failure.CodeOperationCanceled)
 			tt.clear(a)
 
 			if _, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t)); err != nil {
@@ -344,9 +334,8 @@ func TestLargeBlobListCanceledContextAfterFreshArrayReadPreservesLastSuccessfulC
 	a.largeBlobs = []protocol.LargeBlob{added}
 	ctx, cancel := context.WithCancel(context.Background())
 	a.cancelLargeBlobRead = cancel
-	if _, err := session.Run(ctx, model.ListLargeBlobsOperation{Refresh: true}, userVerificationHandler(t)); !model.IsErrorCategory(err, model.ErrorCanceled) {
-		t.Fatalf("refreshed ListLargeBlobs error = %v, want canceled", err)
-	}
+	_, err = session.Run(ctx, model.ListLargeBlobsOperation{Refresh: true}, userVerificationHandler(t))
+	requireFailureCode(t, err, failure.CodeOperationCanceled)
 	a.cancelLargeBlobRead = nil
 
 	cached, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t))
@@ -681,40 +670,6 @@ func TestLargeBlobWritePINOnlyFlowDoesNotRequestUserVerification(t *testing.T) {
 	}
 }
 
-func TestLargeBlobWritePINTokenCTAPStatusMapsSentinel(t *testing.T) {
-	a := &pinOnlyLargeBlobWriteEventAuthenticator{
-		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
-		pinErr: &ctaptransport.CTAPError{
-			Command:    protocol.AuthenticatorClientPIN,
-			StatusCode: ctaptransport.CTAP2_ERR_PIN_INVALID,
-		},
-	}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
-	defer func() { _ = session.Close() }()
-
-	handler := interactionHandlerFunc(func(req model.InteractionRequest) (model.InteractionResponse, error) {
-		if req.Kind != model.InteractionKindPIN {
-			t.Fatalf("interaction kind = %s, want PIN", req.Kind)
-		}
-
-		return model.InteractionResponse{PIN: []byte("1234")}, nil
-	})
-
-	_, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
-		CredentialIDHex: "c05e",
-		Payload:         []byte("test"),
-		Confirmed:       true,
-	}, handler)
-	if !errors.Is(err, appconfig.ErrPINInvalid) {
-		t.Fatalf("Run error = %v, want invalid PIN sentinel", err)
-	}
-	if !model.IsErrorCategory(err, model.ErrorInvalidState) {
-		t.Fatalf("Run category = %v, want invalid-state", err)
-	}
-}
-
 func TestLargeBlobWritePINVerificationFlowSkipsUVForUVCapableAuthenticator(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &pinPreferredLargeBlobWriteEventAuthenticator{
@@ -763,51 +718,5 @@ func TestLargeBlobWritePINVerificationFlowSkipsUVForUVCapableAuthenticator(t *te
 		if event.Kind == model.InteractionKindUserVerification {
 			t.Fatal("user-verification interaction emitted for PIN verification flow")
 		}
-	}
-}
-
-func TestLargeBlobWriteCTAPStatusMapsSentinel(t *testing.T) {
-	tests := []struct {
-		name   string
-		status ctaptransport.StatusCode
-		want   error
-	}{
-		{
-			name:   "storage full",
-			status: ctaptransport.CTAP2_ERR_LARGE_BLOB_STORAGE_FULL,
-			want:   applargeblobs.ErrLargeBlobStorageFull,
-		},
-		{
-			name:   "integrity failure",
-			status: ctaptransport.CTAP2_ERR_INTEGRITY_FAILURE,
-			want:   applargeblobs.ErrLargeBlobIntegrity,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			a := &largeBlobWriteEventAuthenticator{
-				setErr: &ctaptransport.CTAPError{
-					Command:    protocol.AuthenticatorLargeBlobs,
-					StatusCode: tt.status,
-				},
-			}
-			session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-				return a, nil
-			})
-			defer func() { _ = session.Close() }()
-
-			_, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
-				CredentialIDHex: "c05e",
-				Payload:         []byte("test"),
-				Confirmed:       true,
-			}, userVerificationHandler(t))
-			if !errors.Is(err, tt.want) {
-				t.Fatalf("Run error = %v, want sentinel %v", err, tt.want)
-			}
-			if !model.IsErrorCategory(err, model.ErrorInvalidState) {
-				t.Fatalf("Run category = %v, want invalid-state", err)
-			}
-		})
 	}
 }

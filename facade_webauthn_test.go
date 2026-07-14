@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"iter"
 	"maps"
 	"slices"
@@ -17,7 +16,7 @@ import (
 	"github.com/go-ctap/ctap/webauthn"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
-	appcredentials "github.com/go-ctap/kit/model/credentials"
+	"github.com/go-ctap/kit/model/failure"
 	appwebauthn "github.com/go-ctap/kit/model/webauthn"
 	"github.com/go-ctap/kit/transport"
 	"github.com/google/uuid"
@@ -229,12 +228,12 @@ func TestGetAssertionAcquiresScopedTokenWhenUVRequested(t *testing.T) {
 	}
 }
 
-func TestWebAuthnCTAPStatusMapsSentinels(t *testing.T) {
+func TestWebAuthnCTAPStatusMapsCodes(t *testing.T) {
 	tests := []struct {
 		name      string
 		operation model.Operation
 		setupErr  func(*webauthnTestAuthenticator)
-		want      error
+		want      failure.Code
 	}{
 		{
 			name: "make credential excluded",
@@ -248,7 +247,7 @@ func TestWebAuthnCTAPStatusMapsSentinels(t *testing.T) {
 					StatusCode: ctaptransport.CTAP2_ERR_CREDENTIAL_EXCLUDED,
 				}
 			},
-			want: appcredentials.ErrCredentialExcluded,
+			want: failure.CodeCredentialExcluded,
 		},
 		{
 			name: "get assertion no credentials",
@@ -264,7 +263,7 @@ func TestWebAuthnCTAPStatusMapsSentinels(t *testing.T) {
 					StatusCode: ctaptransport.CTAP2_ERR_NO_CREDENTIALS,
 				}
 			},
-			want: appcredentials.ErrCredentialNotFound,
+			want: failure.CodeCredentialNotFound,
 		},
 	}
 
@@ -278,12 +277,7 @@ func TestWebAuthnCTAPStatusMapsSentinels(t *testing.T) {
 			defer func() { _ = session.Close() }()
 
 			_, err := session.Run(context.Background(), tt.operation, nil)
-			if !errors.Is(err, tt.want) {
-				t.Fatalf("Run error = %v, want sentinel %v", err, tt.want)
-			}
-			if !model.IsErrorCategory(err, model.ErrorInvalidState) {
-				t.Fatalf("Run category = %v, want invalid-state", err)
-			}
+			requireFailureCode(t, err, tt.want)
 		})
 	}
 }
@@ -343,6 +337,7 @@ type webauthnTestAuthenticator struct {
 	makeCredentialOptions     map[protocol.Option]bool
 
 	getAssertionErr        error
+	tokenErr               error
 	getAssertionToken      []byte
 	getAssertionClientData []byte
 
@@ -366,6 +361,9 @@ func (a *webauthnTestAuthenticator) GetPinUvAuthTokenUsingUV(
 	rpID string,
 ) ([]byte, error) {
 	a.tokenRPIDs = append(a.tokenRPIDs, rpID)
+	if a.tokenErr != nil {
+		return nil, a.tokenErr
+	}
 
 	return []byte("token:" + rpID), nil
 }

@@ -2,7 +2,6 @@ package conformance_test
 
 import (
 	"encoding/json"
-	"errors"
 	"reflect"
 	"slices"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/model/conformance"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/ldclabs/cose/key"
 )
 
@@ -608,8 +608,15 @@ func TestEvaluateGetInfoAgainstRejectsNonCanonicalTargets(t *testing.T) {
 		{Specification: conformance.SpecificationCTAP20, Profile: conformance.ProfileU2FV2},
 	} {
 		_, err := conformance.EvaluateGetInfoAgainst(validFIDO21Info(), target)
-		if !errors.Is(err, conformance.ErrInvalidTarget) {
-			t.Fatalf("target %#v: error = %v, want ErrInvalidTarget", target, err)
+		if !failure.IsCode(err, failure.CodeConformanceTargetInvalid) {
+			t.Fatalf("target %#v: error = %v, want %s", target, err, failure.CodeConformanceTargetInvalid)
+		}
+		if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
+			t.Fatalf("target %#v: phase = %q, want %q", target, got, failure.PhaseValidation)
+		}
+		params := failure.Snapshot(err).Params
+		if params["specification"] != string(target.Specification) || params["profile"] != string(target.Profile) {
+			t.Fatalf("target %#v: params = %#v, want specification/profile", target, params)
 		}
 	}
 

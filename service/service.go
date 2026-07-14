@@ -2,13 +2,13 @@ package service
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 
 	ghid "github.com/go-ctap/hid"
 	ctapkit "github.com/go-ctap/kit"
 	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 	"github.com/google/uuid"
@@ -128,9 +128,15 @@ func (s *Service) Close() error {
 		operation.cancel()
 	}
 
-	var monitorErr error
+	var cleanupErr error
 	if receiver != nil {
-		monitorErr = receiver.Close()
+		if err := receiver.Close(); err != nil {
+			cleanupErr = failure.Wrap(
+				failure.CodeTransportFailure,
+				err,
+				failure.WithPhase(failure.PhaseCleanup),
+			)
+		}
 	}
 	if monitorDone != nil {
 		<-monitorDone
@@ -138,15 +144,14 @@ func (s *Service) Close() error {
 	if enrichmentDone != nil {
 		<-enrichmentDone
 	}
-	var sessionErr error
 	for _, session := range sessions {
-		if err := session.session.Close(); err != nil {
-			sessionErr = errors.Join(sessionErr, err)
+		if err := session.session.Close(); err != nil && cleanupErr == nil {
+			cleanupErr = err
 		}
 		s.waitForSessionOperations(session.id)
 	}
 
-	return errors.Join(monitorErr, sessionErr)
+	return cleanupErr
 }
 
 func (s *Service) Discover(ctx context.Context, req DiscoverRequest) (DiscoverySnapshot, error) {
@@ -155,11 +160,11 @@ func (s *Service) Discover(ctx context.Context, req DiscoverRequest) (DiscoveryS
 
 func (s *Service) OpenSession(ctx context.Context, req OpenSessionRequest) (SessionSnapshot, error) {
 	if err := ctx.Err(); err != nil {
-		return SessionSnapshot{}, err
+		return SessionSnapshot{}, normalizeServicePhaseError(err, failure.PhaseSession)
 	}
 
 	if s.isClosed() {
-		return SessionSnapshot{}, closedServiceError()
+		return SessionSnapshot{}, closedServiceError(failure.PhaseSession)
 	}
 
 	device, err := s.selectDevice(req.Selector)
@@ -193,7 +198,7 @@ func (s *Service) OpenSession(ctx context.Context, req OpenSessionRequest) (Sess
 		s.mu.Unlock()
 		_ = session.Close()
 
-		return SessionSnapshot{}, closedServiceError()
+		return SessionSnapshot{}, closedServiceError(failure.PhaseSession)
 	}
 	if !deviceReportPresent(deviceReports(s.devices), managed.device) {
 		s.mu.Unlock()
@@ -210,7 +215,7 @@ func (s *Service) OpenSession(ctx context.Context, req OpenSessionRequest) (Sess
 
 func (s *Service) Sessions(ctx context.Context) ([]SessionSnapshot, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, normalizeServicePhaseError(err, failure.PhaseSession)
 	}
 
 	s.mu.Lock()
@@ -226,7 +231,7 @@ func (s *Service) Sessions(ctx context.Context) ([]SessionSnapshot, error) {
 
 func (s *Service) Session(ctx context.Context, id SessionID) (SessionSnapshot, error) {
 	if err := ctx.Err(); err != nil {
-		return SessionSnapshot{}, err
+		return SessionSnapshot{}, normalizeServicePhaseError(err, failure.PhaseSession)
 	}
 
 	s.mu.Lock()
@@ -243,7 +248,7 @@ func (s *Service) Session(ctx context.Context, id SessionID) (SessionSnapshot, e
 
 func (s *Service) CloseSession(ctx context.Context, id SessionID) (SessionSnapshot, error) {
 	if err := ctx.Err(); err != nil {
-		return SessionSnapshot{}, err
+		return SessionSnapshot{}, normalizeServicePhaseError(err, failure.PhaseCleanup)
 	}
 
 	s.mu.Lock()
@@ -268,7 +273,7 @@ func (s *Service) CloseSession(ctx context.Context, id SessionID) (SessionSnapsh
 
 func (s *Service) CloseAllSessions(ctx context.Context) ([]SessionSnapshot, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, normalizeServicePhaseError(err, failure.PhaseCleanup)
 	}
 
 	s.mu.Lock()
@@ -283,8 +288,8 @@ func (s *Service) CloseAllSessions(ctx context.Context) ([]SessionSnapshot, erro
 	var closeErr error
 	for _, session := range sessions {
 		s.cancelSessionOperations(session.id)
-		if err := session.session.Close(); err != nil {
-			closeErr = errors.Join(closeErr, err)
+		if err := session.session.Close(); err != nil && closeErr == nil {
+			closeErr = err
 		}
 		s.waitForSessionOperations(session.id)
 		session.updatedAt = time.Now().UTC()
@@ -334,7 +339,7 @@ func (s *Service) runOperation(ctx context.Context, req OperationRequest, operat
 		SessionID:   req.SessionID,
 		Kind:        operation.Kind(),
 		Result:      result,
-		Error:       runtimeErrorEnvelope(err),
+		Error:       failure.Snapshot(err),
 	}
 
 	return envelope, nil
@@ -349,13 +354,13 @@ func failedOperationEnvelope(req OperationRequest, operation model.Operation, er
 	return operationEnvelope{
 		SessionID: req.SessionID,
 		Kind:      kind,
-		Error:     runtimeErrorEnvelope(err),
+		Error:     failure.Snapshot(err),
 	}
 }
 
 func (s *Service) CancelOperation(ctx context.Context, req CancelOperationRequest) (bool, error) {
 	if err := ctx.Err(); err != nil {
-		return false, err
+		return false, normalizeServicePhaseError(err, failure.PhaseSession)
 	}
 
 	return s.cancelOperation(req.OperationID), nil
@@ -394,7 +399,7 @@ func (s *Service) cancelSessionOperations(id SessionID) bool {
 
 func (s *Service) ResolveInteraction(ctx context.Context, answer InteractionAnswer) (bool, error) {
 	if err := ctx.Err(); err != nil {
-		return false, err
+		return false, normalizeServicePhaseError(err, failure.PhaseInteraction)
 	}
 
 	s.mu.Lock()
@@ -425,14 +430,18 @@ func (s *Service) ResolveInteraction(ctx context.Context, answer InteractionAnsw
 	case <-ctx.Done():
 		clear(response.PIN)
 
-		return false, ctx.Err()
+		return false, normalizeServicePhaseError(ctx.Err(), failure.PhaseInteraction)
 	}
 }
 
 func (s *Service) LookupMDS(ctx context.Context, req MDSLookupRequest) (MDSLookupEnvelope, error) {
 	aaguid, err := uuid.Parse(req.AAGUID)
 	if err != nil {
-		return MDSLookupEnvelope{}, model.NewRuntimeError(model.ErrorInvalidOperation, "invalid AAGUID", err)
+		return MDSLookupEnvelope{}, failure.Wrap(
+			failure.CodeMDSAAGUIDInvalid,
+			err,
+			failure.WithPhase(failure.PhaseMetadata),
+		)
 	}
 
 	opts := []ctapkit.MDSOption{}
@@ -606,7 +615,9 @@ type interactionHandler struct {
 
 func (h interactionHandler) RequestInteraction(req model.InteractionRequest) (model.InteractionResponse, error) {
 	if h.service == nil {
-		return model.InteractionResponse{}, invalidOperationError("interaction service is required")
+		return model.InteractionResponse{}, failure.New(failure.CodeInteractionHandlerRequired,
+			failure.WithPhase(failure.PhaseInteraction),
+		)
 	}
 
 	prompt := InteractionPrompt{
@@ -624,7 +635,9 @@ func (h interactionHandler) RequestInteraction(req model.InteractionRequest) (mo
 	case answer := <-response:
 		return answer, nil
 	case <-h.service.operationDone(h.operationID):
-		return model.InteractionResponse{}, model.NewRuntimeError(model.ErrorCanceled, "interaction canceled", nil)
+		return model.InteractionResponse{}, failure.New(failure.CodeInteractionCanceled,
+			failure.WithPhase(failure.PhaseInteraction),
+		)
 	}
 }
 

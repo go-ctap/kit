@@ -5,8 +5,9 @@ package transport
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
+
+	"github.com/go-ctap/kit/model/failure"
 )
 
 type fakeProvider struct {
@@ -82,11 +83,7 @@ func TestTransportPolicyProxyUnavailable(t *testing.T) {
 		t.Fatal("Resolve(auto,proxy unavailable) returned nil error")
 	}
 
-	if !errors.Is(err, ErrProxyUnavailable) {
-		t.Fatalf("Resolve error = %v, want ErrProxyUnavailable", err)
-	}
-
-	if !strings.Contains(err.Error(), "run elevated or start the proxy service") {
-		t.Fatalf("Resolve error = %q, want user guidance", err.Error())
+	if !failure.IsCode(err, failure.CodeTransportProxyUnavailable) {
+		t.Fatalf("Resolve error = %v, want %s", err, failure.CodeTransportProxyUnavailable)
 	}
 }

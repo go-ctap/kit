@@ -11,6 +11,7 @@ import (
 	ghid "github.com/go-ctap/hid"
 	ctapkit "github.com/go-ctap/kit"
 	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 )
@@ -114,7 +115,10 @@ func TestRefreshDiscoveryPublishesFailureAndRetainsMode(t *testing.T) {
 	service := New(WithEventEmitter(emitter))
 	service.lastDiscoverMode = transport.ModeHID
 	service.scanDevices = func(context.Context, ...ctapkit.DiscoverOption) ([]ctapkit.Device, error) {
-		return nil, errors.New("scan failed")
+		return nil, failure.New(
+			failure.CodeTransportFailure,
+			failure.WithPhase(failure.PhaseDiscovery),
+		)
 	}
 
 	if err := service.RefreshDiscovery(context.Background(), DiscoverRequest{}); err != nil {
@@ -127,7 +131,8 @@ func TestRefreshDiscoveryPublishesFailureAndRetainsMode(t *testing.T) {
 	select {
 	case emitted := <-emitter.events:
 		if emitted.Trigger != DiscoveryTriggerManual || emitted.Snapshot != nil ||
-			emitted.Error == nil || emitted.Error.Message != "scan failed" {
+			emitted.Error == nil || emitted.Error.Code != failure.CodeTransportFailure ||
+			emitted.Error.Phase != failure.PhaseDiscovery {
 			t.Fatalf("failure envelope = %#v", emitted)
 		}
 	case <-time.After(time.Second):

@@ -2,12 +2,12 @@ package ctapkit
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 
 	rtdevice "github.com/go-ctap/kit/internal/device"
 	"github.com/go-ctap/kit/internal/vendorinfo"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 	"github.com/samber/lo"
@@ -44,11 +44,15 @@ func SelectDevice(devices []Device, selector string) (Device, error) {
 
 	switch {
 	case len(devices) == 0:
-		return Device{}, runtimeDeviceError(fmt.Errorf("%w: no authenticators discovered", rtdevice.ErrUnavailable))
+		return Device{}, failure.New(failure.CodeDeviceUnavailable,
+			failure.WithPhase(failure.PhaseDiscovery),
+		)
 	case selector == "" && len(devices) == 1:
 		return devices[0], nil
 	case selector == "":
-		return Device{}, runtimeDeviceError(fmt.Errorf("%w: multiple authenticators available", rtdevice.ErrSelectionRequired))
+		return Device{}, failure.New(failure.CodeDeviceSelectionRequired,
+			failure.WithPhase(failure.PhaseDiscovery),
+		)
 	}
 
 	device, ok := lo.Find(devices, func(device Device) bool {
@@ -59,7 +63,9 @@ func SelectDevice(devices []Device, selector string) (Device, error) {
 		return device, nil
 	}
 
-	return Device{}, runtimeDeviceError(fmt.Errorf("%w: no authenticator matches %q", rtdevice.ErrUnavailable, selector))
+	return Device{}, failure.New(failure.CodeDeviceNotFound,
+		failure.WithPhase(failure.PhaseDiscovery),
+	)
 }
 
 // Report returns public metadata for a discovered authenticator.
@@ -83,12 +89,12 @@ func discoverDevices(ctx context.Context, resolver transport.ProviderResolver, o
 
 	resolved, err := resolver.Resolve(ctx, config.mode)
 	if err != nil {
-		return nil, runtimeDeviceError(err)
+		return nil, err
 	}
 
 	descriptors, err := resolved.Provider.List(ctx)
 	if err != nil {
-		return nil, runtimeDeviceError(err)
+		return nil, err
 	}
 
 	return lo.Map(descriptors, func(descriptor transport.Descriptor, index int) Device {

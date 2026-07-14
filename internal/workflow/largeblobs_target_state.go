@@ -2,13 +2,13 @@ package workflow
 
 import (
 	"context"
-	"fmt"
 	"slices"
 
 	"github.com/go-ctap/ctap/crypto"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/secret"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
+	"github.com/go-ctap/kit/model/failure"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/report"
 )
@@ -37,11 +37,15 @@ func (r Runner) loadTargetBlobState(
 	authenticator := r.largeBlobManager()
 	support := buildLargeBlobSupportReport(authenticator.GetInfo())
 	if !support.LargeBlobs {
-		return targetBlobState{}, fmt.Errorf("%w: device does not support large blobs", applargeblobs.ErrUnsupportedLargeBlobs)
+		return targetBlobState{}, failure.New(failure.CodeLargeBlobUnsupported,
+			failure.WithPhase(failure.PhaseDiscovery),
+		)
 	}
 
 	if len(target.Record.LargeBlobKey) == 0 {
-		return targetBlobState{}, fmt.Errorf("%w: selected credential has no largeBlobKey", applargeblobs.ErrLargeBlobKeyMissing)
+		return targetBlobState{}, failure.New(failure.CodeLargeBlobKeyMissing,
+			failure.WithPhase(failure.PhaseDiscovery),
+		)
 	}
 
 	key := slices.Clone(target.Record.LargeBlobKey)

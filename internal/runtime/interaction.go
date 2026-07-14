@@ -2,12 +2,12 @@ package runtime
 
 import (
 	"context"
-	"errors"
 	"slices"
 
+	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
-	appconfig "github.com/go-ctap/kit/model/config"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/samber/mo"
 )
 
@@ -32,7 +32,9 @@ func (b *InteractionBroker) RequestInteraction(
 	req model.InteractionRequest,
 ) (model.InteractionResponse, error) {
 	if req.Kind == "" {
-		return model.InteractionResponse{}, model.NewRuntimeError(model.ErrorInvalidState, "interaction kind is required", nil)
+		return model.InteractionResponse{}, failure.New(failure.CodeInteractionKindRequired,
+			failure.WithPhase(failure.PhaseInteraction),
+		)
 	}
 
 	b.events.Emit(model.OperationEvent{
@@ -42,7 +44,9 @@ func (b *InteractionBroker) RequestInteraction(
 	})
 
 	if b.handler == nil {
-		return model.InteractionResponse{}, model.NewRuntimeError(model.ErrorInvalidState, "interaction handler is required", nil)
+		return model.InteractionResponse{}, failure.New(failure.CodeInteractionHandlerRequired,
+			failure.WithPhase(failure.PhaseInteraction),
+		)
 	}
 
 	response, err := callInteractionHandler(ctx, b.handler, req)
@@ -65,7 +69,7 @@ func callInteractionHandler(
 	req model.InteractionRequest,
 ) (model.InteractionResponse, error) {
 	if err := ctx.Err(); err != nil {
-		return model.InteractionResponse{}, model.NewRuntimeError(model.ErrorCanceled, "interaction context canceled", err)
+		return model.InteractionResponse{}, annotateInteractionError(err)
 	}
 
 	result := make(chan mo.Either[model.InteractionResponse, error])
@@ -101,33 +105,38 @@ func callInteractionHandler(
 				err = ctxErr
 			}
 
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				return model.InteractionResponse{}, model.NewRuntimeError(model.ErrorCanceled, "interaction context canceled", err)
-			}
-
-			return model.InteractionResponse{}, err
+			return model.InteractionResponse{}, annotateInteractionError(err)
 		}
 
 		if err := ctx.Err(); err != nil {
 			secret.Zero(response.PIN)
 
-			return model.InteractionResponse{}, model.NewRuntimeError(model.ErrorCanceled, "interaction context canceled", err)
+			return model.InteractionResponse{}, annotateInteractionError(err)
 		}
 
 		return response, nil
 	case <-ctx.Done():
-		return model.InteractionResponse{}, model.NewRuntimeError(model.ErrorCanceled, "interaction context canceled", ctx.Err())
+		return model.InteractionResponse{}, annotateInteractionError(ctx.Err())
 	}
 }
 
 func validateInteractionResponse(req model.InteractionRequest, response model.InteractionResponse) error {
 	if response.Canceled {
-		return model.NewRuntimeError(model.ErrorCanceled, "interaction canceled", nil)
+		return failure.New(failure.CodeInteractionCanceled,
+			failure.WithPhase(failure.PhaseInteraction),
+		)
 	}
 
 	if req.Kind == model.InteractionKindPIN && len(response.PIN) == 0 {
-		return model.NewRuntimeError(model.ErrorInvalidOperation, "PIN is required", appconfig.ErrPINRequired)
+		return failure.New(failure.CodePINRequired,
+			failure.WithPhase(failure.PhaseInteraction),
+			failure.WithParams(map[string]string{"field": "pin"}),
+		)
 	}
 
 	return nil
+}
+
+func annotateInteractionError(err error) error {
+	return errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseInteraction))
 }

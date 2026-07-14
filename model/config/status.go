@@ -1,6 +1,9 @@
 package config
 
-import "github.com/go-ctap/kit/model/report"
+import (
+	"github.com/go-ctap/kit/model/failure"
+	"github.com/go-ctap/kit/model/report"
+)
 
 type StateValue string
 
@@ -21,10 +24,10 @@ type CapabilityState struct {
 }
 
 type RetryState struct {
-	State           StateValue `json:"state"`
-	Remaining       *uint      `json:"remaining,omitempty"`
-	PowerCycleState *bool      `json:"powerCycleState,omitempty"`
-	Error           string     `json:"error,omitempty"`
+	State           StateValue       `json:"state"`
+	Remaining       *uint            `json:"remaining,omitempty"`
+	PowerCycleState *bool            `json:"powerCycleState,omitempty"`
+	Failure         *failure.Failure `json:"failure,omitempty"`
 }
 
 type UVStatus struct {

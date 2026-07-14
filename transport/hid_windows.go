@@ -4,7 +4,6 @@ package transport
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-ctap/ctap/discover"
 	"github.com/go-ctap/ctap/options"
@@ -33,7 +32,7 @@ func (p windowsPolicy) Resolve(ctx context.Context, requested Mode) (ResolvedPro
 		}
 
 		if err := p.proxy.Check(ctx); err != nil {
-			return ResolvedProvider{}, fmt.Errorf("%w: run elevated or start the proxy service: %v", ErrProxyUnavailable, err)
+			return ResolvedProvider{}, proxyUnavailableError(err)
 		}
 
 		return ResolvedProvider{Mode: ModeWindowsProxy, Provider: p.proxy}, nil
@@ -41,12 +40,12 @@ func (p windowsPolicy) Resolve(ctx context.Context, requested Mode) (ResolvedPro
 		return ResolvedProvider{Mode: ModeHID, Provider: p.hid}, nil
 	case ModeWindowsProxy:
 		if err := p.proxy.Check(ctx); err != nil {
-			return ResolvedProvider{}, fmt.Errorf("%w: start the proxy service for windows-proxy mode: %v", ErrProxyUnavailable, err)
+			return ResolvedProvider{}, proxyUnavailableError(err)
 		}
 
 		return ResolvedProvider{Mode: ModeWindowsProxy, Provider: p.proxy}, nil
 	default:
-		return ResolvedProvider{}, fmt.Errorf("%w: %s", ErrUnsupportedMode, requested)
+		return ResolvedProvider{}, unsupportedModeError()
 	}
 }
 
@@ -59,7 +58,7 @@ func (hidProvider) Check(context.Context) error {
 func (hidProvider) List(ctx context.Context) ([]Descriptor, error) {
 	infos, err := discover.EnumerateFIDODevices(ctx)
 	if err != nil {
-		return nil, err
+		return nil, transportError(err)
 	}
 
 	return descriptorsFromDeviceInfos(ModeHID, infos), nil
@@ -83,7 +82,7 @@ func proxyDescriptors(ctx context.Context) ([]Descriptor, error) {
 		options.WithUseNamedPipes(),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrProxyUnavailable, err)
+		return nil, proxyUnavailableError(err)
 	}
 
 	return descriptorsFromDeviceInfos(ModeWindowsProxy, infos), nil

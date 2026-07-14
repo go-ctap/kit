@@ -1,8 +1,7 @@
 package config
 
 import (
-	"fmt"
-
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/safety"
 )
 
@@ -22,7 +21,7 @@ func BuildChangePINPreview(status StatusReport, mode safety.PreviewMode) (PINMut
 
 func buildPINPreview(status StatusReport, operation PINMutationOperation, mode safety.PreviewMode) (PINMutationPreview, error) {
 	if !status.PIN.Supported {
-		return PINMutationPreview{}, fmt.Errorf("%w: device does not report clientPin support", ErrPINUnsupported)
+		return PINMutationPreview{}, failure.New(failure.CodePINUnsupported, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	configured := status.PIN.Configured != nil && *status.PIN.Configured
@@ -30,14 +29,14 @@ func buildPINPreview(status StatusReport, operation PINMutationOperation, mode s
 	switch operation {
 	case PINMutationSet:
 		if configured {
-			return PINMutationPreview{}, fmt.Errorf("%w: use config pin change", ErrPINAlreadyConfigured)
+			return PINMutationPreview{}, failure.New(failure.CodePINAlreadyConfigured, failure.WithPhase(failure.PhaseValidation))
 		}
 	case PINMutationChange:
 		if !configured {
-			return PINMutationPreview{}, fmt.Errorf("%w: use config pin set", ErrPINNotConfigured)
+			return PINMutationPreview{}, failure.New(failure.CodePINNotConfigured, failure.WithPhase(failure.PhaseValidation))
 		}
 	default:
-		return PINMutationPreview{}, fmt.Errorf("ctapkit: unsupported PIN operation %q", operation)
+		return PINMutationPreview{}, failure.New(failure.CodePINUnsupported, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	warnings := []safety.Warning{pinMutationWarning(operation)}

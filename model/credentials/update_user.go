@@ -2,9 +2,9 @@ package credentials
 
 import (
 	"encoding/hex"
-	"fmt"
 	"strings"
 
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/safety"
 )
 
@@ -39,10 +39,7 @@ type UpdateUserResult struct {
 
 func BuildUpdateUserPreview(report InventoryReport, req UpdateUserRequest) (UpdateUserPreview, error) {
 	if report.Support.PreviewOnly {
-		return UpdateUserPreview{}, fmt.Errorf(
-			"%w: preview-only devices cannot safely update stored user information with the pinned dependency",
-			ErrUnsupportedCredentialManagement,
-		)
+		return UpdateUserPreview{}, failure.New(failure.CodeCredentialManagementUnsupported, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	target, err := FindCredentialByHexID(report, req.CredentialIDHex)
@@ -78,7 +75,7 @@ func BuildUpdateUserPreview(report InventoryReport, req UpdateUserRequest) (Upda
 
 func ResolveUpdatedUser(target CredentialTarget, req UpdateUserRequest) (UserIdentity, error) {
 	if !req.UserIDProvided && !req.NameProvided && !req.DisplayProvided {
-		return UserIdentity{}, ErrNoCredentialChanges
+		return UserIdentity{}, failure.New(failure.CodeCredentialChangesRequired, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	proposed := target.User
@@ -90,7 +87,7 @@ func ResolveUpdatedUser(target CredentialTarget, req UpdateUserRequest) (UserIde
 		} else {
 			decoded, err := hex.DecodeString(trimmed)
 			if err != nil {
-				return UserIdentity{}, fmt.Errorf("%w: %q", ErrInvalidUserIDHex, req.UserIDHex)
+				return UserIdentity{}, failure.Wrap(failure.CodeUserIDHexInvalid, err, failure.WithPhase(failure.PhaseValidation))
 			}
 
 			proposed.UserIDHex = hex.EncodeToString(decoded)
@@ -110,7 +107,7 @@ func ResolveUpdatedUser(target CredentialTarget, req UpdateUserRequest) (UserIde
 	}
 
 	if proposed == target.User {
-		return UserIdentity{}, ErrNoCredentialChanges
+		return UserIdentity{}, failure.New(failure.CodeCredentialChangesRequired, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	return proposed, nil

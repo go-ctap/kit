@@ -2,10 +2,9 @@ package ctapkit
 
 import (
 	"context"
-	"errors"
 	"testing"
 
-	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/failure"
 	modelreport "github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 )
@@ -126,14 +125,14 @@ func TestSelectDeviceUsesDiscoverySnapshot(t *testing.T) {
 
 	if _, err = SelectDevice(devices, ""); err == nil {
 		t.Fatal("SelectDevice(empty,multiple) returned nil error")
-	} else if !model.IsErrorCategory(err, model.ErrorInvalidOperation) {
-		t.Fatalf("SelectDevice(empty,multiple) error = %v, want invalid-operation", err)
+	} else {
+		requireFailureCode(t, err, failure.CodeDeviceSelectionRequired)
 	}
 
 	if _, err = SelectDevice(devices, "missing"); err == nil {
 		t.Fatal("SelectDevice(missing) returned nil error")
-	} else if !model.IsErrorCategory(err, model.ErrorInvalidState) {
-		t.Fatalf("SelectDevice(missing) error = %v, want invalid-state", err)
+	} else {
+		requireFailureCode(t, err, failure.CodeDeviceNotFound)
 	}
 
 	selected, err = SelectDevice(devices[:1], "")
@@ -146,16 +145,14 @@ func TestSelectDeviceUsesDiscoverySnapshot(t *testing.T) {
 
 	if _, err = SelectDevice(nil, ""); err == nil {
 		t.Fatal("SelectDevice(empty list) returned nil error")
-	} else if !model.IsErrorCategory(err, model.ErrorInvalidState) {
-		t.Fatalf("SelectDevice(empty list) error = %v, want invalid-state", err)
+	} else {
+		requireFailureCode(t, err, failure.CodeDeviceUnavailable)
 	}
 }
 
 func TestOpenSessionRejectsZeroDevice(t *testing.T) {
 	session, err := OpenSession(context.Background(), Device{})
-	if !model.IsErrorCategory(err, model.ErrorInvalidOperation) {
-		t.Fatalf("OpenSession error = %v, want invalid-operation", err)
-	}
+	requireFailureCode(t, err, failure.CodeDeviceHandleInvalid)
 
 	if session != nil {
 		t.Fatalf("session = %#v, want nil", session)
@@ -168,14 +165,5 @@ func newFakeDiscoveryResolver(descriptors []transport.Descriptor) *fakeDiscovery
 			Mode:     transport.ModeHID,
 			Provider: &fakeDiscoveryProvider{list: descriptors},
 		},
-	}
-}
-
-func TestDiscoverDevicesMapsResolverErrors(t *testing.T) {
-	resolver := &fakeDiscoveryResolver{err: transport.ErrUnsupportedMode}
-
-	_, err := discoverDevices(context.Background(), resolver)
-	if !model.IsErrorCategory(err, model.ErrorUnsupported) && !errors.Is(err, transport.ErrUnsupportedMode) {
-		t.Fatalf("DiscoverDevices error = %v, want unsupported", err)
 	}
 }

@@ -2,9 +2,9 @@ package service
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/failure"
 )
 
 func operationEnvelopeMeta(envelope operationEnvelope) OperationEnvelopeMeta {
@@ -43,7 +43,10 @@ func typedOperationResult[T model.OperationResult](envelope operationEnvelope) (
 
 	result, ok := envelope.Result.(T)
 	if !ok {
-		return nil, fmt.Errorf("ctapkit: operation %q returned %T", envelope.Kind, envelope.Result)
+		return nil, failure.New(failure.CodeInternalError,
+			failure.WithOperation(string(envelope.Kind)),
+			failure.WithPhase(failure.PhaseDecode),
+		)
 	}
 
 	return &result, nil

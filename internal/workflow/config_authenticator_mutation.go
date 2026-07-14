@@ -4,10 +4,11 @@ import (
 	"context"
 
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/ctaperrors"
+	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/safety"
 )
 
@@ -36,7 +37,6 @@ func (r Runner) setAlwaysUV(ctx context.Context, req model.SetAlwaysUVOperation)
 		message:         req.ConfirmationMessage,
 		fallbackMessage: "Set alwaysUv " + string(req.Target) + " on authenticator " + r.env.Selected.DeviceID + "?",
 		destructive:     false,
-		declinedErr:     appconfig.ErrConfirmationRequired,
 		preview:         preview,
 	}); err != nil {
 		return output, err
@@ -44,16 +44,13 @@ func (r Runner) setAlwaysUV(ctx context.Context, req model.SetAlwaysUVOperation)
 
 	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionAuthenticatorConfiguration, "")
 	if err != nil {
-		return output, ctaperrors.Annotate(err, ctaperrors.WithConfigSubCommand(
-			model.OperationSetAlwaysUV,
-			protocol.ConfigSubCommandToggleAlwaysUv,
-		))
+		return output, err
 	}
 	defer secret.Zero(token)
 
 	if err := r.configManager().ToggleAlwaysUV(ctx, token); err != nil {
-		return output, ctaperrors.Annotate(err, ctaperrors.WithConfigSubCommand(
-			model.OperationSetAlwaysUV,
+		return output, errornorm.Annotate(err, errornorm.WithConfigSubCommand(
+			failure.PhaseAuthenticatorCommand,
 			protocol.ConfigSubCommandToggleAlwaysUv,
 		))
 	}
@@ -85,10 +82,7 @@ func (r Runner) setMinPINLength(ctx context.Context, req model.SetMinPINLengthOp
 
 	preview, err := appconfig.BuildMinPINLengthPreview(status, minReq, mode)
 	if err != nil {
-		return output, ctaperrors.Annotate(err, ctaperrors.WithConfigSubCommand(
-			model.OperationSetMinPINLength,
-			protocol.ConfigSubCommandSetMinPINLength,
-		))
+		return output, err
 	}
 
 	output.Preview = preview
@@ -101,7 +95,6 @@ func (r Runner) setMinPINLength(ctx context.Context, req model.SetMinPINLengthOp
 		message:         req.ConfirmationMessage,
 		fallbackMessage: "Set minimum PIN length on authenticator " + r.env.Selected.DeviceID + "?",
 		destructive:     false,
-		declinedErr:     appconfig.ErrConfirmationRequired,
 		preview:         preview,
 	}); err != nil {
 		return output, err
@@ -121,7 +114,10 @@ func (r Runner) setMinPINLength(ctx context.Context, req model.SetMinPINLengthOp
 		req.ForceChangePin,
 		req.PinComplexityPolicy,
 	); err != nil {
-		return output, err
+		return output, errornorm.Annotate(err, errornorm.WithConfigSubCommand(
+			failure.PhaseAuthenticatorCommand,
+			protocol.ConfigSubCommandSetMinPINLength,
+		))
 	}
 
 	output.Result = new(appconfig.MinPINLengthResult(r.env.Selected.DeviceID, req.Length))

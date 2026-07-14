@@ -4,7 +4,6 @@ package transport
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-ctap/ctap/discover"
 )
@@ -22,7 +21,7 @@ func (r linuxResolver) Resolve(_ context.Context, requested Mode) (ResolvedProvi
 	case ModeAuto, ModeHID:
 		return ResolvedProvider{Mode: ModeHID, Provider: r.provider}, nil
 	default:
-		return ResolvedProvider{}, fmt.Errorf("%w: %s", ErrUnsupportedMode, requested)
+		return ResolvedProvider{}, unsupportedModeError()
 	}
 }
 
@@ -35,7 +34,7 @@ func (hidProvider) Check(context.Context) error {
 func (hidProvider) List(ctx context.Context) ([]Descriptor, error) {
 	infos, err := discover.EnumerateFIDODevices(ctx)
 	if err != nil {
-		return nil, err
+		return nil, transportError(err)
 	}
 
 	return descriptorsFromDeviceInfos(ModeHID, infos), nil

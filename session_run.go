@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-ctap/kit/internal/workflow"
 	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/failure"
 )
 
 func (s *Session) run(
@@ -13,13 +14,18 @@ func (s *Session) run(
 	handler model.InteractionHandler,
 	opts ...RunOption,
 ) (model.OperationResult, error) {
+	operationKind := ""
+	if operation != nil {
+		operationKind = string(operation.Kind())
+	}
+
 	if err := validateSessionOperationInput(operation); err != nil {
-		return nil, err
+		return nil, normalizeRunError(err, operationKind)
 	}
 
 	config, err := newRunConfig(opts...)
 	if err != nil {
-		return nil, err
+		return nil, normalizeRunError(err, operationKind)
 	}
 
 	result, err := s.core.RunSerializedWorkflow(ctx, func(ctx context.Context) (model.OperationResult, error) {
@@ -36,9 +42,11 @@ func (s *Session) run(
 			StrictPermissions: s.core.StrictPermissions(),
 		}, operation)
 	})
-	err = normalizeRunError(err)
+	if err != nil {
+		return result, normalizeRunError(err, operationKind)
+	}
 
-	return result, err
+	return result, nil
 }
 
 func newRunConfig(opts ...RunOption) (runConfig, error) {
@@ -53,31 +61,31 @@ func newRunConfig(opts ...RunOption) (runConfig, error) {
 	case model.VerificationFlowDefault, model.VerificationFlowPIN:
 		return config, nil
 	default:
-		return runConfig{}, model.NewRuntimeError(
-			model.ErrorInvalidOperation,
-			"unsupported verification flow",
-			nil,
+		return runConfig{}, failure.New(failure.CodeVerificationFlowUnsupported,
+			failure.WithPhase(failure.PhaseValidation),
 		)
 	}
 }
 
 func validateSessionOperationInput(operation model.Operation) error {
 	if operation == nil {
-		return model.NewRuntimeError(model.ErrorInvalidOperation, "operation is required", nil)
+		return failure.New(failure.CodeOperationRequired,
+			failure.WithPhase(failure.PhaseValidation),
+		)
 	}
 
 	switch req := operation.(type) {
 	case model.SetPINOperation:
 		if req.NewPIN == "" {
-			return runtimePINRequiredError("new PIN")
+			return runtimePINRequiredError("newPIN")
 		}
 	case model.ChangePINOperation:
 		if req.CurrentPIN == "" {
-			return runtimePINRequiredError("current PIN")
+			return runtimePINRequiredError("currentPIN")
 		}
 
 		if req.NewPIN == "" {
-			return runtimePINRequiredError("new PIN")
+			return runtimePINRequiredError("newPIN")
 		}
 	}
 

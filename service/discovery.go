@@ -2,11 +2,10 @@ package service
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	ctapkit "github.com/go-ctap/kit"
-	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 )
@@ -41,7 +40,7 @@ func (s *Service) reconcileTopology(
 	envelope := DiscoveryChangedEnvelope{
 		Trigger:  trigger,
 		Snapshot: result.snapshot,
-		Error:    runtimeErrorEnvelope(result.err),
+		Error:    failure.Snapshot(result.err),
 	}
 
 	if force || result.changed || envelope.Error != nil {
@@ -66,11 +65,11 @@ func (s *Service) updateDiscovery(
 ) (discoveryResult, error) {
 	result := discoveryResult{}
 	if err := ctx.Err(); err != nil {
-		return result, err
+		return result, normalizeServicePhaseError(err, failure.PhaseDiscovery)
 	}
 
 	if s.isClosed() {
-		return result, closedServiceError()
+		return result, closedServiceError(failure.PhaseDiscovery)
 	}
 
 	s.mu.Lock()
@@ -80,7 +79,7 @@ func (s *Service) updateDiscovery(
 
 	devices, scanErr := s.scanDevices(ctx, discoverOptions(req)...)
 	if scanErr != nil && ctx.Err() != nil {
-		return result, ctx.Err()
+		return result, normalizeServicePhaseError(ctx.Err(), failure.PhaseDiscovery)
 	}
 
 	var nextReports []report.DeviceReport
@@ -93,7 +92,7 @@ func (s *Service) updateDiscovery(
 	if s.closed {
 		s.mu.Unlock()
 
-		return result, closedServiceError()
+		return result, closedServiceError(failure.PhaseDiscovery)
 	}
 	var affected []*managedSession
 	if authoritative {
@@ -105,7 +104,10 @@ func (s *Service) updateDiscovery(
 	s.mu.Unlock()
 
 	closeErr := s.closeManagedSessions(affected)
-	result.err = errors.Join(scanErr, closeErr)
+	result.err = scanErr
+	if result.err == nil {
+		result.err = closeErr
+	}
 	if authoritative {
 		snapshot := DiscoverySnapshot{Devices: nextReports}
 		result.snapshot = &snapshot
@@ -133,8 +135,8 @@ func (s *Service) closeManagedSessions(sessions []*managedSession) error {
 	var closeErr error
 	for _, session := range sessions {
 		s.cancelSessionOperations(session.id)
-		if err := session.session.Close(); err != nil {
-			closeErr = errors.Join(closeErr, err)
+		if err := session.session.Close(); err != nil && closeErr == nil {
+			closeErr = err
 		}
 		session.updatedAt = time.Now().UTC()
 		s.waitForSessionOperations(session.id)
@@ -206,6 +208,8 @@ func deviceReportPresent(devices []report.DeviceReport, selected report.DeviceRe
 	return false
 }
 
-func closedServiceError() error {
-	return model.NewRuntimeError(model.ErrorInvalidState, "service is closed", nil)
+func closedServiceError(phase failure.Phase) error {
+	return failure.New(failure.CodeServiceClosed,
+		failure.WithPhase(phase),
+	)
 }

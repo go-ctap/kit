@@ -70,22 +70,6 @@ func TestBuildStatusReportMatchesCtaphidOptionSemantics(t *testing.T) {
 	}
 }
 
-func TestRetryStateReportsZeroRemainingRetries(t *testing.T) {
-	state := retryState(0, new(false), nil)
-
-	if state.State != StateSupported {
-		t.Fatalf("state = %s, want supported", state.State)
-	}
-
-	if state.Remaining == nil || *state.Remaining != 0 {
-		t.Fatalf("remaining retries = %#v, want explicit 0", state.Remaining)
-	}
-
-	if state.PowerCycleState == nil || *state.PowerCycleState {
-		t.Fatalf("powerCycleState = %#v, want explicit false", state.PowerCycleState)
-	}
-}
-
 func TestBuildStatusReportLabelsUVModality(t *testing.T) {
 	statusReport := BuildStatusReport(nilDevice(), protocol.AuthenticatorGetInfoResponse{
 		UvModality: new(protocol.UserVerifyFingerprintInternal),

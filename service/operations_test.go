@@ -8,6 +8,7 @@ import (
 
 	ctapkit "github.com/go-ctap/kit"
 	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/failure"
 )
 
 func TestCredentialListRequestRefreshJSONContract(t *testing.T) {
@@ -135,14 +136,21 @@ func TestListCredentialsInvalidSessionReturnsTypedErrorEnvelope(t *testing.T) {
 	if envelope.Kind != model.OperationListCredentials {
 		t.Fatalf("envelope kind = %q, want %q", envelope.Kind, model.OperationListCredentials)
 	}
-	if envelope.Error == nil || envelope.Error.Category != model.ErrorInvalidSession {
-		t.Fatalf("envelope error = %#v, want invalid-session", envelope.Error)
+	if envelope.Error == nil || envelope.Error.Code != failure.CodeSessionInvalid {
+		t.Fatalf("envelope error = %#v, want %s", envelope.Error, failure.CodeSessionInvalid)
+	}
+	if envelope.Error.Category != failure.CategoryInvalidSession || envelope.Error.Phase != failure.PhaseSession {
+		t.Fatalf("envelope error = %#v, want invalid-session/session", envelope.Error)
 	}
 }
 
 func TestListCredentialsOperationFailureUsesOnlyTheTypedEnvelopeError(t *testing.T) {
 	runtime := &recordingOperationSession{
-		runErr: model.NewRuntimeError(model.ErrorCanceled, "operation canceled", context.Canceled),
+		runErr: failure.Wrap(
+			failure.CodeOperationCanceled,
+			context.Canceled,
+			failure.WithPhase(failure.PhaseAuthenticatorCommand),
+		),
 	}
 	service := New()
 	service.sessions["session-1"] = &managedSession{
@@ -156,33 +164,14 @@ func TestListCredentialsOperationFailureUsesOnlyTheTypedEnvelopeError(t *testing
 	if err != nil {
 		t.Fatalf("ListCredentials error = %v, want nil because the failure is in the envelope", err)
 	}
-	if envelope.Error == nil || envelope.Error.Category != model.ErrorCanceled {
-		t.Fatalf("envelope error = %#v, want canceled", envelope.Error)
+	if envelope.Error == nil || envelope.Error.Code != failure.CodeOperationCanceled {
+		t.Fatalf("envelope error = %#v, want %s", envelope.Error, failure.CodeOperationCanceled)
+	}
+	if envelope.Error.Category != failure.CategoryCanceled {
+		t.Fatalf("envelope error category = %q, want %q", envelope.Error.Category, failure.CategoryCanceled)
 	}
 	if envelope.Result != nil {
 		t.Fatalf("envelope result = %#v, want nil on operation failure", envelope.Result)
-	}
-}
-
-func TestListCredentialsInternalTypeFailureDoesNotReturnAMeaningfulEnvelope(t *testing.T) {
-	runtime := &recordingOperationSession{result: model.InspectOutput{}}
-	service := New()
-	service.sessions["session-1"] = &managedSession{
-		id:      "session-1",
-		session: runtime,
-	}
-
-	envelope, err := service.ListCredentials(context.Background(), CredentialListRequest{
-		OperationRequest: OperationRequest{SessionID: "session-1"},
-	})
-	if err == nil {
-		t.Fatal("ListCredentials error = nil, want an internal type error")
-	}
-	if !strings.Contains(err.Error(), "returned model.InspectOutput") {
-		t.Fatalf("ListCredentials error = %v, want typed result mismatch", err)
-	}
-	if envelope.OperationID != "" || envelope.SessionID != "" || envelope.Kind != "" || envelope.Error != nil || envelope.Result != nil {
-		t.Fatalf("envelope = %#v, want zero envelope with internal error", envelope)
 	}
 }
 

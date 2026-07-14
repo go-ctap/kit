@@ -3,13 +3,12 @@ package workflow
 import (
 	"context"
 	"encoding/hex"
-	"fmt"
 
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/ctaperrors"
+	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
-	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/samber/lo"
 )
 
@@ -34,28 +33,29 @@ func (r Runner) bioList(ctx context.Context) (appconfig.BioListReport, error) {
 
 func (r Runner) bioSensorReport(ctx context.Context) (appconfig.BioSensorReport, error) {
 	if err := ctx.Err(); err != nil {
-		return appconfig.BioSensorReport{}, err
+		return appconfig.BioSensorReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseDiscovery))
 	}
 
 	authenticator := r.bioEnrollmentManager()
 	status := r.statusReport()
 	if !status.Bio.Supported {
-		return appconfig.BioSensorReport{}, fmt.Errorf("%w: device does not report bioEnroll support", appconfig.ErrBioUnsupported)
+		return appconfig.BioSensorReport{}, failure.New(failure.CodeBioUnsupported,
+			failure.WithPhase(failure.PhaseDiscovery),
+		)
 	}
 
 	modality, err := authenticator.GetBioModality(ctx)
 	if err != nil {
-		return appconfig.BioSensorReport{}, ctaperrors.Annotate(err, ctaperrors.WithCommand(
-			model.OperationBioSensorInfo,
+		return appconfig.BioSensorReport{}, errornorm.Annotate(err, errornorm.WithCommand(
+			failure.PhaseDiscovery,
 			bioEnrollmentCommand(status),
-			ctaperrors.DomainConfig,
 		))
 	}
 
 	sensor, err := authenticator.GetFingerprintSensorInfo(ctx)
 	if err != nil {
-		return appconfig.BioSensorReport{}, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
-			model.OperationBioSensorInfo,
+		return appconfig.BioSensorReport{}, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
+			failure.PhaseDiscovery,
 			bioEnrollmentCommand(status),
 			protocol.BioEnrollmentSubCommandGetFingerprintSensorInfo,
 		))
@@ -104,17 +104,23 @@ func fingerprintKind(value uint) *appconfig.FingerprintKind {
 
 func (r Runner) bioListReport(ctx context.Context, status appconfig.StatusReport, token []byte) (appconfig.BioListReport, error) {
 	if err := ctx.Err(); err != nil {
-		return appconfig.BioListReport{}, err
+		return appconfig.BioListReport{}, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
+			failure.PhaseDiscovery,
+			bioEnrollmentCommand(status),
+			protocol.BioEnrollmentSubCommandEnumerateEnrollments,
+		))
 	}
 
 	if !status.Bio.Supported {
-		return appconfig.BioListReport{}, fmt.Errorf("%w: device does not report bioEnroll support", appconfig.ErrBioUnsupported)
+		return appconfig.BioListReport{}, failure.New(failure.CodeBioUnsupported,
+			failure.WithPhase(failure.PhaseDiscovery),
+		)
 	}
 
 	resp, err := r.bioEnrollmentManager().EnumerateEnrollments(ctx, token)
 	if err != nil {
-		return appconfig.BioListReport{}, ctaperrors.Annotate(err, ctaperrors.WithBioEnrollmentSubCommand(
-			model.OperationBioList,
+		return appconfig.BioListReport{}, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
+			failure.PhaseDiscovery,
 			bioEnrollmentCommand(status),
 			protocol.BioEnrollmentSubCommandEnumerateEnrollments,
 		))

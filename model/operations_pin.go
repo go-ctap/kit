@@ -1,6 +1,10 @@
 package model
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/go-ctap/kit/model/failure"
+)
 
 type SetPINOperation struct {
 	// NewPIN is accepted by UnmarshalJSON as "newPIN" but intentionally omitted
@@ -25,7 +29,7 @@ func (op *SetPINOperation) UnmarshalJSON(data []byte) error {
 
 	var payload pinPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
-		return err
+		return failure.Wrap(failure.CodeRequestJSONInvalid, err, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	op.NewPIN = payload.NewPIN
@@ -62,7 +66,7 @@ func (op *ChangePINOperation) UnmarshalJSON(data []byte) error {
 
 	var payload pinPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
-		return err
+		return failure.Wrap(failure.CodeRequestJSONInvalid, err, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	op.CurrentPIN = payload.CurrentPIN

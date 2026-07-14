@@ -1,11 +1,11 @@
 package webauthn
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/go-ctap/ctap/attestation"
 	"github.com/go-ctap/ctap/credential"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/model/safety"
 	"github.com/samber/lo"
@@ -106,29 +106,29 @@ func NormalizeMakeCredentialInput(input MakeCredentialInput) (MakeCredentialInpu
 	input.RP.ID = strings.TrimSpace(input.RP.ID)
 	input.RP.Name = strings.TrimSpace(input.RP.Name)
 	if input.RP.ID == "" {
-		return MakeCredentialInput{}, invalidInput("relying party id is required")
+		return MakeCredentialInput{}, failure.New(failure.CodeRelyingPartyIDRequired, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	input.User.Name = strings.TrimSpace(input.User.Name)
 	input.User.DisplayName = strings.TrimSpace(input.User.DisplayName)
 	if len(input.User.ID) == 0 {
-		return MakeCredentialInput{}, invalidInput("user id is required")
+		return MakeCredentialInput{}, failure.New(failure.CodeUserIDRequired, failure.WithPhase(failure.PhaseValidation))
 	}
 	input.User.ID = lo.Clone(input.User.ID)
 
 	if len(input.ClientDataJSON) == 0 {
-		return MakeCredentialInput{}, invalidInput("clientDataJSON is required")
+		return MakeCredentialInput{}, failure.New(failure.CodeClientDataJSONRequired, failure.WithPhase(failure.PhaseValidation))
 	}
 	input.ClientDataJSON = lo.Clone(input.ClientDataJSON)
 
 	if len(input.PubKeyCredParams) == 0 {
-		return MakeCredentialInput{}, invalidInput("public key credential parameters are required")
+		return MakeCredentialInput{}, failure.New(failure.CodePublicKeyCredentialParametersRequired, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	pubKeyCredParams, err := lo.MapErr(input.PubKeyCredParams, func(param credential.PublicKeyCredentialParameters, _ int) (credential.PublicKeyCredentialParameters, error) {
 		param = normalizeCredentialParameter(param)
 		if param.Algorithm == 0 {
-			return credential.PublicKeyCredentialParameters{}, invalidInput("public key credential algorithm is required")
+			return credential.PublicKeyCredentialParameters{}, failure.New(failure.CodePublicKeyCredentialAlgorithmRequired, failure.WithPhase(failure.PhaseValidation))
 		}
 
 		return param, nil
@@ -150,11 +150,11 @@ func NormalizeMakeCredentialInput(input MakeCredentialInput) (MakeCredentialInpu
 func NormalizeGetAssertionInput(input GetAssertionInput) (GetAssertionInput, error) {
 	input.RPID = strings.TrimSpace(input.RPID)
 	if input.RPID == "" {
-		return GetAssertionInput{}, invalidInput("relying party id is required")
+		return GetAssertionInput{}, failure.New(failure.CodeRelyingPartyIDRequired, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	if len(input.ClientDataJSON) == 0 {
-		return GetAssertionInput{}, invalidInput("clientDataJSON is required")
+		return GetAssertionInput{}, failure.New(failure.CodeClientDataJSONRequired, failure.WithPhase(failure.PhaseValidation))
 	}
 	input.ClientDataJSON = lo.Clone(input.ClientDataJSON)
 
@@ -171,7 +171,7 @@ func normalizeDescriptors(in []credential.PublicKeyCredentialDescriptor) ([]cred
 	return lo.MapErr(in, func(descriptor credential.PublicKeyCredentialDescriptor, _ int) (credential.PublicKeyCredentialDescriptor, error) {
 		descriptor.Type = credentialTypeOrDefault(descriptor.Type)
 		if len(descriptor.ID) == 0 {
-			return credential.PublicKeyCredentialDescriptor{}, invalidInput("credential id is required")
+			return credential.PublicKeyCredentialDescriptor{}, failure.New(failure.CodeCredentialIDRequired, failure.WithPhase(failure.PhaseValidation))
 		}
 		descriptor.ID = lo.Clone(descriptor.ID)
 		descriptor.Transports = lo.Clone(descriptor.Transports)
@@ -193,8 +193,4 @@ func credentialTypeOrDefault(value credential.PublicKeyCredentialType) credentia
 	}
 
 	return credential.PublicKeyCredentialType(trimmed)
-}
-
-func invalidInput(format string, args ...any) error {
-	return fmt.Errorf("%w: "+format, append([]any{ErrInvalidInput}, args...)...)
 }

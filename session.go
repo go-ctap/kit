@@ -2,11 +2,11 @@ package ctapkit
 
 import (
 	"context"
-	"errors"
 
 	rtdevice "github.com/go-ctap/kit/internal/device"
 	rtsession "github.com/go-ctap/kit/internal/session"
 	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/failure"
 )
 
 type OpenSessionOption func(*openSessionConfig)
@@ -79,20 +79,22 @@ func openSession(
 	}
 
 	if !dev.valid {
-		return nil, model.NewRuntimeError(model.ErrorInvalidOperation, "device handle is invalid", nil)
+		return nil, failure.New(failure.CodeDeviceHandleInvalid,
+			failure.WithPhase(failure.PhaseSession),
+		)
 	}
 	selected := dev.report
 
 	lease, err := rtdevice.AcquireLease(ctx, selected)
 	if err != nil {
-		return nil, runtimeDeviceError(err)
+		return nil, normalizeLeaseError(err)
 	}
 
 	authenticator, err := deps.openAuthenticator(ctx, selected.Transport, selected.Path)
 	if err != nil {
-		releaseErr := lease.Close()
+		_ = lease.Close()
 
-		return nil, errors.Join(runtimeDeviceError(err), releaseErr)
+		return nil, err
 	}
 
 	return &Session{
@@ -110,7 +112,11 @@ func (s *Session) Run(
 }
 
 func (s *Session) Close() error {
-	return s.core.Close()
+	if err := s.core.Close(); err != nil {
+		return normalizeBoundaryError(err, failure.PhaseCleanup)
+	}
+
+	return nil
 }
 
 func (s *Session) Info() model.SessionInfo {

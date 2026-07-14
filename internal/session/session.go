@@ -9,6 +9,7 @@ import (
 	"github.com/go-ctap/kit/internal/device"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
 )
 
@@ -144,7 +145,9 @@ func (c *Core) trackActiveOperation(cancel context.CancelFunc) error {
 	defer c.stateMu.Unlock()
 
 	if c.closed {
-		return model.NewRuntimeError(model.ErrorInvalidSession, "session is closed", nil)
+		return failure.New(failure.CodeSessionClosed,
+			failure.WithPhase(failure.PhaseSession),
+		)
 	}
 
 	c.activeCancel = cancel

@@ -26,6 +26,7 @@ This repository does not own terminal UX, command parsing, output rendering, MDS
 
 - `ctapkit`: public runtime facade.
 - `model`: public operation, event, interaction, and session DTOs.
+- `model/failure`: stable machine-readable failure codes and transport-safe snapshots.
 - `model/config`: authenticator config DTOs and reports.
 - `model/credentials`: credential DTOs, previews, and reports.
 - `model/largeblobs`: large-blob DTOs, previews, and reports.
@@ -50,6 +51,10 @@ A consumer should generally do this:
 `Session.Run` returns the typed `model.OperationResult` directly. Consumers that need non-blocking UI can call it from their own goroutine or task. Progress and UI updates are delivered through the `model.EventSink` attached with `ctapkit.WithEventSink`; PIN, user-verification, touch, and confirm participation is delivered through `model.InteractionHandler`.
 Interaction requests and operation events contain only their prompt or event payload; consumers should correlate session-specific work through the `*ctapkit.Session` handle and their own event sink ownership.
 
+Public failures use stable codes, optional safe interpolation parameters, and
+exact CTAP provenance. See the [machine-readable error
+contract](docs/error-contract.md).
+
 Verification defaults to UV when the authenticator supports it, with PIN fallback when CTAP reports a fallback condition. A consumer that wants to offer "use PIN" before starting work can pass `ctapkit.WithVerificationFlow(model.VerificationFlowPIN)` to `Session.Run`. User-verification interactions are pre-command prompt and cancel points; the authenticator remains authoritative for whether UV actually succeeds.
 
 Core operations are intentionally UI-neutral. PIN prompts, user verification messages, spinners, progress bars, tables, JSON/YAML formatting, and GUI/TUI event presentation belong to the consumer.
@@ -69,7 +74,7 @@ MDS presentation or policy decisions.
 
 - Per-session workflow serialization prevents multi-step flows on the same opened authenticator from interleaving.
 - Device leases represent cross-session or cross-process ownership of authenticator identity; different authenticators may run independently.
-- Secrets such as PIN input and `pinUvAuthToken` must not be logged, marshaled, or exposed through public results.
+- `pinUvAuthToken` values and other runtime-owned secrets are never exposed through public results. Root `model` PIN operations omit PINs when marshaled; the Wails-oriented `service` request DTOs keep typed PIN fields in JSON, so adapters and clients must redact them and must not log or persist serialized requests.
 - Mutating operations preserve dry-run and confirmation semantics.
 - Destructive flows such as reset, credential deletion, and large-blob deletion require explicit confirmation.
 - Factory reset must be executed shortly after authenticator power-up on many authenticators; consumers should collect any strong UI confirmation before reconnecting and then run a confirmed reset promptly.

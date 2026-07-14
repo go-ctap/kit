@@ -3,17 +3,17 @@ package workflow
 import (
 	"context"
 	"encoding/hex"
-	"fmt"
 	"slices"
 	"sort"
 	"strings"
 
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/ctaperrors"
+	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/samber/lo"
 )
 
@@ -67,7 +67,7 @@ func (r Runner) freshCredentialInventoryReport(ctx context.Context) (appcredenti
 	}
 	if err := ctx.Err(); err != nil {
 		zeroCredentialInventoryReport(&report)
-		return appcredentials.InventoryReport{}, err
+		return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseDiscovery))
 	}
 
 	return report, nil
@@ -79,7 +79,7 @@ func (r Runner) buildCredentialInventoryReport(
 	permission protocol.Permission,
 ) (appcredentials.InventoryReport, error) {
 	if err := ctx.Err(); err != nil {
-		return appcredentials.InventoryReport{}, err
+		return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseMetadata))
 	}
 
 	authenticator := r.credentialManager()
@@ -87,14 +87,18 @@ func (r Runner) buildCredentialInventoryReport(
 
 	metadata, err := authenticator.GetCredsMetadata(ctx, token)
 	if err != nil {
-		return appcredentials.InventoryReport{}, ctaperrors.Annotate(err, ctaperrors.WithCredentialManagementSubCommand(
-			model.OperationListCredentials,
+		return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
+			failure.PhaseMetadata,
 			credentialManagementCommand(info),
 			protocol.CredentialManagementSubCommandGetCredsMetadata,
 		))
 	}
 	if err := ctx.Err(); err != nil {
-		return appcredentials.InventoryReport{}, err
+		return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
+			failure.PhaseMetadata,
+			credentialManagementCommand(info),
+			protocol.CredentialManagementSubCommandGetCredsMetadata,
+		))
 	}
 
 	report := appcredentials.InventoryReport{
@@ -127,13 +131,18 @@ func (r Runner) buildCredentialInventoryReport(
 
 	for rpResponse, err := range authenticator.EnumerateRPs(ctx, token) {
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return appcredentials.InventoryReport{}, ctxErr
+			err = ctxErr
 		}
 		if err != nil {
-			return appcredentials.InventoryReport{}, ctaperrors.Annotate(err, ctaperrors.WithCredentialManagementSubCommand(
-				model.OperationListCredentials,
+			subCommand := protocol.CredentialManagementSubCommandEnumerateRPsBegin
+			if len(rpResponses) > 0 {
+				subCommand = protocol.CredentialManagementSubCommandEnumerateRPsGetNextRP
+			}
+
+			return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
+				failure.PhaseDiscovery,
 				credentialManagementCommand(info),
-				protocol.CredentialManagementSubCommandEnumerateRPsBegin,
+				subCommand,
 			))
 		}
 
@@ -155,7 +164,11 @@ func (r Runner) buildCredentialInventoryReport(
 
 	for _, rpResponse := range rpResponses {
 		if err := ctx.Err(); err != nil {
-			return appcredentials.InventoryReport{}, err
+			return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
+				failure.PhaseDiscovery,
+				credentialManagementCommand(info),
+				protocol.CredentialManagementSubCommandEnumerateCredentialsBegin,
+			))
 		}
 
 		report.Groups = append(report.Groups, appcredentials.CredentialGroup{
@@ -167,13 +180,18 @@ func (r Runner) buildCredentialInventoryReport(
 
 		for credentialResponse, err := range authenticator.EnumerateCredentials(ctx, token, rpResponse.RPIDHash) {
 			if ctxErr := ctx.Err(); ctxErr != nil {
-				return appcredentials.InventoryReport{}, ctxErr
+				err = ctxErr
 			}
 			if err != nil {
-				return appcredentials.InventoryReport{}, ctaperrors.Annotate(err, ctaperrors.WithCredentialManagementSubCommand(
-					model.OperationListCredentials,
+				subCommand := protocol.CredentialManagementSubCommandEnumerateCredentialsBegin
+				if len(group.Credentials) > 0 {
+					subCommand = protocol.CredentialManagementSubCommandEnumerateCredentialsGetNextCredential
+				}
+
+				return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
+					failure.PhaseDiscovery,
 					credentialManagementCommand(info),
-					protocol.CredentialManagementSubCommandEnumerateCredentialsBegin,
+					subCommand,
 				))
 			}
 
@@ -232,7 +250,9 @@ func credentialManagementCommand(info protocol.AuthenticatorGetInfoResponse) pro
 
 func inventoryPermission(info protocol.AuthenticatorGetInfoResponse) (protocol.Permission, error) {
 	if !supportsCredentialManagement(info) {
-		return 0, fmt.Errorf("%w: device does not support resident credential management", appcredentials.ErrUnsupportedCredentialManagement)
+		return 0, failure.New(failure.CodeCredentialManagementUnsupported,
+			failure.WithPhase(failure.PhaseDiscovery),
+		)
 	}
 
 	if info.Options[protocol.OptionCredentialManagementReadOnly] {

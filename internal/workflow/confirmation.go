@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/samber/lo"
 )
 
@@ -12,7 +13,6 @@ type confirmationRequest struct {
 	message         string
 	fallbackMessage string
 	destructive     bool
-	declinedErr     error
 	preview         any
 }
 
@@ -32,7 +32,9 @@ func (r Runner) confirmMutation(ctx context.Context, req confirmationRequest) er
 	}
 
 	if !response.Confirmed {
-		return req.declinedErr
+		return failure.New(failure.CodeConfirmationRequired,
+			failure.WithPhase(failure.PhaseInteraction),
+		)
 	}
 
 	return nil

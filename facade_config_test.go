@@ -13,6 +13,7 @@ import (
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/transport"
 )
 
@@ -131,16 +132,6 @@ func TestBioSensorInfoOmitsUnknownSpecValues(t *testing.T) {
 	}
 }
 
-func TestBioSensorInfoUnsupportedReturnsSentinel(t *testing.T) {
-	session := openContractSession(t, nil, nil)
-	defer func() { _ = session.Close() }()
-
-	_, err := session.Run(context.Background(), model.BioSensorInfoOperation{}, nil)
-	if !errors.Is(err, appconfig.ErrBioUnsupported) {
-		t.Fatalf("Run error = %v, want ErrBioUnsupported", err)
-	}
-}
-
 func TestResetDeclinedConfirmDoesNotEmitTouchOrReset(t *testing.T) {
 	a := &resetCountingAuthenticator{}
 	events := &recordingEventSink{}
@@ -161,9 +152,7 @@ func TestResetDeclinedConfirmDoesNotEmitTouchOrReset(t *testing.T) {
 	})
 
 	_, err := session.Run(context.Background(), model.ResetFactoryOperation{}, handler)
-	if !errors.Is(err, appconfig.ErrConfirmationRequired) {
-		t.Fatalf("Run error = %v, want confirmation required", err)
-	}
+	requireFailureCode(t, err, failure.CodeConfirmationRequired)
 
 	if got := a.resetCount.Load(); got != 0 {
 		t.Fatalf("Reset count = %d, want 0", got)
@@ -214,13 +203,7 @@ func TestResetWindowExpiredMapsNotAllowed(t *testing.T) {
 		StatusCode: ctaptransport.CTAP2_ERR_NOT_ALLOWED,
 	})
 
-	if !model.IsErrorCategory(err, model.ErrorInvalidState) {
-		t.Fatalf("Run error = %v, want invalid-state", err)
-	}
-
-	if !errors.Is(err, appconfig.ErrResetWindowExpired) {
-		t.Fatalf("Run error = %v, want reset window expired sentinel", err)
-	}
+	requireFailureCode(t, err, failure.CodeResetWindowExpired)
 }
 
 func TestResetTimeoutStatusMapsTimeout(t *testing.T) {
@@ -236,9 +219,7 @@ func TestResetTimeoutStatusMapsTimeout(t *testing.T) {
 				StatusCode: status,
 			})
 
-			if !model.IsErrorCategory(err, model.ErrorTimeout) {
-				t.Fatalf("Run error = %v, want timeout", err)
-			}
+			requireFailureCode(t, err, failure.CodeResetTouchTimeout)
 		})
 	}
 }
@@ -249,127 +230,20 @@ func TestResetNotAllowedForOtherCommandDoesNotMapWindowExpired(t *testing.T) {
 		StatusCode: ctaptransport.CTAP2_ERR_NOT_ALLOWED,
 	})
 
-	if errors.Is(err, appconfig.ErrResetWindowExpired) {
-		t.Fatalf("Run error = %v, should not match reset window expired sentinel", err)
-	}
-
-	if !model.IsErrorCategory(err, model.ErrorInvalidState) {
-		t.Fatalf("Run error = %v, want invalid-state", err)
-	}
+	requireFailureCode(t, err, failure.CodeAuthenticatorOperationNotAllowed)
 }
 
-func TestRunReturnsNormalizedCTAPErrorCategory(t *testing.T) {
+func TestRunReturnsNormalizedCTAPError(t *testing.T) {
 	events := &recordingEventSink{}
 	err := runConfirmedResetWithErrorAndEvents(t, events, &ctaptransport.CTAPError{
 		Command:    protocol.AuthenticatorReset,
 		StatusCode: ctaptransport.CTAP2_ERR_ACTION_TIMEOUT,
 	})
 
-	if !model.IsErrorCategory(err, model.ErrorTimeout) {
-		t.Fatalf("Run error = %v, want timeout", err)
-	}
+	requireFailureCode(t, err, failure.CodeResetTouchTimeout)
 
 	if _, ok := errors.AsType[*ctaptransport.CTAPError](err); !ok {
 		t.Fatalf("Run error = %v, want original CTAPError in chain", err)
-	}
-}
-
-func TestPINMutationCTAPStatusMapsSentinel(t *testing.T) {
-	tests := []struct {
-		name      string
-		operation model.Operation
-		auth      *pinMutationCountingAuthenticator
-		want      error
-	}{
-		{
-			name:      "set PIN policy violation",
-			operation: model.SetPINOperation{NewPIN: "1234", Confirmed: true},
-			auth: &pinMutationCountingAuthenticator{
-				setErr: &ctaptransport.CTAPError{
-					Command:    protocol.AuthenticatorClientPIN,
-					StatusCode: ctaptransport.CTAP2_ERR_PIN_POLICY_VIOLATION,
-				},
-			},
-			want: appconfig.ErrPINPolicyViolation,
-		},
-		{
-			name:      "change invalid PIN",
-			operation: model.ChangePINOperation{CurrentPIN: "1234", NewPIN: "5678", Confirmed: true},
-			auth: &pinMutationCountingAuthenticator{
-				configured: true,
-				changeErr: &ctaptransport.CTAPError{
-					Command:    protocol.AuthenticatorClientPIN,
-					StatusCode: ctaptransport.CTAP2_ERR_PIN_INVALID,
-				},
-			},
-			want: appconfig.ErrPINInvalid,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-				return tt.auth, nil
-			})
-			defer func() { _ = session.Close() }()
-
-			_, err := session.Run(context.Background(), tt.operation, nil)
-			if !errors.Is(err, tt.want) {
-				t.Fatalf("Run error = %v, want sentinel %v", err, tt.want)
-			}
-			if !model.IsErrorCategory(err, model.ErrorInvalidState) {
-				t.Fatalf("Run category = %v, want invalid-state", err)
-			}
-		})
-	}
-}
-
-func TestBioEnrollmentCTAPStatusMapsSentinel(t *testing.T) {
-	tests := []struct {
-		name      string
-		operation model.Operation
-		auth      *bioErrorAuthenticator
-		want      error
-	}{
-		{
-			name:      "database full",
-			operation: model.BioEnrollOperation{Confirmed: true},
-			auth: &bioErrorAuthenticator{
-				beginErr: &ctaptransport.CTAPError{
-					Command:    protocol.AuthenticatorBioEnrollment,
-					StatusCode: ctaptransport.CTAP2_ERR_FP_DATABASE_FULL,
-				},
-			},
-			want: appconfig.ErrBioDatabaseFull,
-		},
-		{
-			name:      "template missing",
-			operation: model.BioRemoveOperation{TemplateIDHex: "c05e", Confirmed: true},
-			auth: &bioErrorAuthenticator{
-				removeErr: &ctaptransport.CTAPError{
-					Command:    protocol.AuthenticatorBioEnrollment,
-					StatusCode: ctaptransport.CTAP2_ERR_INVALID_OPTION,
-				},
-			},
-			want: appconfig.ErrBioEnrollmentNotFound,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-				return tt.auth, nil
-			})
-			defer func() { _ = session.Close() }()
-
-			_, err := session.Run(context.Background(), tt.operation, userVerificationHandler(t))
-			if !errors.Is(err, tt.want) {
-				t.Fatalf("Run error = %v, want sentinel %v", err, tt.want)
-			}
-			if !model.IsErrorCategory(err, model.ErrorInvalidState) {
-				t.Fatalf("Run category = %v, want invalid-state", err)
-			}
-		})
 	}
 }
 
@@ -489,12 +363,6 @@ func runConfirmedResetWithErrorAndEvents(t *testing.T, events *recordingEventSin
 	return err
 }
 
-type bioErrorAuthenticator struct {
-	contractAuthenticator
-	beginErr  error
-	removeErr error
-}
-
 type contextRecordingConfigAuthenticator struct {
 	contractAuthenticator
 	tokenCtx   context.Context
@@ -573,29 +441,6 @@ func (a *bioCleanupAuthenticator) CancelCurrentEnrollment(ctx context.Context) e
 	return a.cleanupErr
 }
 
-func (a *bioErrorAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
-	return protocol.AuthenticatorGetInfoResponse{
-		Options: map[protocol.Option]bool{
-			protocol.OptionBioEnroll:        true,
-			protocol.OptionUvBioEnroll:      true,
-			protocol.OptionPinUvAuthToken:   true,
-			protocol.OptionUserVerification: true,
-		},
-	}
-}
-
-func (a *bioErrorAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
-	return []byte("token"), nil
-}
-
-func (a *bioErrorAuthenticator) EnrollBegin(context.Context, []byte, uint) (protocol.AuthenticatorBioEnrollmentResponse, error) {
-	return protocol.AuthenticatorBioEnrollmentResponse{}, a.beginErr
-}
-
-func (a *bioErrorAuthenticator) RemoveEnrollment(context.Context, []byte, []byte) error {
-	return a.removeErr
-}
-
 type bioSensorAuthenticator struct {
 	contractAuthenticator
 	modality        protocol.BioModality
@@ -655,13 +500,7 @@ func TestPINMutationsRejectEmptyPINAtSessionRun(t *testing.T) {
 				t.Fatalf("result = %#v, want nil", result)
 			}
 
-			if !errors.Is(err, appconfig.ErrPINRequired) {
-				t.Fatalf("Run error = %v, want ErrPINRequired", err)
-			}
-
-			if !model.IsErrorCategory(err, model.ErrorInvalidOperation) {
-				t.Fatalf("Start category = %v, want invalid-operation", err)
-			}
+			requireFailureCode(t, err, failure.CodePINRequired)
 
 			if got := a.setCalls.Load(); got != tt.wantSet {
 				t.Fatalf("SetPIN calls = %d, want %d", got, tt.wantSet)

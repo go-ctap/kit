@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"testing"
 
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
-	appconfig "github.com/go-ctap/kit/model/config"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/transport"
 )
 
@@ -48,9 +47,7 @@ func TestPINInteractionRejectsEmptyPINAtSessionRun(t *testing.T) {
 		Payload:         []byte("test"),
 		Confirmed:       true,
 	}, handler)
-	if !errors.Is(err, appconfig.ErrPINRequired) {
-		t.Fatalf("Run(empty PIN) error = %v, want ErrPINRequired", err)
-	}
+	requireFailureCode(t, err, failure.CodePINRequired)
 
 	if got := a.pinCalls.Load(); got != 0 {
 		t.Fatalf("PIN token calls = %d, want 0", got)
@@ -72,9 +69,7 @@ func TestPINInteractionWithoutHandlerReturnsInvalidState(t *testing.T) {
 		Payload:         []byte("test"),
 		Confirmed:       true,
 	}, nil)
-	if !model.IsErrorCategory(err, model.ErrorInvalidState) {
-		t.Fatalf("Run error = %v, want invalid-state", err)
-	}
+	requireFailureCode(t, err, failure.CodeInteractionHandlerRequired)
 
 	if !hasStage(events.Events(), model.OperationStageInteractionRequired) {
 		t.Fatal("interaction-required was not emitted before missing handler error")
@@ -85,7 +80,7 @@ func TestPINInteractionWithoutHandlerReturnsInvalidState(t *testing.T) {
 	}
 }
 
-func TestCanceledContextDuringInteractionReturnsCanceledRuntimeError(t *testing.T) {
+func TestCanceledContextDuringInteractionReturnsCanceledFailure(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &pinOnlyLargeBlobWriteEventAuthenticator{
 		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
@@ -107,16 +102,14 @@ func TestCanceledContextDuringInteractionReturnsCanceledRuntimeError(t *testing.
 		Payload:         []byte("test"),
 		Confirmed:       true,
 	}, handler)
-	if !model.IsErrorCategory(err, model.ErrorCanceled) {
-		t.Fatalf("Run error = %v, want canceled", err)
-	}
+	requireFailureCode(t, err, failure.CodeOperationCanceled)
 
 	if got := a.pinCalls.Load(); got != 0 {
 		t.Fatalf("PIN token calls = %d, want 0", got)
 	}
 }
 
-func TestConfirmInteractionCanceledReturnsCanceledRuntimeError(t *testing.T) {
+func TestConfirmInteractionCanceledReturnsCanceledFailure(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &pinMutationCountingAuthenticator{}
 	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
@@ -135,9 +128,7 @@ func TestConfirmInteractionCanceledReturnsCanceledRuntimeError(t *testing.T) {
 	_, err := session.Run(context.Background(), model.SetPINOperation{
 		NewPIN: "1234",
 	}, handler)
-	if !model.IsErrorCategory(err, model.ErrorCanceled) {
-		t.Fatalf("Run error = %v, want canceled", err)
-	}
+	requireFailureCode(t, err, failure.CodeInteractionCanceled)
 
 	if got := a.setCalls.Load(); got != 0 {
 		t.Fatalf("SetPIN calls = %d, want 0", got)
@@ -145,7 +136,7 @@ func TestConfirmInteractionCanceledReturnsCanceledRuntimeError(t *testing.T) {
 
 }
 
-func TestResetConfirmInteractionCanceledReturnsCanceledRuntimeError(t *testing.T) {
+func TestResetConfirmInteractionCanceledReturnsCanceledFailure(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &resetCountingAuthenticator{}
 	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
@@ -165,9 +156,7 @@ func TestResetConfirmInteractionCanceledReturnsCanceledRuntimeError(t *testing.T
 	})
 
 	_, err := session.Run(context.Background(), model.ResetFactoryOperation{}, handler)
-	if !model.IsErrorCategory(err, model.ErrorCanceled) {
-		t.Fatalf("Run error = %v, want canceled", err)
-	}
+	requireFailureCode(t, err, failure.CodeInteractionCanceled)
 
 	if got := a.resetCount.Load(); got != 0 {
 		t.Fatalf("Reset count = %d, want 0", got)

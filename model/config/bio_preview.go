@@ -2,9 +2,9 @@ package config
 
 import (
 	"encoding/hex"
-	"fmt"
 	"strings"
 
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/safety"
 )
 
@@ -16,30 +16,13 @@ const (
 
 type BioEnrollProgress func(BioEnrollSample) error
 
-type BioEnrollError struct {
-	Result BioEnrollResult
-	Err    error
-}
-
-func (e BioEnrollError) Error() string {
-	if e.Err == nil {
-		return ErrBioEnrollmentFailed.Error()
-	}
-
-	return e.Err.Error()
-}
-
-func (e BioEnrollError) Unwrap() error {
-	return e.Err
-}
-
 func BuildBioEnrollPreview(
 	status StatusReport,
 	timeoutMilliseconds uint,
 	mode safety.PreviewMode,
 ) (BioEnrollPreview, error) {
 	if !status.Bio.Supported {
-		return BioEnrollPreview{}, fmt.Errorf("%w: device does not report bioEnroll support", ErrBioUnsupported)
+		return BioEnrollPreview{}, failure.New(failure.CodeBioUnsupported, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	warnings := []safety.Warning{{
@@ -82,10 +65,10 @@ func buildBioMutationPreview(
 	mode safety.PreviewMode,
 ) (BioMutationPreview, error) {
 	if !status.Bio.Supported {
-		return BioMutationPreview{}, fmt.Errorf("%w: device does not report bioEnroll support", ErrBioUnsupported)
+		return BioMutationPreview{}, failure.New(failure.CodeBioUnsupported, failure.WithPhase(failure.PhaseValidation))
 	}
 	if status.Bio.Configured != nil && !*status.Bio.Configured {
-		return BioMutationPreview{}, fmt.Errorf("%w: device reports no biometric enrollments", ErrBioNoEnrollments)
+		return BioMutationPreview{}, failure.New(failure.CodeBioNoEnrollments, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	if _, err := decodeTemplateID(templateIDHex); err != nil {
@@ -119,12 +102,12 @@ func buildBioMutationPreview(
 func decodeTemplateID(value string) ([]byte, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
-		return nil, fmt.Errorf("%w: template ID is required", ErrBioTemplateID)
+		return nil, failure.New(failure.CodeBioTemplateIDRequired, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	decoded, err := hex.DecodeString(trimmed)
 	if err != nil {
-		return nil, fmt.Errorf("%w: template ID must be valid hex", ErrBioTemplateID)
+		return nil, failure.Wrap(failure.CodeBioTemplateIDInvalid, err, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	return decoded, nil

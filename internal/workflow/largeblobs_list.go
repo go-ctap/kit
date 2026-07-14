@@ -6,10 +6,11 @@ import (
 
 	"github.com/go-ctap/ctap/crypto"
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/ctaperrors"
+	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
+	"github.com/go-ctap/kit/model/failure"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/report"
 )
@@ -40,7 +41,10 @@ func (r Runner) listLargeBlobs(ctx context.Context, req model.ListLargeBlobsOper
 		return applargeblobs.ListReport{}, err
 	}
 	if err := ctx.Err(); err != nil {
-		return applargeblobs.ListReport{}, err
+		return applargeblobs.ListReport{}, errornorm.Annotate(
+			err,
+			errornorm.WithPhase(failure.PhaseDiscovery),
+		)
 	}
 
 	if req.Refresh {
@@ -66,7 +70,7 @@ func (r Runner) listLargeBlobsFromInventory(
 	inventory appcredentials.InventoryReport,
 ) (applargeblobs.ListReport, error) {
 	if err := ctx.Err(); err != nil {
-		return applargeblobs.ListReport{}, err
+		return applargeblobs.ListReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseDiscovery))
 	}
 
 	authenticator := r.largeBlobManager()
@@ -84,10 +88,7 @@ func (r Runner) listLargeBlobsFromInventory(
 	if support.LargeBlobs {
 		blobs, err = r.readLargeBlobArray(ctx)
 		if err != nil {
-			return applargeblobs.ListReport{}, ctaperrors.Annotate(err, ctaperrors.WithLargeBlobsSubCommand(
-				model.OperationListLargeBlobs,
-				ctaperrors.LargeBlobsSubCommandGet,
-			))
+			return applargeblobs.ListReport{}, err
 		}
 
 		report.Array.Read = true

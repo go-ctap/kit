@@ -6,9 +6,11 @@ import (
 	"slices"
 
 	"github.com/go-ctap/ctap/crypto"
+	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
+	"github.com/go-ctap/kit/model/failure"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 )
 
@@ -31,7 +33,7 @@ func (r Runner) readLargeBlobFromInventory(
 	inventory appcredentials.InventoryReport,
 ) (applargeblobs.ReadReport, error) {
 	if err := ctx.Err(); err != nil {
-		return applargeblobs.ReadReport{}, err
+		return applargeblobs.ReadReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseValidation))
 	}
 
 	target, err := appcredentials.FindCredentialByHexID(inventory, req.CredentialIDHex)
