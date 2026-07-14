@@ -150,6 +150,28 @@ func TestTokenServicePINFlowSkipsUVInteractionAndCommand(t *testing.T) {
 	}
 }
 
+func TestTokenServiceRejectsShortPINBeforeAuthenticatorCommand(t *testing.T) {
+	var requests []model.InteractionRequest
+	authenticator := &recordingTokenDevice{info: uvTokenInfo()}
+	tokens := NewTokenService(
+		&testTokenCache{},
+		recordingInteractionHandler(&requests, model.InteractionResponse{PIN: []byte("123")}),
+		model.VerificationFlowPIN,
+	)
+
+	token, err := tokens.Acquire(context.Background(), authenticator, protocol.PermissionCredentialManagement, "")
+	if token != nil {
+		secret.Zero(token)
+		t.Fatalf("token = %q, want nil", token)
+	}
+	if !failure.IsCode(err, failure.CodePINPolicyViolation) {
+		t.Fatalf("Acquire error = %v, want %s", err, failure.CodePINPolicyViolation)
+	}
+	if len(authenticator.pinRPIDs) != 0 {
+		t.Fatalf("PIN token calls = %d, want 0", len(authenticator.pinRPIDs))
+	}
+}
+
 func TestTokenServiceCachedPINFlowPerformsNoInteraction(t *testing.T) {
 	var requests []model.InteractionRequest
 	cache := &testTokenCache{}

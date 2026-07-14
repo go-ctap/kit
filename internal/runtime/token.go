@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	ctapdevice "github.com/go-ctap/ctap/authenticator"
+	ctapclient "github.com/go-ctap/ctap/client"
 	"github.com/go-ctap/ctap/protocol"
 	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/kit/internal/authenticator"
@@ -83,9 +84,9 @@ func (s *TokenService) Acquire(
 		}
 
 		if !fallbackToPIN(err) {
-			return nil, errornorm.Annotate(err, errornorm.WithClientPINSubCommand(
+			return nil, errornorm.Annotate(err, errornorm.WithCommand(
 				failure.PhaseTokenAcquisition,
-				protocol.ClientPINSubCommandGetPinUvAuthTokenUsingUvWithPermissions,
+				protocol.AuthenticatorClientPIN,
 			))
 		}
 	}
@@ -99,11 +100,18 @@ func (s *TokenService) Acquire(
 	}
 	defer secret.Zero(response.PIN)
 
-	token, err = authenticator.GetPinUvAuthTokenUsingPIN(ctx, string(response.PIN), permission, key.RPID)
+	pin, err := ctapclient.NormalizeAndValidatePIN(string(response.PIN), protocol.DefaultMinPINCodePoints)
 	if err != nil {
-		return nil, errornorm.Annotate(err, errornorm.WithClientPINSubCommand(
+		return nil, failure.Wrap(failure.CodePINPolicyViolation, err,
+			failure.WithPhase(failure.PhaseInteraction),
+		)
+	}
+
+	token, err = authenticator.GetPinUvAuthTokenUsingPIN(ctx, pin, permission, key.RPID)
+	if err != nil {
+		return nil, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseTokenAcquisition,
-			protocol.ClientPINSubCommandGetPinUvAuthTokenUsingPinWithPermissions,
+			protocol.AuthenticatorClientPIN,
 		))
 	}
 
