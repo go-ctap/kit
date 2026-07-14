@@ -13,7 +13,8 @@
 ## Safety And Runtime
 - Rely on `go-ctaphid` for per-command CTAP serialization.
 - Use session workflow serialization only to prevent multi-step flows from interleaving on the same opened authenticator.
-- Device leases represent cross-session/process ownership of authenticator identity; different authenticators may run independently.
+- Do not add process-wide or cross-process device leases; CTAPHID channel isolation owns multi-client transport coordination.
+- Treat authenticator state as externally mutable between commands and handle resulting CTAP errors without assuming workflow-level atomicity.
 - Public close/cancel/continue paths must release owned resources and tolerate duplicate or racing consumer calls.
 - Never log, marshal, or expose `pinUvAuthToken`, PINs, reset phrases, or tokens.
 - When taking ownership of caller-provided secret bytes, copy them and wipe the caller-owned buffer at that boundary.

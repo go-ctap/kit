@@ -98,7 +98,6 @@ func newCodeRegistry() map[Code]codeSpec {
 		CodeBioInteractionTimeout,
 	)
 	register(CategoryBusy,
-		CodeDeviceBusy,
 		CodeAuthenticatorBusy,
 		CodeAuthenticatorProcessing,
 		CodeUserActionPending,

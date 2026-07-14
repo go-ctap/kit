@@ -10,7 +10,7 @@ import (
 )
 
 func TestCloseCancelsActiveSerializedWorkflow(t *testing.T) {
-	core := New(nil, report.DeviceReport{}, nil, nil, false)
+	core := New(report.DeviceReport{}, nil, nil, false)
 	entered := make(chan struct{})
 	done := make(chan error, 1)
 

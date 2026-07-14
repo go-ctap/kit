@@ -23,7 +23,6 @@ const (
 	CodeDeviceNotFound                        Code = "DEVICE_NOT_FOUND"
 	CodeDeviceSelectionRequired               Code = "DEVICE_SELECTION_REQUIRED"
 	CodeDeviceUnavailable                     Code = "DEVICE_UNAVAILABLE"
-	CodeDeviceBusy                            Code = "DEVICE_BUSY"
 	CodeTransportModeUnsupported              Code = "TRANSPORT_MODE_UNSUPPORTED"
 	CodeTransportPermissionDenied             Code = "TRANSPORT_PERMISSION_DENIED"
 	CodeTransportProxyUnavailable             Code = "TRANSPORT_PROXY_UNAVAILABLE"

@@ -1,2 +1,2 @@
-// Package device owns runtime device lease identity and cross-process locking.
+// Package device owns stable runtime device identity.
 package device

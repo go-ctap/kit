@@ -33,7 +33,7 @@ This repository does not own terminal UX, command parsing, output rendering, MDS
 - `model/report`: shared report DTOs used across model domains.
 - `model/safety`: shared safety/confirmation DTOs.
 - `transport`: HID and Windows proxy transport boundary.
-- `internal/device`: device discovery, selection identity, and leases.
+- `internal/device`: stable device identity derived from discovery descriptors.
 - `internal/runtime`: event, interaction, and token policies.
 - `internal/session`: opened-session core, lifecycle, serialization, and cache boundary.
 - `internal/workflow`: operation dispatch and domain workflow bodies over an explicit execution environment.
@@ -73,7 +73,7 @@ MDS presentation or policy decisions.
 ## Safety Model
 
 - Per-session workflow serialization prevents multi-step flows on the same opened authenticator from interleaving.
-- Device leases represent cross-session or cross-process ownership of authenticator identity; different authenticators may run independently.
+- CTAPHID channel isolation and per-command serialization allow independent clients to share an authenticator; external state changes remain possible between commands and must be handled as normal runtime errors.
 - `pinUvAuthToken` values and other runtime-owned secrets are never exposed through public results. Root `model` PIN operations omit PINs when marshaled; the Wails-oriented `service` request DTOs keep typed PIN fields in JSON, so adapters and clients must redact them and must not log or persist serialized requests.
 - Mutating operations preserve dry-run and confirmation semantics.
 - Destructive flows such as reset, credential deletion, and large-blob deletion require explicit confirmation.

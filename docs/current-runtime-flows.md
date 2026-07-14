@@ -13,9 +13,8 @@ The root `ctapkit` package is the public runtime facade. Consumers work with
 typed `model.Operation` values, a `*ctapkit.Session` handle, optional operation
 events, and optional interaction handling.
 
-- `ctapkit.OpenSession` resolves a transport/device selector, acquires a device
-  lease, opens the authenticator behind the selected device, and returns a
-  public session facade.
+- `ctapkit.OpenSession` validates a discovered device handle, opens an
+  independent authenticator channel, and returns a public session facade.
 - `(*ctapkit.Session).Run` validates root operation input, emits operation
   lifecycle events, runs exactly one typed operation through the serialized
   internal workflow path, normalizes every failure, and returns a typed
@@ -34,10 +33,9 @@ whole internal session object.
 
 - The public facade session in `session.go` owns the public API shape and event
   lifecycle around each operation.
-- `internal/session.Core` owns the device lease, opened authenticator, selected
-  device metadata, event dispatcher, session cache, closed state, active
-  workflow cancellation, close-once behavior, and per-session workflow
-  serialization.
+- `internal/session.Core` owns the opened authenticator, selected device
+  metadata, event dispatcher, session cache, closed state, active workflow
+  cancellation, close-once behavior, and per-session workflow serialization.
 - `internal/runtime.InteractionBroker` owns interaction event emission, handler
   dispatch, cancellation, and PIN copy/wipe behavior.
 - `internal/runtime.TokenService` owns UV/PIN token acquisition, token cache
@@ -47,9 +45,9 @@ whole internal session object.
 - The authenticator abstraction in `internal/authenticator` groups the CTAP
   capabilities used by workflows: lifecycle, info, token, credential
   management, large-blob management, configuration, and biometric enrollment.
-- Device leases in `device` represent ownership of an authenticator identity
-  across sessions and processes. The lease is acquired before opening the
-  authenticator and released during session close.
+- CTAPHID channel isolation and transport-level command serialization allow
+  sessions and external clients to share an authenticator. Workflows do not
+  assume that authenticator state remains unchanged between commands.
 - The session cache in `internal/session.Cache` stores session-lifetime
   credential inventory, large-blob list reports, config status, and a single
   token secret keyed by permission and RP ID.
@@ -66,22 +64,17 @@ whole internal session object.
 flowchart TD
   A["ctapkit.OpenSession(ctx, dev, options)"] --> B["Apply options and default NoopEventSink"]
   B --> C["Validate device handle"]
-  C --> D["Acquire device lease"]
-  D --> F["Open authenticator through private opener"]
+  C --> F["Open authenticator through private opener"]
   F --> G["Create internal/session.Core"]
   G --> H["Return public *ctapkit.Session facade"]
 
   C -->|invalid handle| X["Return DEVICE_HANDLE_INVALID"]
-  D -->|lease error| Z["Normalize lease failure"]
-  F -->|open error| Y["Release lease and return open error"]
+  F -->|open error| Y["Return normalized transport error"]
 ```
 
-Important ordering:
-
-- The lease is acquired before the authenticator is opened.
-- If authenticator opening fails, the lease is closed before returning.
-- The public session contains the internal session; consumers never receive the
-  internal session directly.
+The public session contains the internal session; consumers never receive the
+internal session directly. Each successful open owns and closes its own
+authenticator channel.
 
 ## Run Operation Flow
 
@@ -124,14 +117,13 @@ flowchart TD
   F --> G["Lock workflowMu"]
   G --> H["Invalidate session cache and token secret"]
   H --> I["Close authenticator"]
-  I --> J["Close device lease"]
-  J --> K["Return remembered close error"]
+  I --> K["Return remembered close error"]
 ```
 
 Close marks the session closed and cancels the active workflow before it waits
 for the workflow lock. This allows close to return even when an interaction
-handler is stuck. The actual authenticator and lease close path is protected by
-`sync.Once`, so duplicate or racing close calls share the same result.
+handler is stuck. The authenticator close path is protected by `sync.Once`, so
+duplicate or racing close calls share the same result.
 
 After close, `RunSerializedWorkflow` rejects new work with the stable
 `SESSION_CLOSED` failure code.
@@ -410,8 +402,8 @@ JSON rules and exact CTAP examples.
 ### Close And Race Behavior
 
 Close is expected to be safe under duplicate and racing consumer calls. It marks
-the session closed, cancels any active workflow, and performs authenticator and
-lease close exactly once. Tests cover repeated close, close during active run,
+the session closed, cancels any active workflow, and closes the authenticator
+exactly once. Tests cover repeated close, close during active run,
 close while an interaction handler is blocked, and run-after-close rejection.
 
 ## Coupling Boundary
@@ -422,5 +414,5 @@ resources, but workflow code no longer receives the whole internal session.
 only selected device metadata, authenticator capabilities, event emission,
 interaction dispatch, token service, and cache access.
 
-This keeps lifecycle, lease ownership, close/cancel state, and workflow
+This keeps lifecycle, authenticator ownership, close/cancel state, and workflow
 serialization out of operation-specific workflow code.

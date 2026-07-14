@@ -3,7 +3,6 @@ package ctapkit
 import (
 	"context"
 
-	rtdevice "github.com/go-ctap/kit/internal/device"
 	rtsession "github.com/go-ctap/kit/internal/session"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
@@ -85,20 +84,13 @@ func openSession(
 	}
 	selected := dev.report
 
-	lease, err := rtdevice.AcquireLease(ctx, selected)
-	if err != nil {
-		return nil, normalizeLeaseError(err)
-	}
-
 	authenticator, err := deps.openAuthenticator(ctx, selected.Transport, selected.Path)
 	if err != nil {
-		_ = lease.Close()
-
 		return nil, err
 	}
 
 	return &Session{
-		core: rtsession.New(lease, selected, authenticator, config.events, config.strictPermissions),
+		core: rtsession.New(selected, authenticator, config.events, config.strictPermissions),
 	}, nil
 }
 

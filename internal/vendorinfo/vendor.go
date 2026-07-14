@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-ctap/ctap/yubico"
 	"github.com/go-ctap/kit/internal/authenticator"
-	rtdevice "github.com/go-ctap/kit/internal/device"
 	"github.com/go-ctap/kit/model/report"
 )
 
@@ -73,16 +72,11 @@ func EnrichOpen(
 	return Enrich(ctx, device, authenticator)
 }
 
-// Probe acquires temporary ownership of a discovered device and obtains its
-// vendor metadata without running a full CTAP inspection workflow.
+// Probe obtains vendor metadata from a discovered device without running a
+// full CTAP inspection workflow.
 func Probe(ctx context.Context, device report.DeviceReport) (*report.DeviceMetadata, error) {
 	if !CanProbe(device) {
 		return nil, nil
-	}
-
-	lease, err := rtdevice.AcquireLease(ctx, device)
-	if err != nil {
-		return nil, err
 	}
 
 	var metadata *report.DeviceMetadata
@@ -99,7 +93,7 @@ func Probe(ctx context.Context, device report.DeviceReport) (*report.DeviceMetad
 		metadata, probeErr = probeToken2(ctx, device, true)
 	}
 
-	return metadata, errors.Join(probeErr, lease.Close())
+	return metadata, probeErr
 }
 
 func normalizeYubico(device report.DeviceReport, info yubico.DeviceInfo) *report.DeviceMetadata {

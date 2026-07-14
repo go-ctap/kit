@@ -2,11 +2,9 @@ package session
 
 import (
 	"context"
-	"errors"
 	"sync"
 
 	"github.com/go-ctap/kit/internal/authenticator"
-	"github.com/go-ctap/kit/internal/device"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
@@ -14,7 +12,6 @@ import (
 )
 
 type Core struct {
-	lease             *device.Lease
 	selected          report.DeviceReport
 	device            authenticator.Device
 	events            *rtruntime.EventDispatcher
@@ -31,7 +28,6 @@ type Core struct {
 }
 
 func New(
-	lease *device.Lease,
 	selected report.DeviceReport,
 	device authenticator.Device,
 	events model.EventSink,
@@ -42,7 +38,6 @@ func New(
 	}
 
 	return &Core{
-		lease:             lease,
 		selected:          selected,
 		device:            device,
 		events:            rtruntime.NewEventDispatcher(events),
@@ -110,17 +105,9 @@ func (c *Core) Close() error {
 
 		c.invalidateSessionState()
 
-		var authenticatorErr error
 		if c.device != nil {
-			authenticatorErr = c.Authenticator().Close()
+			c.closeErr = c.Authenticator().Close()
 		}
-
-		var leaseErr error
-		if c.lease != nil {
-			leaseErr = c.lease.Close()
-		}
-
-		c.closeErr = errors.Join(authenticatorErr, leaseErr)
 	})
 
 	return c.closeErr

@@ -9,6 +9,41 @@ import (
 	"github.com/go-ctap/kit/transport"
 )
 
+func TestOpenSessionAllowsIndependentChannelsForSameDevice(t *testing.T) {
+	opens := 0
+	open := func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		opens++
+
+		return &contractAuthenticator{}, nil
+	}
+	device := newContractDevice()
+	deps := newContractSessionDependencies(open)
+
+	first, err := openSession(t.Context(), device, deps)
+	if err != nil {
+		t.Fatalf("open first session: %v", err)
+	}
+	defer func() {
+		if err := first.Close(); err != nil {
+			t.Errorf("close first session: %v", err)
+		}
+	}()
+
+	second, err := openSession(t.Context(), device, deps)
+	if err != nil {
+		t.Fatalf("open second session: %v", err)
+	}
+	defer func() {
+		if err := second.Close(); err != nil {
+			t.Errorf("close second session: %v", err)
+		}
+	}()
+
+	if opens != 2 {
+		t.Fatalf("authenticator opens = %d, want 2", opens)
+	}
+}
+
 func newContractSessionDependencies(open authenticatorOpenFunc) sessionDependencies {
 	if open == nil {
 		open = func(context.Context, transport.Mode, string) (authenticator.Device, error) {

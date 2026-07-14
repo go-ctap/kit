@@ -76,7 +76,7 @@ func TestInvalidateCachesAfterUsesDomainPolicy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			session := rtsession.New(nil, report.DeviceReport{}, nil, nil, false)
+			session := rtsession.New(report.DeviceReport{}, nil, nil, false)
 			cache := session.Cache()
 			cache.SetCredential(appcredentials.InventoryReport{})
 			cache.SetLargeBlobList(applargeblobs.ListReport{})
@@ -135,7 +135,7 @@ func TestLargeBlobResultEffectsOnlyInvalidateAfterRealMutation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			session := rtsession.New(nil, report.DeviceReport{}, nil, nil, false)
+			session := rtsession.New(report.DeviceReport{}, nil, nil, false)
 			cache := session.Cache()
 			cache.SetLargeBlobList(applargeblobs.ListReport{})
 
@@ -217,7 +217,7 @@ func TestInvalidateCachesAfterUsesTokenPolicy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			session := rtsession.New(nil, report.DeviceReport{}, nil, nil, false)
+			session := rtsession.New(report.DeviceReport{}, nil, nil, false)
 			cache := session.Cache()
 			cache.SetToken(tt.key, secret.New([]byte("token")))
 
@@ -256,7 +256,7 @@ func TestUserPresenceTokenEffectsClearsPermissionsExceptLargeBlobWrite(t *testin
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			session := rtsession.New(nil, report.DeviceReport{}, nil, nil, false)
+			session := rtsession.New(report.DeviceReport{}, nil, nil, false)
 			cache := session.Cache()
 			cache.SetToken(tt.key, secret.New([]byte("token")))
 

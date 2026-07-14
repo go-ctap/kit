@@ -2,10 +2,13 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-ctap/kit/internal/vendorinfo"
 	"github.com/go-ctap/kit/model/report"
 )
+
+const enrichmentProbeTimeout = 2 * time.Second
 
 type discoveryEnrichment struct {
 	running bool
@@ -50,7 +53,9 @@ func (s *Service) runEnrichment(ctx context.Context) {
 			return
 		}
 
-		metadata, err := vendorinfo.Probe(ctx, device)
+		probeCtx, cancel := context.WithTimeout(ctx, enrichmentProbeTimeout)
+		metadata, err := vendorinfo.Probe(probeCtx, device)
+		cancel()
 		if err == nil && metadata != nil {
 			s.applyEnrichment(device, *metadata)
 		}
