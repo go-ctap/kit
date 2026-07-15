@@ -25,7 +25,6 @@ type token2Candidate struct {
 }
 
 type token2PCSCDevice interface {
-	token2.ATRDevice
 	token2.SerialNumberDevice
 	Config(context.Context) (token2.Config, error)
 }

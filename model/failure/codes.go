@@ -48,6 +48,10 @@ const (
 	CodeAssertionDenied                       Code = "ASSERTION_DENIED"
 	CodeAssertionNotAllowed                   Code = "ASSERTION_NOT_ALLOWED"
 	CodeAssertionContinuationUnavailable      Code = "ASSERTION_CONTINUATION_UNAVAILABLE"
+	CodeWebAuthnExtensionInputInvalid         Code = "WEBAUTHN_EXTENSION_INPUT_INVALID"
+	CodeWebAuthnExtensionConflict             Code = "WEBAUTHN_EXTENSION_CONFLICT"
+	CodeWebAuthnSecretSaltLengthInvalid       Code = "WEBAUTHN_SECRET_SALT_LENGTH_INVALID"
+	CodeWebAuthnPRFEvaluationInvalid          Code = "WEBAUTHN_PRF_EVALUATION_INVALID"
 
 	CodePINUnsupported              Code = "PIN_UNSUPPORTED"
 	CodePINAlreadyConfigured        Code = "PIN_ALREADY_CONFIGURED"

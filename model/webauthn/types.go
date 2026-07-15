@@ -1,10 +1,13 @@
 package webauthn
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/go-ctap/ctap/attestation"
 	"github.com/go-ctap/ctap/credential"
+	"github.com/go-ctap/ctap/protocol"
+	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/model/safety"
@@ -20,29 +23,33 @@ type AuthenticatorOptions struct {
 }
 
 type MakeCredentialInput struct {
-	RP               credential.PublicKeyCredentialRpEntity     `json:"rp"`
-	User             credential.PublicKeyCredentialUserEntity   `json:"user"`
-	ClientDataJSON   []byte                                     `json:"clientDataJSON"`
-	PubKeyCredParams []credential.PublicKeyCredentialParameters `json:"pubKeyCredParams"`
-	ExcludeList      []credential.PublicKeyCredentialDescriptor `json:"excludeList,omitempty"`
-	Options          AuthenticatorOptions                       `json:"options,omitempty"`
+	RP               credential.PublicKeyCredentialRpEntity                   `json:"rp"`
+	User             credential.PublicKeyCredentialUserEntity                 `json:"user"`
+	ClientDataJSON   []byte                                                   `json:"clientDataJSON"`
+	PubKeyCredParams []credential.PublicKeyCredentialParameters               `json:"pubKeyCredParams"`
+	ExcludeList      []credential.PublicKeyCredentialDescriptor               `json:"excludeList,omitempty"`
+	Options          AuthenticatorOptions                                     `json:"options,omitempty"`
+	Extensions       *ctapwebauthn.CreateAuthenticationExtensionsClientInputs `json:"extensions,omitempty"`
 }
 
 type GetAssertionInput struct {
-	RPID           string                                     `json:"rpID"`
-	ClientDataJSON []byte                                     `json:"clientDataJSON"`
-	AllowList      []credential.PublicKeyCredentialDescriptor `json:"allowList,omitempty"`
-	Options        AuthenticatorOptions                       `json:"options,omitempty"`
+	RPID           string                                                `json:"rpID"`
+	ClientDataJSON []byte                                                `json:"clientDataJSON"`
+	AllowList      []credential.PublicKeyCredentialDescriptor            `json:"allowList,omitempty"`
+	Options        AuthenticatorOptions                                  `json:"options,omitempty"`
+	Extensions     *ctapwebauthn.GetAuthenticationExtensionsClientInputs `json:"extensions,omitempty"`
 }
 
 type MakeCredentialPreview struct {
-	Device           report.DeviceReport                        `json:"device"`
-	RP               credential.PublicKeyCredentialRpEntity     `json:"rp"`
-	User             credential.PublicKeyCredentialUserEntity   `json:"user"`
-	PubKeyCredParams []credential.PublicKeyCredentialParameters `json:"pubKeyCredParams"`
-	ExcludeList      []credential.PublicKeyCredentialDescriptor `json:"excludeList,omitempty"`
-	Options          AuthenticatorOptions                       `json:"options,omitempty"`
-	Warnings         []safety.Warning                           `json:"warnings,omitempty"`
+	Device   report.DeviceReport `json:"device"`
+	Input    MakeCredentialInput `json:"input"`
+	Warnings []safety.Warning    `json:"warnings,omitempty"`
+}
+
+type GetAssertionPreview struct {
+	Device   report.DeviceReport `json:"device"`
+	Input    GetAssertionInput   `json:"input"`
+	Warnings []safety.Warning    `json:"warnings,omitempty"`
 }
 
 type MakeCredentialResult struct {
@@ -58,6 +65,7 @@ type MakeCredentialResult struct {
 	UserPresent              bool                                             `json:"userPresent"`
 	UserVerified             bool                                             `json:"userVerified"`
 	EnterpriseAttestation    bool                                             `json:"enterpriseAttestation,omitempty"`
+	ExtensionResults         *MakeCredentialExtensionResults                  `json:"extensionResults,omitempty"`
 }
 
 type GetAssertionResult struct {
@@ -77,28 +85,49 @@ type Assertion struct {
 	SignCount            uint32                                    `json:"signCount"`
 	UserPresent          bool                                      `json:"userPresent"`
 	UserVerified         bool                                      `json:"userVerified"`
+	ExtensionResults     *GetAssertionExtensionResults             `json:"extensionResults,omitempty"`
 }
 
-func BuildMakeCredentialPreview(device report.DeviceReport, input MakeCredentialInput) (MakeCredentialPreview, error) {
+func BuildMakeCredentialPreview(
+	device report.DeviceReport,
+	info protocol.AuthenticatorGetInfoResponse,
+	input MakeCredentialInput,
+) (MakeCredentialPreview, error) {
 	normalized, err := NormalizeMakeCredentialInput(input)
 	if err != nil {
 		return MakeCredentialPreview{}, err
 	}
+	if err := validateMakeCredentialCapabilities(info, normalized.Extensions); err != nil {
+		return MakeCredentialPreview{}, err
+	}
 
 	return MakeCredentialPreview{
-		Device:           device,
-		RP:               normalized.RP,
-		User:             normalized.User,
-		PubKeyCredParams: normalized.PubKeyCredParams,
-		ExcludeList:      normalized.ExcludeList,
-		Options:          normalized.Options,
-		Warnings: []safety.Warning{
+		Device: device,
+		Input:  normalized,
+		Warnings: slices.Concat([]safety.Warning{
 			{
 				Severity: safety.SeverityWarning,
 				Code:     "webauthn.make_credential.mutation",
 				Message:  "A new credential may be created on this authenticator.",
 			},
-		},
+		}, makeCredentialExtensionWarnings(info, normalized.Extensions)),
+	}, nil
+}
+
+func BuildGetAssertionPreview(
+	device report.DeviceReport,
+	info protocol.AuthenticatorGetInfoResponse,
+	input GetAssertionInput,
+) (GetAssertionPreview, error) {
+	normalized, err := NormalizeGetAssertionInput(input)
+	if err != nil {
+		return GetAssertionPreview{}, err
+	}
+
+	return GetAssertionPreview{
+		Device:   device,
+		Input:    normalized,
+		Warnings: getAssertionExtensionWarnings(info, normalized.Extensions),
 	}, nil
 }
 
@@ -143,6 +172,10 @@ func NormalizeMakeCredentialInput(input MakeCredentialInput) (MakeCredentialInpu
 		return MakeCredentialInput{}, err
 	}
 	input.ExcludeList = excludeList
+	input.Extensions, err = normalizeMakeCredentialExtensions(input.Extensions)
+	if err != nil {
+		return MakeCredentialInput{}, err
+	}
 
 	return input, nil
 }
@@ -163,6 +196,10 @@ func NormalizeGetAssertionInput(input GetAssertionInput) (GetAssertionInput, err
 		return GetAssertionInput{}, err
 	}
 	input.AllowList = allowList
+	input.Extensions, err = normalizeGetAssertionExtensions(input.Extensions, allowList)
+	if err != nil {
+		return GetAssertionInput{}, err
+	}
 
 	return input, nil
 }

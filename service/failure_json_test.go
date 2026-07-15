@@ -1,11 +1,9 @@
 package service
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/config"
@@ -48,7 +46,7 @@ func TestGetAssertionFailureEnvelopeExactJSON(t *testing.T) {
 func TestDirectServiceErrorIsTypedAndMachineReadable(t *testing.T) {
 	service := New()
 
-	_, err := service.Session(t.Context(), "missing-session")
+	_, err := service.Session("missing-session")
 	if err == nil {
 		t.Fatal("Session error = nil, want failure")
 	}
@@ -59,37 +57,6 @@ func TestDirectServiceErrorIsTypedAndMachineReadable(t *testing.T) {
 	}
 	if !failure.IsCode(err, failure.CodeSessionInvalid) {
 		t.Fatalf("Session error = %v, want %s", err, failure.CodeSessionInvalid)
-	}
-}
-
-func TestDirectServiceContextErrorsHaveDistinctCodes(t *testing.T) {
-	canceled, cancel := context.WithCancel(t.Context())
-	cancel()
-
-	deadline, deadlineCancel := context.WithDeadline(t.Context(), time.Unix(0, 0))
-	defer deadlineCancel()
-
-	tests := []struct {
-		name string
-		ctx  context.Context
-		code failure.Code
-	}{
-		{name: "canceled", ctx: canceled, code: failure.CodeOperationCanceled},
-		{name: "deadline", ctx: deadline, code: failure.CodeOperationTimeout},
-	}
-
-	service := New()
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := service.Sessions(tt.ctx)
-			if !failure.IsCode(err, tt.code) {
-				t.Fatalf("Sessions error = %v, want %s", err, tt.code)
-			}
-			snapshot := failure.Snapshot(err)
-			if snapshot.Phase != failure.PhaseSession {
-				t.Fatalf("Sessions phase = %q, want %q", snapshot.Phase, failure.PhaseSession)
-			}
-		})
 	}
 }
 

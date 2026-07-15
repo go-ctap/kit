@@ -5,6 +5,8 @@ import (
 	"time"
 
 	ctapkit "github.com/go-ctap/kit"
+	kitlog "github.com/go-ctap/kit/internal/logging"
+	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
@@ -23,7 +25,19 @@ func (s *Service) discoverSnapshot(ctx context.Context, req DiscoverRequest) (Di
 }
 
 func (s *Service) RefreshDiscovery(ctx context.Context, req DiscoverRequest) error {
-	return s.reconcileTopology(ctx, s.effectiveDiscoverRequest(req), DiscoveryTriggerManual, true)
+	effective := s.effectiveDiscoverRequest(req)
+	started := time.Now()
+	err := s.reconcileTopology(ctx, effective, DiscoveryTriggerManual, true)
+	s.logs.Append(kitlog.Finish(model.LogEntry{
+		Timestamp: started.UTC(),
+		Layer:     model.LogLayerService,
+		Code:      model.LogCodeDiscoveryRun,
+		Params:    map[string]string{"trigger": string(DiscoveryTriggerManual)},
+		Request:   kitlog.Payload(kitlog.SafeValue(effective)),
+		Response:  kitlog.Payload(kitlog.SafeValue(struct{}{})),
+	}, started, err))
+
+	return err
 }
 
 func (s *Service) reconcileTopology(
@@ -45,6 +59,21 @@ func (s *Service) reconcileTopology(
 
 	if force || result.changed || envelope.Error != nil {
 		s.emit(EventDiscoveryChanged, envelope)
+		entry := model.LogEntry{
+			Timestamp: time.Now().UTC(),
+			Layer:     model.LogLayerService,
+			Level:     model.LogLevelInfo,
+			Outcome:   model.LogOutcomeEvent,
+			Code:      model.LogCodeDiscoveryChanged,
+			Params:    map[string]string{"trigger": string(trigger)},
+			Response:  kitlog.Payload(kitlog.SafeValue(envelope)),
+			Error:     envelope.Error,
+		}
+		if envelope.Error != nil {
+			entry.Level = model.LogLevelError
+			entry.Outcome = model.LogOutcomeFailed
+		}
+		s.logs.Append(entry)
 	}
 	if result.snapshot != nil {
 		s.startEnrichment()
@@ -64,10 +93,6 @@ func (s *Service) updateDiscovery(
 	req DiscoverRequest,
 ) (discoveryResult, error) {
 	result := discoveryResult{}
-	if err := ctx.Err(); err != nil {
-		return result, normalizeServicePhaseError(err, failure.PhaseDiscovery)
-	}
-
 	if s.isClosed() {
 		return result, closedServiceError(failure.PhaseDiscovery)
 	}
@@ -78,8 +103,8 @@ func (s *Service) updateDiscovery(
 	previousReports := s.deviceReportsWithMetadata(previousDevices)
 
 	devices, scanErr := s.scanDevices(ctx, discoverOptions(req)...)
-	if scanErr != nil && ctx.Err() != nil {
-		return result, normalizeServicePhaseError(ctx.Err(), failure.PhaseDiscovery)
+	if ctxErr := ctx.Err(); scanErr != nil && ctxErr != nil {
+		return result, normalizeServicePhaseError(ctxErr, failure.PhaseDiscovery)
 	}
 
 	var nextReports []report.DeviceReport

@@ -15,8 +15,9 @@ func (MakeCredentialOperation) ctapkitOperation()   {}
 
 type GetAssertionOperation struct {
 	webauthn.GetAssertionInput
+	DryRun bool `json:"dryRun,omitempty"`
 }
 
 func (GetAssertionOperation) Kind() OperationKind { return OperationGetAssertion }
-func (GetAssertionOperation) IsDryRun() bool      { return false }
+func (op GetAssertionOperation) IsDryRun() bool   { return op.DryRun }
 func (GetAssertionOperation) ctapkitOperation()   {}

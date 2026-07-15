@@ -3,6 +3,7 @@ package ctapkit
 import (
 	"context"
 
+	"github.com/go-ctap/kit/internal/logging"
 	rtsession "github.com/go-ctap/kit/internal/session"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
@@ -12,6 +13,7 @@ type OpenSessionOption func(*openSessionConfig)
 
 type openSessionConfig struct {
 	events            model.EventSink
+	journal           *LogJournal
 	strictPermissions bool
 }
 
@@ -24,6 +26,12 @@ type runConfig struct {
 func WithEventSink(events model.EventSink) OpenSessionOption {
 	return func(config *openSessionConfig) {
 		config.events = events
+	}
+}
+
+func WithLogJournal(journal *LogJournal) OpenSessionOption {
+	return func(config *openSessionConfig) {
+		config.journal = journal
 	}
 }
 
@@ -45,24 +53,14 @@ type Session struct {
 	core *rtsession.Core
 }
 
-type sessionDependencies struct {
-	openAuthenticator authenticatorOpenFunc
-}
-
 func OpenSession(ctx context.Context, dev Device, opts ...OpenSessionOption) (*Session, error) {
-	return openSession(ctx, dev, defaultSessionDependencies(), opts...)
-}
-
-func defaultSessionDependencies() sessionDependencies {
-	return sessionDependencies{
-		openAuthenticator: openAuthenticator,
-	}
+	return openSession(ctx, dev, openAuthenticator, opts...)
 }
 
 func openSession(
 	ctx context.Context,
 	dev Device,
-	deps sessionDependencies,
+	open authenticatorOpenFunc,
 	opts ...OpenSessionOption,
 ) (*Session, error) {
 	config := &openSessionConfig{
@@ -76,7 +74,6 @@ func openSession(
 	if config.events == nil {
 		config.events = model.NoopEventSink{}
 	}
-
 	if !dev.valid {
 		return nil, failure.New(failure.CodeDeviceHandleInvalid,
 			failure.WithPhase(failure.PhaseSession),
@@ -84,13 +81,17 @@ func openSession(
 	}
 	selected := dev.report
 
-	authenticator, err := deps.openAuthenticator(ctx, selected.Transport, selected.Path)
+	var recorder logging.Recorder
+	if config.journal != nil {
+		recorder = config.journal.journal
+	}
+	device, err := open(logging.WithRecorder(ctx, recorder), selected.Transport, selected.Path)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Session{
-		core: rtsession.New(selected, authenticator, config.events, config.strictPermissions),
+		core: rtsession.New(selected, device, config.events, config.strictPermissions),
 	}, nil
 }
 

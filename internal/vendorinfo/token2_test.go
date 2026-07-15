@@ -15,7 +15,6 @@ func TestToken2PCSCCandidatePropagatesContext(t *testing.T) {
 	marker := new(int)
 	ctx := context.WithValue(context.Background(), contextKey{}, marker)
 	device := &recordingToken2PCSCDevice{
-		atr:    token2.ATRInfo{ProductID: 0x0102},
 		serial: "72103654095303",
 	}
 
@@ -24,7 +23,6 @@ func TestToken2PCSCCandidatePropagatesContext(t *testing.T) {
 		t.Fatalf("candidate = %#v, ok = %v", candidate, ok)
 	}
 	for name, recorded := range map[string]context.Context{
-		"ATRInfo":      device.atrCtx,
 		"SerialNumber": device.serialCtx,
 		"Config":       device.configCtx,
 	} {
@@ -35,20 +33,12 @@ func TestToken2PCSCCandidatePropagatesContext(t *testing.T) {
 }
 
 type recordingToken2PCSCDevice struct {
-	atr       token2.ATRInfo
 	serial    string
-	atrCtx    context.Context
 	serialCtx context.Context
 	configCtx context.Context
 }
 
 func (d *recordingToken2PCSCDevice) Close() error { return nil }
-
-func (d *recordingToken2PCSCDevice) ATRInfo(ctx context.Context) (token2.ATRInfo, error) {
-	d.atrCtx = ctx
-
-	return d.atr, nil
-}
 
 func (d *recordingToken2PCSCDevice) SerialNumber(ctx context.Context) (string, error) {
 	d.serialCtx = ctx

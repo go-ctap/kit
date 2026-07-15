@@ -105,7 +105,7 @@ func evaluateGetInfo(info protocol.AuthenticatorGetInfoResponse, target Target) 
 		baseReferences := rule.references(&context)
 		for _, result := range rule.evaluate(&context) {
 			references := lo.UniqBy(
-				append(slices.Clone(baseReferences), result.references...),
+				slices.Concat(baseReferences, result.references),
 				func(reference RequirementRef) RequirementID { return reference.ID },
 			)
 			validateAssessmentReferences(target, references)

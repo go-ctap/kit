@@ -22,7 +22,16 @@ const (
 	EventDiscoveryChanged     = "ctapkit:discovery-changed"
 	EventOperationEvent       = "ctapkit:operation-event"
 	EventInteractionRequested = "ctapkit:interaction-requested"
+	EventLogsChanged          = "ctapkit:logs-changed"
 )
+
+type ReadLogsRequest struct {
+	After uint64 `json:"after,omitempty"`
+}
+
+type LogCursor struct {
+	Sequence uint64 `json:"sequence"`
+}
 
 type DiscoveryTrigger string
 

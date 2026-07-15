@@ -10,7 +10,8 @@ type MakeCredentialOutput struct {
 func (MakeCredentialOutput) ctapkitResult() {}
 
 type GetAssertionOutput struct {
-	Result webauthn.GetAssertionResult `json:"result"`
+	Preview webauthn.GetAssertionPreview `json:"preview"`
+	Result  *webauthn.GetAssertionResult `json:"result"`
 }
 
 func (GetAssertionOutput) ctapkitResult() {}

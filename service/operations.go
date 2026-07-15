@@ -151,6 +151,7 @@ type MakeCredentialRequest struct {
 type GetAssertionRequest struct {
 	OperationRequest
 	webauthn.GetAssertionInput
+	DryRun bool `json:"dryRun,omitempty"`
 }
 
 func (s *Service) Inspect(ctx context.Context, req OperationRequest) (InspectEnvelope, error) {
@@ -355,6 +356,7 @@ func (s *Service) MakeCredential(ctx context.Context, req MakeCredentialRequest)
 func (s *Service) GetAssertion(ctx context.Context, req GetAssertionRequest) (GetAssertionEnvelope, error) {
 	meta, result, err := runTypedOperation[model.GetAssertionOutput](s, ctx, req.OperationRequest, model.GetAssertionOperation{
 		GetAssertionInput: req.GetAssertionInput,
+		DryRun:            req.DryRun,
 	})
 	return GetAssertionEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }

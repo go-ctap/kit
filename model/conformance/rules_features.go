@@ -1,10 +1,7 @@
 package conformance
 
-func featureRules() []getInfoRule {
-	rules := make([]getInfoRule, 0, 32)
-	rules = append(rules, blobRules()...)
-	rules = append(rules, pinRules()...)
-	rules = append(rules, optionDependencyRules()...)
+import "slices"
 
-	return rules
+func featureRules() []getInfoRule {
+	return slices.Concat(blobRules(), pinRules(), optionDependencyRules())
 }

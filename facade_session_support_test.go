@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/go-ctap/kit/internal/authenticator"
+	kitlog "github.com/go-ctap/kit/internal/logging"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/transport"
 )
@@ -17,9 +18,8 @@ func TestOpenSessionAllowsIndependentChannelsForSameDevice(t *testing.T) {
 		return &contractAuthenticator{}, nil
 	}
 	device := newContractDevice()
-	deps := newContractSessionDependencies(open)
 
-	first, err := openSession(t.Context(), device, deps)
+	first, err := openSession(t.Context(), device, open)
 	if err != nil {
 		t.Fatalf("open first session: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestOpenSessionAllowsIndependentChannelsForSameDevice(t *testing.T) {
 		}
 	}()
 
-	second, err := openSession(t.Context(), device, deps)
+	second, err := openSession(t.Context(), device, open)
 	if err != nil {
 		t.Fatalf("open second session: %v", err)
 	}
@@ -44,15 +44,20 @@ func TestOpenSessionAllowsIndependentChannelsForSameDevice(t *testing.T) {
 	}
 }
 
-func newContractSessionDependencies(open authenticatorOpenFunc) sessionDependencies {
-	if open == nil {
-		open = func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-			return &contractAuthenticator{}, nil
-		}
-	}
+func TestOpenSessionMakesJournalAvailableWhileOpeningAuthenticator(t *testing.T) {
+	journal := NewLogJournal()
+	open := func(ctx context.Context, _ transport.Mode, _ string) (authenticator.Device, error) {
+		kitlog.RecorderFrom(ctx).Append(model.LogEntry{Code: "open-command"})
 
-	return sessionDependencies{
-		openAuthenticator: open,
+		return &contractAuthenticator{}, nil
+	}
+	session := openContractSessionWithOptions(t, nil, open, WithLogJournal(journal))
+	if err := session.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	batch := journal.Read(0)
+	if len(batch.Entries) != 1 || batch.Entries[0].Entry.Code != "open-command" {
+		t.Fatalf("open log entries = %#v", batch.Entries)
 	}
 }
 
@@ -67,6 +72,11 @@ func openContractSessionWithOptions(
 	opts ...OpenSessionOption,
 ) *Session {
 	t.Helper()
+	if open == nil {
+		open = func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+			return &contractAuthenticator{}, nil
+		}
+	}
 
 	sessionOpts := []OpenSessionOption(nil)
 	if events != nil {
@@ -77,7 +87,7 @@ func openContractSessionWithOptions(
 	session, err := openSession(
 		context.Background(),
 		newContractDevice(),
-		newContractSessionDependencies(open),
+		open,
 		sessionOpts...,
 	)
 	if err != nil {

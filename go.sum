@@ -8,6 +8,8 @@ github.com/fxamacker/cbor/v2 v2.9.2 h1:X4Ksno9+x3cz0TZv69ec1hxP/+tymuR8PXQJyDwfh
 github.com/fxamacker/cbor/v2 v2.9.2/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
 github.com/go-ctap/ctap v0.22.0 h1:1ZTdna8CTWAohCLK+MSx//pPPugW2U+TuwC8LaMw6nk=
 github.com/go-ctap/ctap v0.22.0/go.mod h1:gZbZ/0x1IjqIRWqpgZp8DYG7pDmMvsGorkX00ZHZdKc=
+github.com/go-ctap/ctap v0.23.0 h1:fZYvUt/k+7Ypdzd2WkfzVc08k29exhrpI9DWy5j9oQ4=
+github.com/go-ctap/ctap v0.23.0/go.mod h1:gZbZ/0x1IjqIRWqpgZp8DYG7pDmMvsGorkX00ZHZdKc=
 github.com/go-ctap/hid v0.9.1 h1:gSw9vtVqsOxBdkeHnYj7bGC6hALLSQOPS1tJwVDfQGc=
 github.com/go-ctap/hid v0.9.1/go.mod h1:JDxD3E+4ixQRyLWk6aG0sa+lr0CFs3tiSB9LGFHS50E=
 github.com/go-ctap/pcsc v0.3.0 h1:A+9aAHTT9NJMgHlCSe6BlyCl3120MQGu/ev3rNF6TDM=

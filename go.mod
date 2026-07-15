@@ -4,7 +4,7 @@ go 1.26.3
 
 require (
 	github.com/fxamacker/cbor/v2 v2.9.2
-	github.com/go-ctap/ctap v0.22.0
+	github.com/go-ctap/ctap v0.23.0
 	github.com/go-ctap/hid v0.9.1
 	github.com/go-ctap/pcsc v0.3.0
 	github.com/go-ctap/token2 v0.4.2

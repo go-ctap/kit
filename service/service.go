@@ -2,11 +2,13 @@ package service
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 
 	ghid "github.com/go-ctap/hid"
 	ctapkit "github.com/go-ctap/kit"
+	kitlog "github.com/go-ctap/kit/internal/logging"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
@@ -36,6 +38,7 @@ type Service struct {
 	sessions     map[SessionID]*managedSession
 	operations   map[OperationID]*operationState
 	interactions map[InteractionID]*pendingInteraction
+	logs         *ctapkit.LogJournal
 }
 
 type managedSession struct {
@@ -55,6 +58,7 @@ type sessionRuntime interface {
 type operationState struct {
 	id        OperationID
 	sessionID SessionID
+	kind      model.OperationKind
 	cancel    context.CancelFunc
 	done      chan struct{}
 }
@@ -73,13 +77,13 @@ func New(opts ...Option) *Service {
 		scanDevices:      ctapkit.DiscoverDevices,
 		openMonitor:      ghid.Events,
 		enrichment:       newDiscoveryEnrichment(),
+		logs:             ctapkit.NewLogJournal(),
 	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(service)
 		}
 	}
-
 	return service
 }
 
@@ -155,31 +159,50 @@ func (s *Service) Close() error {
 }
 
 func (s *Service) Discover(ctx context.Context, req DiscoverRequest) (DiscoverySnapshot, error) {
-	return s.discoverSnapshot(ctx, req)
+	started := time.Now()
+	snapshot, err := s.discoverSnapshot(ctx, req)
+	s.logs.Append(kitlog.Finish(model.LogEntry{
+		Timestamp: started.UTC(),
+		Layer:     model.LogLayerService,
+		Code:      model.LogCodeDiscoveryRun,
+		Request:   kitlog.Payload(kitlog.SafeValue(req)),
+		Response:  kitlog.Payload(kitlog.SafeValue(snapshot)),
+	}, started, err))
+
+	return snapshot, err
 }
 
-func (s *Service) OpenSession(ctx context.Context, req OpenSessionRequest) (SessionSnapshot, error) {
-	if err := ctx.Err(); err != nil {
-		return SessionSnapshot{}, normalizeServicePhaseError(err, failure.PhaseSession)
-	}
+func (s *Service) OpenSession(ctx context.Context, req OpenSessionRequest) (snapshot SessionSnapshot, returnErr error) {
+	sessionID := newSessionID()
+	started := time.Now()
+	defer func() {
+		s.logs.Append(kitlog.Finish(model.LogEntry{
+			Timestamp: started.UTC(),
+			Layer:     model.LogLayerSession,
+			Code:      model.LogCodeSessionOpen,
+			Request:   kitlog.Payload(kitlog.SafeValue(req)),
+			Response:  kitlog.Payload(kitlog.SafeValue(snapshot)),
+			SessionID: string(sessionID),
+		}, started, returnErr))
+	}()
 
 	if s.isClosed() {
 		return SessionSnapshot{}, closedServiceError(failure.PhaseSession)
 	}
-
 	device, err := s.selectDevice(req.Selector)
 	if err != nil {
 		return SessionSnapshot{}, err
 	}
-	sessionID := newSessionID()
 	opts := []ctapkit.OpenSessionOption{
 		ctapkit.WithEventSink(sessionEventSink{service: s, sessionID: sessionID}),
+		ctapkit.WithLogJournal(s.logs),
 	}
 	if s.strictPermissions {
 		opts = append(opts, ctapkit.WithStrictPermissions())
 	}
 
-	session, err := ctapkit.OpenSession(ctx, device, opts...)
+	openCtx := kitlog.WithCorrelation(ctx, string(sessionID), "", "")
+	session, err := ctapkit.OpenSession(openCtx, device, opts...)
 	if err != nil {
 		return SessionSnapshot{}, err
 	}
@@ -207,49 +230,49 @@ func (s *Service) OpenSession(ctx context.Context, req OpenSessionRequest) (Sess
 		return SessionSnapshot{}, invalidSessionError()
 	}
 	s.sessions[managed.id] = managed
-	snapshot := managed.snapshot(false)
+	snapshot = managed.snapshot(false)
 	s.mu.Unlock()
 
 	return snapshot, nil
 }
 
-func (s *Service) Sessions(ctx context.Context) ([]SessionSnapshot, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, normalizeServicePhaseError(err, failure.PhaseSession)
-	}
-
+func (s *Service) Sessions() []SessionSnapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	snapshots := make([]SessionSnapshot, 0, len(s.sessions))
 	for _, session := range s.sessions {
-		snapshots = append(snapshots, session.snapshot(s.sessionOperationLocked(session.id) != ""))
+		snapshots = append(snapshots, session.snapshot(s.sessionOperationLocked(session.id) != nil))
 	}
 
-	return snapshots, nil
+	return snapshots
 }
 
-func (s *Service) Session(ctx context.Context, id SessionID) (SessionSnapshot, error) {
-	if err := ctx.Err(); err != nil {
-		return SessionSnapshot{}, normalizeServicePhaseError(err, failure.PhaseSession)
-	}
-
+func (s *Service) Session(id SessionID) (SessionSnapshot, error) {
 	s.mu.Lock()
 	session, ok := s.sessions[id]
 	if !ok {
 		s.mu.Unlock()
 		return SessionSnapshot{}, invalidSessionError()
 	}
-	snapshot := session.snapshot(s.sessionOperationLocked(id) != "")
+	snapshot := session.snapshot(s.sessionOperationLocked(id) != nil)
 	s.mu.Unlock()
 
 	return snapshot, nil
 }
 
-func (s *Service) CloseSession(ctx context.Context, id SessionID) (SessionSnapshot, error) {
-	if err := ctx.Err(); err != nil {
-		return SessionSnapshot{}, normalizeServicePhaseError(err, failure.PhaseCleanup)
-	}
+func (s *Service) CloseSession(id SessionID) (snapshot SessionSnapshot, returnErr error) {
+	started := time.Now()
+	defer func() {
+		s.logs.Append(kitlog.Finish(model.LogEntry{
+			Timestamp: started.UTC(),
+			Layer:     model.LogLayerSession,
+			Code:      model.LogCodeSessionClose,
+			Request:   kitlog.Payload(kitlog.SafeValue(map[string]any{"sessionId": id})),
+			Response:  kitlog.Payload(kitlog.SafeValue(snapshot)),
+			SessionID: string(id),
+		}, started, returnErr))
+	}()
 
 	s.mu.Lock()
 	session, ok := s.sessions[id]
@@ -268,13 +291,23 @@ func (s *Service) CloseSession(ctx context.Context, id SessionID) (SessionSnapsh
 	session.updatedAt = time.Now().UTC()
 	s.startEnrichment()
 
-	return session.snapshot(false), err
+	snapshot = session.snapshot(false)
+
+	return snapshot, err
 }
 
-func (s *Service) CloseAllSessions(ctx context.Context) ([]SessionSnapshot, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, normalizeServicePhaseError(err, failure.PhaseCleanup)
-	}
+func (s *Service) CloseAllSessions() (snapshots []SessionSnapshot, returnErr error) {
+	started := time.Now()
+	defer func() {
+		s.logs.Append(kitlog.Finish(model.LogEntry{
+			Timestamp: started.UTC(),
+			Layer:     model.LogLayerSession,
+			Code:      model.LogCodeSessionClose,
+			Params:    map[string]string{"scope": "all"},
+			Request:   kitlog.Payload(kitlog.SafeValue(map[string]any{"all": true})),
+			Response:  kitlog.Payload(kitlog.SafeValue(snapshots)),
+		}, started, returnErr))
+	}()
 
 	s.mu.Lock()
 	sessions := make([]*managedSession, 0, len(s.sessions))
@@ -284,7 +317,7 @@ func (s *Service) CloseAllSessions(ctx context.Context) ([]SessionSnapshot, erro
 	}
 	s.mu.Unlock()
 
-	snapshots := make([]SessionSnapshot, 0, len(sessions))
+	snapshots = make([]SessionSnapshot, 0, len(sessions))
 	var closeErr error
 	for _, session := range sessions {
 		s.cancelSessionOperations(session.id)
@@ -302,18 +335,38 @@ func (s *Service) CloseAllSessions(ctx context.Context) ([]SessionSnapshot, erro
 	return snapshots, closeErr
 }
 
-func (s *Service) runOperation(ctx context.Context, req OperationRequest, operation model.Operation) (operationEnvelope, error) {
+func (s *Service) runOperation(ctx context.Context, req OperationRequest, operation model.Operation) (envelope operationEnvelope, returnErr error) {
+	operationID := newOperationID()
+	request := operationRequestLogValue(req, operation)
+	started := time.Now()
+	defer func() {
+		response := operationEnvelopeLogValue(envelope)
+		s.logs.Append(kitlog.FinishFailure(model.LogEntry{
+			Timestamp:      started.UTC(),
+			Layer:          model.LogLayerOperation,
+			Code:           model.LogCodeOperationRun,
+			Request:        kitlog.Payload(request),
+			Response:       kitlog.Payload(response),
+			RedactedFields: slices.Concat(request.RedactedFields, response.RedactedFields),
+			OperationKind:  operation.Kind(),
+			SessionID:      string(req.SessionID),
+			OperationID:    string(operationID),
+		}, started, envelope.Error))
+	}()
+
 	session, ok := s.session(req.SessionID)
 	if !ok {
 		err := invalidSessionError()
-		return failedOperationEnvelope(req, operation, err), nil
+		envelope = failedOperationEnvelope(operationID, req, operation, err)
+
+		return envelope, nil
 	}
 
-	operationID := newOperationID()
 	ctx, cancel := context.WithCancel(ctx)
 	state := &operationState{
 		id:        operationID,
 		sessionID: req.SessionID,
+		kind:      operation.Kind(),
 		cancel:    cancel,
 		done:      make(chan struct{}),
 	}
@@ -322,19 +375,23 @@ func (s *Service) runOperation(ctx context.Context, req OperationRequest, operat
 		cancel()
 
 		err := invalidSessionError()
-		return failedOperationEnvelope(req, operation, err), nil
+		envelope = failedOperationEnvelope(operationID, req, operation, err)
+
+		return envelope, nil
 	}
 	defer cancel()
 	defer s.unregisterOperation(operationID)
 
 	opts := runOptions(req.VerificationFlow)
+	ctx = kitlog.WithCorrelation(ctx, string(req.SessionID), string(operationID), operation.Kind())
 	result, err := session.session.Run(ctx, operation, interactionHandler{
 		service:     s,
 		sessionID:   req.SessionID,
 		operationID: operationID,
+		kind:        operation.Kind(),
 	}, opts...)
 
-	envelope := operationEnvelope{
+	envelope = operationEnvelope{
 		OperationID: operationID,
 		SessionID:   req.SessionID,
 		Kind:        operation.Kind(),
@@ -345,25 +402,22 @@ func (s *Service) runOperation(ctx context.Context, req OperationRequest, operat
 	return envelope, nil
 }
 
-func failedOperationEnvelope(req OperationRequest, operation model.Operation, err error) operationEnvelope {
+func failedOperationEnvelope(operationID OperationID, req OperationRequest, operation model.Operation, err error) operationEnvelope {
 	kind := model.OperationKind("")
 	if operation != nil {
 		kind = operation.Kind()
 	}
 
 	return operationEnvelope{
-		SessionID: req.SessionID,
-		Kind:      kind,
-		Error:     failure.Snapshot(err),
+		OperationID: operationID,
+		SessionID:   req.SessionID,
+		Kind:        kind,
+		Error:       failure.Snapshot(err),
 	}
 }
 
-func (s *Service) CancelOperation(ctx context.Context, req CancelOperationRequest) (bool, error) {
-	if err := ctx.Err(); err != nil {
-		return false, normalizeServicePhaseError(err, failure.PhaseSession)
-	}
-
-	return s.cancelOperation(req.OperationID), nil
+func (s *Service) CancelOperation(req CancelOperationRequest) bool {
+	return s.cancelOperation(req.OperationID)
 }
 
 func (s *Service) cancelOperation(id OperationID) bool {
@@ -398,10 +452,6 @@ func (s *Service) cancelSessionOperations(id SessionID) bool {
 }
 
 func (s *Service) ResolveInteraction(ctx context.Context, answer InteractionAnswer) (bool, error) {
-	if err := ctx.Err(); err != nil {
-		return false, normalizeServicePhaseError(err, failure.PhaseInteraction)
-	}
-
 	s.mu.Lock()
 	pending, ok := s.interactions[answer.InteractionID]
 	if ok {
@@ -434,7 +484,18 @@ func (s *Service) ResolveInteraction(ctx context.Context, answer InteractionAnsw
 	}
 }
 
-func (s *Service) LookupMDS(ctx context.Context, req MDSLookupRequest) (MDSLookupEnvelope, error) {
+func (s *Service) LookupMDS(ctx context.Context, req MDSLookupRequest) (envelope MDSLookupEnvelope, returnErr error) {
+	started := time.Now()
+	defer func() {
+		s.logs.Append(kitlog.Finish(model.LogEntry{
+			Timestamp: started.UTC(),
+			Layer:     model.LogLayerService,
+			Code:      model.LogCodeMDSLookup,
+			Request:   kitlog.Payload(kitlog.SafeValue(req)),
+			Response:  kitlog.Payload(kitlog.SafeValue(envelope)),
+		}, started, returnErr))
+	}()
+
 	aaguid, err := uuid.Parse(req.AAGUID)
 	if err != nil {
 		return MDSLookupEnvelope{}, failure.Wrap(
@@ -460,7 +521,9 @@ func (s *Service) LookupMDS(ctx context.Context, req MDSLookupRequest) (MDSLooku
 		return MDSLookupEnvelope{}, err
 	}
 
-	return MDSLookupEnvelope{Result: result}, nil
+	envelope = MDSLookupEnvelope{Result: result}
+
+	return envelope, nil
 }
 
 func (s *Service) session(id SessionID) (*managedSession, bool) {
@@ -568,14 +631,14 @@ func (m *managedSession) snapshot(running bool) SessionSnapshot {
 	}
 }
 
-func (s *Service) sessionOperationLocked(id SessionID) OperationID {
+func (s *Service) sessionOperationLocked(id SessionID) *operationState {
 	for _, operation := range s.operations {
 		if operation.sessionID == id {
-			return operation.id
+			return operation
 		}
 	}
 
-	return ""
+	return nil
 }
 
 type sessionEventSink struct {
@@ -594,10 +657,15 @@ func (s sessionEventSink) Emit(event model.OperationEvent) {
 func (s *Service) emitOperationEvent(sessionID SessionID, event model.OperationEvent) {
 	s.mu.Lock()
 	_, ok := s.sessions[sessionID]
-	operationID := s.sessionOperationLocked(sessionID)
+	operation := s.sessionOperationLocked(sessionID)
 	s.mu.Unlock()
 	if !ok {
 		return
+	}
+	operationID := OperationID("")
+	if operation != nil {
+		operationID = operation.id
+		s.logs.Append(operationEventLogEntry(operation, event))
 	}
 
 	s.emit(EventOperationEvent, OperationEventEnvelope{
@@ -611,15 +679,18 @@ type interactionHandler struct {
 	service     *Service
 	sessionID   SessionID
 	operationID OperationID
+	kind        model.OperationKind
 }
 
-func (h interactionHandler) RequestInteraction(req model.InteractionRequest) (model.InteractionResponse, error) {
+func (h interactionHandler) RequestInteraction(req model.InteractionRequest) (answer model.InteractionResponse, returnErr error) {
 	if h.service == nil {
 		return model.InteractionResponse{}, failure.New(failure.CodeInteractionHandlerRequired,
 			failure.WithPhase(failure.PhaseInteraction),
 		)
 	}
 
+	request := interactionRequestLogValue(req)
+	requestStarted := time.Now()
 	prompt := InteractionPrompt{
 		InteractionID: newInteractionID(),
 		OperationID:   h.operationID,
@@ -629,15 +700,58 @@ func (h interactionHandler) RequestInteraction(req model.InteractionRequest) (mo
 	response := make(chan model.InteractionResponse)
 	h.service.registerInteraction(prompt, response)
 	h.service.emit(EventInteractionRequested, prompt)
+	h.service.logs.Append(kitlog.Finish(model.LogEntry{
+		Timestamp:      requestStarted.UTC(),
+		Layer:          model.LogLayerInteraction,
+		Code:           model.LogCodeInteractionRequest,
+		Request:        kitlog.Payload(request),
+		Response:       kitlog.Payload(kitlog.SafeValue(map[string]any{"interactionId": prompt.InteractionID})),
+		RedactedFields: request.RedactedFields,
+		OperationKind:  h.kind,
+		SessionID:      string(h.sessionID),
+		OperationID:    string(h.operationID),
+	}, requestStarted, nil))
 	defer h.service.unregisterInteraction(prompt.InteractionID)
 
+	resolveStarted := time.Now()
+	defer func() {
+		var result any
+		var resolveRedacted []string
+		if returnErr == nil {
+			response := map[string]any{"canceled": answer.Canceled}
+			if answer.Confirmed {
+				response["confirmed"] = kitlog.Redacted
+				resolveRedacted = append(resolveRedacted, "response.confirmed")
+			}
+			if len(answer.PIN) != 0 {
+				response["pin"] = kitlog.Redacted
+				resolveRedacted = append(resolveRedacted, "response.pin")
+			}
+			result = response
+		}
+		h.service.logs.Append(kitlog.Finish(model.LogEntry{
+			Timestamp:      resolveStarted.UTC(),
+			Layer:          model.LogLayerInteraction,
+			Code:           model.LogCodeInteractionResolve,
+			Params:         map[string]string{"interactionId": string(prompt.InteractionID)},
+			Request:        kitlog.Payload(kitlog.SafeValue(map[string]any{"interactionId": prompt.InteractionID})),
+			Response:       kitlog.Payload(kitlog.SafeValue(result)),
+			RedactedFields: resolveRedacted,
+			OperationKind:  h.kind,
+			SessionID:      string(h.sessionID),
+			OperationID:    string(h.operationID),
+		}, resolveStarted, returnErr))
+	}()
+
 	select {
-	case answer := <-response:
+	case answer = <-response:
 		return answer, nil
 	case <-h.service.operationDone(h.operationID):
-		return model.InteractionResponse{}, failure.New(failure.CodeInteractionCanceled,
+		err := failure.New(failure.CodeInteractionCanceled,
 			failure.WithPhase(failure.PhaseInteraction),
 		)
+
+		return model.InteractionResponse{}, err
 	}
 }
 

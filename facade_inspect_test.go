@@ -89,11 +89,13 @@ func openYubicoContractSession(t *testing.T, auth authenticator.Device) *Session
 		VendorID:  0x1050,
 		ProductID: 0x0407,
 	})
-	session, err := openSession(context.Background(), device, newContractSessionDependencies(
+	session, err := openSession(
+		context.Background(),
+		device,
 		func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 			return auth, nil
 		},
-	))
+	)
 	if err != nil {
 		t.Fatalf("OpenSession: %v", err)
 	}

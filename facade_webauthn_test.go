@@ -41,11 +41,44 @@ func TestMakeCredentialDryRunDoesNotConfirmAcquireTokenOrMutate(t *testing.T) {
 	if result.Result != nil {
 		t.Fatalf("dry-run result = %#v, want nil", result.Result)
 	}
-	if result.Preview.RP.ID != "example.com" {
-		t.Fatalf("preview RP = %#v", result.Preview.RP)
+	if result.Preview.Input.RP.ID != "example.com" {
+		t.Fatalf("preview RP = %#v", result.Preview.Input.RP)
 	}
 	if a.makeCredentialCalls != 0 {
 		t.Fatalf("MakeCredential calls = %d, want 0", a.makeCredentialCalls)
+	}
+	if len(a.tokenRPIDs) != 0 {
+		t.Fatalf("token rpIDs = %v, want none", a.tokenRPIDs)
+	}
+}
+
+func TestGetAssertionDryRunDoesNotAcquireTokenOrCallAuthenticator(t *testing.T) {
+	a := &webauthnTestAuthenticator{alwaysUV: true}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	output, err := session.Run(context.Background(), model.GetAssertionOperation{
+		GetAssertionInput: appwebauthn.GetAssertionInput{
+			RPID:           "example.com",
+			ClientDataJSON: []byte(`{"type":"webauthn.get"}`),
+		},
+		DryRun: true,
+	}, nil)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	result := output.(model.GetAssertionOutput)
+	if result.Result != nil {
+		t.Fatalf("dry-run result = %#v, want nil", result.Result)
+	}
+	if result.Preview.Input.RPID != "example.com" {
+		t.Fatalf("preview RP ID = %q", result.Preview.Input.RPID)
+	}
+	if a.getAssertionCalls != 0 {
+		t.Fatalf("GetAssertion calls = %d, want 0", a.getAssertionCalls)
 	}
 	if len(a.tokenRPIDs) != 0 {
 		t.Fatalf("token rpIDs = %v, want none", a.tokenRPIDs)
@@ -311,7 +344,7 @@ func TestWebAuthnCTAPStatusMapsCodes(t *testing.T) {
 
 func TestWebAuthnOutputsDoNotMarshalTokens(t *testing.T) {
 	output := model.GetAssertionOutput{
-		Result: appwebauthn.GetAssertionResult{
+		Result: &appwebauthn.GetAssertionResult{
 			Assertions: []appwebauthn.Assertion{
 				{SignatureHex: "746f6b656e"},
 			},
@@ -365,6 +398,7 @@ type webauthnTestAuthenticator struct {
 	makeCredentialOptions     map[protocol.Option]bool
 
 	getAssertionErr        error
+	getAssertionCalls      int
 	tokenErr               error
 	getAssertionToken      []byte
 	getAssertionClientData []byte
@@ -438,6 +472,7 @@ func (a *webauthnTestAuthenticator) GetAssertion(
 	options map[protocol.Option]bool,
 ) iter.Seq2[protocol.AuthenticatorGetAssertionResponse, error] {
 	return func(yield func(protocol.AuthenticatorGetAssertionResponse, error) bool) {
+		a.getAssertionCalls++
 		a.getAssertionToken = append([]byte(nil), pinUvAuthToken...)
 		a.getAssertionClientData = append([]byte(nil), clientData...)
 		a.getAssertionOptions = maps.Clone(options)

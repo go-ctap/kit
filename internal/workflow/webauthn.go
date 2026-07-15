@@ -3,9 +3,12 @@ package workflow
 import (
 	"context"
 	"encoding/hex"
+	"slices"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
+	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
 	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
@@ -22,7 +25,7 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 		return output, err
 	}
 
-	preview, err := appwebauthn.BuildMakeCredentialPreview(r.env.Selected, input)
+	preview, err := appwebauthn.BuildMakeCredentialPreview(r.env.Selected, r.infoProvider().GetInfo(), input)
 	if err != nil {
 		return output, err
 	}
@@ -54,7 +57,7 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 			return output, annotateMakeCredentialError(err)
 		}
 
-		result, err := makeCredentialResult(r.env.Selected.Fingerprint, input.RP.ID, response)
+		result, err := makeCredentialResult(r.env.Selected.Fingerprint, input.RP.ID, input.Extensions, response)
 		if err != nil {
 			return output, err
 		}
@@ -67,7 +70,7 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 	if err != nil {
 		return output, annotateMakeCredentialError(err)
 	}
-	result, err := makeCredentialResult(r.env.Selected.Fingerprint, input.RP.ID, response)
+	result, err := makeCredentialResult(r.env.Selected.Fingerprint, input.RP.ID, input.Extensions, response)
 	if err != nil {
 		return output, err
 	}
@@ -83,9 +86,20 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 	if err != nil {
 		return output, err
 	}
+	info := r.infoProvider().GetInfo()
+	preview, err := appwebauthn.BuildGetAssertionPreview(r.env.Selected, info, input)
+	if err != nil {
+		return output, err
+	}
+	output.Preview = preview
+	if req.DryRun {
+		return output, nil
+	}
 
 	tokenRequired := lo.FromPtr(input.Options.UserVerification) ||
-		r.infoProvider().GetInfo().Options[protocol.OptionAlwaysUv]
+		info.Options[protocol.OptionAlwaysUv] ||
+		input.Extensions != nil && prfHasEvaluation(input.Extensions.PRFInputs) &&
+			slices.Contains(info.Extensions, extension.ExtensionIdentifierHMACSecret)
 
 	result := appwebauthn.GetAssertionResult{
 		DeviceFingerprint: r.env.Selected.Fingerprint,
@@ -100,14 +114,14 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 			input.RPID,
 			input.ClientDataJSON,
 			input.AllowList,
-			nil,
+			ctapGetAssertionExtensions(input.Extensions, info),
 			ctapAuthenticatorOptions(input.Options, token != nil),
 		) {
 			if err != nil {
 				return annotateGetAssertionError(err)
 			}
 
-			result.Assertions = append(result.Assertions, assertionResult(index, response))
+			result.Assertions = append(result.Assertions, assertionResult(index, input.Extensions, response))
 			index++
 		}
 
@@ -127,7 +141,7 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 		return output, err
 	}
 
-	output.Result = result
+	output.Result = &result
 
 	return output, nil
 }
@@ -145,7 +159,7 @@ func (r Runner) callMakeCredential(
 		input.User,
 		input.PubKeyCredParams,
 		input.ExcludeList,
-		nil,
+		ctapMakeCredentialExtensions(input.Extensions, r.infoProvider().GetInfo()),
 		ctapAuthenticatorOptions(input.Options, token != nil),
 		0,
 		nil,
@@ -173,6 +187,10 @@ func makeCredentialNeedsToken(
 	if lo.FromPtr(input.Options.UserVerification) {
 		return true
 	}
+	if input.Extensions != nil && input.Extensions.PRFInputs != nil && !input.Extensions.PRF.Eval.IsZero() &&
+		slices.Contains(info.Extensions, extension.ExtensionIdentifierHMACSecretMC) {
+		return true
+	}
 
 	notRequired, ok := info.Options[protocol.OptionMakeCredentialUvNotRequired]
 
@@ -182,6 +200,7 @@ func makeCredentialNeedsToken(
 func makeCredentialResult(
 	fingerprint string,
 	rpID string,
+	extensions *ctapwebauthn.CreateAuthenticationExtensionsClientInputs,
 	response protocol.AuthenticatorMakeCredentialResponse,
 ) (appwebauthn.MakeCredentialResult, error) {
 	if response.AuthData == nil || response.AuthData.AttestedCredentialData == nil {
@@ -219,6 +238,7 @@ func makeCredentialResult(
 		UserPresent:              response.AuthData.Flags.UserPresent(),
 		UserVerified:             response.AuthData.Flags.UserVerified(),
 		EnterpriseAttestation:    response.EnterpriseAttestation,
+		ExtensionResults:         makeCredentialExtensionResults(extensions, response),
 	}, nil
 }
 
@@ -240,12 +260,17 @@ func attestationObjectCBOR(response protocol.AuthenticatorMakeCredentialResponse
 	})
 }
 
-func assertionResult(index uint, response protocol.AuthenticatorGetAssertionResponse) appwebauthn.Assertion {
+func assertionResult(
+	index uint,
+	extensions *ctapwebauthn.GetAuthenticationExtensionsClientInputs,
+	response protocol.AuthenticatorGetAssertionResponse,
+) appwebauthn.Assertion {
 	assertion := appwebauthn.Assertion{
 		Index:                index,
 		Credential:           response.Credential,
 		AuthenticatorDataHex: hex.EncodeToString(response.AuthDataRaw),
 		SignatureHex:         hex.EncodeToString(response.Signature),
+		ExtensionResults:     getAssertionExtensionResults(extensions, response.ExtensionOutputs),
 	}
 	if response.NumberOfCredentials != nil {
 		assertion.NumberOfCredentials = snapshotPtr(response.NumberOfCredentials)
