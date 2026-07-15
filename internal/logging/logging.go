@@ -3,6 +3,7 @@ package logging
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 	"unicode/utf8"
 
@@ -106,7 +107,25 @@ func safePreview(raw []byte, limit int) string {
 }
 
 func Finish(entry model.LogEntry, started time.Time, err error) model.LogEntry {
+	entry.ErrorMessage = TransportErrorMessage(err)
+
 	return FinishFailure(entry, started, failure.Snapshot(err))
+}
+
+func TransportErrorMessage(err error) string {
+	code, ok := failure.CodeOf(err)
+	if !ok || code != failure.CodeTransportFailure &&
+		code != failure.CodeTransportPermissionDenied &&
+		code != failure.CodeTransportProxyUnavailable {
+		return ""
+	}
+
+	typed, ok := errors.AsType[*failure.Error](err)
+	if !ok || typed.Unwrap() == nil {
+		return ""
+	}
+
+	return safePreview([]byte(typed.Unwrap().Error()), previewBytes)
 }
 
 func FinishFailure(entry model.LogEntry, started time.Time, snapshot *failure.Failure) model.LogEntry {

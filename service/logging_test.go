@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
 
+	ctaptransport "github.com/go-ctap/ctap/transport"
 	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
 	kitlog "github.com/go-ctap/kit/internal/logging"
 	"github.com/go-ctap/kit/model"
@@ -101,6 +103,43 @@ func TestOperationLoggingDoesNotRequireEventEmitter(t *testing.T) {
 	}
 	if logs := serviceLogs(t, service); len(logs) == 0 {
 		t.Fatal("operation journal is empty")
+	}
+}
+
+func TestOperationLoggingRetainsTransportDiagnostic(t *testing.T) {
+	runtime := &recordingOperationSession{
+		runErr: failure.Wrap(
+			failure.CodeTransportFailure,
+			&ctaptransport.IOError{
+				Operation: ctaptransport.IORead,
+				Err:       io.ErrClosedPipe,
+			},
+			failure.WithOperation(string(model.OperationListCredentials)),
+			failure.WithPhase(failure.PhaseDiscovery),
+		),
+	}
+	service := New()
+	service.sessions["session-1"] = &managedSession{
+		id:      "session-1",
+		session: runtime,
+	}
+
+	envelope, err := service.ListCredentials(context.Background(), CredentialListRequest{
+		OperationRequest: OperationRequest{SessionID: "session-1"},
+	})
+	if err != nil {
+		t.Fatalf("ListCredentials: %v", err)
+	}
+	if envelope.Error == nil || envelope.Error.Code != failure.CodeTransportFailure {
+		t.Fatalf("envelope error = %#v", envelope.Error)
+	}
+
+	logs := serviceLogs(t, service)
+	if len(logs) != 1 {
+		t.Fatalf("operation logs = %#v", logs)
+	}
+	if logs[0].Entry.ErrorMessage != "transport read: io: read/write on closed pipe" {
+		t.Fatalf("error message = %q", logs[0].Entry.ErrorMessage)
 	}
 }
 

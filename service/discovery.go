@@ -60,14 +60,15 @@ func (s *Service) reconcileTopology(
 	if force || result.changed || envelope.Error != nil {
 		s.emit(EventDiscoveryChanged, envelope)
 		entry := model.LogEntry{
-			Timestamp: time.Now().UTC(),
-			Layer:     model.LogLayerService,
-			Level:     model.LogLevelInfo,
-			Outcome:   model.LogOutcomeEvent,
-			Code:      model.LogCodeDiscoveryChanged,
-			Params:    map[string]string{"trigger": string(trigger)},
-			Response:  kitlog.Payload(kitlog.SafeValue(envelope)),
-			Error:     envelope.Error,
+			Timestamp:    time.Now().UTC(),
+			Layer:        model.LogLayerService,
+			Level:        model.LogLevelInfo,
+			Outcome:      model.LogOutcomeEvent,
+			Code:         model.LogCodeDiscoveryChanged,
+			Params:       map[string]string{"trigger": string(trigger)},
+			Response:     kitlog.Payload(kitlog.SafeValue(envelope)),
+			Error:        envelope.Error,
+			ErrorMessage: kitlog.TransportErrorMessage(result.err),
 		}
 		if envelope.Error != nil {
 			entry.Level = model.LogLevelError

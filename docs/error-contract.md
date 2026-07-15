@@ -125,5 +125,27 @@ retaining the outer public operation. LargeBlobs `get` and `set` request fields
 are CBOR map keys, not CTAP subcommands, and are never emitted as subcommand
 metadata.
 
-The original typed CTAP or transport cause remains available only through the
-in-process Go error chain. Consumers must not forward or concatenate its text.
+The original typed CTAP or transport cause is not part of the public failure
+envelope and remains available only through the in-process Go error chain.
+Public error consumers must not forward or concatenate its text.
+
+## Engineering Log Diagnostics
+
+Completed journal entries include the bounded retained cause of transport
+failures as a log-only `errorMessage`:
+
+```json
+{
+  "error": {
+    "code": "TRANSPORT_FAILURE",
+    "category": "transport-failure",
+    "operation": "credentials.list",
+    "phase": "discovery"
+  },
+  "errorMessage": "transport read: io: read/write on closed pipe"
+}
+```
+
+`errorMessage` is engineering evidence, not stable recovery or localization
+input. It is limited to 4 KiB and is emitted only for transport failure codes.
+Use `error.code` for application behavior.

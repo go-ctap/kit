@@ -73,6 +73,7 @@ type LogEntry struct {
 	Request              *LogPayload       `json:"request,omitempty"`
 	Response             *LogPayload       `json:"response,omitempty"`
 	Error                *failure.Failure  `json:"error,omitempty"`
+	ErrorMessage         string            `json:"errorMessage,omitempty"`
 	RedactedFields       []string          `json:"redactedFields,omitempty"`
 	SessionID            string            `json:"sessionId,omitempty"`
 	OperationID          string            `json:"operationId,omitempty"`

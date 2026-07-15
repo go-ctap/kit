@@ -339,9 +339,10 @@ func (s *Service) runOperation(ctx context.Context, req OperationRequest, operat
 	operationID := newOperationID()
 	request := operationRequestLogValue(req, operation)
 	started := time.Now()
+	var operationErr error
 	defer func() {
 		response := operationEnvelopeLogValue(envelope)
-		s.logs.Append(kitlog.FinishFailure(model.LogEntry{
+		s.logs.Append(kitlog.Finish(model.LogEntry{
 			Timestamp:      started.UTC(),
 			Layer:          model.LogLayerOperation,
 			Code:           model.LogCodeOperationRun,
@@ -351,12 +352,13 @@ func (s *Service) runOperation(ctx context.Context, req OperationRequest, operat
 			OperationKind:  operation.Kind(),
 			SessionID:      string(req.SessionID),
 			OperationID:    string(operationID),
-		}, started, envelope.Error))
+		}, started, operationErr))
 	}()
 
 	session, ok := s.session(req.SessionID)
 	if !ok {
 		err := invalidSessionError()
+		operationErr = err
 		envelope = failedOperationEnvelope(operationID, req, operation, err)
 
 		return envelope, nil
@@ -375,6 +377,7 @@ func (s *Service) runOperation(ctx context.Context, req OperationRequest, operat
 		cancel()
 
 		err := invalidSessionError()
+		operationErr = err
 		envelope = failedOperationEnvelope(operationID, req, operation, err)
 
 		return envelope, nil
@@ -390,6 +393,7 @@ func (s *Service) runOperation(ctx context.Context, req OperationRequest, operat
 		operationID: operationID,
 		kind:        operation.Kind(),
 	}, opts...)
+	operationErr = err
 
 	envelope = operationEnvelope{
 		OperationID: operationID,
