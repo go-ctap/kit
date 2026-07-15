@@ -1,5 +1,7 @@
 # ctapkit
 
+[![Go](https://github.com/go-ctap/kit/actions/workflows/go.yml/badge.svg)](https://github.com/go-ctap/kit/actions/workflows/go.yml)
+
 Reusable CTAP/FIDO2 runtime core for the `go-ctap` application family.
 
 The current Go module is:
