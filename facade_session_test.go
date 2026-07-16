@@ -297,7 +297,10 @@ func TestTransportConnectionFailureClosesSession(t *testing.T) {
 
 	for _, operation := range tests {
 		t.Run(string(operation), func(t *testing.T) {
-			a := &transportFailureAuthenticator{operation: operation}
+			a := &transportFailureAuthenticator{
+				operation:   operation,
+				invalidated: true,
+			}
 			session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 				return a, nil
 			})
@@ -328,10 +331,73 @@ func TestTransportConnectionFailureClosesSession(t *testing.T) {
 	}
 }
 
+func TestTransportFailureWithoutDeviceInvalidationKeepsSessionOpen(t *testing.T) {
+	tests := []ctaptransport.IOOperation{
+		ctaptransport.IORead,
+		ctaptransport.IOWrite,
+		ctaptransport.IOTransmit,
+	}
+
+	for _, operation := range tests {
+		t.Run(string(operation), func(t *testing.T) {
+			a := &transportFailureAuthenticator{operation: operation}
+			session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+				return a, nil
+			})
+
+			_, err := session.Run(context.Background(), model.SetPINOperation{
+				NewPIN:    "1234",
+				Confirmed: true,
+			}, nil)
+			requireFailureCode(t, err, failure.CodeTransportFailure)
+
+			if session.Info().Closed {
+				t.Fatal("session closed without device invalidation")
+			}
+			if got := a.closeCount.Load(); got != 0 {
+				t.Fatalf("authenticator close count = %d, want 0", got)
+			}
+
+			if err := session.Close(); err != nil {
+				t.Fatalf("Close: %v", err)
+			}
+			if got := a.closeCount.Load(); got != 1 {
+				t.Fatalf("authenticator close count after Close = %d, want 1", got)
+			}
+		})
+	}
+}
+
+func TestCanceledTransmitWithoutDeviceInvalidationKeepsSessionOpen(t *testing.T) {
+	a := &transportFailureAuthenticator{
+		operation: ctaptransport.IOTransmit,
+		cause:     context.Canceled,
+	}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	_, err := session.Run(context.Background(), model.SetPINOperation{
+		NewPIN:    "1234",
+		Confirmed: true,
+	}, nil)
+	requireFailureCode(t, err, failure.CodeOperationCanceled)
+
+	if session.Info().Closed {
+		t.Fatal("session closed after a canceled transmit without device invalidation")
+	}
+	if got := a.closeCount.Load(); got != 0 {
+		t.Fatalf("authenticator close count = %d, want 0", got)
+	}
+}
+
 type transportFailureAuthenticator struct {
 	contractAuthenticator
-	operation  ctaptransport.IOOperation
-	closeCount atomic.Int32
+	operation   ctaptransport.IOOperation
+	cause       error
+	invalidated bool
+	closeCount  atomic.Int32
 }
 
 func (a *transportFailureAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
@@ -343,10 +409,19 @@ func (a *transportFailureAuthenticator) GetInfo() protocol.AuthenticatorGetInfoR
 }
 
 func (a *transportFailureAuthenticator) SetPIN(context.Context, string) error {
-	return &ctaptransport.IOError{
-		Operation: a.operation,
-		Err:       io.ErrClosedPipe,
+	cause := a.cause
+	if cause == nil {
+		cause = io.ErrClosedPipe
 	}
+	err := &ctaptransport.IOError{
+		Operation: a.operation,
+		Err:       cause,
+	}
+	if a.invalidated {
+		return &ctaptransport.DeviceInvalidatedError{Err: err}
+	}
+
+	return err
 }
 
 func (a *transportFailureAuthenticator) Close() error {

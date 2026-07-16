@@ -37,7 +37,7 @@ func TestGetAssertionFailureEnvelopeExactJSON(t *testing.T) {
 		t.Fatalf("Marshal: %v", marshalErr)
 	}
 
-	want := `{"operationId":"operation-1","sessionId":"session-1","kind":"webauthn.getAssertion","error":{"code":"ASSERTION_NOT_ALLOWED","category":"invalid-state","operation":"webauthn.getAssertion","phase":"authenticator-command","ctap":{"command":"authenticatorGetAssertion","commandCode":2,"status":"CTAP2_ERR_NOT_ALLOWED","statusCode":48}}}`
+	want := `{"operationId":"operation-1","sessionId":"session-1","kind":"webauthn.getAssertion","sessionClosed":false,"error":{"code":"ASSERTION_NOT_ALLOWED","category":"invalid-state","operation":"webauthn.getAssertion","phase":"authenticator-command","ctap":{"command":"authenticatorGetAssertion","commandCode":2,"status":"CTAP2_ERR_NOT_ALLOWED","statusCode":48}}}`
 	if string(raw) != want {
 		t.Fatalf("JSON = %s, want %s", raw, want)
 	}

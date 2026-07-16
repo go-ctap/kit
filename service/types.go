@@ -69,18 +69,20 @@ type SessionSnapshot struct {
 }
 
 type operationEnvelope struct {
-	OperationID OperationID           `json:"operationId"`
-	SessionID   SessionID             `json:"sessionId"`
-	Kind        model.OperationKind   `json:"kind"`
-	Result      model.OperationResult `json:"result,omitempty"`
-	Error       *failure.Failure      `json:"error,omitempty"`
+	OperationID   OperationID           `json:"operationId"`
+	SessionID     SessionID             `json:"sessionId"`
+	Kind          model.OperationKind   `json:"kind"`
+	SessionClosed bool                  `json:"sessionClosed"`
+	Result        model.OperationResult `json:"result,omitempty"`
+	Error         *failure.Failure      `json:"error,omitempty"`
 }
 
 type OperationEnvelopeMeta struct {
-	OperationID OperationID         `json:"operationId"`
-	SessionID   SessionID           `json:"sessionId"`
-	Kind        model.OperationKind `json:"kind"`
-	Error       *failure.Failure    `json:"error,omitempty"`
+	OperationID   OperationID         `json:"operationId"`
+	SessionID     SessionID           `json:"sessionId"`
+	Kind          model.OperationKind `json:"kind"`
+	SessionClosed bool                `json:"sessionClosed"`
+	Error         *failure.Failure    `json:"error,omitempty"`
 }
 
 type InspectEnvelope struct {

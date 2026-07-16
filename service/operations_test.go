@@ -173,6 +173,45 @@ func TestListCredentialsOperationFailureUsesOnlyTheTypedEnvelopeError(t *testing
 	if envelope.Result != nil {
 		t.Fatalf("envelope result = %#v, want nil on operation failure", envelope.Result)
 	}
+	if envelope.SessionClosed {
+		t.Fatal("envelope sessionClosed = true, want false")
+	}
+	if _, err := service.Session("session-1"); err != nil {
+		t.Fatalf("Session: %v", err)
+	}
+}
+
+func TestOperationEnvelopeReportsAndRetiresClosedSession(t *testing.T) {
+	runtime := &recordingOperationSession{
+		info: model.SessionInfo{Closed: true},
+		runErr: failure.Wrap(
+			failure.CodeOperationCanceled,
+			context.Canceled,
+			failure.WithPhase(failure.PhaseAuthenticatorCommand),
+		),
+	}
+	service := New()
+	service.sessions["session-1"] = &managedSession{
+		id:      "session-1",
+		session: runtime,
+	}
+
+	envelope, err := service.ListCredentials(context.Background(), CredentialListRequest{
+		OperationRequest: OperationRequest{SessionID: "session-1"},
+	})
+	if err != nil {
+		t.Fatalf("ListCredentials: %v", err)
+	}
+	if !envelope.SessionClosed {
+		t.Fatal("envelope sessionClosed = false, want true")
+	}
+	if envelope.Error == nil || envelope.Error.Code != failure.CodeOperationCanceled {
+		t.Fatalf("envelope error = %#v, want %s", envelope.Error, failure.CodeOperationCanceled)
+	}
+
+	if _, err := service.Session("session-1"); !failure.IsCode(err, failure.CodeSessionInvalid) {
+		t.Fatalf("Session error = %v, want %s", err, failure.CodeSessionInvalid)
+	}
 }
 
 func TestPINRequestsRoundTripSecrets(t *testing.T) {
@@ -221,6 +260,7 @@ type recordingOperationSession struct {
 	operation model.Operation
 	result    model.OperationResult
 	runErr    error
+	info      model.SessionInfo
 }
 
 func (s *recordingOperationSession) Run(
@@ -239,4 +279,4 @@ func (s *recordingOperationSession) Run(
 
 func (s *recordingOperationSession) Close() error { return nil }
 
-func (s *recordingOperationSession) Info() model.SessionInfo { return model.SessionInfo{} }
+func (s *recordingOperationSession) Info() model.SessionInfo { return s.info }

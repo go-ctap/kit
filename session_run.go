@@ -45,11 +45,8 @@ func (s *Session) run(
 		}, operation)
 	})
 	if err != nil {
-		if ioErr, ok := errors.AsType[*ctaptransport.IOError](err); ok {
-			switch ioErr.Operation {
-			case ctaptransport.IORead, ctaptransport.IOWrite, ctaptransport.IOTransmit:
-				_ = s.core.Close()
-			}
+		if _, invalidated := errors.AsType[*ctaptransport.DeviceInvalidatedError](err); invalidated {
+			_ = s.core.Close()
 		}
 
 		return result, normalizeRunError(err, operationKind)

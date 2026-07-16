@@ -50,11 +50,12 @@ func operationEnvelopeLogValue(envelope operationEnvelope) kitlog.SafeJSONValue 
 
 	return kitlog.SafeJSONValue{
 		Value: map[string]any{
-			"operationId": envelope.OperationID,
-			"sessionId":   envelope.SessionID,
-			"kind":        envelope.Kind,
-			"result":      result,
-			"error":       envelope.Error,
+			"operationId":   envelope.OperationID,
+			"sessionId":     envelope.SessionID,
+			"kind":          envelope.Kind,
+			"sessionClosed": envelope.SessionClosed,
+			"result":        result,
+			"error":         envelope.Error,
 		},
 		RedactedFields: redacted,
 	}

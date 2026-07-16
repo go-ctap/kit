@@ -394,13 +394,18 @@ func (s *Service) runOperation(ctx context.Context, req OperationRequest, operat
 		kind:        operation.Kind(),
 	}, opts...)
 	operationErr = err
+	sessionClosed := session.session.Info().Closed
+	if sessionClosed {
+		s.retireSession(session)
+	}
 
 	envelope = operationEnvelope{
-		OperationID: operationID,
-		SessionID:   req.SessionID,
-		Kind:        operation.Kind(),
-		Result:      result,
-		Error:       failure.Snapshot(err),
+		OperationID:   operationID,
+		SessionID:     req.SessionID,
+		Kind:          operation.Kind(),
+		SessionClosed: sessionClosed,
+		Result:        result,
+		Error:         failure.Snapshot(err),
 	}
 
 	return envelope, nil
@@ -537,6 +542,15 @@ func (s *Service) session(id SessionID) (*managedSession, bool) {
 	session, ok := s.sessions[id]
 
 	return session, ok
+}
+
+func (s *Service) retireSession(session *managedSession) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if current := s.sessions[session.id]; current == session {
+		delete(s.sessions, session.id)
+	}
 }
 
 func (s *Service) selectDevice(selector string) (ctapkit.Device, error) {
