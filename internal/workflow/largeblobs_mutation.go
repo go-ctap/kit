@@ -13,7 +13,18 @@ import (
 func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOperation) (model.OperationResult, error) {
 	var output model.LargeBlobMutationOutput
 
-	inventory, err := r.readCredentialInventoryReport(ctx)
+	permission, err := r.mutationPermission(
+		protocol.PermissionLargeBlobWrite,
+		req.PrepareInventoryRefresh,
+	)
+	if err != nil {
+		return output, err
+	}
+
+	inventory, err := r.readCredentialInventoryReportWithGrant(
+		ctx,
+		inventoryGrantPermission(permission, req.PrepareInventoryRefresh),
+	)
 	if err != nil {
 		return output, err
 	}
@@ -55,7 +66,7 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 		return output, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionLargeBlobWrite, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), permission, "")
 	if err != nil {
 		return output, err
 	}
@@ -76,7 +87,18 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOperation) (model.OperationResult, error) {
 	var output model.LargeBlobMutationOutput
 
-	inventory, err := r.readCredentialInventoryReport(ctx)
+	permission, err := r.mutationPermission(
+		protocol.PermissionLargeBlobWrite,
+		req.PrepareInventoryRefresh,
+	)
+	if err != nil {
+		return output, err
+	}
+
+	inventory, err := r.readCredentialInventoryReportWithGrant(
+		ctx,
+		inventoryGrantPermission(permission, req.PrepareInventoryRefresh),
+	)
 	if err != nil {
 		return output, err
 	}
@@ -121,7 +143,7 @@ func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOp
 		return output, nil
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionLargeBlobWrite, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), permission, "")
 	if err != nil {
 		return output, err
 	}

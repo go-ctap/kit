@@ -247,35 +247,47 @@ func (a *uvTokenAuthenticator) ToggleAlwaysUV(context.Context, []byte) error {
 
 type largeBlobWriteEventAuthenticator struct {
 	contractAuthenticator
-	setErr                      error
-	rpErr                       error
-	largeBlobReadErr            error
-	cancelLargeBlobRead         context.CancelFunc
-	omitLargeBlobKey            bool
-	largeBlobs                  []protocol.LargeBlob
-	lastSetLargeBlobs           []protocol.LargeBlob
-	maxSerializedLargeBlobArray *uint
-	rpEnumerations              atomic.Int32
-	credentialEnumerations      atomic.Int32
-	tokenCalls                  atomic.Int32
-	largeBlobReads              atomic.Int32
-	largeBlobWrites             atomic.Int32
+	setErr                       error
+	rpErr                        error
+	largeBlobReadErr             error
+	cancelLargeBlobRead          context.CancelFunc
+	omitLargeBlobKey             bool
+	largeBlobs                   []protocol.LargeBlob
+	lastSetLargeBlobs            []protocol.LargeBlob
+	maxSerializedLargeBlobArray  *uint
+	rpEnumerations               atomic.Int32
+	credentialEnumerations       atomic.Int32
+	tokenCalls                   atomic.Int32
+	tokenPermissions             []protocol.Permission
+	credentialManagementReadOnly bool
+	largeBlobReads               atomic.Int32
+	largeBlobWrites              atomic.Int32
 }
 
 func (a *largeBlobWriteEventAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	options := map[protocol.Option]bool{
+		protocol.OptionCredentialManagement: true,
+		protocol.OptionLargeBlobs:           true,
+		protocol.OptionPinUvAuthToken:       true,
+		protocol.OptionUserVerification:     true,
+	}
+	if a.credentialManagementReadOnly {
+		options[protocol.OptionCredentialManagementReadOnly] = true
+	}
+
 	return protocol.AuthenticatorGetInfoResponse{
-		Options: map[protocol.Option]bool{
-			protocol.OptionCredentialManagement: true,
-			protocol.OptionLargeBlobs:           true,
-			protocol.OptionPinUvAuthToken:       true,
-			protocol.OptionUserVerification:     true,
-		},
+		Options:                     options,
 		MaxSerializedLargeBlobArray: a.maxSerializedLargeBlobArray,
 	}
 }
 
-func (a *largeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
+func (a *largeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingUV(
+	_ context.Context,
+	permission protocol.Permission,
+	_ string,
+) ([]byte, error) {
 	a.tokenCalls.Add(1)
+	a.tokenPermissions = append(a.tokenPermissions, permission)
 
 	return []byte("token"), nil
 }

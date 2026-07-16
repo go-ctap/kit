@@ -4,12 +4,42 @@ import (
 	"encoding/hex"
 
 	"github.com/go-ctap/ctap/credential"
+	"github.com/go-ctap/ctap/protocol"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
 )
 
-func (r Runner) credentialMutationRPID(target appcredentials.CredentialTarget) string {
-	if !r.env.StrictPermissions {
+func (r Runner) mutationPermission(
+	required protocol.Permission,
+	prepareInventoryRefresh bool,
+) (protocol.Permission, error) {
+	if !prepareInventoryRefresh {
+		return required, nil
+	}
+
+	if _, err := inventoryPermission(r.infoProvider().GetInfo()); err != nil {
+		return protocol.PermissionNone, err
+	}
+
+	return required | protocol.PermissionCredentialManagement, nil
+}
+
+func inventoryGrantPermission(
+	permission protocol.Permission,
+	prepareInventoryRefresh bool,
+) protocol.Permission {
+	if !prepareInventoryRefresh {
+		return protocol.PermissionNone
+	}
+
+	return permission
+}
+
+func (r Runner) credentialMutationRPID(
+	target appcredentials.CredentialTarget,
+	prepareInventoryRefresh bool,
+) string {
+	if prepareInventoryRefresh || !r.env.StrictPermissions {
 		return ""
 	}
 

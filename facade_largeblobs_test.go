@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
@@ -92,6 +93,41 @@ func TestLargeBlobWriteEventsFollowInteractionAndInventoryOrder(t *testing.T) {
 
 	if got := a.largeBlobWrites.Load(); got != 1 {
 		t.Fatalf("large blob writes = %d, want 1", got)
+	}
+}
+
+func TestLargeBlobWritePreparesOneCompositeGrantForInventoryRefresh(t *testing.T) {
+	a := &largeBlobWriteEventAuthenticator{credentialManagementReadOnly: true}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	_, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
+		CredentialIDHex:         "c05e",
+		Payload:                 []byte("test"),
+		PrepareInventoryRefresh: true,
+		Confirmed:               true,
+	}, userVerificationHandler(t))
+	if err != nil {
+		t.Fatalf("WriteLargeBlob: %v", err)
+	}
+
+	if _, err := session.Run(
+		context.Background(),
+		model.ListLargeBlobsOperation{Refresh: true},
+		userVerificationHandler(t),
+	); err != nil {
+		t.Fatalf("ListLargeBlobs refresh: %v", err)
+	}
+
+	wantPermission := protocol.PermissionLargeBlobWrite |
+		protocol.PermissionCredentialManagement
+	if got := a.tokenCalls.Load(); got != 1 {
+		t.Fatalf("token calls = %d, want 1", got)
+	}
+	if !slices.Equal(a.tokenPermissions, []protocol.Permission{wantPermission}) {
+		t.Fatalf("token permissions = %#v, want [%#v]", a.tokenPermissions, wantPermission)
 	}
 }
 
@@ -667,6 +703,50 @@ func TestLargeBlobWritePINOnlyFlowDoesNotRequestUserVerification(t *testing.T) {
 		if event.Kind == model.InteractionKindUserVerification {
 			t.Fatal("user-verification interaction emitted for PIN-only authenticator")
 		}
+	}
+}
+
+func TestLargeBlobWritePreparedRefreshRequestsPINOnce(t *testing.T) {
+	a := &pinOnlyLargeBlobWriteEventAuthenticator{
+		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
+	}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	var requests []model.InteractionRequest
+	handler := interactionHandlerFunc(func(req model.InteractionRequest) (model.InteractionResponse, error) {
+		requests = append(requests, req)
+
+		return model.InteractionResponse{PIN: []byte("1234")}, nil
+	})
+
+	_, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
+		CredentialIDHex:         "c05e",
+		Payload:                 []byte("test"),
+		PrepareInventoryRefresh: true,
+		Confirmed:               true,
+	}, handler)
+	if err != nil {
+		t.Fatalf("WriteLargeBlob: %v", err)
+	}
+	if _, err := session.Run(
+		context.Background(),
+		model.ListLargeBlobsOperation{Refresh: true},
+		handler,
+	); err != nil {
+		t.Fatalf("ListLargeBlobs refresh: %v", err)
+	}
+
+	if got := a.pinCalls.Load(); got != 1 {
+		t.Fatalf("PIN token calls = %d, want 1", got)
+	}
+	if len(requests) != 1 {
+		t.Fatalf("PIN requests = %d, want 1", len(requests))
+	}
+	if got, want := requests[0].Permission, "credentialManagement,largeBlobWrite"; got != want {
+		t.Fatalf("PIN permission = %q, want %q", got, want)
 	}
 }
 

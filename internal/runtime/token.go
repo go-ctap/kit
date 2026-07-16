@@ -20,6 +20,19 @@ type TokenKey struct {
 	RPID       string
 }
 
+// Covers reports whether a cached grant can satisfy the requested token key.
+func (granted TokenKey) Covers(requested TokenKey) bool {
+	if requested.Permission == protocol.PermissionNone || granted.RPID != requested.RPID {
+		return false
+	}
+	if requested.Permission == protocol.PermissionPersistentCredentialManagementReadOnly &&
+		granted.Permission&protocol.PermissionCredentialManagement != 0 {
+		return true
+	}
+
+	return granted.Permission&requested.Permission == requested.Permission
+}
+
 type TokenCache interface {
 	GetToken(TokenKey) ([]byte, bool, error)
 	SetToken(TokenKey, *secret.Handle)
@@ -72,7 +85,7 @@ func (s *TokenService) Acquire(
 		supportsUserVerificationForPermission(authenticator.GetInfo(), permission) {
 		_, err = s.interactions.RequestInteraction(ctx, model.InteractionRequest{
 			Kind:       model.InteractionKindUserVerification,
-			Permission: permission.String(),
+			Permission: permissionLabel(permission),
 		})
 		if err != nil {
 			return nil, err
@@ -91,9 +104,99 @@ func (s *TokenService) Acquire(
 		}
 	}
 
+	var previousFailure *failure.Failure
+	for {
+		pinInteraction, err := readPINInteractionState(ctx, authenticator)
+		if err != nil {
+			return nil, err
+		}
+		pinInteraction.Failure = previousFailure
+
+		token, err = s.acquireUsingPIN(ctx, authenticator, permission, key.RPID, pinInteraction)
+		if err == nil {
+			return s.storeToken(key, token), nil
+		}
+
+		normalized := errornorm.Normalize(err, "")
+		if !failure.IsCode(normalized, failure.CodePINInvalid) {
+			return nil, normalized
+		}
+
+		previousFailure = failure.Snapshot(normalized)
+	}
+}
+
+// Use runs a replay-safe token consumer and retries it once when the
+// authenticator rejects a token that can be safely reacquired. Callers must
+// ensure that replaying the entire consumer cannot repeat a mutation.
+func (s *TokenService) Use(
+	ctx context.Context,
+	authenticator authenticator.TokenProvider,
+	permission protocol.Permission,
+	rpID string,
+	use func([]byte) error,
+) error {
+	retriedRejectedToken := false
+	for {
+		token, err := s.Acquire(ctx, authenticator, permission, rpID)
+		if err != nil {
+			return err
+		}
+
+		err = func() error {
+			defer secret.Zero(token)
+
+			return use(token)
+		}()
+		if err == nil {
+			return nil
+		}
+
+		normalized := errornorm.Normalize(err, "")
+		if normalized.Code != failure.CodePINUVAuthInvalid {
+			return err
+		}
+
+		s.cache.InvalidateToken()
+		if retriedRejectedToken {
+			return err
+		}
+
+		retriedRejectedToken = true
+	}
+}
+
+func readPINInteractionState(
+	ctx context.Context,
+	authenticator authenticator.TokenProvider,
+) (*model.PINInteractionState, error) {
+	retries, powerCycleState, err := authenticator.GetPINRetries(ctx)
+	if err != nil {
+		return nil, errornorm.Normalize(errornorm.Annotate(
+			err,
+			errornorm.WithClientPINSubCommand(
+				failure.PhaseTokenAcquisition,
+				protocol.ClientPINSubCommandGetPINRetries,
+			)), "")
+	}
+
+	return &model.PINInteractionState{
+		RetriesRemaining: new(retries),
+		PowerCycleState:  powerCycleState,
+	}, nil
+}
+
+func (s *TokenService) acquireUsingPIN(
+	ctx context.Context,
+	authenticator authenticator.TokenProvider,
+	permission protocol.Permission,
+	rpID string,
+	pinInteraction *model.PINInteractionState,
+) ([]byte, error) {
 	response, err := s.interactions.RequestInteraction(ctx, model.InteractionRequest{
 		Kind:       model.InteractionKindPIN,
-		Permission: permission.String(),
+		Permission: permissionLabel(permission),
+		PINState:   pinInteraction,
 	})
 	if err != nil {
 		return nil, err
@@ -107,7 +210,7 @@ func (s *TokenService) Acquire(
 		)
 	}
 
-	token, err = authenticator.GetPinUvAuthTokenUsingPIN(ctx, pin, permission, key.RPID)
+	token, err := authenticator.GetPinUvAuthTokenUsingPIN(ctx, pin, permission, rpID)
 	if err != nil {
 		return nil, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseTokenAcquisition,
@@ -115,7 +218,7 @@ func (s *TokenService) Acquire(
 		))
 	}
 
-	return s.storeToken(key, token), nil
+	return token, nil
 }
 
 func (s *TokenService) storeToken(key TokenKey, token []byte) []byte {

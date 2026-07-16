@@ -14,7 +14,18 @@ import (
 func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredentialOperation) (model.OperationResult, error) {
 	var output model.CredentialDeleteOutput
 
-	report, err := r.readCredentialInventoryReport(ctx)
+	permission, err := r.mutationPermission(
+		protocol.PermissionCredentialManagement,
+		req.PrepareInventoryRefresh,
+	)
+	if err != nil {
+		return output, err
+	}
+
+	report, err := r.readCredentialInventoryReportWithGrant(
+		ctx,
+		inventoryGrantPermission(permission, req.PrepareInventoryRefresh),
+	)
 	if err != nil {
 		return output, err
 	}
@@ -53,8 +64,8 @@ func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredential
 	token, err := r.env.Tokens.Acquire(
 		ctx,
 		r.tokenProvider(),
-		protocol.PermissionCredentialManagement,
-		r.credentialMutationRPID(publicTarget),
+		permission,
+		r.credentialMutationRPID(publicTarget, req.PrepareInventoryRefresh),
 	)
 	if err != nil {
 		return output, err

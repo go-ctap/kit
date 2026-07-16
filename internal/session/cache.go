@@ -124,7 +124,7 @@ func (c *Cache) GetToken(key TokenKey) ([]byte, bool, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.tokenSecret == nil || c.tokenKey != key {
+	if c.tokenSecret == nil || !c.tokenKey.Covers(key) {
 		return nil, false, nil
 	}
 
@@ -159,11 +159,27 @@ func (c *Cache) InvalidateTokenUnlessPermission(permission protocol.Permission) 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.tokenSecret == nil || c.tokenKey.Permission == permission {
+	if c.tokenSecret == nil {
 		return
 	}
 
-	c.invalidateTokensLocked()
+	remaining := c.tokenKey.Permission & permission
+	if remaining == protocol.PermissionNone {
+		c.invalidateTokensLocked()
+
+		return
+	}
+
+	c.tokenKey.Permission = remaining
+	if !permissionUsesRPID(remaining) {
+		c.tokenKey.RPID = ""
+	}
+}
+
+func permissionUsesRPID(permission protocol.Permission) bool {
+	return permission&(protocol.PermissionMakeCredential|
+		protocol.PermissionGetAssertion|
+		protocol.PermissionCredentialManagement) != 0
 }
 
 func (c *Cache) invalidateTokensLocked() {

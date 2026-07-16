@@ -10,6 +10,7 @@ import (
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/credentials"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/report"
 	webauthn2 "github.com/go-ctap/kit/model/webauthn"
@@ -91,6 +92,27 @@ func TestListLargeBlobsOperationRefreshJSONContract(t *testing.T) {
 	}
 }
 
+func TestMutationInventoryRefreshJSONContract(t *testing.T) {
+	legacy, err := json.Marshal(model.DeleteCredentialOperation{CredentialIDHex: "c05e"})
+	if err != nil {
+		t.Fatalf("marshal legacy delete credential operation: %v", err)
+	}
+	if strings.Contains(string(legacy), "prepareInventoryRefresh") {
+		t.Fatalf("legacy delete credential operation included refresh plan: %s", legacy)
+	}
+
+	prepared, err := json.Marshal(model.DeleteCredentialOperation{
+		CredentialIDHex:         "c05e",
+		PrepareInventoryRefresh: true,
+	})
+	if err != nil {
+		t.Fatalf("marshal prepared delete credential operation: %v", err)
+	}
+	if !strings.Contains(string(prepared), `"prepareInventoryRefresh":true`) {
+		t.Fatalf("prepared delete credential operation omitted refresh plan: %s", prepared)
+	}
+}
+
 func TestUserVerificationInteractionJSON(t *testing.T) {
 	raw, err := json.Marshal(model.InteractionRequest{
 		Kind:       model.InteractionKindUserVerification,
@@ -127,6 +149,52 @@ func TestUserVerificationInteractionJSON(t *testing.T) {
 
 	if strings.Contains(string(raw), `"status"`) {
 		t.Fatalf("status leaked into interaction request JSON: %s", raw)
+	}
+}
+
+func TestPINRetryInteractionJSON(t *testing.T) {
+	retriesRemaining := uint(6)
+	powerCycleState := false
+	raw, err := json.Marshal(model.InteractionRequest{
+		Kind:       model.InteractionKindPIN,
+		Permission: "credentialManagement",
+		PINState: &model.PINInteractionState{
+			Failure: failure.Snapshot(failure.New(
+				failure.CodePINInvalid,
+				failure.WithPhase(failure.PhaseTokenAcquisition),
+			)),
+			RetriesRemaining: &retriesRemaining,
+			PowerCycleState:  &powerCycleState,
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal PIN retry interaction: %v", err)
+	}
+
+	want := `{"kind":"pin","permission":"credentialManagement","pinState":{"failure":{"code":"PIN_INVALID","category":"invalid-state","phase":"token-acquisition"},"retriesRemaining":6,"powerCycleState":false}}`
+	if string(raw) != want {
+		t.Fatalf("PIN retry interaction JSON = %s, want %s", raw, want)
+	}
+}
+
+func TestInitialPINInteractionJSON(t *testing.T) {
+	retriesRemaining := uint(7)
+	powerCycleState := false
+	raw, err := json.Marshal(model.InteractionRequest{
+		Kind:       model.InteractionKindPIN,
+		Permission: "credentialManagement",
+		PINState: &model.PINInteractionState{
+			RetriesRemaining: &retriesRemaining,
+			PowerCycleState:  &powerCycleState,
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal initial PIN interaction: %v", err)
+	}
+
+	want := `{"kind":"pin","permission":"credentialManagement","pinState":{"retriesRemaining":7,"powerCycleState":false}}`
+	if string(raw) != want {
+		t.Fatalf("initial PIN interaction JSON = %s, want %s", raw, want)
 	}
 }
 

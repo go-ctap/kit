@@ -103,6 +103,11 @@ func TestMakeCredentialMapsRequestAndUsesRawClientDataJSON(t *testing.T) {
 	op.ExcludeList = []credential.PublicKeyCredentialDescriptor{
 		{ID: []byte{0xc0, 0x5e}, Transports: []credential.AuthenticatorTransport{credential.AuthenticatorTransportUSB}},
 	}
+	op.EnterpriseAttestation = 2
+	op.AttestationFormatsPreference = []attestation.AttestationStatementFormatIdentifier{
+		attestation.AttestationStatementFormatIdentifierPacked,
+		attestation.AttestationStatementFormatIdentifierNone,
+	}
 
 	_, err := session.Run(context.Background(), op, userVerificationHandler(t))
 	if err != nil {
@@ -128,6 +133,16 @@ func TestMakeCredentialMapsRequestAndUsesRawClientDataJSON(t *testing.T) {
 	}
 	if !maps.Equal(a.makeCredentialOptions, wantOptions) {
 		t.Fatalf("options = %#v, want %#v", a.makeCredentialOptions, wantOptions)
+	}
+	if a.makeCredentialEnterpriseAttestation != op.EnterpriseAttestation ||
+		!slices.Equal(a.makeCredentialAttestationFormats, op.AttestationFormatsPreference) {
+		t.Fatalf(
+			"attestation parameters = %d %#v, want %d %#v",
+			a.makeCredentialEnterpriseAttestation,
+			a.makeCredentialAttestationFormats,
+			op.EnterpriseAttestation,
+			op.AttestationFormatsPreference,
+		)
 	}
 	if !slices.Equal(a.tokenRPIDs, []string{"example.com"}) {
 		t.Fatalf("token rpIDs = %v, want scoped RP ID", a.tokenRPIDs)
@@ -387,15 +402,17 @@ type webauthnTestAuthenticator struct {
 	alwaysUV                    bool
 	tokenRPIDs                  []string
 
-	makeCredentialCalls       int
-	makeCredentialErr         error
-	makeCredentialToken       []byte
-	makeCredentialClientData  []byte
-	makeCredentialRP          credential.PublicKeyCredentialRpEntity
-	makeCredentialUser        credential.PublicKeyCredentialUserEntity
-	makeCredentialParams      []credential.PublicKeyCredentialParameters
-	makeCredentialExcludeList []credential.PublicKeyCredentialDescriptor
-	makeCredentialOptions     map[protocol.Option]bool
+	makeCredentialCalls                 int
+	makeCredentialErr                   error
+	makeCredentialToken                 []byte
+	makeCredentialClientData            []byte
+	makeCredentialRP                    credential.PublicKeyCredentialRpEntity
+	makeCredentialUser                  credential.PublicKeyCredentialUserEntity
+	makeCredentialParams                []credential.PublicKeyCredentialParameters
+	makeCredentialExcludeList           []credential.PublicKeyCredentialDescriptor
+	makeCredentialOptions               map[protocol.Option]bool
+	makeCredentialEnterpriseAttestation uint
+	makeCredentialAttestationFormats    []attestation.AttestationStatementFormatIdentifier
 
 	getAssertionErr        error
 	getAssertionCalls      int
@@ -442,8 +459,8 @@ func (a *webauthnTestAuthenticator) MakeCredential(
 	excludeList []credential.PublicKeyCredentialDescriptor,
 	_ *webauthn.CreateAuthenticationExtensionsClientInputs,
 	options map[protocol.Option]bool,
-	_ uint,
-	_ []attestation.AttestationStatementFormatIdentifier,
+	enterpriseAttestation uint,
+	attestationFormatsPreference []attestation.AttestationStatementFormatIdentifier,
 ) (protocol.AuthenticatorMakeCredentialResponse, error) {
 	a.makeCredentialCalls++
 	a.makeCredentialToken = append([]byte(nil), pinUvAuthToken...)
@@ -455,6 +472,8 @@ func (a *webauthnTestAuthenticator) MakeCredential(
 	if options != nil {
 		a.makeCredentialOptions = lo.Assign(options)
 	}
+	a.makeCredentialEnterpriseAttestation = enterpriseAttestation
+	a.makeCredentialAttestationFormats = slices.Clone(attestationFormatsPreference)
 	if a.makeCredentialErr != nil {
 		return protocol.AuthenticatorMakeCredentialResponse{}, a.makeCredentialErr
 	}

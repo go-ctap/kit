@@ -39,7 +39,7 @@ func (r Runner) readCredentialInventoryReport(ctx context.Context) (appcredentia
 }
 
 func (r Runner) fetchCredentialInventoryReport(ctx context.Context) (appcredentials.InventoryReport, error) {
-	report, err := r.freshCredentialInventoryReport(ctx)
+	report, err := r.freshCredentialInventoryReport(ctx, protocol.PermissionNone)
 	if err != nil {
 		return appcredentials.InventoryReport{}, err
 	}
@@ -49,28 +49,75 @@ func (r Runner) fetchCredentialInventoryReport(ctx context.Context) (appcredenti
 	return report, nil
 }
 
-func (r Runner) freshCredentialInventoryReport(ctx context.Context) (appcredentials.InventoryReport, error) {
+func (r Runner) readCredentialInventoryReportWithGrant(
+	ctx context.Context,
+	grantPermission protocol.Permission,
+) (appcredentials.InventoryReport, error) {
+	if report, ok := r.env.Cache.Credential(); ok {
+		return report, nil
+	}
+
+	report, err := r.freshCredentialInventoryReport(ctx, grantPermission)
+	if err != nil {
+		return appcredentials.InventoryReport{}, err
+	}
+
+	r.env.Cache.SetCredential(report)
+
+	return report, nil
+}
+
+func (r Runner) freshCredentialInventoryReport(
+	ctx context.Context,
+	grantPermission protocol.Permission,
+) (appcredentials.InventoryReport, error) {
 	permission, err := inventoryPermission(r.infoProvider().GetInfo())
 	if err != nil {
 		return appcredentials.InventoryReport{}, err
 	}
+	if grantPermission == protocol.PermissionNone {
+		grantPermission = permission
+	}
+	if !grantCoversInventoryPermission(grantPermission, permission) {
+		return appcredentials.InventoryReport{}, failure.New(
+			failure.CodeInternalError,
+			failure.WithPhase(failure.PhaseTokenAcquisition),
+		)
+	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), permission, "")
+	var report appcredentials.InventoryReport
+	err = r.env.Tokens.Use(ctx, r.tokenProvider(), grantPermission, "", func(token []byte) error {
+		current, err := r.buildCredentialInventoryReport(ctx, token, permission)
+		if err != nil {
+			return err
+		}
+		if err := ctx.Err(); err != nil {
+			zeroCredentialInventoryReport(&current)
+
+			return errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseDiscovery))
+		}
+
+		report = current
+
+		return nil
+	})
 	if err != nil {
 		return appcredentials.InventoryReport{}, err
-	}
-	defer secret.Zero(token)
-
-	report, err := r.buildCredentialInventoryReport(ctx, token, permission)
-	if err != nil {
-		return appcredentials.InventoryReport{}, err
-	}
-	if err := ctx.Err(); err != nil {
-		zeroCredentialInventoryReport(&report)
-		return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseDiscovery))
 	}
 
 	return report, nil
+}
+
+func grantCoversInventoryPermission(
+	grantPermission protocol.Permission,
+	inventoryPermission protocol.Permission,
+) bool {
+	if grantPermission&inventoryPermission == inventoryPermission {
+		return true
+	}
+
+	return inventoryPermission == protocol.PermissionPersistentCredentialManagementReadOnly &&
+		grantPermission&protocol.PermissionCredentialManagement != 0
 }
 
 func (r Runner) buildCredentialInventoryReport(

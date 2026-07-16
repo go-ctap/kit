@@ -27,7 +27,7 @@ func (r Runner) listLargeBlobs(ctx context.Context, req model.ListLargeBlobsOper
 		err       error
 	)
 	if req.Refresh {
-		inventory, err = r.freshCredentialInventoryReport(ctx)
+		inventory, err = r.freshCredentialInventoryReport(ctx, protocol.PermissionNone)
 	} else {
 		inventory, err = r.readCredentialInventoryReport(ctx)
 	}

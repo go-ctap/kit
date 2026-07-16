@@ -50,7 +50,7 @@ whole internal session object.
   assume that authenticator state remains unchanged between commands.
 - The session cache in `internal/session.Cache` stores session-lifetime
   credential inventory, large-blob list reports, config status, and a single
-  token secret keyed by permission and RP ID.
+  token secret with its granted permissions and RP ID scope.
 - The event sink is a consumer-provided `model.EventSink`, defaulting to
   `model.NoopEventSink`. Runtime code emits factual operation progress and
   session state stages through an event dispatcher.
@@ -148,12 +148,22 @@ flowchart TD
 ```
 
 Interaction requests carry prompt payload only: kind, message, expected phrase,
-permission label, destructive flag, and preview. Session IDs and interaction IDs
-are not exposed in the public event or interaction JSON contracts.
+permission label, destructive flag, preview, and PIN retry state. PIN retry
+state contains remaining retries, the authenticator's optional power-cycle
+state, and a previous safe failure snapshot after an invalid attempt. Session
+IDs and interaction IDs are not exposed in the public event or interaction JSON
+contracts.
 
 PIN responses are copied at the runtime boundary and the caller-owned buffer is
 wiped immediately. Workflows that use PIN-derived values are responsible for
 wiping their local copies after use.
+
+A rejected PIN is recorded as a failed `ctap.command` entry because the
+authenticator, not the interaction handler, rejects it. If the runtime continues
+the operation, the next ordinary `interaction.request` retains the safe
+`pinState` payload with the failure code, remaining retries, and power-cycle
+state. Submitted PIN bytes remain redacted from both interaction and CTAP
+entries.
 
 ## Token Acquisition Flow
 
@@ -163,30 +173,64 @@ flowchart TD
   B --> C{"Matching token in session cache?"}
   C -->|yes| D["Return token bytes from secret handle"]
   C -->|no| E{"Verification flow is PIN?"}
-  E -->|yes| I["Request PIN interaction"]
+  E -->|yes| M["Read PIN retries and power-cycle state"]
   E -->|no| F{"UV supported for permission?"}
   F -->|yes| G["Request user-verification interaction"]
   G --> H["Try UV token command"]
   H -->|success| L["Store token secret and return bytes"]
-  H -->|fallback error| I
+  H -->|fallback error| M
   H -->|other error| X["Return error"]
-  F -->|no| I
+  F -->|no| M
+  M -->|success| I["Request PIN interaction with current retry state"]
+  M -->|error| X
   I --> J["Use PIN token command"]
   J -->|success| L
-  J -->|token-invalidating error| K["Invalidate cached token"]
-  K --> X
+  J -->|PIN_INVALID| M
   J -->|other error| X
 ```
 
-The token cache stores one token secret at a time. A token is reused only when
-the requested permission and RP ID match the cached key. Token invalidation is
-triggered by specific auth-invalid or unauthorized-permission style failures,
-and by successful mutations that make cached tokens unsafe to reuse.
+The token cache stores one token secret at a time. A token is reused when its
+granted permission mask covers every requested permission and its RP ID scope
+matches exactly. This allows a composite grant to serve later requests for its
+individual permissions without widening RP scope. A credential-management
+grant also covers a later read-only credential-management inventory request;
+the reverse is not true. The runtime never combines `pcmr` with another
+permission because CTAP rejects that combination. Interaction permission labels
+are emitted as deterministic comma-separated canonical names. Token
+invalidation is triggered by `PIN_UV_AUTH_INVALID` from a consuming command and
+by successful mutations that make cached tokens unsafe to reuse.
 
 The default verification flow prefers UV when supported. A per-run PIN
 verification flow skips UV interaction and the UV token command, then requests
 PIN directly. User-verification interaction is a pre-command human prompt and
 cancel point; it does not assert that UV succeeded.
+
+The runtime reads PIN retry state before the first prompt and before every retry.
+The first prompt has no previous failure. `PIN_INVALID` during token acquisition
+is non-terminal: the runtime updates the retry state and requests a new PIN
+interaction while keeping the public operation active. Each retry requires a
+fresh handler response; the runtime never resubmits a PIN automatically.
+`PIN_BLOCKED`, `PIN_UV_AUTH_BLOCKED`, cancelation, and other command failures
+remain terminal. A failure to read PIN retry state is also terminal and retains
+`getPINRetries` CTAP provenance.
+
+### Rejected Token Recovery
+
+A token can be accepted during acquisition and later be rejected by a consuming
+authenticator command because authenticator state is externally mutable. The
+token service invalidates the cached token when the consuming command returns
+`PIN_UV_AUTH_INVALID`.
+
+`TokenService.Use` owns acquisition, caller-copy wiping, rejection
+classification, cache invalidation, and one reacquisition. Its contract requires
+the entire callback to be safe to replay. Credential inventory supplies such a
+callback; it does not know which token errors require invalidation. After
+`PIN_UV_AUTH_INVALID`, the service reacquires a token and runs that callback
+once more. A second rejection completes the operation with the normalized
+failure. The rejected token remains invalidated, so a later operation cannot
+reuse it. Other consuming-command failures neither invalidate the cached token
+nor trigger an automatic retry. Mutating token consumers use `Acquire` directly
+and are never retried by this path.
 
 ## Operation Skeletons
 
@@ -206,18 +250,24 @@ cancel point; it does not assert that UV succeeded.
 
 - `ListCredentialsOperation` returns cached credential inventory when
   available. Otherwise it chooses the credential-management permission from
-  authenticator info, acquires a token, reads metadata, enumerates RPs and
-  credentials, emits enumeration progress, stores private mutation targets for
-  the current workflow, and caches the public report.
+  authenticator info and passes a retry-safe inventory callback to the token
+  service. The callback reads metadata, enumerates RPs and credentials, emits
+  enumeration progress, and stores private mutation targets for the current
+  workflow. The token service may restart the callback once after a retryable
+  token rejection; the workflow caches only the successful public report.
 - `DeleteCredentialOperation` reads fresh inventory state, builds a delete
   preview, returns early for dry-run, requests confirmation if needed, resolves
   the private target, acquires a credential-management token scoped to the
-  target RP ID, deletes the credential, and returns a delete result.
+  target RP ID, deletes the credential, and returns a delete result. When
+  `prepareInventoryRefresh` is true, it instead acquires one unscoped
+  credential-management grant that also serves a subsequent forced inventory
+  refresh.
 - `UpdateCredentialUserOperation` reads fresh inventory state, builds and
   returns an update preview for dry-run, confirms if needed, resolves and
   validates the proposed user update, acquires a credential-management token
   scoped to the target RP ID, updates user information, and returns the previous
-  and current public user values.
+  and current public user values. `prepareInventoryRefresh` applies the same
+  explicit unscoped follow-up plan as delete.
 
 Credential inventory state contains private CTAP descriptors, user entities,
 and large-blob keys. Those values are kept out of public reports and are wiped
@@ -253,10 +303,13 @@ The v1 WebAuthn runtime facade accepts raw `clientDataJSON` because the pinned
 - `WriteLargeBlobOperation` reads inventory, loads target blob state, builds a
   preview, returns early for dry-run, confirms if needed, builds a replacement
   shared large-blob array, acquires a large-blob-write token, writes the
-  replacement array, and returns a mutation result.
+  replacement array, and returns a mutation result. With
+  `prepareInventoryRefresh`, the grant is `cm|lbw`, so both cold inventory
+  discovery and a subsequent forced list refresh reuse the same token.
 - `DeleteLargeBlobOperation` follows the same target-state and confirmation
   flow as write. If no blob exists for the target credential, it returns a
-  no-op result without writing the authenticator array.
+  no-op result without writing the authenticator array. Delete and garbage
+  collection use the same explicit inventory-refresh permission plan.
 
 Large-blob mutations rewrite the authenticator shared serialized large-blob
 array. Previews and results include before/after serialized array sizes and

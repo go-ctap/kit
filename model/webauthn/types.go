@@ -23,13 +23,15 @@ type AuthenticatorOptions struct {
 }
 
 type MakeCredentialInput struct {
-	RP               credential.PublicKeyCredentialRpEntity                   `json:"rp"`
-	User             credential.PublicKeyCredentialUserEntity                 `json:"user"`
-	ClientDataJSON   []byte                                                   `json:"clientDataJSON"`
-	PubKeyCredParams []credential.PublicKeyCredentialParameters               `json:"pubKeyCredParams"`
-	ExcludeList      []credential.PublicKeyCredentialDescriptor               `json:"excludeList,omitempty"`
-	Options          AuthenticatorOptions                                     `json:"options,omitempty"`
-	Extensions       *ctapwebauthn.CreateAuthenticationExtensionsClientInputs `json:"extensions,omitempty"`
+	RP                           credential.PublicKeyCredentialRpEntity                   `json:"rp"`
+	User                         credential.PublicKeyCredentialUserEntity                 `json:"user"`
+	ClientDataJSON               []byte                                                   `json:"clientDataJSON"`
+	PubKeyCredParams             []credential.PublicKeyCredentialParameters               `json:"pubKeyCredParams"`
+	ExcludeList                  []credential.PublicKeyCredentialDescriptor               `json:"excludeList,omitempty"`
+	Options                      AuthenticatorOptions                                     `json:"options,omitempty"`
+	Extensions                   *ctapwebauthn.CreateAuthenticationExtensionsClientInputs `json:"extensions,omitempty"`
+	EnterpriseAttestation        uint                                                     `json:"enterpriseAttestation,omitempty"`
+	AttestationFormatsPreference []attestation.AttestationStatementFormatIdentifier       `json:"attestationFormatsPreference,omitempty"`
 }
 
 type GetAssertionInput struct {
@@ -143,6 +145,9 @@ func NormalizeMakeCredentialInput(input MakeCredentialInput) (MakeCredentialInpu
 	if len(input.User.ID) == 0 {
 		return MakeCredentialInput{}, failure.New(failure.CodeUserIDRequired, failure.WithPhase(failure.PhaseValidation))
 	}
+	if len(input.User.ID) > 64 {
+		return MakeCredentialInput{}, failure.New(failure.CodeCTAPLengthInvalid, failure.WithPhase(failure.PhaseValidation))
+	}
 	input.User.ID = lo.Clone(input.User.ID)
 
 	if len(input.ClientDataJSON) == 0 {
@@ -154,11 +159,16 @@ func NormalizeMakeCredentialInput(input MakeCredentialInput) (MakeCredentialInpu
 		return MakeCredentialInput{}, failure.New(failure.CodePublicKeyCredentialParametersRequired, failure.WithPhase(failure.PhaseValidation))
 	}
 
+	seenParameters := make(map[credential.PublicKeyCredentialParameters]struct{}, len(input.PubKeyCredParams))
 	pubKeyCredParams, err := lo.MapErr(input.PubKeyCredParams, func(param credential.PublicKeyCredentialParameters, _ int) (credential.PublicKeyCredentialParameters, error) {
 		param = normalizeCredentialParameter(param)
 		if param.Algorithm == 0 {
 			return credential.PublicKeyCredentialParameters{}, failure.New(failure.CodePublicKeyCredentialAlgorithmRequired, failure.WithPhase(failure.PhaseValidation))
 		}
+		if _, duplicate := seenParameters[param]; duplicate {
+			return credential.PublicKeyCredentialParameters{}, failure.New(failure.CodeCTAPParameterInvalid, failure.WithPhase(failure.PhaseValidation))
+		}
+		seenParameters[param] = struct{}{}
 
 		return param, nil
 	})
@@ -166,6 +176,20 @@ func NormalizeMakeCredentialInput(input MakeCredentialInput) (MakeCredentialInpu
 		return MakeCredentialInput{}, err
 	}
 	input.PubKeyCredParams = pubKeyCredParams
+	if input.Options.UserPresence != nil && !*input.Options.UserPresence {
+		return MakeCredentialInput{}, failure.New(failure.CodeCTAPOptionInvalid, failure.WithPhase(failure.PhaseValidation))
+	}
+	if input.EnterpriseAttestation > 2 {
+		return MakeCredentialInput{}, failure.New(failure.CodeCTAPOptionInvalid, failure.WithPhase(failure.PhaseValidation))
+	}
+	input.AttestationFormatsPreference = slices.Clone(input.AttestationFormatsPreference)
+	for index, format := range input.AttestationFormatsPreference {
+		normalized := attestation.AttestationStatementFormatIdentifier(strings.TrimSpace(string(format)))
+		if normalized == "" {
+			return MakeCredentialInput{}, failure.New(failure.CodeCTAPParameterInvalid, failure.WithPhase(failure.PhaseValidation))
+		}
+		input.AttestationFormatsPreference[index] = normalized
+	}
 
 	excludeList, err := normalizeDescriptors(input.ExcludeList)
 	if err != nil {

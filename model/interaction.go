@@ -1,5 +1,7 @@
 package model
 
+import "github.com/go-ctap/kit/model/failure"
+
 type InteractionHandler interface {
 	RequestInteraction(InteractionRequest) (InteractionResponse, error)
 }
@@ -14,11 +16,18 @@ const (
 )
 
 type InteractionRequest struct {
-	Kind        InteractionKind `json:"kind"`
-	Message     string          `json:"message,omitempty"`
-	Permission  string          `json:"permission,omitempty"`
-	Destructive bool            `json:"destructive,omitempty"`
-	Preview     any             `json:"preview,omitempty"`
+	Kind        InteractionKind      `json:"kind"`
+	Message     string               `json:"message,omitempty"`
+	Permission  string               `json:"permission,omitempty"`
+	Destructive bool                 `json:"destructive,omitempty"`
+	Preview     any                  `json:"preview,omitempty"`
+	PINState    *PINInteractionState `json:"pinState,omitempty"`
+}
+
+type PINInteractionState struct {
+	Failure          *failure.Failure `json:"failure,omitempty"`
+	RetriesRemaining *uint            `json:"retriesRemaining,omitempty"`
+	PowerCycleState  *bool            `json:"powerCycleState,omitempty"`
 }
 
 type InteractionResponse struct {

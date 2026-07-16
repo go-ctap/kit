@@ -60,3 +60,21 @@ func TestSafeValueRedactsSecretMapKeysBeforeJSON(t *testing.T) {
 		t.Fatalf("redacted fields = %v", safe.RedactedFields)
 	}
 }
+
+func TestSafeValuePreservesExplicitPointerZeroValues(t *testing.T) {
+	retriesRemaining := uint(0)
+	powerCycleState := false
+	safe := SafeValue(struct {
+		RetriesRemaining *uint `json:"retriesRemaining,omitempty"`
+		PowerCycleState  *bool `json:"powerCycleState,omitempty"`
+	}{
+		RetriesRemaining: &retriesRemaining,
+		PowerCycleState:  &powerCycleState,
+	})
+
+	payload := Payload(safe)
+	if payload == nil || !strings.Contains(payload.JSON, `"retriesRemaining": 0`) ||
+		!strings.Contains(payload.JSON, `"powerCycleState": false`) {
+		t.Fatalf("safe payload lost explicit pointer zero values: %#v", payload)
+	}
+}

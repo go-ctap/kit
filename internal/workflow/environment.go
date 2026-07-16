@@ -32,6 +32,13 @@ type InteractionRequester interface {
 
 type TokenService interface {
 	Acquire(context.Context, authenticator.TokenProvider, protocol.Permission, string) ([]byte, error)
+	Use(
+		context.Context,
+		authenticator.TokenProvider,
+		protocol.Permission,
+		string,
+		func([]byte) error,
+	) error
 }
 
 type CacheStore interface {

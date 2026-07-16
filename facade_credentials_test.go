@@ -77,6 +77,51 @@ func TestCredentialInventoryReturnsEmptyReportWithoutEnumeratingRPs(t *testing.T
 	}
 }
 
+func TestCredentialInventoryReacquiresRejectedTokenOnce(t *testing.T) {
+	a := &rejectedCredentialTokenAuthenticator{}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	output := runCredentialList(t, session, model.ListCredentialsOperation{})
+	if output.Report.Summary.ExistingResidentCredentialsCount != 0 {
+		t.Fatalf("existing credential count = %d, want 0", output.Report.Summary.ExistingResidentCredentialsCount)
+	}
+	if got := a.tokenCalls.Load(); got != 2 {
+		t.Fatalf("token calls = %d, want 2", got)
+	}
+	if got := a.metadataCalls.Load(); got != 2 {
+		t.Fatalf("metadata calls = %d, want 2", got)
+	}
+	if len(a.metadataTokens) != 2 || !bytes.Equal(a.metadataTokens[0], []byte{1}) || !bytes.Equal(a.metadataTokens[1], []byte{2}) {
+		t.Fatalf("metadata tokens = %#v, want [[1] [2]]", a.metadataTokens)
+	}
+}
+
+func TestCredentialInventoryStopsAfterSecondRejectedToken(t *testing.T) {
+	a := &rejectedCredentialTokenAuthenticator{rejectEveryToken: true}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	_, err := session.Run(
+		context.Background(),
+		model.ListCredentialsOperation{},
+		userVerificationHandler(t),
+	)
+	if !failure.IsCode(err, failure.CodePINUVAuthInvalid) {
+		t.Fatalf("ListCredentials error = %v, want %s", err, failure.CodePINUVAuthInvalid)
+	}
+	if got := a.tokenCalls.Load(); got != 2 {
+		t.Fatalf("token calls = %d, want 2", got)
+	}
+	if got := a.metadataCalls.Load(); got != 2 {
+		t.Fatalf("metadata calls = %d, want 2", got)
+	}
+}
+
 func TestCredentialInventoryFailedRefreshPreservesLastKnownGoodCache(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -288,6 +333,42 @@ func TestCredentialDeleteUsesScopedMutationPermissionsWhenStrict(t *testing.T) {
 	)
 }
 
+func TestCredentialDeletePreparesOneUnscopedGrantForInventoryRefreshWhenStrict(t *testing.T) {
+	a := &credentialMutationTokenAuthenticator{credentialManagementReadOnly: true}
+	session := openContractSessionWithOptions(
+		t,
+		nil,
+		func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+			return a, nil
+		},
+		WithStrictPermissions(),
+	)
+	defer func() { _ = session.Close() }()
+
+	_, err := session.Run(context.Background(), model.DeleteCredentialOperation{
+		CredentialIDHex:         "c05e",
+		PrepareInventoryRefresh: true,
+		Confirmed:               true,
+	}, userVerificationHandler(t))
+	if err != nil {
+		t.Fatalf("DeleteCredential: %v", err)
+	}
+
+	if _, err := session.Run(
+		context.Background(),
+		model.ListCredentialsOperation{Refresh: true},
+		userVerificationHandler(t),
+	); err != nil {
+		t.Fatalf("ListCredentials refresh: %v", err)
+	}
+
+	wantPermission := protocol.PermissionCredentialManagement
+	if !slices.Equal(a.tokenPermissions, []protocol.Permission{wantPermission}) {
+		t.Fatalf("token permissions = %#v, want [%#v]", a.tokenPermissions, wantPermission)
+	}
+	assertCredentialMutationToken(t, a.tokenRPIDs, []string{""}, a.deleteTokens, "token:")
+}
+
 func TestCredentialUpdateUserUsesUnscopedMutationPermissionsByDefault(t *testing.T) {
 	a := &credentialMutationTokenAuthenticator{}
 	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
@@ -346,6 +427,50 @@ type progressCredentialAuthenticator struct {
 type emptyCredentialAuthenticator struct {
 	contractAuthenticator
 	rpEnumerations atomic.Int32
+}
+
+type rejectedCredentialTokenAuthenticator struct {
+	contractAuthenticator
+	rejectEveryToken bool
+	tokenCalls       atomic.Int32
+	metadataCalls    atomic.Int32
+	metadataTokens   [][]byte
+}
+
+func (a *rejectedCredentialTokenAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	return protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionCredentialManagement: true,
+			protocol.OptionPinUvAuthToken:       true,
+			protocol.OptionUserVerification:     true,
+		},
+	}
+}
+
+func (a *rejectedCredentialTokenAuthenticator) GetPinUvAuthTokenUsingUV(
+	context.Context,
+	protocol.Permission,
+	string,
+) ([]byte, error) {
+	return []byte{byte(a.tokenCalls.Add(1))}, nil
+}
+
+func (a *rejectedCredentialTokenAuthenticator) GetCredsMetadata(
+	_ context.Context,
+	token []byte,
+) (protocol.AuthenticatorCredentialManagementResponse, error) {
+	a.metadataCalls.Add(1)
+	a.metadataTokens = append(a.metadataTokens, slices.Clone(token))
+	if a.rejectEveryToken || bytes.Equal(token, []byte{1}) {
+		return protocol.AuthenticatorCredentialManagementResponse{}, &ctaptransport.CTAPError{
+			Command:    protocol.AuthenticatorCredentialManagement,
+			StatusCode: ctaptransport.CTAP2_ERR_PIN_AUTH_INVALID,
+		}
+	}
+
+	return protocol.AuthenticatorCredentialManagementResponse{
+		MaxPossibleRemainingResidentCredentialsCount: 25,
+	}, nil
 }
 
 func (a *emptyCredentialAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
@@ -563,28 +688,36 @@ func progressCredentialResponse(
 
 type credentialMutationTokenAuthenticator struct {
 	contractAuthenticator
-	tokenRPIDs   []string
-	deleteTokens []string
-	updateTokens []string
-	deleteErr    error
-	updateErr    error
+	credentialManagementReadOnly bool
+	tokenPermissions             []protocol.Permission
+	tokenRPIDs                   []string
+	deleteTokens                 []string
+	updateTokens                 []string
+	deleteErr                    error
+	updateErr                    error
 }
 
 func (a *credentialMutationTokenAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	options := map[protocol.Option]bool{
+		protocol.OptionCredentialManagement: true,
+		protocol.OptionPinUvAuthToken:       true,
+		protocol.OptionUserVerification:     true,
+	}
+	if a.credentialManagementReadOnly {
+		options[protocol.OptionCredentialManagementReadOnly] = true
+	}
+
 	return protocol.AuthenticatorGetInfoResponse{
-		Options: map[protocol.Option]bool{
-			protocol.OptionCredentialManagement: true,
-			protocol.OptionPinUvAuthToken:       true,
-			protocol.OptionUserVerification:     true,
-		},
+		Options: options,
 	}
 }
 
 func (a *credentialMutationTokenAuthenticator) GetPinUvAuthTokenUsingUV(
 	_ context.Context,
-	_ protocol.Permission,
+	permission protocol.Permission,
 	rpID string,
 ) ([]byte, error) {
+	a.tokenPermissions = append(a.tokenPermissions, permission)
 	a.tokenRPIDs = append(a.tokenRPIDs, rpID)
 
 	return []byte("token:" + rpID), nil

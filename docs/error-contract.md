@@ -129,6 +129,81 @@ The original typed CTAP or transport cause is not part of the public failure
 envelope and remains available only through the in-process Go error chain.
 Public error consumers must not forward or concatenate its text.
 
+## PIN Interaction State
+
+Before the first PIN token attempt, the runtime reads the current retry state
+and includes it in the PIN interaction request without a previous failure:
+
+```json
+{
+  "kind": "pin",
+  "permission": "credentialManagement",
+  "pinState": {
+    "retriesRemaining": 7,
+    "powerCycleState": false
+  }
+}
+```
+
+`PIN_INVALID` during PIN token acquisition does not complete the public
+operation. The runtime reads the updated PIN retry state and emits another PIN
+interaction request with the previous failure:
+
+```json
+{
+  "kind": "pin",
+  "permission": "credentialManagement",
+  "pinState": {
+    "failure": {
+      "code": "PIN_INVALID",
+      "category": "invalid-state",
+      "phase": "token-acquisition",
+      "ctap": {
+        "command": "authenticatorClientPIN",
+        "commandCode": 6,
+        "status": "CTAP2_ERR_PIN_INVALID",
+        "statusCode": 49
+      }
+    },
+    "retriesRemaining": 6,
+    "powerCycleState": false
+  }
+}
+```
+
+`retriesRemaining` is present after `getPINRetries` succeeds.
+`powerCycleState` preserves the authenticator's optional boolean, including an
+explicit `false`; it is omitted when the authenticator does not return it. A
+failure to read retry state completes the operation before requesting the PIN.
+The embedded previous failure is a detached, secret-free snapshot and omits
+runtime correlation identifiers.
+
+Every retry requires a new interaction response. The runtime never resubmits a
+previous PIN. Blocked states, cancellation, other token failures, and a failure
+to read retry state complete the operation with an ordinary public failure.
+
+The journal records the authenticator rejection as a failed `ctap.command`.
+Because the interaction handler itself completed successfully, it is not logged
+as a failed interaction. The following ordinary `interaction.request` contains
+the safe `pinState` payload with the previous failure, remaining retries, and
+power-cycle state. The submitted PIN remains redacted.
+
+## Rejected Token Recovery
+
+`PIN_UV_AUTH_INVALID` can occur after successful token acquisition when an
+authenticator rejects that token on a consuming command. `TokenService.Use`
+owns token acquisition, caller-copy wiping, rejection classification, cache
+invalidation, and one reacquisition. Its caller must supply an entire callback
+that is safe to replay. Credential inventory supplies such a callback; it does
+not decide which token errors invalidate the cache. The first rejection is
+therefore not returned as the final `credentials.list` error.
+
+If the fresh token is also rejected, the operation completes with the second
+normalized failure. The token is still invalidated, preventing subsequent
+operations from repeatedly using the same rejected secret. Other consuming-
+command failures neither invalidate the cached token nor trigger an automatic
+retry.
+
 ## Engineering Log Diagnostics
 
 Completed journal entries include the bounded retained cause of transport

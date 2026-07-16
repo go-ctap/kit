@@ -194,12 +194,5 @@ func appendPath(path []string, value string) []string {
 }
 
 func isZero(value reflect.Value) bool {
-	for value.IsValid() && (value.Kind() == reflect.Interface || value.Kind() == reflect.Pointer) {
-		if value.IsNil() {
-			return true
-		}
-		value = value.Elem()
-	}
-
 	return !value.IsValid() || value.IsZero()
 }

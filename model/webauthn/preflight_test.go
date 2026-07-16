@@ -2,13 +2,16 @@ package webauthn
 
 import (
 	"bytes"
+	"slices"
 	"testing"
 
+	"github.com/go-ctap/ctap/attestation"
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/kit/model/failure"
 )
 
 func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {
+	userPresenceFalse := false
 	base := MakeCredentialInput{
 		RP:             credential.PublicKeyCredentialRpEntity{ID: "example.com"},
 		User:           credential.PublicKeyCredentialUserEntity{ID: []byte{0x01, 0x02}},
@@ -69,6 +72,51 @@ func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {
 				PubKeyCredParams: []credential.PublicKeyCredentialParameters{{}},
 			},
 		},
+		{
+			name:     "user id length",
+			wantCode: failure.CodeCTAPLengthInvalid,
+			input: MakeCredentialInput{
+				RP:               base.RP,
+				User:             credential.PublicKeyCredentialUserEntity{ID: bytes.Repeat([]byte{0x01}, 65)},
+				ClientDataJSON:   base.ClientDataJSON,
+				PubKeyCredParams: base.PubKeyCredParams,
+			},
+		},
+		{
+			name:     "duplicate parameter",
+			wantCode: failure.CodeCTAPParameterInvalid,
+			input: MakeCredentialInput{
+				RP:             base.RP,
+				User:           base.User,
+				ClientDataJSON: base.ClientDataJSON,
+				PubKeyCredParams: []credential.PublicKeyCredentialParameters{
+					{Algorithm: -7},
+					{Algorithm: -7},
+				},
+			},
+		},
+		{
+			name:     "false user presence",
+			wantCode: failure.CodeCTAPOptionInvalid,
+			input: MakeCredentialInput{
+				RP:               base.RP,
+				User:             base.User,
+				ClientDataJSON:   base.ClientDataJSON,
+				PubKeyCredParams: base.PubKeyCredParams,
+				Options:          AuthenticatorOptions{UserPresence: &userPresenceFalse},
+			},
+		},
+		{
+			name:     "enterprise attestation",
+			wantCode: failure.CodeCTAPOptionInvalid,
+			input: MakeCredentialInput{
+				RP:                    base.RP,
+				User:                  base.User,
+				ClientDataJSON:        base.ClientDataJSON,
+				PubKeyCredParams:      base.PubKeyCredParams,
+				EnterpriseAttestation: 3,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -87,16 +135,23 @@ func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {
 func TestNormalizeInputsTrimCloneAndDefaultCredentialTypes(t *testing.T) {
 	userID := []byte{0x0a, 0x0b}
 	credentialID := []byte{0xc0, 0x5e}
+	formats := []attestation.AttestationStatementFormatIdentifier{
+		attestation.AttestationStatementFormatIdentifierPacked,
+		attestation.AttestationStatementFormatIdentifierPacked,
+		attestation.AttestationStatementFormatIdentifierNone,
+	}
 	input, err := NormalizeMakeCredentialInput(MakeCredentialInput{
 		RP:             credential.PublicKeyCredentialRpEntity{ID: " example.com "},
 		User:           credential.PublicKeyCredentialUserEntity{ID: userID},
 		ClientDataJSON: []byte("client-data"),
 		PubKeyCredParams: []credential.PublicKeyCredentialParameters{
 			{Algorithm: -7},
+			{Type: "future-key", Algorithm: -7},
 		},
 		ExcludeList: []credential.PublicKeyCredentialDescriptor{
 			{ID: credentialID},
 		},
+		AttestationFormatsPreference: formats,
 	})
 	if err != nil {
 		t.Fatalf("NormalizeMakeCredentialInput: %v", err)
@@ -113,11 +168,18 @@ func TestNormalizeInputsTrimCloneAndDefaultCredentialTypes(t *testing.T) {
 	if input.PubKeyCredParams[0].Type != PublicKeyCredentialTypePublicKey {
 		t.Fatalf("param type = %q, want public-key", input.PubKeyCredParams[0].Type)
 	}
+	if input.PubKeyCredParams[1].Type != "future-key" {
+		t.Fatalf("param type = %q, want future-key", input.PubKeyCredParams[1].Type)
+	}
 
 	if input.ExcludeList[0].Type != PublicKeyCredentialTypePublicKey ||
 		!bytes.Equal(input.ExcludeList[0].ID, credentialID) ||
 		&input.ExcludeList[0].ID[0] == &credentialID[0] {
 		t.Fatalf("exclude descriptor = %#v, want default public-key with cloned id", input.ExcludeList[0])
+	}
+	if !slices.Equal(input.AttestationFormatsPreference, formats) ||
+		&input.AttestationFormatsPreference[0] == &formats[0] {
+		t.Fatalf("attestation formats = %#v, want cloned formats", input.AttestationFormatsPreference)
 	}
 }
 

@@ -327,6 +327,8 @@ func TestProgressLoggingDoesNotDuplicateOperationEvent(t *testing.T) {
 
 func TestInteractionLoggingAppendsCompletedEntriesWithoutDuplicatePrompt(t *testing.T) {
 	const sentinelPIN = "sentinel-interaction-pin-8301"
+	retriesRemaining := uint(6)
+	powerCycleState := false
 	emitter := newCountingLogEmitter()
 	service := New(WithEventEmitter(emitter))
 	service.operations["operation-1"] = &operationState{
@@ -344,7 +346,17 @@ func TestInteractionLoggingAppendsCompletedEntriesWithoutDuplicatePrompt(t *test
 
 	result := make(chan error, 1)
 	go func() {
-		_, err := handler.RequestInteraction(model.InteractionRequest{})
+		_, err := handler.RequestInteraction(model.InteractionRequest{
+			Kind: model.InteractionKindPIN,
+			PINState: &model.PINInteractionState{
+				Failure: failure.Snapshot(failure.New(
+					failure.CodePINInvalid,
+					failure.WithPhase(failure.PhaseTokenAcquisition),
+				)),
+				RetriesRemaining: &retriesRemaining,
+				PowerCycleState:  &powerCycleState,
+			},
+		})
 		result <- err
 	}()
 	prompt := <-emitter.prompts
@@ -369,6 +381,25 @@ func TestInteractionLoggingAppendsCompletedEntriesWithoutDuplicatePrompt(t *test
 		if record.Entry.SessionID != "session-1" || record.Entry.OperationID != "operation-1" {
 			t.Fatalf("interaction correlation = %#v", record.Entry)
 		}
+	}
+	requestEntry := logs[0].Entry
+	if requestEntry.Code != model.LogCodeInteractionRequest ||
+		requestEntry.Level != model.LogLevelInfo ||
+		requestEntry.Outcome != model.LogOutcomeSucceeded {
+		t.Fatalf("interaction request log = %#v", requestEntry)
+	}
+	if requestEntry.Request == nil {
+		t.Fatal("retry interaction request = nil")
+	}
+	var loggedRequest model.InteractionRequest
+	if err := json.Unmarshal([]byte(requestEntry.Request.JSON), &loggedRequest); err != nil {
+		t.Fatalf("decode retry interaction request: %v", err)
+	}
+	if loggedRequest.PINState == nil ||
+		loggedRequest.PINState.Failure == nil || loggedRequest.PINState.Failure.Code != failure.CodePINInvalid ||
+		loggedRequest.PINState.RetriesRemaining == nil || *loggedRequest.PINState.RetriesRemaining != 6 ||
+		loggedRequest.PINState.PowerCycleState == nil || *loggedRequest.PINState.PowerCycleState {
+		t.Fatalf("retry interaction request = %#v", loggedRequest)
 	}
 	raw, err := json.Marshal(logs)
 	if err != nil {

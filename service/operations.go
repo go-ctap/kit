@@ -21,24 +21,28 @@ type CredentialListRequest struct {
 
 type CredentialDeleteRequest struct {
 	OperationRequest
-	CredentialIDHex     string `json:"credentialIdHex"`
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	CredentialIDHex string `json:"credentialIdHex"`
+	// PrepareInventoryRefresh broadens the token plan only enough for a subsequent inventory refresh.
+	PrepareInventoryRefresh bool   `json:"prepareInventoryRefresh,omitempty"`
+	Confirmed               bool   `json:"confirmed,omitempty"`
+	ConfirmationMessage     string `json:"confirmationMessage,omitempty"`
+	DryRun                  bool   `json:"dryRun,omitempty"`
 }
 
 type CredentialUpdateRequest struct {
 	OperationRequest
-	CredentialIDHex     string `json:"credentialIdHex"`
-	UserIDHex           string `json:"userIdHex,omitempty"`
-	Name                string `json:"name,omitempty"`
-	DisplayName         string `json:"displayName,omitempty"`
-	UserIDProvided      bool   `json:"userIdProvided,omitempty"`
-	NameProvided        bool   `json:"nameProvided,omitempty"`
-	DisplayProvided     bool   `json:"displayProvided,omitempty"`
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	CredentialIDHex string `json:"credentialIdHex"`
+	// PrepareInventoryRefresh broadens the token plan only enough for a subsequent inventory refresh.
+	PrepareInventoryRefresh bool   `json:"prepareInventoryRefresh,omitempty"`
+	UserIDHex               string `json:"userIdHex,omitempty"`
+	Name                    string `json:"name,omitempty"`
+	DisplayName             string `json:"displayName,omitempty"`
+	UserIDProvided          bool   `json:"userIdProvided,omitempty"`
+	NameProvided            bool   `json:"nameProvided,omitempty"`
+	DisplayProvided         bool   `json:"displayProvided,omitempty"`
+	Confirmed               bool   `json:"confirmed,omitempty"`
+	ConfirmationMessage     string `json:"confirmationMessage,omitempty"`
+	DryRun                  bool   `json:"dryRun,omitempty"`
 }
 
 type LargeBlobReadRequest struct {
@@ -54,18 +58,22 @@ type LargeBlobListRequest struct {
 
 type LargeBlobMutationRequest struct {
 	OperationRequest
-	CredentialIDHex     string `json:"credentialIdHex"`
-	Payload             []byte `json:"payload,omitempty"`
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	CredentialIDHex string `json:"credentialIdHex"`
+	Payload         []byte `json:"payload,omitempty"`
+	// PrepareInventoryRefresh broadens the token plan only enough for a subsequent inventory refresh.
+	PrepareInventoryRefresh bool   `json:"prepareInventoryRefresh,omitempty"`
+	Confirmed               bool   `json:"confirmed,omitempty"`
+	ConfirmationMessage     string `json:"confirmationMessage,omitempty"`
+	DryRun                  bool   `json:"dryRun,omitempty"`
 }
 
 type LargeBlobGarbageCollectRequest struct {
 	OperationRequest
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	// PrepareInventoryRefresh broadens the token plan only enough for a subsequent inventory refresh.
+	PrepareInventoryRefresh bool   `json:"prepareInventoryRefresh,omitempty"`
+	Confirmed               bool   `json:"confirmed,omitempty"`
+	ConfirmationMessage     string `json:"confirmationMessage,omitempty"`
+	DryRun                  bool   `json:"dryRun,omitempty"`
 }
 
 type PINSetRequest struct {
@@ -175,26 +183,28 @@ func (s *Service) ListCredentials(ctx context.Context, req CredentialListRequest
 
 func (s *Service) DeleteCredential(ctx context.Context, req CredentialDeleteRequest) (CredentialDeleteEnvelope, error) {
 	meta, result, err := runTypedOperation[model.CredentialDeleteOutput](s, ctx, req.OperationRequest, model.DeleteCredentialOperation{
-		CredentialIDHex:     req.CredentialIDHex,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		CredentialIDHex:         req.CredentialIDHex,
+		PrepareInventoryRefresh: req.PrepareInventoryRefresh,
+		Confirmed:               req.Confirmed,
+		ConfirmationMessage:     req.ConfirmationMessage,
+		DryRun:                  req.DryRun,
 	})
 	return CredentialDeleteEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
 func (s *Service) UpdateCredentialUser(ctx context.Context, req CredentialUpdateRequest) (CredentialUpdateEnvelope, error) {
 	meta, result, err := runTypedOperation[model.CredentialUpdateOutput](s, ctx, req.OperationRequest, model.UpdateCredentialUserOperation{
-		CredentialIDHex:     req.CredentialIDHex,
-		UserIDHex:           req.UserIDHex,
-		Name:                req.Name,
-		DisplayName:         req.DisplayName,
-		UserIDProvided:      req.UserIDProvided,
-		NameProvided:        req.NameProvided,
-		DisplayProvided:     req.DisplayProvided,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		CredentialIDHex:         req.CredentialIDHex,
+		PrepareInventoryRefresh: req.PrepareInventoryRefresh,
+		UserIDHex:               req.UserIDHex,
+		Name:                    req.Name,
+		DisplayName:             req.DisplayName,
+		UserIDProvided:          req.UserIDProvided,
+		NameProvided:            req.NameProvided,
+		DisplayProvided:         req.DisplayProvided,
+		Confirmed:               req.Confirmed,
+		ConfirmationMessage:     req.ConfirmationMessage,
+		DryRun:                  req.DryRun,
 	})
 	return CredentialUpdateEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
@@ -216,30 +226,33 @@ func (s *Service) ListLargeBlobs(ctx context.Context, req LargeBlobListRequest) 
 
 func (s *Service) WriteLargeBlob(ctx context.Context, req LargeBlobMutationRequest) (LargeBlobMutationEnvelope, error) {
 	meta, result, err := runTypedOperation[model.LargeBlobMutationOutput](s, ctx, req.OperationRequest, model.WriteLargeBlobOperation{
-		CredentialIDHex:     req.CredentialIDHex,
-		Payload:             req.Payload,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		CredentialIDHex:         req.CredentialIDHex,
+		Payload:                 req.Payload,
+		PrepareInventoryRefresh: req.PrepareInventoryRefresh,
+		Confirmed:               req.Confirmed,
+		ConfirmationMessage:     req.ConfirmationMessage,
+		DryRun:                  req.DryRun,
 	})
 	return LargeBlobMutationEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
 func (s *Service) DeleteLargeBlob(ctx context.Context, req LargeBlobMutationRequest) (LargeBlobMutationEnvelope, error) {
 	meta, result, err := runTypedOperation[model.LargeBlobMutationOutput](s, ctx, req.OperationRequest, model.DeleteLargeBlobOperation{
-		CredentialIDHex:     req.CredentialIDHex,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		CredentialIDHex:         req.CredentialIDHex,
+		PrepareInventoryRefresh: req.PrepareInventoryRefresh,
+		Confirmed:               req.Confirmed,
+		ConfirmationMessage:     req.ConfirmationMessage,
+		DryRun:                  req.DryRun,
 	})
 	return LargeBlobMutationEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
 func (s *Service) GarbageCollectLargeBlobs(ctx context.Context, req LargeBlobGarbageCollectRequest) (LargeBlobMutationEnvelope, error) {
 	meta, result, err := runTypedOperation[model.LargeBlobMutationOutput](s, ctx, req.OperationRequest, model.GarbageCollectLargeBlobsOperation{
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		Confirmed:               req.Confirmed,
+		PrepareInventoryRefresh: req.PrepareInventoryRefresh,
+		ConfirmationMessage:     req.ConfirmationMessage,
+		DryRun:                  req.DryRun,
 	})
 	return LargeBlobMutationEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }

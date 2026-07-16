@@ -22,6 +22,7 @@ type TokenProvider interface {
 	InfoProvider
 	GetPinUvAuthTokenUsingPIN(ctx context.Context, pin string, permission protocol.Permission, rpID string) ([]byte, error)
 	GetPinUvAuthTokenUsingUV(ctx context.Context, permission protocol.Permission, rpID string) ([]byte, error)
+	GetPINRetries(ctx context.Context) (uint, *bool, error)
 }
 
 type CredentialManager interface {

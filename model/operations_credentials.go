@@ -9,10 +9,12 @@ func (ListCredentialsOperation) IsDryRun() bool      { return false }
 func (ListCredentialsOperation) ctapkitOperation()   {}
 
 type DeleteCredentialOperation struct {
-	CredentialIDHex     string `json:"credentialIdHex"`
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	CredentialIDHex string `json:"credentialIdHex"`
+	// PrepareInventoryRefresh requests a grant that can serve the next inventory refresh.
+	PrepareInventoryRefresh bool   `json:"prepareInventoryRefresh,omitempty"`
+	Confirmed               bool   `json:"confirmed,omitempty"`
+	ConfirmationMessage     string `json:"confirmationMessage,omitempty"`
+	DryRun                  bool   `json:"dryRun,omitempty"`
 }
 
 func (DeleteCredentialOperation) Kind() OperationKind { return OperationDeleteCredential }
@@ -20,16 +22,18 @@ func (op DeleteCredentialOperation) IsDryRun() bool   { return op.DryRun }
 func (DeleteCredentialOperation) ctapkitOperation()   {}
 
 type UpdateCredentialUserOperation struct {
-	CredentialIDHex     string `json:"credentialIdHex"`
-	UserIDHex           string `json:"userIdHex,omitempty"`
-	Name                string `json:"name,omitempty"`
-	DisplayName         string `json:"displayName,omitempty"`
-	UserIDProvided      bool   `json:"userIdProvided,omitempty"`
-	NameProvided        bool   `json:"nameProvided,omitempty"`
-	DisplayProvided     bool   `json:"displayProvided,omitempty"`
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	CredentialIDHex string `json:"credentialIdHex"`
+	// PrepareInventoryRefresh requests a grant that can serve the next inventory refresh.
+	PrepareInventoryRefresh bool   `json:"prepareInventoryRefresh,omitempty"`
+	UserIDHex               string `json:"userIdHex,omitempty"`
+	Name                    string `json:"name,omitempty"`
+	DisplayName             string `json:"displayName,omitempty"`
+	UserIDProvided          bool   `json:"userIdProvided,omitempty"`
+	NameProvided            bool   `json:"nameProvided,omitempty"`
+	DisplayProvided         bool   `json:"displayProvided,omitempty"`
+	Confirmed               bool   `json:"confirmed,omitempty"`
+	ConfirmationMessage     string `json:"confirmationMessage,omitempty"`
+	DryRun                  bool   `json:"dryRun,omitempty"`
 }
 
 func (UpdateCredentialUserOperation) Kind() OperationKind { return OperationUpdateCredentialUser }

@@ -45,6 +45,71 @@ func TestCacheSetTokenInvalidatesExistingSecrets(t *testing.T) {
 	}
 }
 
+func TestCacheCompositeTokenCoversPermissionSubsets(t *testing.T) {
+	cache := NewCache()
+	granted := TokenKey{
+		Permission: protocol.PermissionCredentialManagement |
+			protocol.PermissionLargeBlobWrite,
+	}
+	cache.SetToken(granted, secret.New([]byte("composite-token")))
+
+	for _, permission := range []protocol.Permission{
+		protocol.PermissionCredentialManagement,
+		protocol.PermissionLargeBlobWrite,
+		granted.Permission,
+	} {
+		token, ok, err := cache.GetToken(TokenKey{Permission: permission})
+		if err != nil {
+			t.Fatalf("GetToken(%s): %v", permission, err)
+		}
+		secret.Zero(token)
+		if !ok {
+			t.Fatalf("GetToken(%s) missed composite grant", permission)
+		}
+	}
+
+	if _, ok, _ := cache.GetToken(TokenKey{Permission: protocol.PermissionBioEnrollment}); ok {
+		t.Fatal("composite grant covered an ungranted permission")
+	}
+	if _, ok, _ := cache.GetToken(TokenKey{
+		Permission: protocol.PermissionCredentialManagement,
+		RPID:       "example.com",
+	}); ok {
+		t.Fatal("unscoped composite grant covered a differently scoped request")
+	}
+}
+
+func TestCacheCredentialManagementGrantCoversReadOnlyInventoryRequest(t *testing.T) {
+	cache := NewCache()
+	cache.SetToken(
+		TokenKey{Permission: protocol.PermissionCredentialManagement},
+		secret.New([]byte("credential-management-token")),
+	)
+
+	token, ok, err := cache.GetToken(TokenKey{
+		Permission: protocol.PermissionPersistentCredentialManagementReadOnly,
+	})
+	if err != nil {
+		t.Fatalf("GetToken: %v", err)
+	}
+	secret.Zero(token)
+	if !ok {
+		t.Fatal("credential-management grant did not cover read-only inventory request")
+	}
+}
+
+func TestCacheRejectsPermissionlessTokenRequest(t *testing.T) {
+	cache := NewCache()
+	cache.SetToken(
+		TokenKey{Permission: protocol.PermissionCredentialManagement},
+		secret.New([]byte("token")),
+	)
+
+	if _, ok, _ := cache.GetToken(TokenKey{}); ok {
+		t.Fatal("cached token covered a permissionless request")
+	}
+}
+
 func TestCacheInvalidateAllInvalidatesToken(t *testing.T) {
 	cache := NewCache()
 	key := TokenKey{Permission: protocol.PermissionCredentialManagement}
@@ -160,6 +225,24 @@ func TestCacheInvalidateTokenUnlessPermissionPreservesMatchingPermission(t *test
 
 	if _, ok, _ := cache.GetToken(key); !ok {
 		t.Fatal("matching token was invalidated")
+	}
+}
+
+func TestCacheInvalidateTokenUnlessPermissionNarrowsCompositeGrant(t *testing.T) {
+	cache := NewCache()
+	granted := TokenKey{
+		Permission: protocol.PermissionCredentialManagement |
+			protocol.PermissionLargeBlobWrite,
+	}
+	cache.SetToken(granted, secret.New([]byte("token")))
+
+	cache.InvalidateTokenUnlessPermission(protocol.PermissionLargeBlobWrite)
+
+	if _, ok, _ := cache.GetToken(TokenKey{Permission: protocol.PermissionLargeBlobWrite}); !ok {
+		t.Fatal("surviving large-blob-write permission was invalidated")
+	}
+	if _, ok, _ := cache.GetToken(TokenKey{Permission: protocol.PermissionCredentialManagement}); ok {
+		t.Fatal("removed credential-management permission remained cached")
 	}
 }
 

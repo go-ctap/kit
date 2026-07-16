@@ -161,8 +161,8 @@ func (r Runner) callMakeCredential(
 		input.ExcludeList,
 		ctapMakeCredentialExtensions(input.Extensions, r.infoProvider().GetInfo()),
 		ctapAuthenticatorOptions(input.Options, token != nil),
-		0,
-		nil,
+		input.EnterpriseAttestation,
+		input.AttestationFormatsPreference,
 	)
 }
 

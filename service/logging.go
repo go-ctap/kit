@@ -67,6 +67,7 @@ func interactionRequestLogValue(request model.InteractionRequest) kitlog.SafeJSO
 		request.Message = kitlog.Redacted
 		redacted = append(redacted, "request.message")
 	}
+
 	value := kitlog.SafeValue(request)
 	redacted = slices.Concat(redacted, prefixLogFields(value.RedactedFields, "request"))
 

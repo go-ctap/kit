@@ -28,7 +28,18 @@ type garbageCollectState struct {
 func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageCollectLargeBlobsOperation) (model.OperationResult, error) {
 	var output model.LargeBlobMutationOutput
 
-	state, err := r.loadGarbageCollectState(ctx)
+	permission, err := r.mutationPermission(
+		protocol.PermissionLargeBlobWrite,
+		req.PrepareInventoryRefresh,
+	)
+	if err != nil {
+		return output, err
+	}
+
+	state, err := r.loadGarbageCollectState(
+		ctx,
+		inventoryGrantPermission(permission, req.PrepareInventoryRefresh),
+	)
 	if err != nil {
 		return output, err
 	}
@@ -56,7 +67,7 @@ func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageC
 		return output, nil
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionLargeBlobWrite, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), permission, "")
 	if err != nil {
 		return output, err
 	}
@@ -74,8 +85,11 @@ func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageC
 	return output, nil
 }
 
-func (r Runner) loadGarbageCollectState(ctx context.Context) (garbageCollectState, error) {
-	inventory, err := r.readCredentialInventoryReport(ctx)
+func (r Runner) loadGarbageCollectState(
+	ctx context.Context,
+	grantPermission protocol.Permission,
+) (garbageCollectState, error) {
+	inventory, err := r.readCredentialInventoryReportWithGrant(ctx, grantPermission)
 	if err != nil {
 		return garbageCollectState{}, err
 	}
