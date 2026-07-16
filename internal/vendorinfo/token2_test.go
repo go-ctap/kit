@@ -57,32 +57,32 @@ func TestToken2IdentityMetadata(t *testing.T) {
 		name         string
 		serialNumber string
 		model        string
-		revision     string
+		release      string
 	}{
 		{
 			name:         "branded",
 			serialNumber: "72103654095303",
-			model:        "Token2 Bio3 Dual A+C PIN+ R3.2",
-			revision:     "R3.2",
+			model:        "Token2 Bio3 Dual A+C PIN+",
+			release:      "R3.2",
 		},
 		{
 			name:         "unbranded",
 			serialNumber: "22103654095303",
-			model:        "Bio3 Dual A+C PIN+ R3.2",
-			revision:     "R3.2",
+			model:        "Bio3 Dual A+C PIN+",
+			release:      "R3.2",
 		},
 		{
 			name:         "distinct unbranded octo branding",
 			serialNumber: "66113654095303",
-			model:        "Unbranded Octo Dual NFC PIN+ PIV+ R3.3",
-			revision:     "R3.3",
+			model:        "Unbranded Octo Dual NFC PIN+ PIV+",
+			release:      "R3.3",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			metadata := token2IdentityMetadata(test.serialNumber)
-			if metadata.Serial != test.serialNumber || metadata.Model != test.model || metadata.Firmware != test.revision {
+			if metadata.Serial != test.serialNumber || metadata.Model != test.model || metadata.Firmware != test.release {
 				t.Fatalf("metadata = %#v", metadata)
 			}
 		})

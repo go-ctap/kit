@@ -2,7 +2,9 @@ package ctapkit
 
 import (
 	"context"
+	"errors"
 
+	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/kit/internal/workflow"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
@@ -43,6 +45,13 @@ func (s *Session) run(
 		}, operation)
 	})
 	if err != nil {
+		if ioErr, ok := errors.AsType[*ctaptransport.IOError](err); ok {
+			switch ioErr.Operation {
+			case ctaptransport.IORead, ctaptransport.IOWrite, ctaptransport.IOTransmit:
+				_ = s.core.Close()
+			}
+		}
+
 		return result, normalizeRunError(err, operationKind)
 	}
 

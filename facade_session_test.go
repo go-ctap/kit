@@ -2,9 +2,13 @@ package ctapkit
 
 import (
 	"context"
+	"io"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/go-ctap/ctap/protocol"
+	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
@@ -282,6 +286,73 @@ func TestRunAfterSessionCloseIsRejected(t *testing.T) {
 	if result != nil {
 		t.Fatalf("result = %#v, want nil", result)
 	}
+}
+
+func TestTransportConnectionFailureClosesSession(t *testing.T) {
+	tests := []ctaptransport.IOOperation{
+		ctaptransport.IORead,
+		ctaptransport.IOWrite,
+		ctaptransport.IOTransmit,
+	}
+
+	for _, operation := range tests {
+		t.Run(string(operation), func(t *testing.T) {
+			a := &transportFailureAuthenticator{operation: operation}
+			session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+				return a, nil
+			})
+
+			_, err := session.Run(context.Background(), model.SetPINOperation{
+				NewPIN:    "1234",
+				Confirmed: true,
+			}, nil)
+			requireFailureCode(t, err, failure.CodeTransportFailure)
+
+			if !session.Info().Closed {
+				t.Fatal("session remained open after transport connection failure")
+			}
+			if got := a.closeCount.Load(); got != 1 {
+				t.Fatalf("authenticator close count = %d, want 1", got)
+			}
+
+			_, err = session.Run(context.Background(), model.ConfigStatusOperation{}, nil)
+			requireFailureCode(t, err, failure.CodeSessionClosed)
+
+			if err := session.Close(); err != nil {
+				t.Fatalf("Close: %v", err)
+			}
+			if got := a.closeCount.Load(); got != 1 {
+				t.Fatalf("authenticator close count after duplicate Close = %d, want 1", got)
+			}
+		})
+	}
+}
+
+type transportFailureAuthenticator struct {
+	contractAuthenticator
+	operation  ctaptransport.IOOperation
+	closeCount atomic.Int32
+}
+
+func (a *transportFailureAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+	return protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionClientPIN: false,
+		},
+	}
+}
+
+func (a *transportFailureAuthenticator) SetPIN(context.Context, string) error {
+	return &ctaptransport.IOError{
+		Operation: a.operation,
+		Err:       io.ErrClosedPipe,
+	}
+}
+
+func (a *transportFailureAuthenticator) Close() error {
+	a.closeCount.Add(1)
+
+	return nil
 }
 
 func TestSessionEventSinksAreScopedToOpenedSession(t *testing.T) {
