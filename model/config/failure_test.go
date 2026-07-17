@@ -93,14 +93,14 @@ func TestAuthenticatorConfigPreviewFailuresUseStableCodes(t *testing.T) {
 
 func TestMinPINLengthDecreaseFailureKeepsApprovedParams(t *testing.T) {
 	status := StatusReport{
-		PIN: PINStatus{MinPINLength: new(uint(8))},
+		PIN: PINStatus{MinPINLength: 8},
 		AuthenticatorConfig: AuthenticatorConfigStatus{
 			Supported:       true,
 			SetMinPINLength: CapabilityState{Supported: true},
 		},
 	}
 
-	_, err := BuildMinPINLengthPreview(status, MinPINLengthRequest{Length: 4}, safety.PreviewModeDryRun)
+	_, err := BuildMinPINLengthPreview(status, MinPINLengthRequest{NewMinPINLength: new(uint(4))}, safety.PreviewModeDryRun)
 	if !failure.IsCode(err, failure.CodeMinPINLengthDecreaseNotAllowed) {
 		t.Fatalf("BuildMinPINLengthPreview error = %v, want %s", err, failure.CodeMinPINLengthDecreaseNotAllowed)
 	}
@@ -111,5 +111,67 @@ func TestMinPINLengthDecreaseFailureKeepsApprovedParams(t *testing.T) {
 	}
 	if snapshot.Params["requested"] != "4" || snapshot.Params["current"] != "8" {
 		t.Fatalf("failure params = %#v, want requested/current", snapshot.Params)
+	}
+}
+
+func TestMinPINLengthPreviewUsesZeroValuesAsAbsent(t *testing.T) {
+	status := StatusReport{
+		PIN: PINStatus{MinPINLength: 4, MaxPINLength: 63},
+		AuthenticatorConfig: AuthenticatorConfigStatus{
+			Supported:       true,
+			SetMinPINLength: CapabilityState{Supported: true},
+		},
+	}
+	request := MinPINLengthRequest{
+		NewMinPINLength: new(uint(0)),
+	}
+
+	preview, err := BuildMinPINLengthPreview(status, request, safety.PreviewModeDryRun)
+	if !failure.IsCode(err, failure.CodeMinPINLengthDecreaseNotAllowed) {
+		t.Fatalf("zero minimum error = %v, want decrease rejection", err)
+	}
+
+	request.NewMinPINLength = nil
+	preview, err = BuildMinPINLengthPreview(status, request, safety.PreviewModeDryRun)
+	if !failure.IsCode(err, failure.CodeCTAPParameterMissing) {
+		t.Fatalf("zero-value request error = %v, want parameter missing", err)
+	}
+
+	request.MinPINLengthRPIDs = []string{"example.com"}
+	request.ForceChangePIN = true
+	request.PINComplexityPolicy = true
+	preview, err = BuildMinPINLengthPreview(status, request, safety.PreviewModeDryRun)
+	if err != nil {
+		t.Fatalf("BuildMinPINLengthPreview: %v", err)
+	}
+	if len(preview.MinPINLengthRPIDs) != 1 || !preview.ForceChangePIN || !preview.PINComplexityPolicy {
+		t.Fatalf("preview = %#v", preview)
+	}
+
+	result := MinPINLengthResult("device", request)
+	if len(result.MinPINLengthRPIDs) != 1 || !result.ForceChangePIN || !result.PINComplexityPolicy {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestEnableLongTouchForResetPreviewValidation(t *testing.T) {
+	base := StatusReport{AuthenticatorConfig: AuthenticatorConfigStatus{Supported: true}}
+	if _, err := BuildEnableLongTouchForResetPreview(base, safety.PreviewModeDryRun); !failure.IsCode(err, failure.CodeAuthenticatorConfigUnsupported) {
+		t.Fatalf("unsupported error = %v", err)
+	}
+
+	base.AuthenticatorConfig.LongTouchForReset = CapabilityState{Supported: true, Configured: new(true)}
+	if _, err := BuildEnableLongTouchForResetPreview(base, safety.PreviewModeDryRun); !failure.IsCode(err, failure.CodeAuthenticatorOperationNotAllowed) {
+		t.Fatalf("already enabled error = %v", err)
+	}
+
+	base.AuthenticatorConfig.LongTouchForReset.Configured = new(false)
+	preview, err := BuildEnableLongTouchForResetPreview(base, safety.PreviewModeDryRun)
+	if err != nil {
+		t.Fatalf("BuildEnableLongTouchForResetPreview: %v", err)
+	}
+	if preview.CurrentLongTouch == nil || *preview.CurrentLongTouch ||
+		!preview.RequestedLongTouch {
+		t.Fatalf("preview = %#v", preview)
 	}
 }

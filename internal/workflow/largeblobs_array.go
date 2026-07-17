@@ -18,7 +18,7 @@ func buildLargeBlobSupportReport(info protocol.AuthenticatorGetInfoResponse) app
 	report := applargeblobs.SupportReport{}
 	report.LargeBlobs = info.Options[protocol.OptionLargeBlobs]
 
-	report.MaxSerializedLargeBlobArray = snapshotPtr(info.MaxSerializedLargeBlobArray)
+	report.MaxSerializedLargeBlobArray = info.MaxSerializedLargeBlobArray
 	report.LargeBlobKeyExtension = lo.Contains(info.Extensions, extension.ExtensionIdentifierLargeBlobKey)
 
 	return report
@@ -38,8 +38,8 @@ func serializedLargeBlobArraySize(blobs []protocol.LargeBlob) (int, error) {
 	return len(data) + 16, nil
 }
 
-func checkSerializedArrayLimit(limit *uint, size int) error {
-	if limit == nil || uint(size) <= *limit {
+func checkSerializedArrayLimit(limit uint, size int) error {
+	if limit == 0 || uint(size) <= limit {
 		return nil
 	}
 
@@ -47,7 +47,7 @@ func checkSerializedArrayLimit(limit *uint, size int) error {
 		failure.WithPhase(failure.PhaseValidation),
 		failure.WithParams(map[string]string{
 			"requested": strconv.FormatUint(uint64(size), 10),
-			"limit":     strconv.FormatUint(uint64(*limit), 10),
+			"limit":     strconv.FormatUint(uint64(limit), 10),
 		}),
 	)
 }

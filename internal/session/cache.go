@@ -162,6 +162,12 @@ func (c *Cache) InvalidateTokenUnlessPermission(permission protocol.Permission) 
 	if c.tokenSecret == nil {
 		return
 	}
+	if permission == protocol.PermissionPersistentCredentialManagementReadOnly &&
+		c.tokenKey.Permission != permission {
+		c.invalidateTokensLocked()
+
+		return
+	}
 
 	remaining := c.tokenKey.Permission & permission
 	if remaining == protocol.PermissionNone {

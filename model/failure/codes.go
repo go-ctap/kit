@@ -58,6 +58,7 @@ const (
 	CodePINUVAuthInvalid            Code = "PIN_UV_AUTH_INVALID"
 	CodePINUVAuthBlocked            Code = "PIN_UV_AUTH_BLOCKED"
 	CodePINPolicyViolation          Code = "PIN_POLICY_VIOLATION"
+	CodePINChangeRequired           Code = "PIN_CHANGE_REQUIRED"
 	CodePINUVAuthTokenRequired      Code = "PIN_UV_AUTH_TOKEN_REQUIRED"
 	CodePINUVPermissionUnauthorized Code = "PIN_UV_PERMISSION_UNAUTHORIZED"
 	CodeUserPresenceRequired        Code = "USER_PRESENCE_REQUIRED"

@@ -73,7 +73,11 @@ func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageC
 	}
 	defer secret.Zero(token)
 
-	if err := r.largeBlobManager().SetLargeBlobs(ctx, token, state.replacement); err != nil {
+	err = r.largeBlobManager().SetLargeBlobs(ctx, token, state.replacement)
+	if r.env.Cache != nil {
+		r.env.Cache.InvalidateLargeBlobs()
+	}
+	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.AuthenticatorLargeBlobs,

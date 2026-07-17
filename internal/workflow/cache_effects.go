@@ -112,15 +112,21 @@ func makeCredentialEffects(op dryRunOperation, output model.MakeCredentialOutput
 	return effects
 }
 
-func getAssertionEffects(output model.GetAssertionOutput) Effects {
+func getAssertionEffects(op model.GetAssertionOperation, output model.GetAssertionOutput) Effects {
+	effects := Effects{}
+	if hasLargeBlobWrite(op.Extensions) && !op.DryRun {
+		effects.InvalidateLargeBlobs = true
+	}
 	if output.Result == nil {
-		return Effects{}
+		return effects
 	}
 	for _, assertion := range output.Result.Assertions {
 		if assertion.UserPresent {
-			return Effects{ClearTokenUnlessLargeBlobWrite: true}
+			effects.ClearTokenUnlessLargeBlobWrite = true
+
+			return effects
 		}
 	}
 
-	return Effects{}
+	return effects
 }

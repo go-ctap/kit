@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"iter"
 	"maps"
 	"slices"
@@ -82,6 +83,47 @@ func TestGetAssertionDryRunDoesNotAcquireTokenOrCallAuthenticator(t *testing.T) 
 	}
 	if len(a.tokenRPIDs) != 0 {
 		t.Fatalf("token rpIDs = %v, want none", a.tokenRPIDs)
+	}
+}
+
+func TestGetAssertionLargeBlobWriteRequiresConfirmationIncludingEmptyBlob(t *testing.T) {
+	a := &webauthnTestAuthenticator{}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	op := model.GetAssertionOperation{GetAssertionInput: appwebauthn.GetAssertionInput{
+		RPID:           "example.com",
+		ClientDataJSON: []byte(`{"type":"webauthn.get"}`),
+		Extensions: &webauthn.GetAuthenticationExtensionsClientInputs{
+			LargeBlobInputs: &webauthn.LargeBlobInputs{LargeBlob: webauthn.AuthenticationExtensionsLargeBlobInputs{
+				Write: []byte{},
+			}},
+		},
+	}}
+
+	result, err := session.Run(context.Background(), op, interactionHandlerFunc(func(req model.InteractionRequest) (model.InteractionResponse, error) {
+		if req.Kind != model.InteractionKindConfirm {
+			t.Fatalf("interaction kind = %s, want confirm", req.Kind)
+		}
+
+		return model.InteractionResponse{}, nil
+	}))
+	if !failure.IsCode(err, failure.CodeConfirmationRequired) {
+		t.Fatalf("unconfirmed write error = %v", err)
+	}
+	if result.(model.GetAssertionOutput).Result != nil || a.getAssertionCalls != 0 {
+		t.Fatalf("unconfirmed result/calls = %#v/%d", result, a.getAssertionCalls)
+	}
+
+	op.Confirmed = true
+	if _, err := session.Run(context.Background(), op, nil); err != nil {
+		t.Fatalf("confirmed write: %v", err)
+	}
+	if a.getAssertionCalls != 1 || a.getAssertionExtensions == nil ||
+		a.getAssertionExtensions.LargeBlobInputs == nil || a.getAssertionExtensions.LargeBlob.Write == nil {
+		t.Fatalf("confirmed write calls/extensions = %d/%#v", a.getAssertionCalls, a.getAssertionExtensions)
 	}
 }
 
@@ -174,6 +216,47 @@ func TestMakeCredentialAcquiresScopedTokenWhenCTAPRequiresIt(t *testing.T) {
 	}
 }
 
+func TestMakeCredentialKeepsPartialResultAndInvalidatesInventoryOnRefreshFailure(t *testing.T) {
+	refreshErr := errors.New("getInfo refresh failed")
+	a := &webauthnTestAuthenticator{
+		makeCredentialUvNotRequired:         true,
+		makeCredentialErr:                   refreshErr,
+		returnMakeCredentialResponseOnError: true,
+	}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	inventory, err := session.Run(context.Background(), model.ListCredentialsOperation{}, userVerificationHandler(t))
+	if err != nil {
+		t.Fatalf("prime credentials: %v", err)
+	}
+	record := inventory.(model.CredentialsOutput).Report.Groups[0].Credentials[0]
+	if record.CredProtect != 0 ||
+		record.ThirdPartyPayment == nil || *record.ThirdPartyPayment {
+		t.Fatalf("optional inventory fields = %#v", record)
+	}
+	op := sampleMakeCredentialOperation(false)
+	op.Confirmed = true
+	result, err := session.Run(context.Background(), op, nil)
+	if !errors.Is(err, refreshErr) {
+		t.Fatalf("MakeCredential error = %v, want refresh error", err)
+	}
+	output := result.(model.MakeCredentialOutput)
+	if output.Result == nil || output.Result.CredentialIDHex == "" {
+		t.Fatalf("partial output = %#v, want valid credential result", output)
+	}
+
+	a.makeCredentialErr = nil
+	if _, err := session.Run(context.Background(), model.ListCredentialsOperation{}, userVerificationHandler(t)); err != nil {
+		t.Fatalf("credentials after partial mutation: %v", err)
+	}
+	if a.metadataCalls != 2 {
+		t.Fatalf("metadata calls = %d, want invalidated inventory refresh", a.metadataCalls)
+	}
+}
+
 func TestMakeCredentialSkipsTokenWhenAuthenticatorDoesNotRequireIt(t *testing.T) {
 	a := &webauthnTestAuthenticator{makeCredentialUvNotRequired: true}
 	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
@@ -257,11 +340,11 @@ func TestGetAssertionReturnsAllAssertionsInOrder(t *testing.T) {
 		!bytes.Equal(result.Assertions[1].User.ID, []byte("user-2")) {
 		t.Fatalf("assertion mapping = %#v", result.Assertions)
 	}
-	if result.Assertions[1].NumberOfCredentials == nil || *result.Assertions[1].NumberOfCredentials != 0 {
-		t.Fatalf("numberOfCredentials = %#v, want explicit 0", result.Assertions[1].NumberOfCredentials)
+	if result.Assertions[1].NumberOfCredentials != 0 {
+		t.Fatalf("numberOfCredentials = %#v, want 0", result.Assertions[1].NumberOfCredentials)
 	}
-	if result.Assertions[0].UserSelected == nil || *result.Assertions[0].UserSelected {
-		t.Fatalf("userSelected = %#v, want explicit false", result.Assertions[0].UserSelected)
+	if result.Assertions[0].UserSelected {
+		t.Fatalf("userSelected = %#v, want false", result.Assertions[0].UserSelected)
 	}
 	if !bytes.Equal(a.getAssertionClientData, []byte(`{"type":"webauthn.get"}`)) {
 		t.Fatalf("getAssertion clientDataJSON = %q", a.getAssertionClientData)
@@ -500,6 +583,7 @@ type webauthnTestAuthenticator struct {
 
 	makeCredentialCalls                 int
 	makeCredentialErr                   error
+	returnMakeCredentialResponseOnError bool
 	makeCredentialToken                 []byte
 	makeCredentialClientData            []byte
 	makeCredentialRP                    credential.PublicKeyCredentialRpEntity
@@ -577,6 +661,9 @@ func (a *webauthnTestAuthenticator) MakeCredential(
 		return protocol.AuthenticatorMakeCredentialResponse{}, ctapdevice.ErrPinUvAuthTokenRequired
 	}
 	if a.makeCredentialErr != nil {
+		if a.returnMakeCredentialResponseOnError {
+			return sampleMakeCredentialResponse(), a.makeCredentialErr
+		}
 		return protocol.AuthenticatorMakeCredentialResponse{}, a.makeCredentialErr
 	}
 
@@ -628,8 +715,8 @@ func (a *webauthnTestAuthenticator) GetCredsMetadata(
 	a.metadataCalls++
 
 	return protocol.AuthenticatorCredentialManagementResponse{
-		ExistingResidentCredentialsCount:             1,
-		MaxPossibleRemainingResidentCredentialsCount: 8,
+		ExistingResidentCredentialsCount:             new(uint(1)),
+		MaxPossibleRemainingResidentCredentialsCount: new(uint(8)),
 	}, nil
 }
 
@@ -662,7 +749,9 @@ func (a *webauthnTestAuthenticator) EnumerateCredentials(
 				Type: credential.PublicKeyCredentialTypePublicKey,
 				ID:   []byte{0xc0, 0x5e},
 			},
-			TotalCredentials: 1,
+			TotalCredentials:  1,
+			CredProtect:       0,
+			ThirdPartyPayment: new(false),
 		}, nil)
 	}
 }
@@ -712,7 +801,7 @@ func sampleAssertionResponse(
 		},
 		Signature:           signature,
 		User:                &credential.PublicKeyCredentialUserEntity{ID: userID, Name: string(userID)},
-		NumberOfCredentials: &numberOfCredentials,
-		UserSelected:        new(false),
+		NumberOfCredentials: numberOfCredentials,
+		UserSelected:        false,
 	}
 }

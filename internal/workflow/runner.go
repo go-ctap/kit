@@ -54,11 +54,17 @@ func Run(
 
 func (r Runner) runOperation(ctx context.Context, operation model.Operation) (model.OperationResult, error) {
 	result, err := r.runOperationBody(ctx, operation)
-	if err == nil {
+	if err == nil || hasCommittedPartialResult(result.Output) {
 		result.Effects.Apply(r.env.Cache)
 	}
 
 	return result.Output, err
+}
+
+func hasCommittedPartialResult(output model.OperationResult) bool {
+	result, ok := output.(model.MakeCredentialOutput)
+
+	return ok && result.Result != nil
 }
 
 type operationResult struct {
@@ -93,6 +99,33 @@ func (r Runner) runWithOptionalToken(
 	return run(token)
 }
 
+func (r Runner) runMutationWithOptionalToken(
+	ctx context.Context,
+	permission protocol.Permission,
+	rpID string,
+	run func([]byte) error,
+	commandFinished func(),
+) error {
+	err := run(nil)
+	if !errors.Is(err, ctapdevice.ErrPinUvAuthTokenRequired) &&
+		!errors.Is(err, ctapdevice.ErrBuiltInUVRequired) {
+		commandFinished()
+
+		return err
+	}
+
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), permission, rpID)
+	if err != nil {
+		return err
+	}
+	defer secret.Zero(token)
+
+	err = run(token)
+	commandFinished()
+
+	return err
+}
+
 func (r Runner) runOperationBody(ctx context.Context, operation model.Operation) (operationResult, error) {
 	switch req := operation.(type) {
 	case model.InspectOperation:
@@ -103,6 +136,10 @@ func (r Runner) runOperationBody(ctx context.Context, operation model.Operation)
 		result, err := r.listCredentials(ctx, req)
 
 		return outputOnly(model.CredentialsOutput{Report: result}), err
+	case model.CredentialStoreStateOperation:
+		result, err := r.credentialStoreState(ctx)
+
+		return outputOnly(model.CredentialStoreStateOutput{Result: result}), err
 	case model.ReadLargeBlobOperation:
 		result, err := r.readLargeBlob(ctx, req)
 
@@ -138,7 +175,7 @@ func (r Runner) runOperationBody(ctx context.Context, operation model.Operation)
 	case model.GetAssertionOperation:
 		result, err := r.getAssertion(ctx, req)
 
-		return operationResult{Output: result, Effects: getAssertionEffects(result)}, err
+		return operationResult{Output: result, Effects: getAssertionEffects(req, result)}, err
 	case model.WriteLargeBlobOperation:
 		result, err := r.writeLargeBlob(ctx, req)
 
@@ -181,6 +218,10 @@ func (r Runner) runOperationBody(ctx context.Context, operation model.Operation)
 		return operationResult{Output: result, Effects: authenticatorConfigEffects(req)}, err
 	case model.SetMinPINLengthOperation:
 		result, err := r.setMinPINLength(ctx, req)
+
+		return operationResult{Output: result, Effects: authenticatorConfigEffects(req)}, err
+	case model.EnableLongTouchForResetOperation:
+		result, err := r.enableLongTouchForReset(ctx, req)
 
 		return operationResult{Output: result, Effects: authenticatorConfigEffects(req)}, err
 	default:

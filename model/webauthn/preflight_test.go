@@ -132,7 +132,7 @@ func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {
 	}
 }
 
-func TestNormalizeInputsTrimCloneAndDefaultCredentialTypes(t *testing.T) {
+func TestNormalizeInputsTrimAndDefaultCredentialTypes(t *testing.T) {
 	userID := []byte{0x0a, 0x0b}
 	credentialID := []byte{0xc0, 0x5e}
 	formats := []attestation.AttestationStatementFormatIdentifier{
@@ -161,8 +161,8 @@ func TestNormalizeInputsTrimCloneAndDefaultCredentialTypes(t *testing.T) {
 		t.Fatalf("RP.ID = %q, want trimmed", input.RP.ID)
 	}
 
-	if !bytes.Equal(input.User.ID, userID) || &input.User.ID[0] == &userID[0] {
-		t.Fatalf("User.ID = %#v, want cloned user id", input.User.ID)
+	if !bytes.Equal(input.User.ID, userID) {
+		t.Fatalf("User.ID = %#v, want original user id", input.User.ID)
 	}
 
 	if input.PubKeyCredParams[0].Type != PublicKeyCredentialTypePublicKey {
@@ -173,13 +173,11 @@ func TestNormalizeInputsTrimCloneAndDefaultCredentialTypes(t *testing.T) {
 	}
 
 	if input.ExcludeList[0].Type != PublicKeyCredentialTypePublicKey ||
-		!bytes.Equal(input.ExcludeList[0].ID, credentialID) ||
-		&input.ExcludeList[0].ID[0] == &credentialID[0] {
-		t.Fatalf("exclude descriptor = %#v, want default public-key with cloned id", input.ExcludeList[0])
+		!bytes.Equal(input.ExcludeList[0].ID, credentialID) {
+		t.Fatalf("exclude descriptor = %#v, want default public-key with original id", input.ExcludeList[0])
 	}
-	if !slices.Equal(input.AttestationFormatsPreference, formats) ||
-		&input.AttestationFormatsPreference[0] == &formats[0] {
-		t.Fatalf("attestation formats = %#v, want cloned formats", input.AttestationFormatsPreference)
+	if !slices.Equal(input.AttestationFormatsPreference, formats) {
+		t.Fatalf("attestation formats = %#v, want original formats", input.AttestationFormatsPreference)
 	}
 }
 

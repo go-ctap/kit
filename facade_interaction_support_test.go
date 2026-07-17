@@ -42,7 +42,7 @@ func (s *recordingEventSink) Events() []model.OperationEvent {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return lo.Clone(s.events)
+	return s.events
 }
 
 func eventStages(events []model.OperationEvent) []model.OperationStage {

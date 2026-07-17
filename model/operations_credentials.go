@@ -4,6 +4,12 @@ type ListCredentialsOperation struct {
 	Refresh bool `json:"refresh,omitempty"`
 }
 
+type CredentialStoreStateOperation struct{}
+
+func (CredentialStoreStateOperation) Kind() OperationKind { return OperationCredentialStoreState }
+func (CredentialStoreStateOperation) IsDryRun() bool      { return false }
+func (CredentialStoreStateOperation) ctapkitOperation()   {}
+
 func (ListCredentialsOperation) Kind() OperationKind { return OperationListCredentials }
 func (ListCredentialsOperation) IsDryRun() bool      { return false }
 func (ListCredentialsOperation) ctapkitOperation()   {}

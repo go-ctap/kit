@@ -54,7 +54,7 @@ func structuralRules() []getInfoRule {
 			"transports",
 			"transports-nonempty",
 			func(context *getInfoContext) (bool, []string) {
-				return context.info.Transports != nil, slices.Clone(context.info.Transports)
+				return context.info.Transports != nil, stringValues(context.info.Transports)
 			},
 		),
 		listUniqueRule(
@@ -63,7 +63,7 @@ func structuralRules() []getInfoRule {
 			"transports",
 			"transports-unique",
 			func(context *getInfoContext) (bool, []string) {
-				return context.info.Transports != nil, slices.Clone(context.info.Transports)
+				return context.info.Transports != nil, stringValues(context.info.Transports)
 			},
 		),
 		listNonEmptyRule(
@@ -90,7 +90,7 @@ func structuralRules() []getInfoRule {
 			"transportsForReset",
 			"transports-for-reset-nonempty",
 			func(context *getInfoContext) (bool, []string) {
-				return context.info.TransportsForReset != nil, slices.Clone(context.info.TransportsForReset)
+				return context.info.TransportsForReset != nil, stringValues(context.info.TransportsForReset)
 			},
 		),
 		listUniqueRule(
@@ -99,7 +99,7 @@ func structuralRules() []getInfoRule {
 			"transportsForReset",
 			"transports-for-reset-unique",
 			func(context *getInfoContext) (bool, []string) {
-				return context.info.TransportsForReset != nil, slices.Clone(context.info.TransportsForReset)
+				return context.info.TransportsForReset != nil, stringValues(context.info.TransportsForReset)
 			},
 		),
 		listNonEmptyRule(
@@ -108,7 +108,7 @@ func structuralRules() []getInfoRule {
 			"attestationFormats",
 			"attestation-formats-nonempty",
 			func(context *getInfoContext) (bool, []string) {
-				return context.info.AttestationFormats != nil, slices.Clone(context.info.AttestationFormats)
+				return context.info.AttestationFormats != nil, stringValues(context.info.AttestationFormats)
 			},
 		),
 		listUniqueRule(
@@ -117,7 +117,7 @@ func structuralRules() []getInfoRule {
 			"attestationFormats",
 			"attestation-formats-unique",
 			func(context *getInfoContext) (bool, []string) {
-				return context.info.AttestationFormats != nil, slices.Clone(context.info.AttestationFormats)
+				return context.info.AttestationFormats != nil, stringValues(context.info.AttestationFormats)
 			},
 		),
 		{
@@ -134,7 +134,7 @@ func structuralRules() []getInfoRule {
 				return finding(
 					[]FieldPath{"attestationFormats"},
 					expected(ExpectationExcludes, "none"),
-					observedStrings("attestationFormats", true, context.info.AttestationFormats),
+					observedStrings("attestationFormats", true, stringValues(context.info.AttestationFormats)),
 				)
 			},
 		},
@@ -196,27 +196,6 @@ func structuralRules() []getInfoRule {
 				return results
 			},
 		},
-		positiveUnsignedRule(
-			RuleMaxCredentialCountPositive,
-			selectCTAP21OrLater,
-			"maxCredentialCountInList",
-			"max-credential-count-in-list-positive",
-			func(context *getInfoContext) *uint { return context.info.MaxCredentialCountInList },
-		),
-		positiveUnsignedRule(
-			RuleMaxCredentialIDLengthPositive,
-			selectCTAP21OrLater,
-			"maxCredentialIdLength",
-			"max-credential-id-length-positive",
-			func(context *getInfoContext) *uint { return context.info.MaxCredentialIdLength },
-		),
-		positiveUnsignedRule(
-			RulePreferredPlatformUVAttemptsPositive,
-			selectCTAP21OrLater,
-			"preferredPlatformUvAttempts",
-			"preferred-platform-uv-attempts-positive",
-			func(context *getInfoContext) *uint { return context.info.PreferredPlatformUvAttempts },
-		),
 	}
 }
 
@@ -259,28 +238,6 @@ func listUniqueRule(id RuleID, selector func(*getInfoContext) bool, path FieldPa
 				[]FieldPath{path},
 				expected(ExpectationUnique),
 				observedStrings(path, true, values),
-			)
-		},
-	}
-}
-
-func positiveUnsignedRule(id RuleID, selector func(*getInfoContext) bool, path FieldPath, clause string, value func(*getInfoContext) *uint) getInfoRule {
-	return getInfoRule{
-		id:       id,
-		selector: selector,
-		references: func(context *getInfoContext) []RequirementRef {
-			return []RequirementRef{getInfoRequirement(context.target, clause, RequirementMust)}
-		},
-		evaluate: func(context *getInfoContext) []assessment {
-			input := value(context)
-			if input == nil || *input > 0 {
-				return nil
-			}
-
-			return finding(
-				[]FieldPath{path},
-				expected(ExpectationMinimum, "1"),
-				observed(path, EvidenceValue, strconv.FormatUint(uint64(*input), 10)),
 			)
 		},
 	}

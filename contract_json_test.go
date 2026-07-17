@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-ctap/ctap/attestation"
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/model"
@@ -281,8 +282,8 @@ func TestInteractionRequestJSONIncludesPreviewAndResponseOmitsPIN(t *testing.T) 
 	}
 }
 
-func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
-	// This audit test keeps public input/output names aligned with CTAP 2.2 spellings.
+func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
+	// This audit test keeps public input/output names aligned with CTAP 2.3 spellings.
 	tests := []struct {
 		name   string
 		value  any
@@ -293,17 +294,20 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 			name: "inspect mirrors authenticator get info",
 			value: model.InspectOutput{
 				Result: model.NewInspectResult(report.DeviceReport{}, protocol.AuthenticatorGetInfoResponse{
-					ForcePINChange:              new(true),
-					MinPINLength:                new(uint(4)),
-					MaxCredentialIdLength:       new(uint(32)),
-					MaxRPIDsForSetMinPINLength:  new(uint(3)),
-					Algorithms:                  []credential.PublicKeyCredentialParameters{{Type: credential.PublicKeyCredentialTypePublicKey, Algorithm: -7}},
-					PinComplexityPolicy:         new(true),
-					PinComplexityPolicyURL:      new("https://policy.example"),
-					MaxPINLength:                new(uint(64)),
-					EncCredStoreState:           []byte("encrypted-store-state"),
-					AuthenticatorConfigCommands: []uint{1, 4},
-					UvModality:                  new(protocol.UserVerifyFingerprintInternal),
+					ForcePINChange:                true,
+					MinPINLength:                  4,
+					MaxCredentialIdLength:         32,
+					MaxRPIDsForSetMinPINLength:    new(uint(3)),
+					Algorithms:                    []credential.PublicKeyCredentialParameters{{Type: credential.PublicKeyCredentialTypePublicKey, Algorithm: -7}},
+					Transports:                    []credential.AuthenticatorTransport{credential.AuthenticatorTransportUSB},
+					AttestationFormats:            []attestation.AttestationStatementFormatIdentifier{attestation.AttestationStatementFormatIdentifierPacked},
+					VendorPrototypeConfigCommands: []protocol.VendorCommandID{0x1_0000_0000},
+					PinComplexityPolicy:           new(true),
+					PinComplexityPolicyURL:        []byte("https://policy.example"),
+					MaxPINLength:                  64,
+					EncCredStoreState:             []byte("encrypted-store-state"),
+					AuthenticatorConfigCommands:   []protocol.ConfigSubCommand{1, 4},
+					UvModality:                    new(protocol.UserVerifyFingerprintInternal),
 				}),
 			},
 			want: []string{
@@ -313,7 +317,10 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 				`"maxCredentialIdLength":32`,
 				`"maxRPIDsForSetMinPINLength":3`,
 				`"algorithms":[{"type":"public-key","alg":-7}]`,
-				`"pinComplexityPolicyURL":"https://policy.example"`,
+				`"transports":["usb"]`,
+				`"attestationFormats":["packed"]`,
+				`"vendorPrototypeConfigCommands":[4294967296]`,
+				`"pinComplexityPolicyURL":"aHR0cHM6Ly9wb2xpY3kuZXhhbXBsZQ=="`,
 				`"maxPINLength":64`,
 				`"encCredStoreState":"ZW5jcnlwdGVkLXN0b3JlLXN0YXRl"`,
 				`"authenticatorConfigCommands":[1,4]`,
@@ -502,10 +509,10 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 						State:               config.StateConfigured,
 						Supported:           true,
 						Configured:          new(true),
-						MinPINLength:        new(uint(4)),
-						MaxPINLength:        new(uint(64)),
-						ForcePINChange:      new(true),
-						PinComplexityURL:    new("https://policy.example"),
+						MinPINLength:        4,
+						MaxPINLength:        64,
+						ForcePINChange:      true,
+						PinComplexityURL:    "https://policy.example",
 						PinComplexityPolicy: new(true),
 						Retries: config.RetryState{
 							State:           config.StateSupported,
@@ -558,8 +565,8 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 			value: model.BioSensorOutput{
 				Report: config.BioSensorReport{
 					Supported:                          true,
-					Modality:                           new(config.BioModalityFingerprint),
-					FingerprintKind:                    new(config.FingerprintKindTouch),
+					Modality:                           config.BioModalityFingerprint,
+					FingerprintKind:                    config.FingerprintKindTouch,
 					MaxCaptureSamplesRequiredForEnroll: new(uint(4)),
 					MaxTemplateFriendlyName:            new(uint(64)),
 				},
@@ -584,25 +591,25 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 			name: "authenticator config output names set min PIN length result",
 			value: model.AuthenticatorConfigOutput{
 				Preview: config.AuthenticatorConfigPreview{
-					Operation:             config.AuthenticatorConfigMinPINLength,
-					CurrentMinPINLength:   new(uint(4)),
-					RequestedMinPINLength: new(uint(8)),
-					MaxPINLength:          new(uint(64)),
-					RPIDs:                 []string{"example.com"},
+					Operation:           config.AuthenticatorConfigMinPINLength,
+					CurrentMinPINLength: 4,
+					NewMinPINLength:     new(uint(8)),
+					MaxPINLength:        64,
+					MinPINLengthRPIDs:   []string{"example.com"},
 					Authenticator: config.AuthenticatorConfigStatus{
 						SetMinPINLength: config.CapabilityState{Supported: true},
 					},
 				},
 				Result: &config.AuthenticatorConfigResult{
 					Operation:       config.AuthenticatorConfigMinPINLength,
-					NewMinPINLength: 8,
+					NewMinPINLength: new(uint(8)),
 					State:           config.StateSupported,
 				},
 			},
 			want: []string{
 				`"operation":"setMinPINLength"`,
 				`"currentMinPINLength":4`,
-				`"requestedMinPINLength":8`,
+				`"newMinPINLength":8`,
 				`"maxPINLength":64`,
 				`"minPinLengthRPIDs":["example.com"]`,
 				`"setMinPINLength"`,
@@ -623,10 +630,10 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 		{
 			name: "set min PIN length operation uses CTAP subcommand parameter names",
 			value: model.SetMinPINLengthOperation{
-				Length:              8,
-				RPIDs:               []string{"example.com"},
-				ForceChangePin:      true,
-				PinComplexityPolicy: true,
+				NewMinPINLength:     new(uint(8)),
+				MinPINLengthRPIDs:   []string{"example.com"},
+				ForceChangePIN:      true,
+				PINComplexityPolicy: true,
 			},
 			want: []string{
 				`"newMinPINLength":8`,
@@ -643,10 +650,10 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 		{
 			name: "set min PIN length request uses CTAP subcommand parameter names",
 			value: config.MinPINLengthRequest{
-				Length:              8,
-				RPIDs:               []string{"example.com"},
-				ForceChangePin:      true,
-				PinComplexityPolicy: true,
+				NewMinPINLength:     new(uint(8)),
+				MinPINLengthRPIDs:   []string{"example.com"},
+				ForceChangePIN:      true,
+				PINComplexityPolicy: true,
 			},
 			want: []string{
 				`"newMinPINLength":8`,
@@ -837,5 +844,59 @@ func TestDeviceReportVendorMetadataJSON(t *testing.T) {
 		if strings.Contains(text, obsolete) {
 			t.Fatalf("JSON retained obsolete field %s: %s", obsolete, text)
 		}
+	}
+}
+
+func TestCTAP23JSONPresenceContracts(t *testing.T) {
+	operation := model.SetMinPINLengthOperation{
+		NewMinPINLength: new(uint(0)),
+	}
+	raw, err := json.Marshal(operation)
+	if err != nil {
+		t.Fatalf("Marshal operation: %v", err)
+	}
+	if string(raw) != `{"newMinPINLength":0}` {
+		t.Fatalf("operation JSON = %s", raw)
+	}
+
+	absent, err := json.Marshal(model.SetMinPINLengthOperation{})
+	if err != nil {
+		t.Fatalf("Marshal absent operation: %v", err)
+	}
+	if string(absent) != "{}" {
+		t.Fatalf("absent operation JSON = %s, want {}", absent)
+	}
+
+	emptyBlob := ""
+	written := false
+	thirdPartyPayment := false
+	extensions := webauthn2.GetAssertionExtensionResults{
+		Client: &webauthn2.GetAssertionClientExtensionResults{
+			LargeBlob: &webauthn2.LargeBlobGetOutput{BlobHex: &emptyBlob, Written: &written},
+		},
+		Authenticator: &webauthn2.GetAssertionAuthenticatorExtensionOutputs{
+			ThirdPartyPayment: &thirdPartyPayment,
+		},
+	}
+	raw, err = json.Marshal(extensions)
+	if err != nil {
+		t.Fatalf("Marshal extensions: %v", err)
+	}
+	for _, want := range []string{`"blobHex":""`, `"written":false`, `"thirdPartyPayment":false`} {
+		if !strings.Contains(string(raw), want) {
+			t.Fatalf("extensions JSON = %s, want %s", raw, want)
+		}
+	}
+
+	storeState, err := json.Marshal(credentials.StoreStateResult{
+		AuthenticatorIdentifierHex: "00",
+		CredentialStoreStateHex:    "11",
+	})
+	if err != nil {
+		t.Fatalf("Marshal store state: %v", err)
+	}
+	if !strings.Contains(string(storeState), `"authenticatorIdentifierHex":"00"`) ||
+		!strings.Contains(string(storeState), `"credentialStoreStateHex":"11"`) {
+		t.Fatalf("store state JSON = %s", storeState)
 	}
 }

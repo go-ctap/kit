@@ -72,7 +72,11 @@ func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredential
 	}
 	defer secret.Zero(token)
 
-	if err := r.credentialManager().DeleteCredential(ctx, token, descriptor); err != nil {
+	err = r.credentialManager().DeleteCredential(ctx, token, descriptor)
+	if r.env.Cache != nil {
+		r.env.Cache.InvalidateCredentials()
+	}
+	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 			failure.PhaseAuthenticatorCommand,
 			credentialManagementCommand(r.infoProvider().GetInfo()),

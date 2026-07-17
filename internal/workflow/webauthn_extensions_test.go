@@ -34,8 +34,8 @@ func TestMakeCredentialExtensionResultsKeepRawOutputsAndMapLevel3Results(t *test
 			}},
 		},
 		AuthData: &protocol.MakeCredentialAuthData{Extensions: &protocol.CreateExtensionOutputs{
-			CreateCredProtectOutput:  &protocol.CreateCredProtectOutput{CredProtect: 0x03},
-			CreateMinPinLengthOutput: &protocol.CreateMinPinLengthOutput{MinPinLength: 8},
+			CreateCredProtectOutput:  protocol.CreateCredProtectOutput{CredProtect: 0x03},
+			CreateMinPinLengthOutput: protocol.CreateMinPinLengthOutput{MinPinLength: 8},
 			CreatePinComplexityPolicyOutput: &protocol.CreatePinComplexityPolicyOutput{
 				PinComplexityPolicy: true,
 			},
@@ -116,37 +116,72 @@ func TestMakeCredentialExtensionResultsStillRoutesRawHMACMC(t *testing.T) {
 }
 
 func TestGetAssertionExtensionResultsUseLevel3PRFOutputWithoutEnabled(t *testing.T) {
-	got := getAssertionExtensionResults(&ctapwebauthn.GetAuthenticationExtensionsClientOutputs{
+	got := getAssertionExtensionResults(protocol.AuthenticatorGetAssertionResponse{ExtensionOutputs: &ctapwebauthn.GetAuthenticationExtensionsClientOutputs{
 		GetPRFOutputs: &ctapwebauthn.GetPRFOutputs{PRF: ctapwebauthn.GetAuthenticationExtensionsPRFOutputs{
 			Results: ctapwebauthn.AuthenticationExtensionsPRFValues{
 				First: []byte{0x07, 0x08},
 			},
 		}},
-	})
+	}})
 	if got == nil || got.Client == nil || got.Client.PRF == nil ||
 		len(got.Client.PRF.Results.First) != 2 {
 		t.Fatalf("GetAssertion PRF result = %#v", got)
 	}
 
-	empty := getAssertionExtensionResults(&ctapwebauthn.GetAuthenticationExtensionsClientOutputs{
+	empty := getAssertionExtensionResults(protocol.AuthenticatorGetAssertionResponse{ExtensionOutputs: &ctapwebauthn.GetAuthenticationExtensionsClientOutputs{
 		GetPRFOutputs: &ctapwebauthn.GetPRFOutputs{},
-	})
+	}})
 	if empty == nil || empty.Client == nil || empty.Client.PRF == nil || !empty.Client.PRF.Results.IsZero() {
 		t.Fatalf("empty PRF result = %#v, want {prf:{}}", empty)
 	}
 }
 
 func TestGetAssertionExtensionResultsKeepRawOutputs(t *testing.T) {
-	got := getAssertionExtensionResults(&ctapwebauthn.GetAuthenticationExtensionsClientOutputs{
+	got := getAssertionExtensionResults(protocol.AuthenticatorGetAssertionResponse{ExtensionOutputs: &ctapwebauthn.GetAuthenticationExtensionsClientOutputs{
 		GetCredentialBlobOutputs: &ctapwebauthn.GetCredentialBlobOutputs{GetCredBlob: []byte{0x01, 0x02}},
 		GetHMACSecretOutputs: &ctapwebauthn.GetHMACSecretOutputs{HMACGetSecret: ctapwebauthn.HMACGetSecretOutput{
 			Output1: []byte{0x03, 0x04},
 			Output2: []byte{0x05, 0x06},
 		}},
-	})
+	}})
 	if got == nil || got.Client == nil || got.Client.CredentialBlob == nil ||
 		got.Client.CredentialBlob.ValueHex != "0102" || got.Client.HMACSecret == nil ||
 		got.Client.HMACSecret.Output1Hex != "0304" || got.Client.HMACSecret.Output2Hex != "0506" {
 		t.Fatalf("raw GetAssertion extension results = %#v", got)
+	}
+}
+
+func TestWebAuthnLargeBlobOutputsPreserveOptionalPresence(t *testing.T) {
+	unsupported := false
+	makeResult := makeCredentialExtensionResults(nil, protocol.AuthenticatorMakeCredentialResponse{
+		ExtensionOutputs: &ctapwebauthn.CreateAuthenticationExtensionsClientOutputs{
+			LargeBlobOutputs: &ctapwebauthn.LargeBlobOutputs{LargeBlob: ctapwebauthn.AuthenticationExtensionsLargeBlobOutputs{
+				Supported: &unsupported,
+			}},
+		},
+	})
+	if makeResult == nil || makeResult.Client == nil || makeResult.Client.LargeBlob == nil ||
+		makeResult.Client.LargeBlob.Supported {
+		t.Fatalf("make largeBlob output = %#v, want explicit false", makeResult)
+	}
+
+	written := false
+	getResult := getAssertionExtensionResults(protocol.AuthenticatorGetAssertionResponse{
+		ExtensionOutputs: &ctapwebauthn.GetAuthenticationExtensionsClientOutputs{
+			LargeBlobOutputs: &ctapwebauthn.LargeBlobOutputs{LargeBlob: ctapwebauthn.AuthenticationExtensionsLargeBlobOutputs{
+				Blob:    []byte{},
+				Written: &written,
+			}},
+		},
+		AuthData: &protocol.GetAssertionAuthData{Extensions: &protocol.GetExtensionOutputs{
+			GetThirdPartyPaymentOutput: &protocol.GetThirdPartyPaymentOutput{ThirdPartyPayment: false},
+		}},
+	})
+	if getResult == nil || getResult.Client == nil || getResult.Client.LargeBlob == nil ||
+		getResult.Client.LargeBlob.BlobHex == nil || *getResult.Client.LargeBlob.BlobHex != "" ||
+		getResult.Client.LargeBlob.Written == nil || *getResult.Client.LargeBlob.Written ||
+		getResult.Authenticator == nil || getResult.Authenticator.ThirdPartyPayment == nil ||
+		*getResult.Authenticator.ThirdPartyPayment {
+		t.Fatalf("get extension output = %#v, want present-empty blob and explicit false outputs", getResult)
 	}
 }

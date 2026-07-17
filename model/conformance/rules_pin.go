@@ -155,7 +155,7 @@ func pinRules() []getInfoRule {
 				if optionTrue(context.info, protocol.OptionSetMinPINLength) {
 					references = append(references, optionReference)
 				}
-				if slices.Contains(context.info.AuthenticatorConfigCommands, uint(protocol.ConfigSubCommandSetMinPINLength)) {
+				if slices.Contains(context.info.AuthenticatorConfigCommands, protocol.ConfigSubCommandSetMinPINLength) {
 					references = append(references, commandsReference)
 				}
 				if slices.Contains(context.info.Extensions, extension.ExtensionIdentifierMinPinLength) {
@@ -172,7 +172,7 @@ func pinRules() []getInfoRule {
 					expectations = append(expectations, expectedFor([]FieldPath{"extensions"}, ExpectationContains, "minPinLength"))
 					references = append(references, featureReference)
 				}
-				commandMissing := !slices.Contains(context.info.AuthenticatorConfigCommands, uint(protocol.ConfigSubCommandSetMinPINLength))
+				commandMissing := !slices.Contains(context.info.AuthenticatorConfigCommands, protocol.ConfigSubCommandSetMinPINLength)
 				if commandMissing {
 					expectations = append(expectations, expectedFor([]FieldPath{"authenticatorConfigCommands"}, ExpectationContains, "0x03"))
 					references = append(references, inventoryReference)
@@ -212,14 +212,14 @@ func pinRules() []getInfoRule {
 				return []RequirementRef{getInfoRequirement(context.target, "minimum-pin-length-at-least-four", RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
-				if context.info.MinPINLength == nil || *context.info.MinPINLength >= 4 {
+				if context.info.MinPINLength == 0 || context.info.MinPINLength >= 4 {
 					return nil
 				}
 
 				return finding(
 					[]FieldPath{"minPINLength"},
 					expected(ExpectationMinimum, "4"),
-					observedUnsigned("minPINLength", *context.info.MinPINLength),
+					observedUnsigned("minPINLength", context.info.MinPINLength),
 				)
 			},
 		},
@@ -230,14 +230,14 @@ func pinRules() []getInfoRule {
 				return []RequirementRef{getInfoRequirement(context.target, "min-pin-length-requires-client-pin", RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
-				if context.info.MinPINLength == nil || optionPresent(context.info, protocol.OptionClientPIN) {
+				if context.info.MinPINLength == 0 || optionPresent(context.info, protocol.OptionClientPIN) {
 					return nil
 				}
 
 				return finding(
 					[]FieldPath{"minPINLength"},
 					expected(ExpectationAbsent),
-					observedUnsigned("minPINLength", *context.info.MinPINLength),
+					observedUnsigned("minPINLength", context.info.MinPINLength),
 					observedOption(context.info, protocol.OptionClientPIN),
 				)
 			},
@@ -249,7 +249,7 @@ func pinRules() []getInfoRule {
 				return []RequirementRef{getInfoRequirement(context.target, "client-pin-requires-min-pin-length", RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
-				if !optionPresent(context.info, protocol.OptionClientPIN) || context.info.MinPINLength != nil {
+				if !optionPresent(context.info, protocol.OptionClientPIN) || context.info.MinPINLength != 0 {
 					return nil
 				}
 
@@ -268,14 +268,14 @@ func pinRules() []getInfoRule {
 				return []RequirementRef{getInfoRequirement(context.target, "maximum-pin-length-at-least-eight", RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
-				if context.info.MaxPINLength == nil || *context.info.MaxPINLength >= 8 {
+				if context.info.MaxPINLength == 0 || context.info.MaxPINLength >= 8 {
 					return nil
 				}
 
 				return finding(
 					[]FieldPath{"maxPINLength"},
 					expected(ExpectationMinimum, "8"),
-					observedUnsigned("maxPINLength", *context.info.MaxPINLength),
+					observedUnsigned("maxPINLength", context.info.MaxPINLength),
 				)
 			},
 		},
@@ -286,14 +286,14 @@ func pinRules() []getInfoRule {
 				return []RequirementRef{getInfoRequirement(context.target, "max-pin-length-requires-client-pin", RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
-				if context.info.MaxPINLength == nil || optionPresent(context.info, protocol.OptionClientPIN) {
+				if context.info.MaxPINLength == 0 || optionPresent(context.info, protocol.OptionClientPIN) {
 					return nil
 				}
 
 				return finding(
 					[]FieldPath{"maxPINLength"},
 					expected(ExpectationAbsent),
-					observedUnsigned("maxPINLength", *context.info.MaxPINLength),
+					observedUnsigned("maxPINLength", context.info.MaxPINLength),
 					observedOption(context.info, protocol.OptionClientPIN),
 				)
 			},
@@ -332,7 +332,7 @@ func setMinSupportExpected(context *getInfoContext) bool {
 	if context.target.Specification != SpecificationCTAP23 {
 		return false
 	}
-	if slices.Contains(context.info.AuthenticatorConfigCommands, uint(protocol.ConfigSubCommandSetMinPINLength)) {
+	if slices.Contains(context.info.AuthenticatorConfigCommands, protocol.ConfigSubCommandSetMinPINLength) {
 		return true
 	}
 	if context.target.Profile == ProfileFIDO23 && slices.Contains(context.info.Extensions, extension.ExtensionIdentifierMinPinLength) {

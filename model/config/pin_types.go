@@ -17,11 +17,11 @@ type PINStatus struct {
 	Supported           bool       `json:"supported"`
 	Configured          *bool      `json:"configured,omitempty"`
 	ProtocolSupported   bool       `json:"protocolSupported"`
-	MinPINLength        *uint      `json:"minPINLength,omitempty"`
-	MaxPINLength        *uint      `json:"maxPINLength,omitempty"`
-	ForcePINChange      *bool      `json:"forcePINChange,omitempty"`
+	MinPINLength        uint       `json:"minPINLength"`
+	MaxPINLength        uint       `json:"maxPINLength"`
+	ForcePINChange      bool       `json:"forcePINChange,omitempty"`
 	PinComplexityPolicy *bool      `json:"pinComplexityPolicy,omitempty"`
-	PinComplexityURL    *string    `json:"pinComplexityPolicyURL,omitempty"`
+	PinComplexityURL    string     `json:"pinComplexityPolicyURL,omitempty"`
 	Retries             RetryState `json:"retries"`
 }
 

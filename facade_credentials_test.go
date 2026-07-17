@@ -469,7 +469,8 @@ func (a *rejectedCredentialTokenAuthenticator) GetCredsMetadata(
 	}
 
 	return protocol.AuthenticatorCredentialManagementResponse{
-		MaxPossibleRemainingResidentCredentialsCount: 25,
+		ExistingResidentCredentialsCount:             new(uint(0)),
+		MaxPossibleRemainingResidentCredentialsCount: new(uint(25)),
 	}, nil
 }
 
@@ -489,7 +490,8 @@ func (a *emptyCredentialAuthenticator) GetPinUvAuthTokenUsingUV(context.Context,
 
 func (a *emptyCredentialAuthenticator) GetCredsMetadata(context.Context, []byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
 	return protocol.AuthenticatorCredentialManagementResponse{
-		MaxPossibleRemainingResidentCredentialsCount: 25,
+		ExistingResidentCredentialsCount:             new(uint(0)),
+		MaxPossibleRemainingResidentCredentialsCount: new(uint(25)),
 	}, nil
 }
 
@@ -536,8 +538,8 @@ func (a *refreshCredentialAuthenticator) GetCredsMetadata(context.Context, []byt
 	}
 
 	return protocol.AuthenticatorCredentialManagementResponse{
-		ExistingResidentCredentialsCount:             1,
-		MaxPossibleRemainingResidentCredentialsCount: 10,
+		ExistingResidentCredentialsCount:             new(uint(1)),
+		MaxPossibleRemainingResidentCredentialsCount: new(uint(10)),
 	}, nil
 }
 
@@ -579,6 +581,7 @@ func (a *refreshCredentialAuthenticator) EnumerateCredentials(
 				Type: credential.PublicKeyCredentialTypePublicKey,
 				ID:   []byte{a.revision},
 			},
+			TotalCredentials: 1,
 		}, nil)
 	}
 }
@@ -625,8 +628,8 @@ func (a *progressCredentialAuthenticator) GetPinUvAuthTokenUsingUV(context.Conte
 
 func (a *progressCredentialAuthenticator) GetCredsMetadata(context.Context, []byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
 	return protocol.AuthenticatorCredentialManagementResponse{
-		ExistingResidentCredentialsCount:             3,
-		MaxPossibleRemainingResidentCredentialsCount: 10,
+		ExistingResidentCredentialsCount:             new(uint(3)),
+		MaxPossibleRemainingResidentCredentialsCount: new(uint(10)),
 	}, nil
 }
 
@@ -728,8 +731,8 @@ func (a *credentialMutationTokenAuthenticator) GetCredsMetadata(
 	[]byte,
 ) (protocol.AuthenticatorCredentialManagementResponse, error) {
 	return protocol.AuthenticatorCredentialManagementResponse{
-		ExistingResidentCredentialsCount:             1,
-		MaxPossibleRemainingResidentCredentialsCount: 8,
+		ExistingResidentCredentialsCount:             new(uint(1)),
+		MaxPossibleRemainingResidentCredentialsCount: new(uint(8)),
 	}, nil
 }
 

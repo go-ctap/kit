@@ -132,7 +132,7 @@ func TestLargeBlobWritePreparesOneCompositeGrantForInventoryRefresh(t *testing.T
 }
 
 func TestLargeBlobWriteCapacityErrorKeepsPreview(t *testing.T) {
-	a := &largeBlobWriteEventAuthenticator{maxSerializedLargeBlobArray: new(uint(16))}
+	a := &largeBlobWriteEventAuthenticator{maxSerializedLargeBlobArray: 16}
 	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
@@ -149,19 +149,19 @@ func TestLargeBlobWriteCapacityErrorKeepsPreview(t *testing.T) {
 	if !ok {
 		t.Fatalf("result = %T, want LargeBlobMutationOutput", result)
 	}
-	if output.Preview.SerializedLargeBlobArrayLimit == nil || *output.Preview.SerializedLargeBlobArrayLimit != 16 {
+	if output.Preview.SerializedLargeBlobArrayLimit != 16 {
 		t.Fatalf("preview limit = %#v, want 16", output.Preview.SerializedLargeBlobArrayLimit)
 	}
-	if output.Preview.SerializedLargeBlobArraySizeAfter <= int(*output.Preview.SerializedLargeBlobArrayLimit) {
+	if output.Preview.SerializedLargeBlobArraySizeAfter <= int(output.Preview.SerializedLargeBlobArrayLimit) {
 		t.Fatalf("preview size after = %d, want over limit %d",
 			output.Preview.SerializedLargeBlobArraySizeAfter,
-			*output.Preview.SerializedLargeBlobArrayLimit,
+			output.Preview.SerializedLargeBlobArrayLimit,
 		)
 	}
 }
 
-func TestLargeBlobWriteExplicitZeroCapacityRejectsMutation(t *testing.T) {
-	a := &largeBlobWriteEventAuthenticator{maxSerializedLargeBlobArray: new(uint(0))}
+func TestLargeBlobWriteZeroCapacityMeansUnknownLimit(t *testing.T) {
+	a := &largeBlobWriteEventAuthenticator{}
 	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
@@ -172,14 +172,16 @@ func TestLargeBlobWriteExplicitZeroCapacityRejectsMutation(t *testing.T) {
 		Payload:         []byte("test"),
 		DryRun:          true,
 	}, userVerificationHandler(t))
-	requireFailureCode(t, err, failure.CodeLargeBlobArrayTooLarge)
+	if err != nil {
+		t.Fatalf("WriteLargeBlob dry run: %v", err)
+	}
 
 	output, ok := result.(model.LargeBlobMutationOutput)
 	if !ok {
 		t.Fatalf("result = %T, want LargeBlobMutationOutput", result)
 	}
-	if output.Preview.SerializedLargeBlobArrayLimit == nil || *output.Preview.SerializedLargeBlobArrayLimit != 0 {
-		t.Fatalf("preview limit = %#v, want explicit 0", output.Preview.SerializedLargeBlobArrayLimit)
+	if output.Preview.SerializedLargeBlobArrayLimit != 0 {
+		t.Fatalf("preview limit = %#v, want unknown", output.Preview.SerializedLargeBlobArrayLimit)
 	}
 }
 

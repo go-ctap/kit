@@ -107,13 +107,20 @@ type AlwaysUVRequest struct {
 
 type MinPINLengthRequest struct {
 	OperationRequest
-	NewMinPINLength     uint     `json:"newMinPINLength"`
-	MinPinLengthRPIDs   []string `json:"minPinLengthRPIDs,omitempty"`
-	ForceChangePin      bool     `json:"forceChangePin,omitempty"`
-	PinComplexityPolicy bool     `json:"pinComplexityPolicy,omitempty"`
+	NewMinPINLength     *uint    `json:"newMinPINLength,omitempty"`
+	MinPINLengthRPIDs   []string `json:"minPinLengthRPIDs,omitempty"`
+	ForceChangePIN      bool     `json:"forceChangePin,omitempty"`
+	PINComplexityPolicy bool     `json:"pinComplexityPolicy,omitempty"`
 	Confirmed           bool     `json:"confirmed,omitempty"`
 	ConfirmationMessage string   `json:"confirmationMessage,omitempty"`
 	DryRun              bool     `json:"dryRun,omitempty"`
+}
+
+type EnableLongTouchForResetRequest struct {
+	OperationRequest
+	Confirmed           bool   `json:"confirmed,omitempty"`
+	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
+	DryRun              bool   `json:"dryRun,omitempty"`
 }
 
 type BioEnrollRequest struct {
@@ -159,7 +166,9 @@ type MakeCredentialRequest struct {
 type GetAssertionRequest struct {
 	OperationRequest
 	webauthn.GetAssertionInput
-	DryRun bool `json:"dryRun,omitempty"`
+	Confirmed           bool   `json:"confirmed,omitempty"`
+	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
+	DryRun              bool   `json:"dryRun,omitempty"`
 }
 
 func (s *Service) Inspect(ctx context.Context, req OperationRequest) (InspectEnvelope, error) {
@@ -179,6 +188,12 @@ func (s *Service) ListCredentials(ctx context.Context, req CredentialListRequest
 		Refresh: req.Refresh,
 	})
 	return CredentialsEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
+}
+
+func (s *Service) CredentialStoreState(ctx context.Context, req OperationRequest) (CredentialStoreStateEnvelope, error) {
+	meta, result, err := runTypedOperation[model.CredentialStoreStateOutput](s, ctx, req, model.CredentialStoreStateOperation{})
+
+	return CredentialStoreStateEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
 func (s *Service) DeleteCredential(ctx context.Context, req CredentialDeleteRequest) (CredentialDeleteEnvelope, error) {
@@ -295,14 +310,24 @@ func (s *Service) SetAlwaysUV(ctx context.Context, req AlwaysUVRequest) (Authent
 
 func (s *Service) SetMinPINLength(ctx context.Context, req MinPINLengthRequest) (AuthenticatorConfigEnvelope, error) {
 	meta, result, err := runTypedOperation[model.AuthenticatorConfigOutput](s, ctx, req.OperationRequest, model.SetMinPINLengthOperation{
-		Length:              req.NewMinPINLength,
-		RPIDs:               req.MinPinLengthRPIDs,
-		ForceChangePin:      req.ForceChangePin,
-		PinComplexityPolicy: req.PinComplexityPolicy,
+		NewMinPINLength:     req.NewMinPINLength,
+		MinPINLengthRPIDs:   req.MinPINLengthRPIDs,
+		ForceChangePIN:      req.ForceChangePIN,
+		PINComplexityPolicy: req.PINComplexityPolicy,
 		Confirmed:           req.Confirmed,
 		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
+	return AuthenticatorConfigEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
+}
+
+func (s *Service) EnableLongTouchForReset(ctx context.Context, req EnableLongTouchForResetRequest) (AuthenticatorConfigEnvelope, error) {
+	meta, result, err := runTypedOperation[model.AuthenticatorConfigOutput](s, ctx, req.OperationRequest, model.EnableLongTouchForResetOperation{
+		Confirmed:           req.Confirmed,
+		ConfirmationMessage: req.ConfirmationMessage,
+		DryRun:              req.DryRun,
+	})
+
 	return AuthenticatorConfigEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
@@ -368,8 +393,10 @@ func (s *Service) MakeCredential(ctx context.Context, req MakeCredentialRequest)
 
 func (s *Service) GetAssertion(ctx context.Context, req GetAssertionRequest) (GetAssertionEnvelope, error) {
 	meta, result, err := runTypedOperation[model.GetAssertionOutput](s, ctx, req.OperationRequest, model.GetAssertionOperation{
-		GetAssertionInput: req.GetAssertionInput,
-		DryRun:            req.DryRun,
+		GetAssertionInput:   req.GetAssertionInput,
+		Confirmed:           req.Confirmed,
+		ConfirmationMessage: req.ConfirmationMessage,
+		DryRun:              req.DryRun,
 	})
 	return GetAssertionEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }

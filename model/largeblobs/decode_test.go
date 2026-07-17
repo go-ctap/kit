@@ -76,11 +76,10 @@ func TestDecodeMissingBlobIsState(t *testing.T) {
 	}
 }
 
-func TestSupportReportPreservesExplicitZeroLargeBlobArrayLimit(t *testing.T) {
+func TestSupportReportOmitsZeroLargeBlobArrayLimit(t *testing.T) {
 	report := SupportReport{
-		LargeBlobs:                  true,
-		LargeBlobKeyExtension:       true,
-		MaxSerializedLargeBlobArray: ptr(uint(0)),
+		LargeBlobs:            true,
+		LargeBlobKeyExtension: true,
 	}
 
 	raw, err := json.Marshal(report)
@@ -88,8 +87,8 @@ func TestSupportReportPreservesExplicitZeroLargeBlobArrayLimit(t *testing.T) {
 		t.Fatalf("Marshal: %v", err)
 	}
 
-	if !strings.Contains(string(raw), `"maxSerializedLargeBlobArray":0`) {
-		t.Fatalf("JSON missing explicit zero large blob limit: %s", raw)
+	if strings.Contains(string(raw), "maxSerializedLargeBlobArray") {
+		t.Fatalf("JSON included zero large blob limit: %s", raw)
 	}
 }
 

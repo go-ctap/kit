@@ -82,8 +82,8 @@ type Assertion struct {
 	AuthenticatorDataHex string                                    `json:"authenticatorDataHex"`
 	SignatureHex         string                                    `json:"signatureHex"`
 	User                 *credential.PublicKeyCredentialUserEntity `json:"user,omitempty"`
-	NumberOfCredentials  *uint                                     `json:"numberOfCredentials,omitempty"`
-	UserSelected         *bool                                     `json:"userSelected,omitempty"`
+	NumberOfCredentials  uint                                      `json:"numberOfCredentials,omitempty"`
+	UserSelected         bool                                      `json:"userSelected,omitempty"`
 	SignCount            uint32                                    `json:"signCount"`
 	UserPresent          bool                                      `json:"userPresent"`
 	UserVerified         bool                                      `json:"userVerified"`
@@ -145,13 +145,9 @@ func NormalizeMakeCredentialInput(input MakeCredentialInput) (MakeCredentialInpu
 	if len(input.User.ID) > 64 {
 		return MakeCredentialInput{}, failure.New(failure.CodeCTAPLengthInvalid, failure.WithPhase(failure.PhaseValidation))
 	}
-	input.User.ID = lo.Clone(input.User.ID)
-
 	if len(input.ClientDataJSON) == 0 {
 		return MakeCredentialInput{}, failure.New(failure.CodeClientDataJSONRequired, failure.WithPhase(failure.PhaseValidation))
 	}
-	input.ClientDataJSON = lo.Clone(input.ClientDataJSON)
-
 	if len(input.PubKeyCredParams) == 0 {
 		return MakeCredentialInput{}, failure.New(failure.CodePublicKeyCredentialParametersRequired, failure.WithPhase(failure.PhaseValidation))
 	}
@@ -179,7 +175,6 @@ func NormalizeMakeCredentialInput(input MakeCredentialInput) (MakeCredentialInpu
 	if input.EnterpriseAttestation > 2 {
 		return MakeCredentialInput{}, failure.New(failure.CodeCTAPOptionInvalid, failure.WithPhase(failure.PhaseValidation))
 	}
-	input.AttestationFormatsPreference = slices.Clone(input.AttestationFormatsPreference)
 	for index, format := range input.AttestationFormatsPreference {
 		normalized := attestation.AttestationStatementFormatIdentifier(strings.TrimSpace(string(format)))
 		if normalized == "" {
@@ -193,7 +188,6 @@ func NormalizeMakeCredentialInput(input MakeCredentialInput) (MakeCredentialInpu
 		return MakeCredentialInput{}, err
 	}
 	input.ExcludeList = excludeList
-	input.Extensions = normalizeMakeCredentialExtensions(input.Extensions)
 
 	return input, nil
 }
@@ -207,14 +201,11 @@ func NormalizeGetAssertionInput(input GetAssertionInput) (GetAssertionInput, err
 	if len(input.ClientDataJSON) == 0 {
 		return GetAssertionInput{}, failure.New(failure.CodeClientDataJSONRequired, failure.WithPhase(failure.PhaseValidation))
 	}
-	input.ClientDataJSON = lo.Clone(input.ClientDataJSON)
-
 	allowList, err := normalizeDescriptors(input.AllowList)
 	if err != nil {
 		return GetAssertionInput{}, err
 	}
 	input.AllowList = allowList
-	input.Extensions = normalizeGetAssertionExtensions(input.Extensions)
 
 	return input, nil
 }
@@ -225,9 +216,6 @@ func normalizeDescriptors(in []credential.PublicKeyCredentialDescriptor) ([]cred
 		if len(descriptor.ID) == 0 {
 			return credential.PublicKeyCredentialDescriptor{}, failure.New(failure.CodeCredentialIDRequired, failure.WithPhase(failure.PhaseValidation))
 		}
-		descriptor.ID = lo.Clone(descriptor.ID)
-		descriptor.Transports = lo.Clone(descriptor.Transports)
-
 		return descriptor, nil
 	})
 }

@@ -1,9 +1,11 @@
 package config
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/samber/lo"
@@ -25,10 +27,11 @@ func BuildStatusReport(device report.DeviceReport, info protocol.AuthenticatorGe
 			UVBioEnroll: CapabilityState{State: StateUnknown},
 		},
 		AuthenticatorConfig: AuthenticatorConfigStatus{
-			State:           StateUnknown,
-			UVAcfg:          CapabilityState{State: StateUnknown},
-			AlwaysUV:        CapabilityState{State: StateUnknown},
-			SetMinPINLength: CapabilityState{State: StateUnknown},
+			State:             StateUnknown,
+			UVAcfg:            CapabilityState{State: StateUnknown},
+			AlwaysUV:          CapabilityState{State: StateUnknown},
+			SetMinPINLength:   CapabilityState{State: StateUnknown},
+			LongTouchForReset: CapabilityState{State: StateUnknown},
 		},
 		ResetHints: ResetHints{LongTouchForReset: StateUnknown},
 	}
@@ -41,12 +44,15 @@ func BuildStatusReport(device report.DeviceReport, info protocol.AuthenticatorGe
 		r.Bio.UVModalityLabel = formatUVModalityLabel(*info.UvModality)
 	}
 	r.ResetHints.LongTouchForReset = boolConfiguredState(info.LongTouchForReset)
-	r.ResetHints.TransportsForReset = lo.Clone(info.TransportsForReset)
+	r.ResetHints.TransportsForReset = lo.Map(info.TransportsForReset, func(value credential.AuthenticatorTransport, _ int) string {
+		return string(value)
+	})
 	r.Bio.UVBioEnroll = requiredOptionCapability(info, protocol.OptionUvBioEnroll, false)
 	r.AuthenticatorConfig = buildAuthenticatorConfigStatus(requiredOptionCapability(info, protocol.OptionAuthenticatorConfig, false))
 	r.AuthenticatorConfig.UVAcfg = requiredOptionCapability(info, protocol.OptionUvAcfg, false)
 	r.AuthenticatorConfig.AlwaysUV = configuredOptionCapability(info, protocol.OptionAlwaysUv, false)
 	r.AuthenticatorConfig.SetMinPINLength = requiredOptionCapability(info, protocol.OptionSetMinPINLength, false)
+	r.AuthenticatorConfig.LongTouchForReset = longTouchCapability(info)
 	r.Limits = buildLimitsStatus(info)
 
 	return r
@@ -90,9 +96,9 @@ func buildPINStatus(info protocol.AuthenticatorGetInfoResponse) PINStatus {
 	status.ProtocolSupported = len(info.PinUvAuthProtocols) > 0
 	status.ForcePINChange = info.ForcePINChange
 	status.PinComplexityPolicy = info.PinComplexityPolicy
-	status.PinComplexityURL = clonePtr(info.PinComplexityPolicyURL)
-	status.MinPINLength = info.MinPINLength
-	status.MaxPINLength = info.MaxPINLength
+	status.PinComplexityURL = info.PinComplexityPolicyURLString()
+	status.MinPINLength = info.EffectiveMinPINLength()
+	status.MaxPINLength = info.EffectiveMaxPINLength()
 
 	value, ok := info.Options[protocol.OptionClientPIN]
 	if !ok {
@@ -182,13 +188,27 @@ func buildBioStatus(capability CapabilityState) BioStatus {
 
 func buildAuthenticatorConfigStatus(capability CapabilityState) AuthenticatorConfigStatus {
 	return AuthenticatorConfigStatus{
-		State:           capability.State,
-		Supported:       capability.Supported,
-		Configured:      capability.Configured,
-		PreviewOnly:     capability.PreviewOnly,
-		UVAcfg:          CapabilityState{State: StateUnknown},
-		AlwaysUV:        CapabilityState{State: StateUnknown},
-		SetMinPINLength: CapabilityState{State: StateUnknown},
+		State:             capability.State,
+		Supported:         capability.Supported,
+		Configured:        capability.Configured,
+		PreviewOnly:       capability.PreviewOnly,
+		UVAcfg:            CapabilityState{State: StateUnknown},
+		AlwaysUV:          CapabilityState{State: StateUnknown},
+		SetMinPINLength:   CapabilityState{State: StateUnknown},
+		LongTouchForReset: CapabilityState{State: StateUnknown},
+	}
+}
+
+func longTouchCapability(info protocol.AuthenticatorGetInfoResponse) CapabilityState {
+	if info.LongTouchForReset == nil ||
+		!slices.Contains(info.AuthenticatorConfigCommands, protocol.ConfigSubCommandEnableLongTouchForReset) {
+		return CapabilityState{State: StateUnsupported}
+	}
+
+	return CapabilityState{
+		State:      boolConfiguredState(info.LongTouchForReset),
+		Supported:  true,
+		Configured: info.LongTouchForReset,
 	}
 }
 
@@ -205,18 +225,10 @@ func boolConfiguredState(value *bool) StateValue {
 
 func buildLimitsStatus(info protocol.AuthenticatorGetInfoResponse) LimitsStatus {
 	return LimitsStatus{
-		MinPINLength:                info.MinPINLength,
-		MaxPINLength:                info.MaxPINLength,
+		MinPINLength:                info.EffectiveMinPINLength(),
+		MaxPINLength:                info.EffectiveMaxPINLength(),
 		MaxRPIDsForSetMinPINLength:  info.MaxRPIDsForSetMinPINLength,
 		PreferredPlatformUVAttempts: info.PreferredPlatformUvAttempts,
 		UVCountSinceLastPINEntry:    info.UvCountSinceLastPinEntry,
 	}
-}
-
-func clonePtr[T any](value *T) *T {
-	if value == nil {
-		return nil
-	}
-
-	return new(*value)
 }

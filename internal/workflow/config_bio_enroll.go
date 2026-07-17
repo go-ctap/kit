@@ -61,6 +61,9 @@ func (r Runner) enrollBio(ctx context.Context, req model.BioEnrollOperation) (mo
 		preview,
 		token,
 	)
+	if r.env.Cache != nil {
+		r.env.Cache.InvalidateConfig()
+	}
 
 	output.Result = &result
 	return output, err

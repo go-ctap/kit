@@ -54,10 +54,10 @@ type ResetHints struct {
 }
 
 type LimitsStatus struct {
-	MinPINLength                *uint `json:"minPINLength,omitempty"`
-	MaxPINLength                *uint `json:"maxPINLength,omitempty"`
+	MinPINLength                uint  `json:"minPINLength"`
+	MaxPINLength                uint  `json:"maxPINLength"`
 	MaxRPIDsForSetMinPINLength  *uint `json:"maxRPIDsForSetMinPINLength,omitempty"`
-	PreferredPlatformUVAttempts *uint `json:"preferredPlatformUvAttempts,omitempty"`
+	PreferredPlatformUVAttempts uint  `json:"preferredPlatformUvAttempts,omitempty"`
 	UVCountSinceLastPINEntry    *uint `json:"uvCountSinceLastPinEntry,omitempty"`
 }
 

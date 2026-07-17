@@ -43,13 +43,23 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 	}
 
 	var response protocol.AuthenticatorMakeCredentialResponse
-	err = r.runWithOptionalToken(ctx, protocol.PermissionMakeCredential, input.RP.ID, func(token []byte) error {
+	err = r.runMutationWithOptionalToken(ctx, protocol.PermissionMakeCredential, input.RP.ID, func(token []byte) error {
 		var err error
 		response, err = r.callMakeCredential(ctx, token, input)
 
 		return err
+	}, func() {
+		if r.env.Cache != nil {
+			r.env.Cache.InvalidateCredentials()
+		}
 	})
 	if err != nil {
+		if response.AuthData != nil && response.AuthData.AttestedCredentialData != nil {
+			if result, resultErr := makeCredentialResult(r.env.Selected.Fingerprint, input.RP.ID, input.Extensions, response); resultErr == nil {
+				output.Result = &result
+			}
+		}
+
 		return output, annotateMakeCredentialError(err)
 	}
 	result, err := makeCredentialResult(r.env.Selected.Fingerprint, input.RP.ID, input.Extensions, response)
@@ -76,6 +86,17 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 	output.Preview = preview
 	if req.DryRun {
 		return output, nil
+	}
+	if hasLargeBlobWrite(input.Extensions) {
+		if err := r.confirmMutation(ctx, confirmationRequest{
+			confirmed:       req.Confirmed,
+			message:         req.ConfirmationMessage,
+			fallbackMessage: "Write the WebAuthn large blob for " + input.RPID + "?",
+			destructive:     false,
+			preview:         preview,
+		}); err != nil {
+			return output, err
+		}
 	}
 
 	result := appwebauthn.GetAssertionResult{
@@ -104,7 +125,17 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 
 		return nil
 	}
-	if err := r.runWithOptionalToken(ctx, protocol.PermissionGetAssertion, input.RPID, readAssertions); err != nil {
+	run := r.runWithOptionalToken
+	if hasLargeBlobWrite(input.Extensions) {
+		run = func(ctx context.Context, permission protocol.Permission, rpID string, use func([]byte) error) error {
+			return r.runMutationWithOptionalToken(ctx, permission, rpID, use, func() {
+				if r.env.Cache != nil {
+					r.env.Cache.InvalidateLargeBlobs()
+				}
+			})
+		}
+	}
+	if err := run(ctx, protocol.PermissionGetAssertion, input.RPID, readAssertions); err != nil {
 		return output, err
 	}
 
@@ -219,13 +250,9 @@ func assertionResult(
 		Credential:           response.Credential,
 		AuthenticatorDataHex: hex.EncodeToString(response.AuthDataRaw),
 		SignatureHex:         hex.EncodeToString(response.Signature),
-		ExtensionResults:     getAssertionExtensionResults(response.ExtensionOutputs),
-	}
-	if response.NumberOfCredentials != nil {
-		assertion.NumberOfCredentials = snapshotPtr(response.NumberOfCredentials)
-	}
-	if response.UserSelected != nil {
-		assertion.UserSelected = snapshotPtr(response.UserSelected)
+		NumberOfCredentials:  response.NumberOfCredentials,
+		UserSelected:         response.UserSelected,
+		ExtensionResults:     getAssertionExtensionResults(response),
 	}
 
 	if response.AuthData != nil {
@@ -241,6 +268,10 @@ func assertionResult(
 	}
 
 	return assertion
+}
+
+func hasLargeBlobWrite(input *ctapwebauthn.GetAuthenticationExtensionsClientInputs) bool {
+	return input != nil && input.LargeBlobInputs != nil && input.LargeBlob.Write != nil
 }
 
 func ctapAuthenticatorOptions(options appwebauthn.AuthenticatorOptions, withToken bool) map[protocol.Option]bool {

@@ -3,6 +3,7 @@ package logging
 import (
 	"encoding/base64"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -76,5 +77,39 @@ func TestSafeValuePreservesExplicitPointerZeroValues(t *testing.T) {
 	if payload == nil || !strings.Contains(payload.JSON, `"retriesRemaining": 0`) ||
 		!strings.Contains(payload.JSON, `"powerCycleState": false`) {
 		t.Fatalf("safe payload lost explicit pointer zero values: %#v", payload)
+	}
+}
+
+func TestSafeValueRedactsCTAP23LargeBlobPaymentAndStoreState(t *testing.T) {
+	const secret = "sentinel-ctap23-secret"
+	safe := SafeValue(map[string]any{
+		"largeBlob": map[string]any{
+			"write":   []byte(secret),
+			"blobHex": secret,
+		},
+		"payment": map[string]any{
+			"instrument": map[string]any{"details": secret},
+		},
+		"authenticatorIdentifierHex": secret,
+		"credentialStoreStateHex":    secret,
+	})
+
+	raw, err := json.Marshal(safe.Value)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if strings.Contains(string(raw), secret) || strings.Contains(string(raw), base64.StdEncoding.EncodeToString([]byte(secret))) {
+		t.Fatalf("safe CTAP 2.3 payload contains secret: %s", raw)
+	}
+	for _, field := range []string{
+		"largeBlob.write",
+		"largeBlob.blobHex",
+		"payment",
+		"authenticatorIdentifierHex",
+		"credentialStoreStateHex",
+	} {
+		if !slices.Contains(safe.RedactedFields, field) {
+			t.Fatalf("redacted fields = %v, want %s", safe.RedactedFields, field)
+		}
 	}
 }

@@ -109,26 +109,26 @@ func TestPreviewOnlyBioStatusReportsSupportWhenNoEnrollmentProvisioned(t *testin
 	}
 }
 
-func TestBuildStatusReportPreservesExplicitZeroNullableLimits(t *testing.T) {
+func TestBuildStatusReportAppliesEffectiveLimitsAndPreservesNullableZeros(t *testing.T) {
 	statusReport := BuildStatusReport(nilDevice(), protocol.AuthenticatorGetInfoResponse{
 		Options: map[protocol.Option]bool{
 			protocol.OptionClientPIN: false,
 		},
-		ForcePINChange:              new(false),
-		MinPINLength:                new(uint(0)),
-		MaxPINLength:                new(uint(0)),
+		ForcePINChange:              false,
+		MinPINLength:                0,
+		MaxPINLength:                0,
 		MaxRPIDsForSetMinPINLength:  new(uint(0)),
-		PreferredPlatformUvAttempts: new(uint(0)),
+		PreferredPlatformUvAttempts: 0,
 		UvCountSinceLastPinEntry:    new(uint(0)),
 		PinComplexityPolicy:         new(false),
-		PinComplexityPolicyURL:      new(""),
+		PinComplexityPolicyURL:      []byte{},
 	})
 
-	if statusReport.PIN.MinPINLength == nil || *statusReport.PIN.MinPINLength != 0 {
-		t.Fatalf("pin minPINLength = %#v, want explicit 0", statusReport.PIN.MinPINLength)
+	if statusReport.PIN.MinPINLength != 4 {
+		t.Fatalf("pin minPINLength = %#v, want effective 4", statusReport.PIN.MinPINLength)
 	}
-	if statusReport.PIN.ForcePINChange == nil || *statusReport.PIN.ForcePINChange {
-		t.Fatalf("forcePINChange = %#v, want explicit false", statusReport.PIN.ForcePINChange)
+	if statusReport.PIN.MaxPINLength != 63 {
+		t.Fatalf("pin maxPINLength = %#v, want effective 63", statusReport.PIN.MaxPINLength)
 	}
 	if statusReport.PIN.PinComplexityPolicy == nil || *statusReport.PIN.PinComplexityPolicy {
 		t.Fatalf("pinComplexityPolicy = %#v, want explicit false", statusReport.PIN.PinComplexityPolicy)
@@ -144,22 +144,24 @@ func TestBuildStatusReportPreservesExplicitZeroNullableLimits(t *testing.T) {
 
 	text := string(raw)
 	for _, want := range []string{
-		`"minPINLength":0`,
-		`"maxPINLength":0`,
-		`"forcePINChange":false`,
+		`"minPINLength":4`,
+		`"maxPINLength":63`,
 		`"pinComplexityPolicy":false`,
-		`"pinComplexityPolicyURL":""`,
 		`"maxRPIDsForSetMinPINLength":0`,
-		`"preferredPlatformUvAttempts":0`,
 		`"uvCountSinceLastPinEntry":0`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("JSON missing %s: %s", want, text)
 		}
 	}
+	for _, reject := range []string{"forcePINChange", "pinComplexityPolicyURL", "preferredPlatformUvAttempts"} {
+		if strings.Contains(text, reject) {
+			t.Fatalf("JSON included zero-value %s: %s", reject, text)
+		}
+	}
 }
 
-func TestBuildStatusReportOmitsAbsentNullableLimits(t *testing.T) {
+func TestBuildStatusReportUsesEffectivePINLimitsAndOmitsOtherAbsentNullableLimits(t *testing.T) {
 	statusReport := BuildStatusReport(nilDevice(), protocol.AuthenticatorGetInfoResponse{})
 
 	raw, err := json.Marshal(statusReport)
@@ -169,8 +171,6 @@ func TestBuildStatusReportOmitsAbsentNullableLimits(t *testing.T) {
 
 	text := string(raw)
 	for _, reject := range []string{
-		"minPINLength",
-		"maxPINLength",
 		"forcePINChange",
 		"pinComplexityPolicy",
 		"pinComplexityPolicyURL",
@@ -181,6 +181,12 @@ func TestBuildStatusReportOmitsAbsentNullableLimits(t *testing.T) {
 		if strings.Contains(text, reject) {
 			t.Fatalf("JSON included absent %s: %s", reject, text)
 		}
+	}
+	if !strings.Contains(text, `"maxPINLength":63`) {
+		t.Fatalf("JSON omitted effective max PIN length: %s", text)
+	}
+	if !strings.Contains(text, `"minPINLength":4`) {
+		t.Fatalf("JSON omitted effective minimum PIN length: %s", text)
 	}
 }
 

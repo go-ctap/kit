@@ -363,6 +363,7 @@ func TestUpstreamCode(t *testing.T) {
 		{ctapdevice.ErrPinUvAuthTokenRequired, commandContext(protocol.AuthenticatorMakeCredential), failure.CodePINUVAuthTokenRequired},
 		{ctapdevice.ErrPinNotSet, tokenContext(protocol.ClientPINSubCommandGetPinUvAuthTokenUsingPinWithPermissions), failure.CodePINNotConfigured},
 		{ctapdevice.ErrPinAlreadySet, WithClientPINSubCommand(failure.PhaseAuthenticatorCommand, protocol.ClientPINSubCommandSetPIN), failure.CodePINAlreadyConfigured},
+		{ctapdevice.ErrPinChangeRequired, commandContext(protocol.AuthenticatorMakeCredential), failure.CodePINChangeRequired},
 		{ctapdevice.ErrBuiltInUVRequired, commandContext(protocol.AuthenticatorGetAssertion), failure.CodeVerificationFlowUnsupported},
 		{ctapdevice.ErrUvNotConfigured, tokenContext(protocol.ClientPINSubCommandGetPinUvAuthTokenUsingUvWithPermissions), failure.CodeVerificationFlowUnsupported},
 		{ctapdevice.ErrLargeBlobsIntegrityCheck, commandContext(protocol.AuthenticatorLargeBlobs), failure.CodeLargeBlobIntegrityFailure},

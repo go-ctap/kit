@@ -5,7 +5,6 @@ import (
 
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/safety"
-	"github.com/samber/lo"
 )
 
 const (
@@ -13,6 +12,7 @@ const (
 	warningMinPINLengthPolicy            = "config.min_pin_length.policy"
 	warningMinPINLengthIrreversible      = "config.min_pin_length.irreversible"
 	warningMinPINLengthEnterpriseOverlap = "config.min_pin_length.enterprise_overlap"
+	warningLongTouchForReset             = "config.long_touch_for_reset.enable"
 )
 
 func BuildAlwaysUVPreview(status StatusReport, target AlwaysUVTarget, mode safety.PreviewMode) (AuthenticatorConfigPreview, error) {
@@ -51,6 +51,36 @@ func BuildAlwaysUVPreview(status StatusReport, target AlwaysUVTarget, mode safet
 	}, nil
 }
 
+func BuildEnableLongTouchForResetPreview(status StatusReport, mode safety.PreviewMode) (AuthenticatorConfigPreview, error) {
+	capability := status.AuthenticatorConfig.LongTouchForReset
+	if !status.AuthenticatorConfig.Supported || !capability.Supported || capability.Configured == nil {
+		return AuthenticatorConfigPreview{}, failure.New(
+			failure.CodeAuthenticatorConfigUnsupported,
+			failure.WithPhase(failure.PhaseValidation),
+		)
+	}
+	if *capability.Configured {
+		return AuthenticatorConfigPreview{}, failure.New(
+			failure.CodeAuthenticatorOperationNotAllowed,
+			failure.WithPhase(failure.PhaseValidation),
+		)
+	}
+
+	return AuthenticatorConfigPreview{
+		Operation:          AuthenticatorConfigLongTouch,
+		Device:             status.Device,
+		Authenticator:      status.AuthenticatorConfig,
+		CurrentLongTouch:   capability.Configured,
+		RequestedLongTouch: true,
+		Mode:               mode,
+		Warnings: []safety.Warning{{
+			Severity: safety.SeverityWarning,
+			Code:     warningLongTouchForReset,
+			Message:  "Factory reset will require the authenticator's long-touch gesture after this setting is enabled.",
+		}},
+	}, nil
+}
+
 func BuildMinPINLengthPreview(status StatusReport, req MinPINLengthRequest, mode safety.PreviewMode) (AuthenticatorConfigPreview, error) {
 	if !status.AuthenticatorConfig.Supported {
 		return AuthenticatorConfigPreview{}, failure.New(failure.CodeAuthenticatorConfigUnsupported, failure.WithPhase(failure.PhaseValidation))
@@ -60,14 +90,21 @@ func BuildMinPINLengthPreview(status StatusReport, req MinPINLengthRequest, mode
 		return AuthenticatorConfigPreview{}, failure.New(failure.CodeMinPINLengthUnsupported, failure.WithPhase(failure.PhaseValidation))
 	}
 
-	if status.PIN.MinPINLength != nil && req.Length < *status.PIN.MinPINLength {
+	if req.NewMinPINLength == nil && len(req.MinPINLengthRPIDs) == 0 && !req.ForceChangePIN && !req.PINComplexityPolicy {
+		return AuthenticatorConfigPreview{}, failure.New(failure.CodeCTAPParameterMissing, failure.WithPhase(failure.PhaseValidation))
+	}
+
+	if req.NewMinPINLength != nil && *req.NewMinPINLength < status.PIN.MinPINLength {
 		return AuthenticatorConfigPreview{}, failure.New(failure.CodeMinPINLengthDecreaseNotAllowed,
 			failure.WithParams(map[string]string{
-				"requested": strconv.FormatUint(uint64(req.Length), 10),
-				"current":   strconv.FormatUint(uint64(*status.PIN.MinPINLength), 10),
+				"requested": strconv.FormatUint(uint64(*req.NewMinPINLength), 10),
+				"current":   strconv.FormatUint(uint64(status.PIN.MinPINLength), 10),
 			}),
 			failure.WithPhase(failure.PhaseValidation),
 		)
+	}
+	if req.NewMinPINLength != nil && *req.NewMinPINLength > status.PIN.MaxPINLength {
+		return AuthenticatorConfigPreview{}, failure.New(failure.CodeCTAPParameterInvalid, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	warnings := []safety.Warning{
@@ -82,7 +119,7 @@ func BuildMinPINLengthPreview(status StatusReport, req MinPINLengthRequest, mode
 			Message:  "Some authenticators may reject later attempts to lower the minimum PIN length or may require PIN change after policy updates.",
 		},
 	}
-	if len(req.RPIDs) > 0 {
+	if len(req.MinPINLengthRPIDs) > 0 {
 		warnings = append(warnings, safety.Warning{
 			Severity: safety.SeverityWarning,
 			Code:     warningMinPINLengthEnterpriseOverlap,
@@ -91,16 +128,16 @@ func BuildMinPINLengthPreview(status StatusReport, req MinPINLengthRequest, mode
 	}
 
 	return AuthenticatorConfigPreview{
-		Operation:             AuthenticatorConfigMinPINLength,
-		Device:                status.Device,
-		Authenticator:         status.AuthenticatorConfig,
-		CurrentMinPINLength:   status.PIN.MinPINLength,
-		RequestedMinPINLength: new(req.Length),
-		MaxPINLength:          status.PIN.MaxPINLength,
-		RPIDs:                 lo.Clone(req.RPIDs),
-		ForceChangePin:        req.ForceChangePin,
-		PinComplexityPolicy:   req.PinComplexityPolicy,
-		Mode:                  mode,
-		Warnings:              warnings,
+		Operation:           AuthenticatorConfigMinPINLength,
+		Device:              status.Device,
+		Authenticator:       status.AuthenticatorConfig,
+		CurrentMinPINLength: status.PIN.MinPINLength,
+		NewMinPINLength:     req.NewMinPINLength,
+		MaxPINLength:        status.PIN.MaxPINLength,
+		MinPINLengthRPIDs:   req.MinPINLengthRPIDs,
+		ForceChangePIN:      req.ForceChangePIN,
+		PINComplexityPolicy: req.PINComplexityPolicy,
+		Mode:                mode,
+		Warnings:            warnings,
 	}, nil
 }

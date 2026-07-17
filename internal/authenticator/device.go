@@ -5,6 +5,7 @@ import (
 	"iter"
 
 	"github.com/go-ctap/ctap/attestation"
+	ctapauthenticator "github.com/go-ctap/ctap/authenticator"
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/ctap/webauthn"
@@ -30,6 +31,7 @@ type CredentialManager interface {
 	GetCredsMetadata(ctx context.Context, pinUvAuthToken []byte) (protocol.AuthenticatorCredentialManagementResponse, error)
 	EnumerateRPs(ctx context.Context, pinUvAuthToken []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error]
 	EnumerateCredentials(ctx context.Context, pinUvAuthToken []byte, rpIDHash []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error]
+	GetPersistentCredentialStoreState(ctx context.Context, pinUvAuthToken []byte) (ctapauthenticator.PersistentCredentialStoreState, error)
 	DeleteCredential(ctx context.Context, pinUvAuthToken []byte, credentialID credential.PublicKeyCredentialDescriptor) error
 	UpdateUserInformation(ctx context.Context, pinUvAuthToken []byte, credentialID credential.PublicKeyCredentialDescriptor, user credential.PublicKeyCredentialUserEntity) error
 }
@@ -73,7 +75,8 @@ type ConfigManager interface {
 	ChangePIN(ctx context.Context, currentPin, newPin string) error
 	Reset(ctx context.Context) error
 	ToggleAlwaysUV(ctx context.Context, pinUvAuthToken []byte) error
-	SetMinPINLength(ctx context.Context, pinUvAuthToken []byte, newMinPINLength uint, minPinLengthRPIDs []string, forceChangePin bool, pinComplexityPolicy bool) error
+	SetMinPINLength(ctx context.Context, pinUvAuthToken []byte, params protocol.SetMinPINLengthConfigSubCommandParams) error
+	EnableLongTouchForReset(ctx context.Context, pinUvAuthToken []byte) error
 }
 
 type BioEnrollmentManager interface {

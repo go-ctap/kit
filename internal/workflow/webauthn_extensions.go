@@ -30,10 +30,10 @@ func makeCredentialExtensionResults(
 		hasClientResult = true
 		client.CredentialProperties = &output.CredentialProperties
 	}
-	if authenticatorOutput != nil && authenticatorOutput.CreateCredProtectOutput != nil {
+	if authenticatorOutput != nil && authenticatorOutput.CredProtect != 0 {
 		hasAuthenticatorOutput = true
 		policy := extension.CredentialProtectionPolicy("")
-		switch authenticatorOutput.CreateCredProtectOutput.CredProtect {
+		switch authenticatorOutput.CredProtect {
 		case 0x01:
 			policy = extension.CredentialProtectionPolicyUserVerificationOptional
 		case 0x02:
@@ -51,6 +51,10 @@ func makeCredentialExtensionResults(
 		hasClientResult = true
 		client.HMACSecret = &appwebauthn.HMACSecretCreateOutput{Enabled: output.HMACCreateSecret}
 	}
+	if output != nil && output.LargeBlobOutputs != nil && output.LargeBlob.Supported != nil {
+		hasClientResult = true
+		client.LargeBlob = &appwebauthn.LargeBlobCreateOutput{Supported: *output.LargeBlob.Supported}
+	}
 	if output != nil && output.CreateHMACSecretMCOutputs != nil {
 		hasClientResult = true
 		client.HMACSecretMC = hmacSecretOutput(output.CreateHMACSecretMCOutputs.HMACGetSecret)
@@ -61,10 +65,10 @@ func makeCredentialExtensionResults(
 			Output2Hex: hex.EncodeToString(output.PRF.Results.Second),
 		}
 	}
-	if authenticatorOutput != nil && authenticatorOutput.CreateMinPinLengthOutput != nil {
+	if authenticatorOutput != nil && authenticatorOutput.MinPinLength != 0 {
 		hasAuthenticatorOutput = true
 		authenticator.MinPINLength = &appwebauthn.MinPINLengthOutput{
-			Value: authenticatorOutput.CreateMinPinLengthOutput.MinPinLength,
+			Value: authenticatorOutput.MinPinLength,
 		}
 	}
 	if authenticatorOutput != nil && authenticatorOutput.CreatePinComplexityPolicyOutput != nil {
@@ -94,31 +98,58 @@ func makeCredentialExtensionResults(
 }
 
 func getAssertionExtensionResults(
-	output *ctapwebauthn.GetAuthenticationExtensionsClientOutputs,
+	response protocol.AuthenticatorGetAssertionResponse,
 ) *appwebauthn.GetAssertionExtensionResults {
-	result := new(appwebauthn.GetAssertionClientExtensionResults)
-	hasResult := false
+	output := response.ExtensionOutputs
+	client := new(appwebauthn.GetAssertionClientExtensionResults)
+	hasClientResult := false
 	if output != nil && output.GetCredentialBlobOutputs != nil {
-		hasResult = true
-		result.CredentialBlob = &appwebauthn.CredentialBlobGetOutput{
+		hasClientResult = true
+		client.CredentialBlob = &appwebauthn.CredentialBlobGetOutput{
 			ValueHex: hex.EncodeToString(output.GetCredBlob),
 		}
 	}
 	if output != nil && output.GetHMACSecretOutputs != nil {
-		hasResult = true
-		result.HMACSecret = hmacSecretOutput(output.GetHMACSecretOutputs.HMACGetSecret)
+		hasClientResult = true
+		client.HMACSecret = hmacSecretOutput(output.GetHMACSecretOutputs.HMACGetSecret)
 	}
 	if output != nil && output.GetPRFOutputs != nil {
-		hasResult = true
-		result.PRF = &appwebauthn.GetAssertionPRFOutput{
+		hasClientResult = true
+		client.PRF = &appwebauthn.GetAssertionPRFOutput{
 			Results: prfOutputValues(output.PRF.Results),
 		}
 	}
-	if !hasResult {
+	if output != nil && output.LargeBlobOutputs != nil {
+		hasClientResult = true
+		largeBlob := &appwebauthn.LargeBlobGetOutput{
+			Written: output.LargeBlob.Written,
+		}
+		if output.LargeBlob.Blob != nil {
+			largeBlob.BlobHex = new(hex.EncodeToString(output.LargeBlob.Blob))
+		}
+		client.LargeBlob = largeBlob
+	}
+
+	authenticator := new(appwebauthn.GetAssertionAuthenticatorExtensionOutputs)
+	hasAuthenticatorResult := false
+	if response.AuthData != nil && response.AuthData.Extensions != nil &&
+		response.AuthData.Extensions.GetThirdPartyPaymentOutput != nil {
+		hasAuthenticatorResult = true
+		authenticator.ThirdPartyPayment = &response.AuthData.Extensions.GetThirdPartyPaymentOutput.ThirdPartyPayment
+	}
+	if !hasClientResult && !hasAuthenticatorResult {
 		return nil
 	}
 
-	return &appwebauthn.GetAssertionExtensionResults{Client: result}
+	result := new(appwebauthn.GetAssertionExtensionResults)
+	if hasClientResult {
+		result.Client = client
+	}
+	if hasAuthenticatorResult {
+		result.Authenticator = authenticator
+	}
+
+	return result
 }
 
 func hmacSecretOutput(output ctapwebauthn.HMACGetSecretOutput) *appwebauthn.HMACSecretOutput {

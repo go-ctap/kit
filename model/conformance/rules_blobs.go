@@ -37,7 +37,7 @@ func blobRules() []getInfoRule {
 				return []RequirementRef{getInfoRequirement(context.target, "cred-blob-requires-max-length", RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
-				if !slices.Contains(context.info.Extensions, extension.ExtensionIdentifierCredentialBlob) || context.info.MaxCredBlobLength != nil {
+				if !slices.Contains(context.info.Extensions, extension.ExtensionIdentifierCredentialBlob) || context.info.MaxCredBlobLength != 0 {
 					return nil
 				}
 
@@ -56,14 +56,14 @@ func blobRules() []getInfoRule {
 				return []RequirementRef{getInfoRequirement(context.target, "cred-blob-max-length-minimum", RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
-				if context.info.MaxCredBlobLength == nil || *context.info.MaxCredBlobLength >= 32 {
+				if context.info.MaxCredBlobLength == 0 || context.info.MaxCredBlobLength >= 32 {
 					return nil
 				}
 
 				return finding(
 					[]FieldPath{"maxCredBlobLength"},
 					expected(ExpectationMinimum, "32"),
-					observedUnsigned("maxCredBlobLength", *context.info.MaxCredBlobLength),
+					observedUnsigned("maxCredBlobLength", context.info.MaxCredBlobLength),
 				)
 			},
 		},
@@ -74,14 +74,14 @@ func blobRules() []getInfoRule {
 				return []RequirementRef{getInfoRequirement(context.target, "cred-blob-max-length-requires-extension", RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
-				if context.info.MaxCredBlobLength == nil || slices.Contains(context.info.Extensions, extension.ExtensionIdentifierCredentialBlob) {
+				if context.info.MaxCredBlobLength == 0 || slices.Contains(context.info.Extensions, extension.ExtensionIdentifierCredentialBlob) {
 					return nil
 				}
 
 				return finding(
 					[]FieldPath{"maxCredBlobLength"},
 					expected(ExpectationAbsent),
-					observedUnsigned("maxCredBlobLength", *context.info.MaxCredBlobLength),
+					observedUnsigned("maxCredBlobLength", context.info.MaxCredBlobLength),
 					observedStrings("extensions", context.info.Extensions != nil, extensionValues(context.info)),
 				)
 			},
@@ -153,7 +153,7 @@ func blobRules() []getInfoRule {
 				return []RequirementRef{getInfoRequirement(context.target, "large-blobs-command-requires-capacity", RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
-				if !optionTrue(context.info, protocol.OptionLargeBlobs) || context.info.MaxSerializedLargeBlobArray != nil {
+				if !optionTrue(context.info, protocol.OptionLargeBlobs) || context.info.MaxSerializedLargeBlobArray != 0 {
 					return nil
 				}
 
@@ -173,14 +173,14 @@ func blobRules() []getInfoRule {
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				value := context.info.MaxSerializedLargeBlobArray
-				if value == nil || *value >= 1024 {
+				if value == 0 || value >= 1024 {
 					return nil
 				}
 
 				return finding(
 					[]FieldPath{"maxSerializedLargeBlobArray"},
 					expected(ExpectationMinimum, "1024"),
-					observed("maxSerializedLargeBlobArray", EvidenceValue, strconv.FormatUint(uint64(*value), 10)),
+					observed("maxSerializedLargeBlobArray", EvidenceValue, strconv.FormatUint(uint64(value), 10)),
 				)
 			},
 		},
@@ -192,14 +192,14 @@ func blobRules() []getInfoRule {
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				value := context.info.MaxSerializedLargeBlobArray
-				if value == nil || optionTrue(context.info, protocol.OptionLargeBlobs) {
+				if value == 0 || optionTrue(context.info, protocol.OptionLargeBlobs) {
 					return nil
 				}
 
 				return finding(
 					[]FieldPath{"maxSerializedLargeBlobArray"},
 					expected(ExpectationAbsent),
-					observedUnsigned("maxSerializedLargeBlobArray", *value),
+					observedUnsigned("maxSerializedLargeBlobArray", value),
 					observedOption(context.info, protocol.OptionLargeBlobs),
 				)
 			},

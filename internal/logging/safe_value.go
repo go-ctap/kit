@@ -134,12 +134,16 @@ func sensitiveLogField(path []string) bool {
 		"authdataraw", "authenticatordatahex", "attestationobjectcborhex",
 		"unsignedextensionoutputs", "extensionoutputs",
 		"credentialblob", "credblob", "hmacsecret", "hmacsecretmc", "hmacgetsecret", "prf",
-		"saltenc", "saltauth", "output1hex", "output2hex", "firstoutputhex", "secondoutputhex":
+		"saltenc", "saltauth", "output1hex", "output2hex", "firstoutputhex", "secondoutputhex",
+		"payment", "encidentifier", "enccredstorestate", "authenticatoridentifierhex", "credentialstorestatehex":
 		return true
-	case "valuehex":
+	case "valuehex", "write", "blob", "blobhex":
 		for _, parent := range path[:len(path)-1] {
 			normalized := canonicalLogName(parent)
 			if normalized == "credentialblob" || normalized == "getcredblob" || normalized == "credblob" {
+				return true
+			}
+			if normalized == "largeblob" || normalized == "largeblobinputs" || normalized == "largebloboutputs" {
 				return true
 			}
 		}

@@ -2,7 +2,6 @@ package webauthn
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"testing"
 
@@ -31,102 +30,6 @@ func TestWebAuthnExtensionJSONUsesLevel3Shapes(t *testing.T) {
 			t.Fatalf("JSON = %s, want %s", raw, want)
 		}
 	}
-}
-
-func TestNormalizeHMACSecretInputClonesWithoutDuplicatingCTAPValidation(t *testing.T) {
-	input := &ctapwebauthn.CreateAuthenticationExtensionsClientInputs{
-		CreateHMACSecretMCInputs: &ctapwebauthn.CreateHMACSecretMCInputs{
-			HMACGetSecret: ctapwebauthn.HMACGetSecretInput{
-				Salt1: bytes.Repeat([]byte{0x11}, 31),
-				Salt2: bytes.Repeat([]byte{0x22}, 33),
-			},
-		},
-	}
-
-	normalized := normalizeMakeCredentialExtensions(input)
-	if normalized.CreateHMACSecretMCInputs == input.CreateHMACSecretMCInputs ||
-		&normalized.HMACGetSecret.Salt1[0] == &input.HMACGetSecret.Salt1[0] {
-		t.Fatal("normalized HMAC input aliases caller input")
-	}
-	if len(normalized.HMACGetSecret.Salt1) != 31 || len(normalized.HMACGetSecret.Salt2) != 33 {
-		t.Fatalf("normalized HMAC input = %#v, want values preserved for ctap validation", normalized.HMACGetSecret)
-	}
-}
-
-func TestNormalizeMakeCredentialPRF(t *testing.T) {
-	t.Run("empty request is valid", func(t *testing.T) {
-		input := createPRFExtensions(ctapwebauthn.AuthenticationExtensionsPRFInputs{})
-		normalized := normalizeMakeCredentialExtensions(input)
-		if normalized.PRFInputs == nil || normalized.PRFInputs == input.PRFInputs {
-			t.Fatalf("normalized PRF = %#v, want cloned empty request", normalized.PRFInputs)
-		}
-	})
-
-	t.Run("empty BufferSources remain present", func(t *testing.T) {
-		input := createPRFExtensions(ctapwebauthn.AuthenticationExtensionsPRFInputs{
-			Eval: ctapwebauthn.AuthenticationExtensionsPRFValues{First: []byte{}, Second: []byte{}},
-		})
-		normalized := normalizeMakeCredentialExtensions(input)
-		if normalized.PRF.Eval.First == nil || normalized.PRF.Eval.Second == nil {
-			t.Fatalf("normalized PRF = %#v, want present-empty values", normalized.PRF)
-		}
-	})
-
-	t.Run("ctap-owned combinations are preserved", func(t *testing.T) {
-		raw := &ctapwebauthn.CreateHMACSecretMCInputs{
-			HMACGetSecret: ctapwebauthn.HMACGetSecretInput{Salt1: make([]byte, 31)},
-		}
-		input := createPRFExtensions(ctapwebauthn.AuthenticationExtensionsPRFInputs{
-			EvalByCredential: map[string]ctapwebauthn.AuthenticationExtensionsPRFValues{"id": {}},
-		})
-		input.CreateHMACSecretMCInputs = raw
-
-		normalized := normalizeMakeCredentialExtensions(input)
-		if normalized.CreateHMACSecretMCInputs == nil || normalized.PRF.EvalByCredential == nil {
-			t.Fatalf("normalized extensions = %#v, want ctap-owned inputs preserved", normalized)
-		}
-	})
-}
-
-func TestNormalizeGetAssertionPRF(t *testing.T) {
-	credentialID := []byte{0xaa, 0xbb}
-	key := base64.RawURLEncoding.EncodeToString(credentialID)
-	t.Run("empty request is valid", func(t *testing.T) {
-		normalized := normalizeGetAssertionExtensions(
-			getPRFExtensions(ctapwebauthn.AuthenticationExtensionsPRFInputs{}))
-		if normalized.PRFInputs == nil {
-			t.Fatalf("normalized = %#v, want PRF input", normalized)
-		}
-	})
-
-	t.Run("global and matching record are cloned", func(t *testing.T) {
-		values := ctapwebauthn.AuthenticationExtensionsPRFValues{First: []byte{0x01}, Second: []byte{0x02}}
-		input := getPRFExtensions(ctapwebauthn.AuthenticationExtensionsPRFInputs{
-			Eval:             values,
-			EvalByCredential: map[string]ctapwebauthn.AuthenticationExtensionsPRFValues{key: values},
-		})
-		normalized := normalizeGetAssertionExtensions(input)
-		mapped := normalized.PRF.EvalByCredential[key]
-		if &normalized.PRF.Eval.First[0] == &input.PRF.Eval.First[0] ||
-			&mapped.Second[0] == &input.PRF.EvalByCredential[key].Second[0] {
-			t.Fatal("normalized PRF values alias caller-owned values")
-		}
-	})
-
-	t.Run("ctap-owned combinations are preserved", func(t *testing.T) {
-		raw := &ctapwebauthn.GetHMACSecretInputs{
-			HMACGetSecret: ctapwebauthn.HMACGetSecretInput{Salt1: make([]byte, 31)},
-		}
-		input := getPRFExtensions(ctapwebauthn.AuthenticationExtensionsPRFInputs{
-			EvalByCredential: map[string]ctapwebauthn.AuthenticationExtensionsPRFValues{"not+base64url": {}},
-		})
-		input.GetHMACSecretInputs = raw
-
-		normalized := normalizeGetAssertionExtensions(input)
-		if normalized.GetHMACSecretInputs == nil || normalized.PRF.EvalByCredential == nil {
-			t.Fatalf("normalized extensions = %#v, want ctap-owned inputs preserved", normalized)
-		}
-	})
 }
 
 func TestBuildWebAuthnPreviewsKeepRawWarningsAndPRFSemantics(t *testing.T) {
@@ -172,10 +75,9 @@ func TestBuildWebAuthnPreviewsKeepRawWarningsAndPRFSemantics(t *testing.T) {
 }
 
 func TestBuildMakeCredentialPreviewDefersCredentialBlobLimitToCTAP(t *testing.T) {
-	maximum := uint(3)
 	preview, err := BuildMakeCredentialPreview(
 		report.DeviceReport{},
-		protocol.AuthenticatorGetInfoResponse{MaxCredBlobLength: &maximum},
+		protocol.AuthenticatorGetInfoResponse{MaxCredBlobLength: 3},
 		validMakeCredentialInput(&ctapwebauthn.CreateAuthenticationExtensionsClientInputs{
 			CreateCredentialBlobInputs: &ctapwebauthn.CreateCredentialBlobInputs{CredBlob: []byte("four")},
 		}),

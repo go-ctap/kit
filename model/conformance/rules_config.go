@@ -59,7 +59,7 @@ func configRules() []getInfoRule {
 
 				if context.target.Profile == ProfileFIDO23 &&
 					optionPresent(context.info, protocol.OptionEnterpriseAttestation) &&
-					!slices.Contains(context.info.AuthenticatorConfigCommands, uint(protocol.ConfigSubCommandEnableEnterpriseAttestation)) {
+					!slices.Contains(context.info.AuthenticatorConfigCommands, protocol.ConfigSubCommandEnableEnterpriseAttestation) {
 					results = append(results, findingWithReferences(
 						[]FieldPath{"authenticatorConfigCommands"},
 						expected(ExpectationContains, "0x01"),
@@ -70,7 +70,7 @@ func configRules() []getInfoRule {
 				}
 
 				if context.info.VendorPrototypeConfigCommands != nil &&
-					!slices.Contains(context.info.AuthenticatorConfigCommands, uint(protocol.ConfigSubCommandVendorPrototype)) {
+					!slices.Contains(context.info.AuthenticatorConfigCommands, protocol.ConfigSubCommandVendorPrototype) {
 					results = append(results, findingWithReferences(
 						[]FieldPath{"authenticatorConfigCommands"},
 						expected(ExpectationContains, "0xFF"),
@@ -96,7 +96,7 @@ func configRules() []getInfoRule {
 				commands := observedStrings("authenticatorConfigCommands", true, unsignedValues(context.info.AuthenticatorConfigCommands))
 				results := make([]assessment, 0, 4)
 				add := func(command protocol.ConfigSubCommand, valid bool, subject FieldPath, expectation Expectation, evidence Evidence, reference RequirementRef) {
-					if !slices.Contains(context.info.AuthenticatorConfigCommands, uint(command)) || valid {
+					if !slices.Contains(context.info.AuthenticatorConfigCommands, command) || valid {
 						return
 					}
 					results = append(results, findingWithReferences(

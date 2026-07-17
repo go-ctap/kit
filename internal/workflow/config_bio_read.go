@@ -66,12 +66,8 @@ func (r Runner) bioSensorReport(ctx context.Context) (appconfig.BioSensorReport,
 		Supported:   true,
 		PreviewOnly: status.Bio.PreviewOnly,
 	}
-	if modality.Modality != nil {
-		report.Modality = bioModality(*modality.Modality)
-	}
-	if sensor.FingerprintKind != nil {
-		report.FingerprintKind = fingerprintKind(*sensor.FingerprintKind)
-	}
+	report.Modality = bioModality(modality.Modality)
+	report.FingerprintKind = fingerprintKind(sensor.FingerprintKind)
 	if sensor.MaxCaptureSamplesRequiredForEnroll != nil {
 		report.MaxCaptureSamplesRequiredForEnroll = sensor.MaxCaptureSamplesRequiredForEnroll
 	}
@@ -82,23 +78,23 @@ func (r Runner) bioSensorReport(ctx context.Context) (appconfig.BioSensorReport,
 	return report, nil
 }
 
-func bioModality(value protocol.BioModality) *appconfig.BioModality {
+func bioModality(value protocol.BioModality) appconfig.BioModality {
 	switch value {
 	case protocol.BioModalityFingerprint:
-		return new(appconfig.BioModalityFingerprint)
+		return appconfig.BioModalityFingerprint
 	default:
-		return nil
+		return ""
 	}
 }
 
-func fingerprintKind(value uint) *appconfig.FingerprintKind {
+func fingerprintKind(value uint) appconfig.FingerprintKind {
 	switch value {
 	case 1:
-		return new(appconfig.FingerprintKindTouch)
+		return appconfig.FingerprintKindTouch
 	case 2:
-		return new(appconfig.FingerprintKindSwipe)
+		return appconfig.FingerprintKindSwipe
 	default:
-		return nil
+		return ""
 	}
 }
 

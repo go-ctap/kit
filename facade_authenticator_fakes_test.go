@@ -102,8 +102,16 @@ func (a *contractAuthenticator) ToggleAlwaysUV(context.Context, []byte) error {
 	return errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) SetMinPINLength(context.Context, []byte, uint, []string, bool, bool) error {
+func (a *contractAuthenticator) SetMinPINLength(context.Context, []byte, protocol.SetMinPINLengthConfigSubCommandParams) error {
 	return errors.New("not implemented")
+}
+
+func (a *contractAuthenticator) EnableLongTouchForReset(context.Context, []byte) error {
+	return errors.New("not implemented")
+}
+
+func (a *contractAuthenticator) GetPersistentCredentialStoreState(context.Context, []byte) (ctapdevice.PersistentCredentialStoreState, error) {
+	return ctapdevice.PersistentCredentialStoreState{}, errors.New("not implemented")
 }
 
 func (a *contractAuthenticator) GetBioModality(context.Context) (protocol.AuthenticatorBioEnrollmentResponse, error) {
@@ -259,7 +267,7 @@ type largeBlobWriteEventAuthenticator struct {
 	omitLargeBlobKey             bool
 	largeBlobs                   []protocol.LargeBlob
 	lastSetLargeBlobs            []protocol.LargeBlob
-	maxSerializedLargeBlobArray  *uint
+	maxSerializedLargeBlobArray  uint
 	rpEnumerations               atomic.Int32
 	credentialEnumerations       atomic.Int32
 	tokenCalls                   atomic.Int32
@@ -299,8 +307,8 @@ func (a *largeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingUV(
 
 func (a *largeBlobWriteEventAuthenticator) GetCredsMetadata(context.Context, []byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
 	return protocol.AuthenticatorCredentialManagementResponse{
-		ExistingResidentCredentialsCount:             1,
-		MaxPossibleRemainingResidentCredentialsCount: 10,
+		ExistingResidentCredentialsCount:             new(uint(1)),
+		MaxPossibleRemainingResidentCredentialsCount: new(uint(10)),
 	}, nil
 }
 
@@ -337,7 +345,8 @@ func (a *largeBlobWriteEventAuthenticator) EnumerateCredentials(context.Context,
 				Type: credential.PublicKeyCredentialTypePublicKey,
 				ID:   []byte{0xc0, 0x5e},
 			},
-			LargeBlobKey: largeBlobKey,
+			LargeBlobKey:     largeBlobKey,
+			TotalCredentials: 1,
 		}, nil)
 	}
 }

@@ -19,9 +19,9 @@ const (
 )
 
 type SupportReport struct {
-	LargeBlobs                  bool  `json:"largeBlobs"`
-	LargeBlobKeyExtension       bool  `json:"largeBlobKeyExtension"`
-	MaxSerializedLargeBlobArray *uint `json:"maxSerializedLargeBlobArray,omitempty"`
+	LargeBlobs                  bool `json:"largeBlobs"`
+	LargeBlobKeyExtension       bool `json:"largeBlobKeyExtension"`
+	MaxSerializedLargeBlobArray uint `json:"maxSerializedLargeBlobArray,omitempty"`
 }
 
 type ArrayState struct {

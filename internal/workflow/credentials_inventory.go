@@ -147,6 +147,13 @@ func (r Runner) buildCredentialInventoryReport(
 			protocol.CredentialManagementSubCommandGetCredsMetadata,
 		))
 	}
+	if metadata.ExistingResidentCredentialsCount == nil ||
+		metadata.MaxPossibleRemainingResidentCredentialsCount == nil {
+		return appcredentials.InventoryReport{}, failure.New(
+			failure.CodeCTAPSpecViolation,
+			failure.WithPhase(failure.PhaseMetadata),
+		)
+	}
 
 	report := appcredentials.InventoryReport{
 		Device: r.env.Selected,
@@ -156,8 +163,8 @@ func (r Runner) buildCredentialInventoryReport(
 			ReadOnlyPermission:   permission == protocol.PermissionPersistentCredentialManagementReadOnly,
 		},
 		Summary: appcredentials.InventorySummary{
-			ExistingResidentCredentialsCount:             metadata.ExistingResidentCredentialsCount,
-			MaxPossibleRemainingResidentCredentialsCount: metadata.MaxPossibleRemainingResidentCredentialsCount,
+			ExistingResidentCredentialsCount:             *metadata.ExistingResidentCredentialsCount,
+			MaxPossibleRemainingResidentCredentialsCount: *metadata.MaxPossibleRemainingResidentCredentialsCount,
 		},
 	}
 	completed := false
@@ -167,7 +174,7 @@ func (r Runner) buildCredentialInventoryReport(
 		}
 	}()
 
-	if metadata.ExistingResidentCredentialsCount == 0 {
+	if *metadata.ExistingResidentCredentialsCount == 0 {
 		report.Groups = []appcredentials.CredentialGroup{}
 		completed = true
 		return report, nil
@@ -193,7 +200,7 @@ func (r Runner) buildCredentialInventoryReport(
 			))
 		}
 
-		if rpTotal == 0 {
+		if len(rpResponses) == 0 {
 			rpTotal = uint64(rpResponse.TotalRPs)
 		}
 
@@ -207,7 +214,7 @@ func (r Runner) buildCredentialInventoryReport(
 	}
 
 	report.Groups = make([]appcredentials.CredentialGroup, 0, len(rpResponses))
-	credentialsTotal := uint64(metadata.ExistingResidentCredentialsCount)
+	credentialsTotal := uint64(*metadata.ExistingResidentCredentialsCount)
 
 	for _, rpResponse := range rpResponses {
 		if err := ctx.Err(); err != nil {
@@ -241,7 +248,6 @@ func (r Runner) buildCredentialInventoryReport(
 					subCommand,
 				))
 			}
-
 			record := appcredentials.CredentialRecord{
 				CredentialIDHex:      hex.EncodeToString(credentialResponse.CredentialID.ID),
 				CredentialType:       string(credentialResponse.CredentialID.Type),

@@ -9,95 +9,6 @@ import (
 	"github.com/go-ctap/kit/model/safety"
 )
 
-func normalizeMakeCredentialExtensions(
-	input *ctapwebauthn.CreateAuthenticationExtensionsClientInputs,
-) *ctapwebauthn.CreateAuthenticationExtensionsClientInputs {
-	if input == nil {
-		return nil
-	}
-
-	result := *input
-	result.CreateCredentialPropertiesInputs = clonePointer(input.CreateCredentialPropertiesInputs)
-	result.CreateHMACSecretInputs = clonePointer(input.CreateHMACSecretInputs)
-	result.CreateMinPinLengthInputs = clonePointer(input.CreateMinPinLengthInputs)
-	result.CreatePinComplexityPolicyInputs = clonePointer(input.CreatePinComplexityPolicyInputs)
-	if input.CreateCredentialProtectionInputs != nil {
-		value := *input.CreateCredentialProtectionInputs
-		result.CreateCredentialProtectionInputs = &value
-	}
-	if input.CreateCredentialBlobInputs != nil {
-		value := *input.CreateCredentialBlobInputs
-		value.CredBlob = slices.Clone(value.CredBlob)
-		result.CreateCredentialBlobInputs = &value
-	}
-	if input.CreateHMACSecretMCInputs != nil {
-		value := *input.CreateHMACSecretMCInputs
-		value.HMACGetSecret = cloneHMACSecretInput(value.HMACGetSecret)
-		result.CreateHMACSecretMCInputs = &value
-	}
-	if input.PRFInputs != nil {
-		result.PRFInputs = &ctapwebauthn.PRFInputs{PRF: normalizePRFInputs(input.PRF)}
-	}
-
-	return &result
-}
-
-func normalizeGetAssertionExtensions(
-	input *ctapwebauthn.GetAuthenticationExtensionsClientInputs,
-) *ctapwebauthn.GetAuthenticationExtensionsClientInputs {
-	if input == nil {
-		return nil
-	}
-
-	result := *input
-	result.GetCredentialBlobInputs = clonePointer(input.GetCredentialBlobInputs)
-	if input.GetHMACSecretInputs != nil {
-		value := *input.GetHMACSecretInputs
-		value.HMACGetSecret = cloneHMACSecretInput(value.HMACGetSecret)
-		result.GetHMACSecretInputs = &value
-	}
-	if input.PRFInputs != nil {
-		result.PRFInputs = &ctapwebauthn.PRFInputs{PRF: normalizePRFInputs(input.PRF)}
-	}
-
-	return &result
-}
-
-func cloneHMACSecretInput(
-	input ctapwebauthn.HMACGetSecretInput,
-) ctapwebauthn.HMACGetSecretInput {
-	return ctapwebauthn.HMACGetSecretInput{
-		Salt1: slices.Clone(input.Salt1),
-		Salt2: slices.Clone(input.Salt2),
-	}
-}
-
-func normalizePRFInputs(
-	input ctapwebauthn.AuthenticationExtensionsPRFInputs,
-) ctapwebauthn.AuthenticationExtensionsPRFInputs {
-	result := ctapwebauthn.AuthenticationExtensionsPRFInputs{
-		Eval: normalizePRFValues(input.Eval),
-	}
-	if input.EvalByCredential != nil {
-		result.EvalByCredential = make(map[string]ctapwebauthn.AuthenticationExtensionsPRFValues,
-			len(input.EvalByCredential))
-		for key, values := range input.EvalByCredential {
-			result.EvalByCredential[key] = normalizePRFValues(values)
-		}
-	}
-
-	return result
-}
-
-func normalizePRFValues(
-	input ctapwebauthn.AuthenticationExtensionsPRFValues,
-) ctapwebauthn.AuthenticationExtensionsPRFValues {
-	return ctapwebauthn.AuthenticationExtensionsPRFValues{
-		First:  slices.Clone(input.First),
-		Second: slices.Clone(input.Second),
-	}
-}
-
 func hasPRFEvaluation(input *ctapwebauthn.PRFInputs) bool {
 	return input != nil && (!input.PRF.Eval.IsZero() || len(input.PRF.EvalByCredential) > 0)
 }
@@ -128,6 +39,10 @@ func makeCredentialExtensionWarnings(
 		"webauthn.extension.min_pin_length.not_advertised", "minPinLength")
 	appendMissing(input.CreatePinComplexityPolicyInputs != nil, extension.ExtensionIdentifierPinComplexityPolicy,
 		"webauthn.extension.pin_complexity_policy.not_advertised", "pinComplexityPolicy")
+	appendMissing(input.LargeBlobInputs != nil, extension.ExtensionIdentifierLargeBlobKey,
+		"webauthn.extension.large_blob.not_advertised", "largeBlob")
+	appendMissing(input.PaymentInputs != nil && input.Payment.IsPayment, extension.ExtensionIdentifierThirdPartyPayment,
+		"webauthn.extension.third_party_payment.not_advertised", "thirdPartyPayment")
 	if input.PRFInputs != nil {
 		appendMissing(true, extension.ExtensionIdentifierHMACSecret,
 			"webauthn.extension.prf.not_advertised", "prf")
@@ -157,6 +72,15 @@ func getAssertionExtensionWarnings(
 		warnings = append(warnings, unsupportedExtensionWarning(
 			"webauthn.extension.prf.not_advertised", "prf"))
 	}
+	if input.LargeBlobInputs != nil && !slices.Contains(info.Extensions, extension.ExtensionIdentifierLargeBlobKey) {
+		warnings = append(warnings, unsupportedExtensionWarning(
+			"webauthn.extension.large_blob.not_advertised", "largeBlob"))
+	}
+	if input.PaymentInputs != nil && input.Payment.IsPayment &&
+		!slices.Contains(info.Extensions, extension.ExtensionIdentifierThirdPartyPayment) {
+		warnings = append(warnings, unsupportedExtensionWarning(
+			"webauthn.extension.third_party_payment.not_advertised", "thirdPartyPayment"))
+	}
 
 	return warnings
 }
@@ -167,13 +91,4 @@ func unsupportedExtensionWarning(code, label string) safety.Warning {
 		Code:     code,
 		Message:  label + " is not advertised by this authenticator; execution is still allowed.",
 	}
-}
-
-func clonePointer[T any](value *T) *T {
-	if value == nil {
-		return nil
-	}
-	cloned := *value
-
-	return &cloned
 }

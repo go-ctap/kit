@@ -103,7 +103,11 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 	}
 	defer secret.Zero(token)
 
-	if err := r.credentialManager().UpdateUserInformation(ctx, token, descriptor, updatedUser); err != nil {
+	err = r.credentialManager().UpdateUserInformation(ctx, token, descriptor, updatedUser)
+	if r.env.Cache != nil {
+		r.env.Cache.InvalidateCredentials()
+	}
+	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 			failure.PhaseAuthenticatorCommand,
 			credentialManagementCommand(r.infoProvider().GetInfo()),

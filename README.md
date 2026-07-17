@@ -4,6 +4,9 @@
 
 Reusable CTAP/FIDO2 runtime core for the `go-ctap` application family.
 
+The runtime currently targets `github.com/go-ctap/ctap` v0.30.0 and exposes the
+CTAP 2.3 operation model without legacy API aliases.
+
 The current Go module is:
 
 ```go
@@ -71,6 +74,27 @@ The runtime fetches and verifies the FIDO MDS3 blob, indexes entries by AAGUID,
 and caches the verified response in memory and on disk under the user cache
 directory. Disk cache entries are verified again before use. Consumers own any
 MDS presentation or policy decisions.
+
+## CTAP 2.3 Runtime Surface
+
+- `model.InspectResult.Info` embeds `protocol.AuthenticatorGetInfoResponse`, so
+  get-info fields and types track `ctap` directly; the kit only adds the UV
+  modality label and conformance report.
+- `model.CredentialStoreStateOperation` reads the persistent credential-store
+  identifiers with a standalone `pcmr` token. The result contains lowercase
+  hexadecimal identifiers and must be treated as sensitive.
+- `model.EnableLongTouchForResetOperation` supports preview, dry-run, and
+  confirmation before enabling the reset gesture requirement.
+- `model.SetMinPINLengthOperation` mirrors the upstream config parameters:
+  `NewMinPINLength` is optional, while RP-ID and boolean fields use their zero
+  values when omitted.
+- WebAuthn make-credential and get-assertion operations delegate direct and
+  legacy `largeBlob` processing to `ctap`. A non-nil get-assertion
+  `largeBlob.write`, including an empty blob, requires confirmation. The
+  existing `largeBlobs.*` operations remain the explicit legacy-array
+  management API.
+- WebAuthn extension results preserve present-empty large blobs, explicit false
+  `written`/`thirdPartyPayment` values, and make-credential `supported` output.
 
 ## Safety Model
 

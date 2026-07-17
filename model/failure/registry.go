@@ -166,6 +166,7 @@ func newCodeRegistry() map[Code]codeSpec {
 		CodePINUVAuthInvalid,
 		CodePINUVAuthBlocked,
 		CodePINPolicyViolation,
+		CodePINChangeRequired,
 		CodePINUVAuthTokenRequired,
 		CodePINUVPermissionUnauthorized,
 		CodeUserPresenceRequired,

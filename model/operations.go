@@ -5,6 +5,7 @@ type OperationKind string
 const (
 	OperationInspect                  OperationKind = "inspect"
 	OperationListCredentials          OperationKind = "credentials.list"
+	OperationCredentialStoreState     OperationKind = "credentials.storeState"
 	OperationDeleteCredential         OperationKind = "credentials.delete"
 	OperationUpdateCredentialUser     OperationKind = "credentials.updateUser"
 	OperationReadLargeBlob            OperationKind = "largeBlobs.read"
@@ -23,6 +24,7 @@ const (
 	OperationChangePIN                OperationKind = "config.pin.change"
 	OperationSetAlwaysUV              OperationKind = "config.alwaysUv.set"
 	OperationSetMinPINLength          OperationKind = "config.minPinLength.set"
+	OperationEnableLongTouchForReset  OperationKind = "config.longTouchForReset.enable"
 	OperationMakeCredential           OperationKind = "webauthn.makeCredential"
 	OperationGetAssertion             OperationKind = "webauthn.getAssertion"
 )

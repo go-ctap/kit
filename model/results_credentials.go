@@ -2,6 +2,12 @@ package model
 
 import "github.com/go-ctap/kit/model/credentials"
 
+type CredentialStoreStateOutput struct {
+	Result credentials.StoreStateResult `json:"result"`
+}
+
+func (CredentialStoreStateOutput) ctapkitResult() {}
+
 type CredentialsOutput struct {
 	Report credentials.InventoryReport `json:"report"`
 }

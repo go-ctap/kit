@@ -72,7 +72,11 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 	}
 	defer secret.Zero(token)
 
-	if err := r.largeBlobManager().SetLargeBlobs(ctx, token, replacement); err != nil {
+	err = r.largeBlobManager().SetLargeBlobs(ctx, token, replacement)
+	if r.env.Cache != nil {
+		r.env.Cache.InvalidateLargeBlobs()
+	}
+	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.AuthenticatorLargeBlobs,
@@ -149,7 +153,11 @@ func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOp
 	}
 	defer secret.Zero(token)
 
-	if err := r.largeBlobManager().SetLargeBlobs(ctx, token, replacement); err != nil {
+	err = r.largeBlobManager().SetLargeBlobs(ctx, token, replacement)
+	if r.env.Cache != nil {
+		r.env.Cache.InvalidateLargeBlobs()
+	}
+	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.AuthenticatorLargeBlobs,

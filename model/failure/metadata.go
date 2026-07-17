@@ -9,6 +9,7 @@ func canonicalOperation(operation string) string {
 	switch operation {
 	case "inspect",
 		"credentials.list",
+		"credentials.storeState",
 		"credentials.delete",
 		"credentials.updateUser",
 		"largeBlobs.read",
@@ -27,6 +28,7 @@ func canonicalOperation(operation string) string {
 		"config.pin.change",
 		"config.alwaysUv.set",
 		"config.minPinLength.set",
+		"config.longTouchForReset.enable",
 		"webauthn.makeCredential",
 		"webauthn.getAssertion":
 		return operation

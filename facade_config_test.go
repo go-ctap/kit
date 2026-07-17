@@ -56,10 +56,10 @@ func TestBioSensorInfoReportsSpecNamedEnums(t *testing.T) {
 			if !ok {
 				t.Fatalf("output = %#v, want BioSensorOutput", output)
 			}
-			if typed.Report.Modality == nil || *typed.Report.Modality != appconfig.BioModalityFingerprint {
+			if typed.Report.Modality != appconfig.BioModalityFingerprint {
 				t.Fatalf("modality = %#v, want fingerprint", typed.Report.Modality)
 			}
-			if typed.Report.FingerprintKind == nil || *typed.Report.FingerprintKind != tt.want {
+			if typed.Report.FingerprintKind != tt.want {
 				t.Fatalf("fingerprintKind = %#v, want %s", typed.Report.FingerprintKind, tt.want)
 			}
 
@@ -114,11 +114,11 @@ func TestBioSensorInfoOmitsUnknownSpecValues(t *testing.T) {
 			if !ok {
 				t.Fatalf("output = %#v, want BioSensorOutput", output)
 			}
-			if typed.Report.Modality != nil {
-				t.Fatalf("modality = %#v, want nil", typed.Report.Modality)
+			if typed.Report.Modality != "" {
+				t.Fatalf("modality = %#v, want empty", typed.Report.Modality)
 			}
-			if typed.Report.FingerprintKind != nil {
-				t.Fatalf("fingerprintKind = %#v, want nil", typed.Report.FingerprintKind)
+			if typed.Report.FingerprintKind != "" {
+				t.Fatalf("fingerprintKind = %#v, want empty", typed.Report.FingerprintKind)
 			}
 
 			raw, err := json.Marshal(output)
@@ -461,11 +461,11 @@ func (a *bioSensorAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse
 }
 
 func (a *bioSensorAuthenticator) GetBioModality(context.Context) (protocol.AuthenticatorBioEnrollmentResponse, error) {
-	return protocol.AuthenticatorBioEnrollmentResponse{Modality: &a.modality}, nil
+	return protocol.AuthenticatorBioEnrollmentResponse{Modality: a.modality}, nil
 }
 
 func (a *bioSensorAuthenticator) GetFingerprintSensorInfo(context.Context) (protocol.AuthenticatorBioEnrollmentResponse, error) {
-	return protocol.AuthenticatorBioEnrollmentResponse{FingerprintKind: &a.fingerprintKind}, nil
+	return protocol.AuthenticatorBioEnrollmentResponse{FingerprintKind: a.fingerprintKind}, nil
 }
 
 func TestPINMutationsRejectEmptyPINAtSessionRun(t *testing.T) {

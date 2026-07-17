@@ -246,6 +246,31 @@ func TestCacheInvalidateTokenUnlessPermissionNarrowsCompositeGrant(t *testing.T)
 	}
 }
 
+func TestCacheInvalidateTokenUnlessPermissionRequiresStandalonePCMR(t *testing.T) {
+	cache := NewCache()
+	composite := TokenKey{
+		Permission: protocol.PermissionCredentialManagement |
+			protocol.PermissionPersistentCredentialManagementReadOnly,
+	}
+	cache.SetToken(composite, secret.New([]byte("composite-token")))
+
+	cache.InvalidateTokenUnlessPermission(protocol.PermissionPersistentCredentialManagementReadOnly)
+
+	if _, ok, _ := cache.GetToken(TokenKey{
+		Permission: protocol.PermissionPersistentCredentialManagementReadOnly,
+	}); ok {
+		t.Fatal("composite grant survived standalone pcmr filtering")
+	}
+
+	standalone := TokenKey{Permission: protocol.PermissionPersistentCredentialManagementReadOnly}
+	cache.SetToken(standalone, secret.New([]byte("standalone-token")))
+	cache.InvalidateTokenUnlessPermission(protocol.PermissionPersistentCredentialManagementReadOnly)
+
+	if _, ok, _ := cache.GetToken(standalone); !ok {
+		t.Fatal("standalone pcmr grant was invalidated")
+	}
+}
+
 func TestCacheInvalidateTokenUnlessPermissionClearsOtherPermission(t *testing.T) {
 	cache := NewCache()
 	key := TokenKey{Permission: protocol.PermissionCredentialManagement}

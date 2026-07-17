@@ -40,5 +40,5 @@ type CredentialRecord struct {
 	CredProtect          uint     `json:"credProtect,omitempty"`
 	LargeBlobKeyState    string   `json:"largeBlobKeyState,omitempty"`
 	LargeBlobKey         []byte   `json:"-"`
-	ThirdPartyPayment    bool     `json:"thirdPartyPayment,omitempty"`
+	ThirdPartyPayment    *bool    `json:"thirdPartyPayment,omitempty"`
 }

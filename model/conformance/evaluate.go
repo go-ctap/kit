@@ -281,10 +281,19 @@ func pinProtocolValues(info protocol.AuthenticatorGetInfoResponse) []string {
 	return values
 }
 
-func unsignedValues(values []uint) []string {
+func unsignedValues[T ~uint | ~uint64](values []T) []string {
 	result := make([]string, 0, len(values))
 	for _, value := range values {
-		result = append(result, fmt.Sprintf("0x%02X", value))
+		result = append(result, fmt.Sprintf("0x%02X", uint64(value)))
+	}
+
+	return result
+}
+
+func stringValues[T ~string](values []T) []string {
+	result := make([]string, len(values))
+	for index, value := range values {
+		result[index] = string(value)
 	}
 
 	return result

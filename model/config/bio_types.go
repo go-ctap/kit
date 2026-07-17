@@ -29,8 +29,8 @@ type BioSensorReport struct {
 	Device                             report.DeviceReport `json:"device"`
 	Supported                          bool                `json:"supported"`
 	PreviewOnly                        bool                `json:"previewOnly"`
-	Modality                           *BioModality        `json:"modality,omitempty"`
-	FingerprintKind                    *FingerprintKind    `json:"fingerprintKind,omitempty"`
+	Modality                           BioModality         `json:"modality,omitempty"`
+	FingerprintKind                    FingerprintKind     `json:"fingerprintKind,omitempty"`
 	MaxCaptureSamplesRequiredForEnroll *uint               `json:"maxCaptureSamplesRequiredForEnroll,omitempty"`
 	MaxTemplateFriendlyName            *uint               `json:"maxTemplateFriendlyName,omitempty"`
 }

@@ -42,6 +42,10 @@ func (r Runner) setPIN(ctx context.Context, req model.SetPINOperation) (model.Op
 	}
 
 	err = r.configManager().SetPIN(ctx, req.NewPIN)
+	if r.env.Cache != nil {
+		r.env.Cache.InvalidateConfig()
+		r.env.Cache.InvalidateToken()
+	}
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithClientPINSubCommand(
 			failure.PhaseAuthenticatorCommand,
@@ -84,6 +88,10 @@ func (r Runner) changePIN(ctx context.Context, req model.ChangePINOperation) (mo
 	}
 
 	err = r.configManager().ChangePIN(ctx, req.CurrentPIN, req.NewPIN)
+	if r.env.Cache != nil {
+		r.env.Cache.InvalidateConfig()
+		r.env.Cache.InvalidateToken()
+	}
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithClientPINSubCommand(
 			failure.PhaseAuthenticatorCommand,

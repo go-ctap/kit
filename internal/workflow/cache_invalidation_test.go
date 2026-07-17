@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/go-ctap/ctap/protocol"
+	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
 	"github.com/go-ctap/kit/internal/secret"
 	rtsession "github.com/go-ctap/kit/internal/session"
 	"github.com/go-ctap/kit/model"
@@ -11,6 +12,7 @@ import (
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/report"
+	"github.com/go-ctap/kit/model/webauthn"
 )
 
 func TestInvalidateCachesAfterUsesDomainPolicy(t *testing.T) {
@@ -145,6 +147,25 @@ func TestLargeBlobResultEffectsOnlyInvalidateAfterRealMutation(t *testing.T) {
 				t.Fatalf("large blob cache present = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestGetAssertionLargeBlobWriteInvalidatesLegacyArrayCache(t *testing.T) {
+	operation := model.GetAssertionOperation{GetAssertionInput: webauthn.GetAssertionInput{
+		Extensions: &ctapwebauthn.GetAuthenticationExtensionsClientInputs{
+			LargeBlobInputs: &ctapwebauthn.LargeBlobInputs{LargeBlob: ctapwebauthn.AuthenticationExtensionsLargeBlobInputs{
+				Write: []byte{},
+			}},
+		},
+	}}
+	session := rtsession.New(report.DeviceReport{}, nil, nil, false)
+	cache := session.Cache()
+	cache.SetLargeBlobList(applargeblobs.ListReport{})
+
+	getAssertionEffects(operation, model.GetAssertionOutput{}).Apply(cache)
+
+	if _, ok := cache.LargeBlobList(); ok {
+		t.Fatal("large blob cache survived present-empty getAssertion write")
 	}
 }
 

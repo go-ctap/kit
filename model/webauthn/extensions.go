@@ -34,6 +34,15 @@ type PINComplexityPolicyOutput struct {
 	Enabled bool `json:"enabled"`
 }
 
+type LargeBlobCreateOutput struct {
+	Supported bool `json:"supported"`
+}
+
+type LargeBlobGetOutput struct {
+	BlobHex *string `json:"blobHex,omitempty"`
+	Written *bool   `json:"written,omitempty"`
+}
+
 type MakeCredentialPRFOutput struct {
 	Enabled bool                                           `json:"enabled"`
 	Results ctapwebauthn.AuthenticationExtensionsPRFValues `json:"results,omitzero"`
@@ -49,6 +58,7 @@ type MakeCredentialClientExtensionResults struct {
 	HMACSecret           *HMACSecretCreateOutput                  `json:"hmac-secret,omitempty"`
 	HMACSecretMC         *HMACSecretOutput                        `json:"hmac-secret-mc,omitempty"`
 	PRF                  *MakeCredentialPRFOutput                 `json:"prf,omitempty"`
+	LargeBlob            *LargeBlobCreateOutput                   `json:"largeBlob,omitempty"`
 }
 
 type MakeCredentialAuthenticatorExtensionOutputs struct {
@@ -66,8 +76,14 @@ type GetAssertionClientExtensionResults struct {
 	CredentialBlob *CredentialBlobGetOutput `json:"getCredBlob,omitempty"`
 	HMACSecret     *HMACSecretOutput        `json:"hmac-secret,omitempty"`
 	PRF            *GetAssertionPRFOutput   `json:"prf,omitempty"`
+	LargeBlob      *LargeBlobGetOutput      `json:"largeBlob,omitempty"`
+}
+
+type GetAssertionAuthenticatorExtensionOutputs struct {
+	ThirdPartyPayment *bool `json:"thirdPartyPayment,omitempty"`
 }
 
 type GetAssertionExtensionResults struct {
-	Client *GetAssertionClientExtensionResults `json:"client,omitempty"`
+	Client        *GetAssertionClientExtensionResults        `json:"client,omitempty"`
+	Authenticator *GetAssertionAuthenticatorExtensionOutputs `json:"authenticator,omitempty"`
 }

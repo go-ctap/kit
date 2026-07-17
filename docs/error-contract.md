@@ -198,6 +198,11 @@ that is safe to replay. Credential inventory supplies such a callback; it does
 not decide which token errors invalidate the cache. The first rejection is
 therefore not returned as the final `credentials.list` error.
 
+Persistent credential-store state uses the ordinary replay-safe token path.
+Before acquisition, the session cache retains only an already-standalone
+`persistentCredentialManagementReadOnly` grant; credential-management and
+composite grants are discarded.
+
 If the fresh token is also rejected, the operation completes with the second
 normalized failure. The token is still invalidated, preventing subsequent
 operations from repeatedly using the same rejected secret. Other consuming-

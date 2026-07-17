@@ -95,6 +95,11 @@ type CredentialsEnvelope struct {
 	Result *model.CredentialsOutput `json:"result,omitempty"`
 }
 
+type CredentialStoreStateEnvelope struct {
+	OperationEnvelopeMeta
+	Result *model.CredentialStoreStateOutput `json:"result,omitempty"`
+}
+
 type CredentialDeleteEnvelope struct {
 	OperationEnvelopeMeta
 	Result *model.CredentialDeleteOutput `json:"result,omitempty"`

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-ctap/ctap/attestation"
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
@@ -52,7 +53,7 @@ func TestEvaluateGetInfoAcceptsVersionSpecificProfiles(t *testing.T) {
 func TestEvaluateGetInfoScreenshotRegressionIsProfileSpecific(t *testing.T) {
 	info := validFIDO21Info()
 	info.Options[protocol.OptionLargeBlobs] = true
-	info.MaxSerializedLargeBlobArray = ptr(uint(1024))
+	info.MaxSerializedLargeBlobArray = 1024
 
 	report21 := conformance.EvaluateGetInfo(info)
 	assertNoAssessments(t, report21)
@@ -171,7 +172,7 @@ func TestEvaluateGetInfoSeparatesFIDO21AndFIDO23RKSemantics(t *testing.T) {
 	missingState.Options[protocol.OptionResidentKeys] = true
 	missingState.Options[protocol.OptionCredentialManagement] = true
 	delete(missingState.Options, protocol.OptionClientPIN)
-	missingState.MinPINLength = nil
+	missingState.MinPINLength = 0
 	finding = requireOnlyFinding(t, conformance.EvaluateGetInfo(missingState), conformance.RuleProfileRKUVCapabilityRequired)
 	assertExpectations(t, finding.Expectations, []conformance.Expectation{
 		expectation(
@@ -244,7 +245,7 @@ func TestEvaluateGetInfoRequiresOnlyNormativeConfigCommands(t *testing.T) {
 			name: "vendor prototype",
 			info: func() protocol.AuthenticatorGetInfoResponse {
 				info := configNeutralFIDO23Info()
-				info.VendorPrototypeConfigCommands = []uint{}
+				info.VendorPrototypeConfigCommands = []protocol.VendorCommandID{}
 				return info
 			},
 			want: []conformance.Expectation{
@@ -318,7 +319,7 @@ func TestEvaluateGetInfoChecksConfigCommandPrerequisitesInTheSupportedDirection(
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			info := configNeutralFIDO23Info()
-			info.AuthenticatorConfigCommands = []uint{uint(test.command)}
+			info.AuthenticatorConfigCommands = []protocol.ConfigSubCommand{test.command}
 			finding := requireOnlyFinding(t, conformance.EvaluateGetInfo(info), test.rule)
 			assertExpectations(t, finding.Expectations, test.want)
 		})
@@ -361,13 +362,13 @@ func TestEvaluateGetInfoDoesNotInventOptionalConfigCommands(t *testing.T) {
 		{
 			name: "unknown command",
 			mutate: func(info *protocol.AuthenticatorGetInfoResponse) {
-				info.AuthenticatorConfigCommands = []uint{0x80}
+				info.AuthenticatorConfigCommands = []protocol.ConfigSubCommand{0x80}
 			},
 		},
 		{
 			name: "duplicate unknown command",
 			mutate: func(info *protocol.AuthenticatorGetInfoResponse) {
-				info.AuthenticatorConfigCommands = []uint{0x80, 0x80}
+				info.AuthenticatorConfigCommands = []protocol.ConfigSubCommand{0x80, 0x80}
 			},
 		},
 	}
@@ -451,7 +452,7 @@ func TestEvaluateGetInfoDistinguishesAbsentAndPresentConfigInventory(t *testing.
 	delete(info.Options, protocol.OptionAuthenticatorConfig)
 	assertNoAssessments(t, conformance.EvaluateGetInfo(info))
 
-	info.AuthenticatorConfigCommands = []uint{}
+	info.AuthenticatorConfigCommands = []protocol.ConfigSubCommand{}
 	finding := requireOnlyFinding(t, conformance.EvaluateGetInfo(info), conformance.RuleAuthenticatorConfigSupportConsistency)
 	assertExpectations(t, finding.Expectations, []conformance.Expectation{
 		expectation([]conformance.FieldPath{"options.authnrCfg"}, conformance.ExpectationAll, conformance.ExpectationTrue),
@@ -505,7 +506,7 @@ func TestEvaluateGetInfoSetMinPINReferencesFollowActualTriggers(t *testing.T) {
 		{
 			name: "command only",
 			mutate: func(info *protocol.AuthenticatorGetInfoResponse) {
-				info.AuthenticatorConfigCommands = []uint{uint(protocol.ConfigSubCommandSetMinPINLength)}
+				info.AuthenticatorConfigCommands = []protocol.ConfigSubCommand{protocol.ConfigSubCommandSetMinPINLength}
 			},
 			want: []conformance.RequirementID{commands, option, feature, maxRPIDs},
 		},
@@ -520,7 +521,7 @@ func TestEvaluateGetInfoSetMinPINReferencesFollowActualTriggers(t *testing.T) {
 			name: "minimum PIN extension and command",
 			mutate: func(info *protocol.AuthenticatorGetInfoResponse) {
 				info.Extensions = append(info.Extensions, extension.ExtensionIdentifierMinPinLength)
-				info.AuthenticatorConfigCommands = []uint{uint(protocol.ConfigSubCommandSetMinPINLength)}
+				info.AuthenticatorConfigCommands = []protocol.ConfigSubCommand{protocol.ConfigSubCommandSetMinPINLength}
 			},
 			want: []conformance.RequirementID{commands, minimumExtension, option, maxRPIDs},
 		},
@@ -554,7 +555,7 @@ func TestEvaluateGetInfoReportsAllMissingRequiredCommandsDeterministically(t *te
 	info := validFIDO23Info()
 	info.AuthenticatorConfigCommands = nil
 	info.Options[protocol.OptionEnterpriseAttestation] = false
-	info.VendorPrototypeConfigCommands = []uint{}
+	info.VendorPrototypeConfigCommands = []protocol.VendorCommandID{}
 
 	report := conformance.EvaluateGetInfo(info)
 	if len(report.Findings) != 3 || len(report.Inconclusive) != 0 {
@@ -591,7 +592,7 @@ func TestEvaluateGetInfoReportsAllMissingRequiredCommandsDeterministically(t *te
 func TestEvaluateGetInfoStrictFIDO21IgnoresCTAP23OnlyInventory(t *testing.T) {
 	info := validFIDO21Info()
 	info.Options[protocol.OptionSetMinPINLength] = false
-	info.AuthenticatorConfigCommands = []uint{uint(protocol.ConfigSubCommandSetMinPINLength)}
+	info.AuthenticatorConfigCommands = []protocol.ConfigSubCommand{protocol.ConfigSubCommandSetMinPINLength}
 
 	finding := requireOnlyFinding(t, conformance.EvaluateGetInfo(info), conformance.RuleSetMinPINSupportConsistency)
 	assertExpectations(t, finding.Expectations, []conformance.Expectation{
@@ -630,7 +631,7 @@ func TestEvaluateGetInfoAgainstRejectsNonCanonicalTargets(t *testing.T) {
 }
 
 func TestEvaluateGetInfoAllowsDeclaredMaxMessageSize(t *testing.T) {
-	for _, value := range []*uint{nil, ptr(uint(512)), ptr(uint(1024)), ptr(uint(4096))} {
+	for _, value := range []uint{0, 512, 1024, 4096} {
 		info := validFIDO23Info()
 		info.MaxMsgSize = value
 		assertNoAssessments(t, conformance.EvaluateGetInfo(info))
@@ -649,8 +650,12 @@ func TestEvaluateGetInfoValidatesOptionalListShape(t *testing.T) {
 		{"duplicate PIN protocols", func(info *protocol.AuthenticatorGetInfoResponse) {
 			info.PinUvAuthProtocols = []protocol.PinUvAuthProtocol{2, 2}
 		}, conformance.RulePinUVAuthProtocolsUnique},
-		{"empty transports", func(info *protocol.AuthenticatorGetInfoResponse) { info.Transports = []string{} }, conformance.RuleTransportsNonEmpty},
-		{"duplicate transports", func(info *protocol.AuthenticatorGetInfoResponse) { info.Transports = []string{"usb", "usb"} }, conformance.RuleTransportsUnique},
+		{"empty transports", func(info *protocol.AuthenticatorGetInfoResponse) {
+			info.Transports = []credential.AuthenticatorTransport{}
+		}, conformance.RuleTransportsNonEmpty},
+		{"duplicate transports", func(info *protocol.AuthenticatorGetInfoResponse) {
+			info.Transports = []credential.AuthenticatorTransport{"usb", "usb"}
+		}, conformance.RuleTransportsUnique},
 		{"empty algorithms", func(info *protocol.AuthenticatorGetInfoResponse) {
 			info.Algorithms = []credential.PublicKeyCredentialParameters{}
 		}, conformance.RuleAlgorithmsNonEmpty},
@@ -660,13 +665,21 @@ func TestEvaluateGetInfoValidatesOptionalListShape(t *testing.T) {
 				{Type: credential.PublicKeyCredentialTypePublicKey, Algorithm: -7},
 			}
 		}, conformance.RuleAlgorithmsUnique},
-		{"empty reset transports", func(info *protocol.AuthenticatorGetInfoResponse) { info.TransportsForReset = []string{} }, conformance.RuleTransportsForResetNonEmpty},
-		{"duplicate reset transports", func(info *protocol.AuthenticatorGetInfoResponse) { info.TransportsForReset = []string{"usb", "usb"} }, conformance.RuleTransportsForResetUnique},
-		{"empty attestation formats", func(info *protocol.AuthenticatorGetInfoResponse) { info.AttestationFormats = []string{} }, conformance.RuleAttestationFormatsNonEmpty},
+		{"empty reset transports", func(info *protocol.AuthenticatorGetInfoResponse) {
+			info.TransportsForReset = []credential.AuthenticatorTransport{}
+		}, conformance.RuleTransportsForResetNonEmpty},
+		{"duplicate reset transports", func(info *protocol.AuthenticatorGetInfoResponse) {
+			info.TransportsForReset = []credential.AuthenticatorTransport{"usb", "usb"}
+		}, conformance.RuleTransportsForResetUnique},
+		{"empty attestation formats", func(info *protocol.AuthenticatorGetInfoResponse) {
+			info.AttestationFormats = []attestation.AttestationStatementFormatIdentifier{}
+		}, conformance.RuleAttestationFormatsNonEmpty},
 		{"duplicate attestation formats", func(info *protocol.AuthenticatorGetInfoResponse) {
-			info.AttestationFormats = []string{"packed", "packed"}
+			info.AttestationFormats = []attestation.AttestationStatementFormatIdentifier{"packed", "packed"}
 		}, conformance.RuleAttestationFormatsUnique},
-		{"none attestation format", func(info *protocol.AuthenticatorGetInfoResponse) { info.AttestationFormats = []string{"none"} }, conformance.RuleAttestationFormatsNoneOmitted},
+		{"none attestation format", func(info *protocol.AuthenticatorGetInfoResponse) {
+			info.AttestationFormats = []attestation.AttestationStatementFormatIdentifier{"none"}
+		}, conformance.RuleAttestationFormatsNoneOmitted},
 	}
 
 	for _, test := range tests {
@@ -745,10 +758,10 @@ func TestEvaluateGetInfoKeepsUnobservableExceptionsInconclusive(t *testing.T) {
 		info := configNeutralFIDO23Info()
 		delete(info.Options, protocol.OptionClientPIN)
 		info.Options[protocol.OptionUserVerification] = false
-		info.MinPINLength = nil
+		info.MinPINLength = 0
 		info.Options[protocol.OptionSetMinPINLength] = true
 		info.Extensions = append(info.Extensions, extension.ExtensionIdentifierMinPinLength)
-		info.AuthenticatorConfigCommands = []uint{uint(protocol.ConfigSubCommandSetMinPINLength)}
+		info.AuthenticatorConfigCommands = []protocol.ConfigSubCommand{protocol.ConfigSubCommandSetMinPINLength}
 		info.MaxRPIDsForSetMinPINLength = ptr(uint(3))
 		result := requireOnlyInconclusive(t, conformance.EvaluateGetInfo(info), conformance.RuleSetMinPINRequiresPINCapability)
 		if result.Reason != conformance.EvidenceGapBuiltInPINEntryUnknown {
@@ -761,7 +774,7 @@ func TestEvaluateGetInfoKeepsUnobservableExceptionsInconclusive(t *testing.T) {
 		delete(info.Options, protocol.OptionClientPIN)
 		delete(info.Options, protocol.OptionResidentKeys)
 		info.Options[protocol.OptionUserVerification] = false
-		info.MinPINLength = nil
+		info.MinPINLength = 0
 		finding := requireOnlyFinding(t, conformance.EvaluateGetInfo(info), conformance.RuleSetMinPINRequiresPINCapability)
 		if len(finding.References) != 1 ||
 			finding.References[0].Specification != conformance.SpecificationCTAP21 ||
@@ -777,7 +790,7 @@ func TestEvaluateGetInfoSetMinPINFalseDoesNotRequirePINCapability(t *testing.T) 
 	info21.Options[protocol.OptionSetMinPINLength] = false
 	delete(info21.Options, protocol.OptionClientPIN)
 	delete(info21.Options, protocol.OptionResidentKeys)
-	info21.MinPINLength = nil
+	info21.MinPINLength = 0
 	info21.MaxRPIDsForSetMinPINLength = nil
 	info21.Extensions = slices.DeleteFunc(info21.Extensions, func(value extension.ExtensionIdentifier) bool {
 		return value == extension.ExtensionIdentifierMinPinLength
@@ -787,7 +800,7 @@ func TestEvaluateGetInfoSetMinPINFalseDoesNotRequirePINCapability(t *testing.T) 
 	info23 := configNeutralFIDO23Info()
 	info23.Options[protocol.OptionSetMinPINLength] = false
 	delete(info23.Options, protocol.OptionClientPIN)
-	info23.MinPINLength = nil
+	info23.MinPINLength = 0
 	assertNoAssessments(t, conformance.EvaluateGetInfo(info23))
 }
 
@@ -865,7 +878,7 @@ func validFIDO21Info() protocol.AuthenticatorGetInfoResponse {
 			protocol.OptionAlwaysUv:             false,
 		},
 		PinUvAuthProtocols:         []protocol.PinUvAuthProtocol{protocol.PinUvAuthProtocolTwo},
-		MinPINLength:               ptr(uint(4)),
+		MinPINLength:               4,
 		MaxRPIDsForSetMinPINLength: ptr(uint(3)),
 	}
 }
@@ -873,7 +886,7 @@ func validFIDO21Info() protocol.AuthenticatorGetInfoResponse {
 func validFIDO23Info() protocol.AuthenticatorGetInfoResponse {
 	info := validFIDO21Info()
 	info.Versions = protocol.Versions{protocol.FIDO_2_3}
-	info.AuthenticatorConfigCommands = []uint{uint(protocol.ConfigSubCommandSetMinPINLength)}
+	info.AuthenticatorConfigCommands = []protocol.ConfigSubCommand{protocol.ConfigSubCommandSetMinPINLength}
 
 	return info
 }
@@ -891,7 +904,7 @@ func configNeutralFIDO23Info() protocol.AuthenticatorGetInfoResponse {
 			protocol.OptionAuthenticatorConfig: true,
 		},
 		PinUvAuthProtocols: []protocol.PinUvAuthProtocol{protocol.PinUvAuthProtocolTwo},
-		MinPINLength:       ptr(uint(4)),
+		MinPINLength:       4,
 	}
 }
 

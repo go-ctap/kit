@@ -26,11 +26,22 @@ func AlwaysUVResult(fingerprint string, target AlwaysUVTarget, requestedAlwaysUV
 	}
 }
 
-func MinPINLengthResult(fingerprint string, length uint) AuthenticatorConfigResult {
+func MinPINLengthResult(fingerprint string, request MinPINLengthRequest) AuthenticatorConfigResult {
 	return AuthenticatorConfigResult{
-		Operation:         AuthenticatorConfigMinPINLength,
+		Operation:           AuthenticatorConfigMinPINLength,
+		DeviceFingerprint:   fingerprint,
+		NewMinPINLength:     request.NewMinPINLength,
+		MinPINLengthRPIDs:   request.MinPINLengthRPIDs,
+		ForceChangePIN:      request.ForceChangePIN,
+		PINComplexityPolicy: request.PINComplexityPolicy,
+		State:               StateSupported,
+	}
+}
+
+func LongTouchForResetResult(fingerprint string) AuthenticatorConfigResult {
+	return AuthenticatorConfigResult{
+		Operation:         AuthenticatorConfigLongTouch,
 		DeviceFingerprint: fingerprint,
-		NewMinPINLength:   length,
-		State:             StateSupported,
+		State:             StateConfigured,
 	}
 }

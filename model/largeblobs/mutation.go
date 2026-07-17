@@ -25,7 +25,7 @@ type MutationPreview struct {
 	ProposedByteCount                  int                 `json:"proposedByteCount"`
 	SerializedLargeBlobArraySizeBefore int                 `json:"serializedLargeBlobArraySizeBefore"`
 	SerializedLargeBlobArraySizeAfter  int                 `json:"serializedLargeBlobArraySizeAfter"`
-	SerializedLargeBlobArrayLimit      *uint               `json:"serializedLargeBlobArrayLimit,omitempty"`
+	SerializedLargeBlobArrayLimit      uint                `json:"serializedLargeBlobArrayLimit,omitempty"`
 	BlobCountBefore                    int                 `json:"blobCountBefore"`
 	BlobCountAfter                     int                 `json:"blobCountAfter"`
 	MatchedBlobCount                   int                 `json:"matchedBlobCount,omitempty"`
@@ -49,7 +49,7 @@ type MutationResult struct {
 	ProposedByteCount                  int               `json:"proposedByteCount"`
 	SerializedLargeBlobArraySizeBefore int               `json:"serializedLargeBlobArraySizeBefore"`
 	SerializedLargeBlobArraySizeAfter  int               `json:"serializedLargeBlobArraySizeAfter"`
-	SerializedLargeBlobArrayLimit      *uint             `json:"serializedLargeBlobArrayLimit,omitempty"`
+	SerializedLargeBlobArrayLimit      uint              `json:"serializedLargeBlobArrayLimit,omitempty"`
 	BlobCountBefore                    int               `json:"blobCountBefore"`
 	BlobCountAfter                     int               `json:"blobCountAfter"`
 	MatchedBlobCount                   int               `json:"matchedBlobCount,omitempty"`

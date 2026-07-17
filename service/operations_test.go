@@ -66,6 +66,48 @@ func TestListCredentialsMapsRefreshToRuntimeOperation(t *testing.T) {
 	}
 }
 
+func TestCTAP23ServiceRequestsMapPresenceAndNewOperations(t *testing.T) {
+	runtime := &recordingOperationSession{}
+	service := New()
+	service.sessions["session-1"] = &managedSession{id: "session-1", session: runtime}
+	runtime.result = model.AuthenticatorConfigOutput{}
+
+	_, err := service.SetMinPINLength(context.Background(), MinPINLengthRequest{
+		OperationRequest:    OperationRequest{SessionID: "session-1"},
+		MinPINLengthRPIDs:   []string{"example.com"},
+		ForceChangePIN:      true,
+		PINComplexityPolicy: true,
+	})
+	if err != nil {
+		t.Fatalf("SetMinPINLength: %v", err)
+	}
+	setMin := runtime.operation.(model.SetMinPINLengthOperation)
+	if setMin.NewMinPINLength != nil || len(setMin.MinPINLengthRPIDs) != 1 ||
+		!setMin.ForceChangePIN || !setMin.PINComplexityPolicy {
+		t.Fatalf("setMin operation = %#v", setMin)
+	}
+
+	runtime.result = model.CredentialStoreStateOutput{}
+	if _, err := service.CredentialStoreState(context.Background(), OperationRequest{SessionID: "session-1"}); err != nil {
+		t.Fatalf("CredentialStoreState: %v", err)
+	}
+	if _, ok := runtime.operation.(model.CredentialStoreStateOperation); !ok {
+		t.Fatalf("store-state operation = %T", runtime.operation)
+	}
+
+	runtime.result = model.AuthenticatorConfigOutput{}
+	if _, err := service.EnableLongTouchForReset(context.Background(), EnableLongTouchForResetRequest{
+		OperationRequest: OperationRequest{SessionID: "session-1"},
+		Confirmed:        true,
+	}); err != nil {
+		t.Fatalf("EnableLongTouchForReset: %v", err)
+	}
+	longTouch := runtime.operation.(model.EnableLongTouchForResetOperation)
+	if !longTouch.Confirmed {
+		t.Fatalf("long-touch operation = %#v", longTouch)
+	}
+}
+
 func TestLargeBlobListRequestRefreshJSONContract(t *testing.T) {
 	var legacy LargeBlobListRequest
 	if err := json.Unmarshal([]byte(`{"sessionId":"session-1"}`), &legacy); err != nil {

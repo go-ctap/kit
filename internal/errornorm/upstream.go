@@ -16,6 +16,8 @@ func upstreamCode(err error, ctx errorContext) (failure.Code, bool) {
 		return failure.CodePINNotConfigured, true
 	case errors.Is(err, ctapdevice.ErrPinAlreadySet):
 		return failure.CodePINAlreadyConfigured, true
+	case errors.Is(err, ctapdevice.ErrPinChangeRequired):
+		return failure.CodePINChangeRequired, true
 	case errors.Is(err, ctapdevice.ErrBuiltInUVRequired),
 		errors.Is(err, ctapdevice.ErrUvNotConfigured):
 		return failure.CodeVerificationFlowUnsupported, true

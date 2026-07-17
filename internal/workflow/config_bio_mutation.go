@@ -114,7 +114,11 @@ func (r Runner) removeBio(ctx context.Context, req model.BioRemoveOperation) (mo
 	}
 	defer secret.Zero(token)
 
-	if err := r.bioEnrollmentManager().RemoveEnrollment(ctx, token, templateID); err != nil {
+	err = r.bioEnrollmentManager().RemoveEnrollment(ctx, token, templateID)
+	if r.env.Cache != nil {
+		r.env.Cache.InvalidateConfig()
+	}
+	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 			failure.PhaseAuthenticatorCommand,
 			bioEnrollmentCommand(status),
