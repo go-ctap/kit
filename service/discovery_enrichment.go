@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/go-ctap/kit/internal/vendorinfo"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
 )
 
@@ -14,12 +15,14 @@ type discoveryEnrichment struct {
 	running bool
 	cancel  context.CancelFunc
 	done    chan struct{}
+	claims  map[string]chan struct{}
 	cache   map[string]report.DeviceMetadata
 }
 
 func newDiscoveryEnrichment() discoveryEnrichment {
 	return discoveryEnrichment{
-		cache: make(map[string]report.DeviceMetadata),
+		claims: make(map[string]chan struct{}),
+		cache:  make(map[string]report.DeviceMetadata),
 	}
 }
 
@@ -59,6 +62,7 @@ func (s *Service) runEnrichment(ctx context.Context) {
 		if err == nil && metadata != nil {
 			s.applyEnrichment(device, *metadata)
 		}
+		s.releaseDeviceClaim(device)
 	}
 }
 
@@ -79,15 +83,25 @@ func (s *Service) nextEnrichmentCandidate(
 		deviceReports(s.devices),
 		s.enrichment.cache,
 		attempted,
-		s.hasSessionForDeviceLocked,
+		s.deviceBusyForEnrichmentLocked,
 	)
 	if ok {
+		s.enrichment.claims[enrichmentKey(device)] = make(chan struct{})
+
 		return device, true
 	}
 
 	s.finishEnrichmentLocked()
 
 	return report.DeviceReport{}, false
+}
+
+func (s *Service) releaseDeviceClaim(device report.DeviceReport) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := enrichmentKey(device)
+	close(s.enrichment.claims[key])
+	delete(s.enrichment.claims, key)
 }
 
 func takeEnrichmentCandidate(
@@ -145,6 +159,46 @@ func (s *Service) applyEnrichment(device report.DeviceReport, metadata report.De
 		Trigger:  DiscoveryTriggerEnriched,
 		Snapshot: &snapshot,
 	})
+}
+
+func (s *Service) claimDeviceForSession(
+	ctx context.Context,
+	device report.DeviceReport,
+) (func(), error) {
+	key := enrichmentKey(device)
+	for {
+		s.mu.Lock()
+		if s.closed {
+			s.mu.Unlock()
+
+			return nil, closedServiceError(failure.PhaseSession)
+		}
+		current := s.enrichment.claims[key]
+		if current == nil {
+			s.enrichment.claims[key] = make(chan struct{})
+			s.mu.Unlock()
+
+			return func() {
+				s.releaseDeviceClaim(device)
+				s.startEnrichment()
+			}, nil
+		}
+		s.mu.Unlock()
+
+		select {
+		case <-current:
+		case <-ctx.Done():
+			return nil, normalizeServicePhaseError(ctx.Err(), failure.PhaseSession)
+		}
+	}
+}
+
+func (s *Service) deviceBusyForEnrichmentLocked(device report.DeviceReport) bool {
+	if s.enrichment.claims[enrichmentKey(device)] != nil {
+		return true
+	}
+
+	return s.hasSessionForDeviceLocked(device)
 }
 
 func (s *Service) hasSessionForDeviceLocked(device report.DeviceReport) bool {

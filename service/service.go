@@ -193,6 +193,11 @@ func (s *Service) OpenSession(ctx context.Context, req OpenSessionRequest) (snap
 	if err != nil {
 		return SessionSnapshot{}, err
 	}
+	releaseDevice, err := s.claimDeviceForSession(ctx, device.Report())
+	if err != nil {
+		return SessionSnapshot{}, err
+	}
+	defer releaseDevice()
 	opts := []ctapkit.OpenSessionOption{
 		ctapkit.WithEventSink(sessionEventSink{service: s, sessionID: sessionID}),
 		ctapkit.WithLogJournal(s.logs),

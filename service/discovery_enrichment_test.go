@@ -1,11 +1,39 @@
 package service
 
 import (
+	"context"
 	"testing"
 
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 )
+
+func TestSessionClaimsArePerDevice(t *testing.T) {
+	service := New()
+	claimedDevice := report.DeviceReport{Fingerprint: "claimed", Transport: transport.ModeHID}
+	otherDevice := report.DeviceReport{Fingerprint: "other", Transport: transport.ModeHID}
+	service.enrichment.claims[enrichmentKey(claimedDevice)] = make(chan struct{})
+
+	release, err := service.claimDeviceForSession(t.Context(), otherDevice)
+	if err != nil {
+		t.Fatalf("claim other device: %v", err)
+	}
+	release()
+
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	if release, err := service.claimDeviceForSession(canceled, claimedDevice); err == nil {
+		release()
+		t.Fatal("claimed device was acquired")
+	}
+
+	service.releaseDeviceClaim(claimedDevice)
+	release, err = service.claimDeviceForSession(t.Context(), claimedDevice)
+	if err != nil {
+		t.Fatalf("claim released device: %v", err)
+	}
+	release()
+}
 
 func TestTakeEnrichmentCandidateAttemptsAvailableKnownVendors(t *testing.T) {
 	cache := make(map[string]report.DeviceMetadata)
