@@ -14,7 +14,6 @@ import (
 	"github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/report"
 	webauthn2 "github.com/go-ctap/kit/model/webauthn"
-	"github.com/ldclabs/cose/key"
 )
 
 func TestOperationEventStagesHaveCountsWithoutPercent(t *testing.T) {
@@ -298,7 +297,7 @@ func TestPublicDTOJSONContractsUseCTAP22Spellings(t *testing.T) {
 					MinPINLength:                new(uint(4)),
 					MaxCredentialIdLength:       new(uint(32)),
 					MaxRPIDsForSetMinPINLength:  new(uint(3)),
-					Algorithms:                  []credential.PublicKeyCredentialParameters{{Type: credential.PublicKeyCredentialTypePublicKey, Algorithm: key.Alg(-7)}},
+					Algorithms:                  []credential.PublicKeyCredentialParameters{{Type: credential.PublicKeyCredentialTypePublicKey, Algorithm: -7}},
 					PinComplexityPolicy:         new(true),
 					PinComplexityPolicyURL:      new("https://policy.example"),
 					MaxPINLength:                new(uint(64)),

@@ -370,6 +370,7 @@ func TestUpstreamCode(t *testing.T) {
 		{ctapdevice.ErrLargeBlobsTooBig, commandContext(protocol.AuthenticatorLargeBlobs), failure.CodeLargeBlobArrayTooLarge},
 		{ctapdevice.ErrInvalidSaltSize, commandContext(protocol.AuthenticatorGetAssertion), failure.CodeCTAPParameterInvalid},
 		{ctapdevice.SyntaxError, commandContext(protocol.AuthenticatorGetAssertion), failure.CodeCTAPParameterInvalid},
+		{ctapdevice.ErrSpecViolation, commandContext(protocol.AuthenticatorGetAssertion), failure.CodeCTAPSpecViolation},
 		{ctapdevice.ErrPingPongMismatch, WithPhase(failure.PhaseAuthenticatorCommand), failure.CodeTransportFailure},
 		{ctapdevice.ErrNotSupported, commandContext(protocol.AuthenticatorGetInfo), failure.CodeGetInfoUnsupported},
 		{ctapdevice.ErrNotSupported, commandContext(protocol.AuthenticatorClientPIN), failure.CodePINUnsupported},

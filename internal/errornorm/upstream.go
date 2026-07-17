@@ -27,6 +27,8 @@ func upstreamCode(err error, ctx errorContext) (failure.Code, bool) {
 		return failure.CodeLargeBlobArrayInvalid, true
 	case errors.Is(err, ctapdevice.ErrInvalidSaltSize), errors.Is(err, ctapdevice.SyntaxError):
 		return failure.CodeCTAPParameterInvalid, true
+	case errors.Is(err, ctapdevice.ErrSpecViolation):
+		return failure.CodeCTAPSpecViolation, true
 	case errors.Is(err, ctapdevice.ErrPingPongMismatch):
 		return failure.CodeTransportFailure, true
 	case errors.Is(err, ctapdevice.ErrNotSupported):

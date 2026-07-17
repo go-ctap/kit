@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/go-ctap/ctap/attestation"
+	ctapdevice "github.com/go-ctap/ctap/authenticator"
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/ctap/webauthn"
@@ -241,7 +242,11 @@ func (a *uvTokenAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protoco
 	return []byte("token"), nil
 }
 
-func (a *uvTokenAuthenticator) ToggleAlwaysUV(context.Context, []byte) error {
+func (a *uvTokenAuthenticator) ToggleAlwaysUV(_ context.Context, token []byte) error {
+	if token == nil {
+		return ctapdevice.ErrPinUvAuthTokenRequired
+	}
+
 	return nil
 }
 
@@ -472,7 +477,11 @@ func (a *blockingConfigAuthenticator) GetPinUvAuthTokenUsingUV(
 	return []byte("token"), nil
 }
 
-func (a *blockingConfigAuthenticator) ToggleAlwaysUV(ctx context.Context, _ []byte) error {
+func (a *blockingConfigAuthenticator) ToggleAlwaysUV(ctx context.Context, token []byte) error {
+	if token == nil {
+		return ctapdevice.ErrPinUvAuthTokenRequired
+	}
+
 	close(a.commandEntered)
 	<-ctx.Done()
 

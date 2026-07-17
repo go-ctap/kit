@@ -1,136 +1,12 @@
 package workflow
 
 import (
-	"encoding/base64"
 	"testing"
 
 	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
 	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
 )
-
-func TestCTAPMakeCredentialExtensionsKeepsRawInputsAndMapsCredProps(t *testing.T) {
-	credProtect := &ctapwebauthn.CreateCredentialProtectionInputs{
-		CredentialProtectionPolicy:        extension.CredentialProtectionPolicyUserVerificationRequired,
-		EnforceCredentialProtectionPolicy: true,
-	}
-	credBlob := &ctapwebauthn.CreateCredentialBlobInputs{CredBlob: []byte("blob")}
-	hmacCreate := &ctapwebauthn.CreateHMACSecretInputs{HMACCreateSecret: true}
-	hmacMC := &ctapwebauthn.CreateHMACSecretMCInputs{
-		HMACGetSecret: ctapwebauthn.HMACGetSecretInput{Salt1: make([]byte, 32)},
-	}
-	minPINLength := &ctapwebauthn.CreateMinPinLengthInputs{MinPinLength: true}
-	complexity := &ctapwebauthn.CreatePinComplexityPolicyInputs{PinComplexityPolicy: true}
-
-	got := ctapMakeCredentialExtensions(&ctapwebauthn.CreateAuthenticationExtensionsClientInputs{
-		CreateCredentialPropertiesInputs: &ctapwebauthn.CreateCredentialPropertiesInputs{CredentialProperties: true},
-		CreateCredentialProtectionInputs: credProtect,
-		CreateCredentialBlobInputs:       credBlob,
-		CreateHMACSecretInputs:           hmacCreate,
-		CreateHMACSecretMCInputs:         hmacMC,
-		CreateMinPinLengthInputs:         minPINLength,
-		CreatePinComplexityPolicyInputs:  complexity,
-	}, protocol.AuthenticatorGetInfoResponse{})
-
-	if got == nil || got.CreateCredentialPropertiesInputs == nil || !got.CredentialProperties ||
-		got.CreateCredentialProtectionInputs != credProtect ||
-		got.CreateCredentialBlobInputs != credBlob ||
-		got.CreateHMACSecretInputs != hmacCreate ||
-		got.CreateHMACSecretMCInputs != hmacMC ||
-		got.CreateMinPinLengthInputs != minPINLength ||
-		got.CreatePinComplexityPolicyInputs != complexity {
-		t.Fatalf("CTAP create extensions = %#v, want raw inputs plus credProps:true", got)
-	}
-}
-
-func TestCTAPMakeCredentialPRFUsesAvailableAuthenticatorExtension(t *testing.T) {
-	evaluated := &ctapwebauthn.PRFInputs{
-		PRF: ctapwebauthn.AuthenticationExtensionsPRFInputs{
-			Eval: ctapwebauthn.AuthenticationExtensionsPRFValues{First: []byte{}, Second: []byte{}},
-		},
-	}
-
-	t.Run("availability request uses hmac-secret", func(t *testing.T) {
-		got := ctapMakeCredentialExtensions(&ctapwebauthn.CreateAuthenticationExtensionsClientInputs{
-			PRFInputs: &ctapwebauthn.PRFInputs{},
-		}, protocol.AuthenticatorGetInfoResponse{
-			Extensions: []extension.ExtensionIdentifier{extension.ExtensionIdentifierHMACSecret},
-		})
-		if got.CreateHMACSecretInputs == nil || !got.HMACCreateSecret || got.PRFInputs != nil {
-			t.Fatalf("CTAP extensions = %#v, want hmac-secret enable", got)
-		}
-	})
-
-	t.Run("registration evaluation uses hmac-secret-mc PRF", func(t *testing.T) {
-		got := ctapMakeCredentialExtensions(&ctapwebauthn.CreateAuthenticationExtensionsClientInputs{PRFInputs: evaluated},
-			protocol.AuthenticatorGetInfoResponse{
-				Extensions: []extension.ExtensionIdentifier{extension.ExtensionIdentifierHMACSecretMC},
-			})
-		if got.PRFInputs == nil || got.PRF.Eval.Second == nil {
-			t.Fatalf("CTAP extensions = %#v, want evaluated PRF with present-empty second", got)
-		}
-	})
-
-	t.Run("hmac-secret fallback enables PRF without results", func(t *testing.T) {
-		got := ctapMakeCredentialExtensions(&ctapwebauthn.CreateAuthenticationExtensionsClientInputs{PRFInputs: evaluated},
-			protocol.AuthenticatorGetInfoResponse{
-				Extensions: []extension.ExtensionIdentifier{extension.ExtensionIdentifierHMACSecret},
-			})
-		if got.CreateHMACSecretInputs == nil || !got.HMACCreateSecret || got.PRFInputs != nil {
-			t.Fatalf("CTAP extensions = %#v, want hmac-secret fallback", got)
-		}
-	})
-
-	t.Run("unsupported PRF is ignored", func(t *testing.T) {
-		got := ctapMakeCredentialExtensions(&ctapwebauthn.CreateAuthenticationExtensionsClientInputs{PRFInputs: evaluated},
-			protocol.AuthenticatorGetInfoResponse{})
-		if got.PRFInputs != nil || got.CreateHMACSecretInputs != nil {
-			t.Fatalf("CTAP extensions = %#v, want ignored PRF", got)
-		}
-	})
-}
-
-func TestCTAPGetAssertionPRFUsesSingleAllowListOverride(t *testing.T) {
-	credentialID := []byte{0xfb, 0xff, 0x00}
-	input := &ctapwebauthn.GetAuthenticationExtensionsClientInputs{
-		PRFInputs: &ctapwebauthn.PRFInputs{PRF: ctapwebauthn.AuthenticationExtensionsPRFInputs{
-			Eval: ctapwebauthn.AuthenticationExtensionsPRFValues{First: []byte("global")},
-			EvalByCredential: map[string]ctapwebauthn.AuthenticationExtensionsPRFValues{
-				base64.RawURLEncoding.EncodeToString(credentialID): {First: []byte("override")},
-			},
-		}},
-	}
-	got := ctapGetAssertionExtensions(input, protocol.AuthenticatorGetInfoResponse{
-		Extensions: []extension.ExtensionIdentifier{extension.ExtensionIdentifierHMACSecret},
-	})
-
-	key := base64.RawURLEncoding.EncodeToString(credentialID)
-	if got == nil || got.PRFInputs == nil ||
-		string(got.PRF.Eval.First) != "global" || len(got.PRF.EvalByCredential) != 1 ||
-		string(got.PRF.EvalByCredential[key].First) != "override" {
-		t.Fatalf("CTAP get PRF = %#v, want the normalized Level 3 PRF inputs", got)
-	}
-}
-
-func TestCTAPGetAssertionEmptyAndUnsupportedPRFAreIgnored(t *testing.T) {
-	empty := ctapGetAssertionExtensions(&ctapwebauthn.GetAuthenticationExtensionsClientInputs{
-		PRFInputs: &ctapwebauthn.PRFInputs{},
-	}, protocol.AuthenticatorGetInfoResponse{
-		Extensions: []extension.ExtensionIdentifier{extension.ExtensionIdentifierHMACSecret},
-	})
-	if empty == nil || empty.PRFInputs != nil {
-		t.Fatalf("empty PRF CTAP inputs = %#v, want no authenticator extension", empty)
-	}
-
-	unsupported := ctapGetAssertionExtensions(&ctapwebauthn.GetAuthenticationExtensionsClientInputs{
-		PRFInputs: &ctapwebauthn.PRFInputs{PRF: ctapwebauthn.AuthenticationExtensionsPRFInputs{
-			Eval: ctapwebauthn.AuthenticationExtensionsPRFValues{},
-		}},
-	}, protocol.AuthenticatorGetInfoResponse{})
-	if unsupported == nil || unsupported.PRFInputs != nil {
-		t.Fatalf("unsupported PRF CTAP inputs = %#v, want ignored extension", unsupported)
-	}
-}
 
 func TestMakeCredentialExtensionResultsKeepRawOutputsAndMapLevel3Results(t *testing.T) {
 	residentKey := false
@@ -188,10 +64,14 @@ func TestMakeCredentialExtensionResultsKeepRawOutputsAndMapLevel3Results(t *test
 	}
 }
 
-func TestMakeCredentialPRFAlwaysReportsEnabledAndOnlyReturnsRequestedEvaluation(t *testing.T) {
+func TestMakeCredentialPRFUsesCTAPClientOutput(t *testing.T) {
 	empty := makeCredentialExtensionResults(&ctapwebauthn.CreateAuthenticationExtensionsClientInputs{
 		PRFInputs: &ctapwebauthn.PRFInputs{},
-	}, protocol.AuthenticatorMakeCredentialResponse{})
+	}, protocol.AuthenticatorMakeCredentialResponse{
+		ExtensionOutputs: &ctapwebauthn.CreateAuthenticationExtensionsClientOutputs{
+			CreatePRFOutputs: &ctapwebauthn.CreatePRFOutputs{},
+		},
+	})
 	if empty == nil || empty.Client == nil || empty.Client.PRF == nil || empty.Client.PRF.Enabled ||
 		!empty.Client.PRF.Results.IsZero() {
 		t.Fatalf("unsupported PRF result = %#v, want {enabled:false}", empty)
@@ -201,7 +81,6 @@ func TestMakeCredentialPRFAlwaysReportsEnabledAndOnlyReturnsRequestedEvaluation(
 		ExtensionOutputs: &ctapwebauthn.CreateAuthenticationExtensionsClientOutputs{
 			CreatePRFOutputs: &ctapwebauthn.CreatePRFOutputs{PRF: ctapwebauthn.CreateAuthenticationExtensionsPRFOutputs{
 				Enabled: true,
-				Results: ctapwebauthn.AuthenticationExtensionsPRFValues{First: []byte{0xaa}},
 			}},
 		},
 	}
@@ -237,12 +116,7 @@ func TestMakeCredentialExtensionResultsStillRoutesRawHMACMC(t *testing.T) {
 }
 
 func TestGetAssertionExtensionResultsUseLevel3PRFOutputWithoutEnabled(t *testing.T) {
-	input := &ctapwebauthn.GetAuthenticationExtensionsClientInputs{PRFInputs: &ctapwebauthn.PRFInputs{
-		PRF: ctapwebauthn.AuthenticationExtensionsPRFInputs{
-			Eval: ctapwebauthn.AuthenticationExtensionsPRFValues{First: []byte{}},
-		},
-	}}
-	got := getAssertionExtensionResults(input, &ctapwebauthn.GetAuthenticationExtensionsClientOutputs{
+	got := getAssertionExtensionResults(&ctapwebauthn.GetAuthenticationExtensionsClientOutputs{
 		GetPRFOutputs: &ctapwebauthn.GetPRFOutputs{PRF: ctapwebauthn.GetAuthenticationExtensionsPRFOutputs{
 			Results: ctapwebauthn.AuthenticationExtensionsPRFValues{
 				First: []byte{0x07, 0x08},
@@ -254,16 +128,16 @@ func TestGetAssertionExtensionResultsUseLevel3PRFOutputWithoutEnabled(t *testing
 		t.Fatalf("GetAssertion PRF result = %#v", got)
 	}
 
-	empty := getAssertionExtensionResults(&ctapwebauthn.GetAuthenticationExtensionsClientInputs{
-		PRFInputs: &ctapwebauthn.PRFInputs{},
-	}, nil)
+	empty := getAssertionExtensionResults(&ctapwebauthn.GetAuthenticationExtensionsClientOutputs{
+		GetPRFOutputs: &ctapwebauthn.GetPRFOutputs{},
+	})
 	if empty == nil || empty.Client == nil || empty.Client.PRF == nil || !empty.Client.PRF.Results.IsZero() {
 		t.Fatalf("empty PRF result = %#v, want {prf:{}}", empty)
 	}
 }
 
 func TestGetAssertionExtensionResultsKeepRawOutputs(t *testing.T) {
-	got := getAssertionExtensionResults(nil, &ctapwebauthn.GetAuthenticationExtensionsClientOutputs{
+	got := getAssertionExtensionResults(&ctapwebauthn.GetAuthenticationExtensionsClientOutputs{
 		GetCredentialBlobOutputs: &ctapwebauthn.GetCredentialBlobOutputs{GetCredBlob: []byte{0x01, 0x02}},
 		GetHMACSecretOutputs: &ctapwebauthn.GetHMACSecretOutputs{HMACGetSecret: ctapwebauthn.HMACGetSecretOutput{
 			Output1: []byte{0x03, 0x04},

@@ -12,7 +12,6 @@ import (
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/model/conformance"
 	"github.com/go-ctap/kit/model/failure"
-	"github.com/ldclabs/cose/key"
 )
 
 func TestEvaluateGetInfoAcceptsVersionSpecificProfiles(t *testing.T) {
@@ -657,8 +656,8 @@ func TestEvaluateGetInfoValidatesOptionalListShape(t *testing.T) {
 		}, conformance.RuleAlgorithmsNonEmpty},
 		{"canonical duplicate algorithms", func(info *protocol.AuthenticatorGetInfoResponse) {
 			info.Algorithms = []credential.PublicKeyCredentialParameters{
-				{Algorithm: key.Alg(-7)},
-				{Type: credential.PublicKeyCredentialTypePublicKey, Algorithm: key.Alg(-7)},
+				{Algorithm: -7},
+				{Type: credential.PublicKeyCredentialTypePublicKey, Algorithm: -7},
 			}
 		}, conformance.RuleAlgorithmsUnique},
 		{"empty reset transports", func(info *protocol.AuthenticatorGetInfoResponse) { info.TransportsForReset = []string{} }, conformance.RuleTransportsForResetNonEmpty},

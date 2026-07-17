@@ -48,10 +48,6 @@ const (
 	CodeAssertionDenied                       Code = "ASSERTION_DENIED"
 	CodeAssertionNotAllowed                   Code = "ASSERTION_NOT_ALLOWED"
 	CodeAssertionContinuationUnavailable      Code = "ASSERTION_CONTINUATION_UNAVAILABLE"
-	CodeWebAuthnExtensionInputInvalid         Code = "WEBAUTHN_EXTENSION_INPUT_INVALID"
-	CodeWebAuthnExtensionConflict             Code = "WEBAUTHN_EXTENSION_CONFLICT"
-	CodeWebAuthnSecretSaltLengthInvalid       Code = "WEBAUTHN_SECRET_SALT_LENGTH_INVALID"
-	CodeWebAuthnPRFEvaluationInvalid          Code = "WEBAUTHN_PRF_EVALUATION_INVALID"
 
 	CodePINUnsupported              Code = "PIN_UNSUPPORTED"
 	CodePINAlreadyConfigured        Code = "PIN_ALREADY_CONFIGURED"
@@ -108,6 +104,7 @@ const (
 	CodeCTAPChannelInvalid             Code = "CTAP_CHANNEL_INVALID"
 	CodeCTAPCBORTypeInvalid            Code = "CTAP_CBOR_TYPE_INVALID"
 	CodeCTAPCBORInvalid                Code = "CTAP_CBOR_INVALID"
+	CodeCTAPSpecViolation              Code = "CTAP_SPEC_VIOLATION"
 	CodeCTAPParameterMissing           Code = "CTAP_PARAMETER_MISSING"
 	CodeCTAPLimitExceeded              Code = "CTAP_LIMIT_EXCEEDED"
 	CodeAuthenticatorProcessing        Code = "AUTHENTICATOR_PROCESSING"

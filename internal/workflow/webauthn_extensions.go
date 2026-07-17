@@ -10,50 +10,6 @@ import (
 	appwebauthn "github.com/go-ctap/kit/model/webauthn"
 )
 
-func ctapMakeCredentialExtensions(
-	input *ctapwebauthn.CreateAuthenticationExtensionsClientInputs,
-	info protocol.AuthenticatorGetInfoResponse,
-) *ctapwebauthn.CreateAuthenticationExtensionsClientInputs {
-	if input == nil {
-		return nil
-	}
-
-	result := *input
-	if input.PRFInputs != nil {
-		result.PRFInputs = nil
-		switch {
-		case !input.PRF.Eval.IsZero() && slices.Contains(info.Extensions, extension.ExtensionIdentifierHMACSecretMC):
-			result.PRFInputs = input.PRFInputs
-		case slices.Contains(info.Extensions, extension.ExtensionIdentifierHMACSecret):
-			result.CreateHMACSecretInputs = &ctapwebauthn.CreateHMACSecretInputs{HMACCreateSecret: true}
-		}
-	}
-
-	return &result
-}
-
-func ctapGetAssertionExtensions(
-	input *ctapwebauthn.GetAuthenticationExtensionsClientInputs,
-	info protocol.AuthenticatorGetInfoResponse,
-) *ctapwebauthn.GetAuthenticationExtensionsClientInputs {
-	if input == nil {
-		return nil
-	}
-
-	result := *input
-	result.PRFInputs = nil
-	if prfHasEvaluation(input.PRFInputs) &&
-		slices.Contains(info.Extensions, extension.ExtensionIdentifierHMACSecret) {
-		result.PRFInputs = input.PRFInputs
-	}
-
-	return &result
-}
-
-func prfHasEvaluation(input *ctapwebauthn.PRFInputs) bool {
-	return input != nil && (!input.PRF.Eval.IsZero() || len(input.PRF.EvalByCredential) > 0)
-}
-
 func makeCredentialExtensionResults(
 	input *ctapwebauthn.CreateAuthenticationExtensionsClientInputs,
 	response protocol.AuthenticatorMakeCredentialResponse,
@@ -67,6 +23,7 @@ func makeCredentialExtensionResults(
 	result := new(appwebauthn.MakeCredentialExtensionResults)
 	client := new(appwebauthn.MakeCredentialClientExtensionResults)
 	authenticator := new(appwebauthn.MakeCredentialAuthenticatorExtensionOutputs)
+	rawHMACMCRequested := input != nil && input.CreateHMACSecretMCInputs != nil
 	hasClientResult := false
 	hasAuthenticatorOutput := false
 	if output != nil && output.CreateCredentialPropertiesOutputs != nil {
@@ -90,14 +47,14 @@ func makeCredentialExtensionResults(
 		hasClientResult = true
 		client.CredentialBlob = &appwebauthn.CredentialBlobCreateOutput{Accepted: output.CredBlob}
 	}
-	if output != nil && output.CreateHMACSecretOutputs != nil && input != nil && input.CreateHMACSecretInputs != nil {
+	if output != nil && output.CreateHMACSecretOutputs != nil {
 		hasClientResult = true
 		client.HMACSecret = &appwebauthn.HMACSecretCreateOutput{Enabled: output.HMACCreateSecret}
 	}
 	if output != nil && output.CreateHMACSecretMCOutputs != nil {
 		hasClientResult = true
 		client.HMACSecretMC = hmacSecretOutput(output.CreateHMACSecretMCOutputs.HMACGetSecret)
-	} else if input != nil && input.CreateHMACSecretMCInputs != nil && output != nil && output.CreatePRFOutputs != nil {
+	} else if rawHMACMCRequested && output != nil && output.CreatePRFOutputs != nil {
 		hasClientResult = true
 		client.HMACSecretMC = &appwebauthn.HMACSecretOutput{
 			Output1Hex: hex.EncodeToString(output.PRF.Results.First),
@@ -116,19 +73,12 @@ func makeCredentialExtensionResults(
 			Enabled: authenticatorOutput.CreatePinComplexityPolicyOutput.PinComplexityPolicy,
 		}
 	}
-	if input != nil && input.PRFInputs != nil {
+	if !rawHMACMCRequested && output != nil && output.CreatePRFOutputs != nil {
 		hasClientResult = true
-		prf := &appwebauthn.MakeCredentialPRFOutput{}
-		if output != nil && output.CreateHMACSecretOutputs != nil {
-			prf.Enabled = output.HMACCreateSecret
+		client.PRF = &appwebauthn.MakeCredentialPRFOutput{
+			Enabled: output.PRF.Enabled,
+			Results: prfOutputValues(output.PRF.Results),
 		}
-		if output != nil && output.CreatePRFOutputs != nil {
-			prf.Enabled = output.PRF.Enabled
-			if !input.PRF.Eval.IsZero() {
-				prf.Results = prfOutputValues(output.PRF.Results)
-			}
-		}
-		client.PRF = prf
 	}
 	if hasClientResult {
 		result.Client = client
@@ -144,7 +94,6 @@ func makeCredentialExtensionResults(
 }
 
 func getAssertionExtensionResults(
-	input *ctapwebauthn.GetAuthenticationExtensionsClientInputs,
 	output *ctapwebauthn.GetAuthenticationExtensionsClientOutputs,
 ) *appwebauthn.GetAssertionExtensionResults {
 	result := new(appwebauthn.GetAssertionClientExtensionResults)
@@ -159,11 +108,10 @@ func getAssertionExtensionResults(
 		hasResult = true
 		result.HMACSecret = hmacSecretOutput(output.GetHMACSecretOutputs.HMACGetSecret)
 	}
-	if input != nil && input.PRFInputs != nil {
+	if output != nil && output.GetPRFOutputs != nil {
 		hasResult = true
-		result.PRF = &appwebauthn.GetAssertionPRFOutput{}
-		if output != nil && output.GetPRFOutputs != nil {
-			result.PRF.Results = prfOutputValues(output.PRF.Results)
+		result.PRF = &appwebauthn.GetAssertionPRFOutput{
+			Results: prfOutputValues(output.PRF.Results),
 		}
 	}
 	if !hasResult {

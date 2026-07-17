@@ -99,9 +99,6 @@ func BuildMakeCredentialPreview(
 	if err != nil {
 		return MakeCredentialPreview{}, err
 	}
-	if err := validateMakeCredentialCapabilities(info, normalized.Extensions); err != nil {
-		return MakeCredentialPreview{}, err
-	}
 
 	return MakeCredentialPreview{
 		Device: device,
@@ -196,10 +193,7 @@ func NormalizeMakeCredentialInput(input MakeCredentialInput) (MakeCredentialInpu
 		return MakeCredentialInput{}, err
 	}
 	input.ExcludeList = excludeList
-	input.Extensions, err = normalizeMakeCredentialExtensions(input.Extensions)
-	if err != nil {
-		return MakeCredentialInput{}, err
-	}
+	input.Extensions = normalizeMakeCredentialExtensions(input.Extensions)
 
 	return input, nil
 }
@@ -220,10 +214,7 @@ func NormalizeGetAssertionInput(input GetAssertionInput) (GetAssertionInput, err
 		return GetAssertionInput{}, err
 	}
 	input.AllowList = allowList
-	input.Extensions, err = normalizeGetAssertionExtensions(input.Extensions, allowList)
-	if err != nil {
-		return GetAssertionInput{}, err
-	}
+	input.Extensions = normalizeGetAssertionExtensions(input.Extensions)
 
 	return input, nil
 }

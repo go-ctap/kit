@@ -2,8 +2,12 @@ package workflow
 
 import (
 	"context"
+	"errors"
 
+	ctapdevice "github.com/go-ctap/ctap/authenticator"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/authenticator"
+	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
 )
@@ -64,6 +68,29 @@ type operationResult struct {
 
 func outputOnly(output model.OperationResult) operationResult {
 	return operationResult{Output: output}
+}
+
+func (r Runner) runWithOptionalToken(
+	ctx context.Context,
+	permission protocol.Permission,
+	rpID string,
+	run func([]byte) error,
+) error {
+	// High-level ctap methods complete authorization preflight before sending
+	// the authenticator command, so this retry cannot repeat a mutation.
+	err := run(nil)
+	if !errors.Is(err, ctapdevice.ErrPinUvAuthTokenRequired) &&
+		!errors.Is(err, ctapdevice.ErrBuiltInUVRequired) {
+		return err
+	}
+
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), permission, rpID)
+	if err != nil {
+		return err
+	}
+	defer secret.Zero(token)
+
+	return run(token)
 }
 
 func (r Runner) runOperationBody(ctx context.Context, operation model.Operation) (operationResult, error) {

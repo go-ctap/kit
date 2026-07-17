@@ -357,9 +357,13 @@ func TestTokenServicePINRetriesFailureStopsRetryFlow(t *testing.T) {
 	}
 }
 
-func TestTokenServiceRejectsShortPINBeforeAuthenticatorCommand(t *testing.T) {
+func TestTokenServiceDelegatesPINValidationToAuthenticator(t *testing.T) {
 	var requests []model.InteractionRequest
-	authenticator := &recordingTokenDevice{info: uvTokenInfo()}
+	validationErr := errors.New("pin rejected by ctap")
+	authenticator := &recordingTokenDevice{
+		info:    uvTokenInfo(),
+		pinErrs: []error{validationErr},
+	}
 	tokens := NewTokenService(
 		&testTokenCache{},
 		recordingInteractionHandler(&requests, model.InteractionResponse{PIN: []byte("123")}),
@@ -371,11 +375,11 @@ func TestTokenServiceRejectsShortPINBeforeAuthenticatorCommand(t *testing.T) {
 		secret.Zero(token)
 		t.Fatalf("token = %q, want nil", token)
 	}
-	if !failure.IsCode(err, failure.CodePINPolicyViolation) {
-		t.Fatalf("Acquire error = %v, want %s", err, failure.CodePINPolicyViolation)
+	if !failure.IsCode(err, failure.CodeInternalError) || !errors.Is(err, validationErr) {
+		t.Fatalf("Acquire error = %v, want delegated validation error", err)
 	}
-	if len(authenticator.pinRPIDs) != 0 {
-		t.Fatalf("PIN token calls = %d, want 0", len(authenticator.pinRPIDs))
+	if len(authenticator.pinRPIDs) != 1 {
+		t.Fatalf("PIN token calls = %d, want 1", len(authenticator.pinRPIDs))
 	}
 }
 

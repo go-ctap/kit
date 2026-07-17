@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	ctapdevice "github.com/go-ctap/ctap/authenticator"
 	"github.com/go-ctap/ctap/protocol"
 	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/kit/internal/authenticator"
@@ -389,7 +390,11 @@ func (a *contextRecordingConfigAuthenticator) GetPinUvAuthTokenUsingUV(
 	return []byte("token"), nil
 }
 
-func (a *contextRecordingConfigAuthenticator) ToggleAlwaysUV(ctx context.Context, _ []byte) error {
+func (a *contextRecordingConfigAuthenticator) ToggleAlwaysUV(ctx context.Context, token []byte) error {
+	if token == nil {
+		return ctapdevice.ErrPinUvAuthTokenRequired
+	}
+
 	a.commandCtx = ctx
 
 	return nil

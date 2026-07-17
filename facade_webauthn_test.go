@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/go-ctap/ctap/attestation"
+	ctapdevice "github.com/go-ctap/ctap/authenticator"
+	"github.com/go-ctap/ctap/cose"
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
 	ctaptransport "github.com/go-ctap/ctap/transport"
@@ -20,8 +22,6 @@ import (
 	appwebauthn "github.com/go-ctap/kit/model/webauthn"
 	"github.com/go-ctap/kit/transport"
 	"github.com/google/uuid"
-	"github.com/ldclabs/cose/iana"
-	"github.com/ldclabs/cose/key"
 	"github.com/samber/lo"
 )
 
@@ -129,7 +129,8 @@ func TestMakeCredentialMapsRequestAndUsesRawClientDataJSON(t *testing.T) {
 		t.Fatalf("mapped excludeList = %#v", a.makeCredentialExcludeList)
 	}
 	wantOptions := map[protocol.Option]bool{
-		protocol.OptionResidentKeys: false,
+		protocol.OptionResidentKeys:     false,
+		protocol.OptionUserVerification: true,
 	}
 	if !maps.Equal(a.makeCredentialOptions, wantOptions) {
 		t.Fatalf("options = %#v, want %#v", a.makeCredentialOptions, wantOptions)
@@ -144,8 +145,32 @@ func TestMakeCredentialMapsRequestAndUsesRawClientDataJSON(t *testing.T) {
 			op.AttestationFormatsPreference,
 		)
 	}
+	if len(a.tokenRPIDs) != 0 {
+		t.Fatalf("token rpIDs = %v, want built-in UV without a token", a.tokenRPIDs)
+	}
+}
+
+func TestMakeCredentialAcquiresScopedTokenWhenCTAPRequiresIt(t *testing.T) {
+	a := &webauthnTestAuthenticator{makeCredentialRequiresToken: true}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	op := sampleMakeCredentialOperation(false)
+	op.Confirmed = true
+	if _, err := session.Run(context.Background(), op, userVerificationHandler(t)); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	if a.makeCredentialCalls != 2 {
+		t.Fatalf("MakeCredential calls = %d, want preflight plus authorized retry", a.makeCredentialCalls)
+	}
 	if !slices.Equal(a.tokenRPIDs, []string{"example.com"}) {
 		t.Fatalf("token rpIDs = %v, want scoped RP ID", a.tokenRPIDs)
+	}
+	if string(a.makeCredentialToken) != "token:example.com" {
+		t.Fatalf("MakeCredential token = %q, want scoped token", a.makeCredentialToken)
 	}
 }
 
@@ -246,7 +271,7 @@ func TestGetAssertionReturnsAllAssertionsInOrder(t *testing.T) {
 	}
 }
 
-func TestGetAssertionAcquiresScopedTokenWhenUVRequested(t *testing.T) {
+func TestGetAssertionUsesBuiltInUVWhenRequested(t *testing.T) {
 	a := &webauthnTestAuthenticator{}
 	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
@@ -267,19 +292,19 @@ func TestGetAssertionAcquiresScopedTokenWhenUVRequested(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 
-	if !slices.Equal(a.tokenRPIDs, []string{"example.com"}) {
-		t.Fatalf("token rpIDs = %v, want scoped RP ID", a.tokenRPIDs)
+	if len(a.tokenRPIDs) != 0 {
+		t.Fatalf("token rpIDs = %v, want built-in UV without a token", a.tokenRPIDs)
 	}
-	if string(a.getAssertionToken) != "token:example.com" {
-		t.Fatalf("GetAssertion token = %q, want scoped token", a.getAssertionToken)
+	if len(a.getAssertionToken) != 0 {
+		t.Fatalf("GetAssertion token = %q, want none", a.getAssertionToken)
 	}
-	if _, ok := a.getAssertionOptions[protocol.OptionUserVerification]; ok {
-		t.Fatalf("GetAssertion options = %#v, must omit uv when using a token", a.getAssertionOptions)
+	if !a.getAssertionOptions[protocol.OptionUserVerification] {
+		t.Fatalf("GetAssertion options = %#v, want built-in uv", a.getAssertionOptions)
 	}
 }
 
-func TestGetAssertionAcquiresScopedTokenWhenAlwaysUVEnabled(t *testing.T) {
-	a := &webauthnTestAuthenticator{alwaysUV: true}
+func TestGetAssertionAcquiresScopedTokenWhenCTAPRequiresIt(t *testing.T) {
+	a := &webauthnTestAuthenticator{getAssertionRequiresToken: true}
 	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
@@ -300,6 +325,74 @@ func TestGetAssertionAcquiresScopedTokenWhenAlwaysUVEnabled(t *testing.T) {
 	}
 	if string(a.getAssertionToken) != "token:example.com" {
 		t.Fatalf("GetAssertion token = %q, want scoped token", a.getAssertionToken)
+	}
+	if a.getAssertionCalls != 2 {
+		t.Fatalf("GetAssertion calls = %d, want preflight plus authorized retry", a.getAssertionCalls)
+	}
+}
+
+func TestGetAssertionAcquiresScopedTokenWhenCTAPRequiresBuiltInUV(t *testing.T) {
+	a := &webauthnTestAuthenticator{getAssertionRequiresBuiltInUV: true}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	_, err := session.Run(context.Background(), model.GetAssertionOperation{
+		GetAssertionInput: appwebauthn.GetAssertionInput{
+			RPID:           "example.com",
+			ClientDataJSON: []byte("client-data"),
+		},
+	}, userVerificationHandler(t))
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	if !slices.Equal(a.tokenRPIDs, []string{"example.com"}) {
+		t.Fatalf("token rpIDs = %v, want scoped RP ID", a.tokenRPIDs)
+	}
+	if a.getAssertionCalls != 2 {
+		t.Fatalf("GetAssertion calls = %d, want preflight plus authorized retry", a.getAssertionCalls)
+	}
+}
+
+func TestWebAuthnDelegatesPRFRoutingToCTAP(t *testing.T) {
+	a := &webauthnTestAuthenticator{makeCredentialUvNotRequired: true}
+	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	makeOperation := sampleMakeCredentialOperation(false)
+	makeOperation.Confirmed = true
+	makeOperation.Extensions = &webauthn.CreateAuthenticationExtensionsClientInputs{
+		PRFInputs: &webauthn.PRFInputs{PRF: webauthn.AuthenticationExtensionsPRFInputs{
+			Eval: webauthn.AuthenticationExtensionsPRFValues{First: []byte("make")},
+		}},
+	}
+	if _, err := session.Run(context.Background(), makeOperation, nil); err != nil {
+		t.Fatalf("MakeCredential: %v", err)
+	}
+	if a.makeCredentialExtensions == nil || a.makeCredentialExtensions.PRFInputs == nil ||
+		string(a.makeCredentialExtensions.PRF.Eval.First) != "make" {
+		t.Fatalf("MakeCredential extensions = %#v, want unmodified PRF input", a.makeCredentialExtensions)
+	}
+
+	getOperation := model.GetAssertionOperation{GetAssertionInput: appwebauthn.GetAssertionInput{
+		RPID:           "example.com",
+		ClientDataJSON: []byte("client-data"),
+		Extensions: &webauthn.GetAuthenticationExtensionsClientInputs{
+			PRFInputs: &webauthn.PRFInputs{PRF: webauthn.AuthenticationExtensionsPRFInputs{
+				Eval: webauthn.AuthenticationExtensionsPRFValues{First: []byte("get")},
+			}},
+		},
+	}}
+	if _, err := session.Run(context.Background(), getOperation, nil); err != nil {
+		t.Fatalf("GetAssertion: %v", err)
+	}
+	if a.getAssertionExtensions == nil || a.getAssertionExtensions.PRFInputs == nil ||
+		string(a.getAssertionExtensions.PRF.Eval.First) != "get" {
+		t.Fatalf("GetAssertion extensions = %#v, want unmodified PRF input", a.getAssertionExtensions)
 	}
 }
 
@@ -398,9 +491,12 @@ func sampleMakeCredentialOperation(dryRun bool) model.MakeCredentialOperation {
 
 type webauthnTestAuthenticator struct {
 	contractAuthenticator
-	makeCredentialUvNotRequired bool
-	alwaysUV                    bool
-	tokenRPIDs                  []string
+	makeCredentialUvNotRequired   bool
+	alwaysUV                      bool
+	makeCredentialRequiresToken   bool
+	getAssertionRequiresToken     bool
+	getAssertionRequiresBuiltInUV bool
+	tokenRPIDs                    []string
 
 	makeCredentialCalls                 int
 	makeCredentialErr                   error
@@ -410,6 +506,7 @@ type webauthnTestAuthenticator struct {
 	makeCredentialUser                  credential.PublicKeyCredentialUserEntity
 	makeCredentialParams                []credential.PublicKeyCredentialParameters
 	makeCredentialExcludeList           []credential.PublicKeyCredentialDescriptor
+	makeCredentialExtensions            *webauthn.CreateAuthenticationExtensionsClientInputs
 	makeCredentialOptions               map[protocol.Option]bool
 	makeCredentialEnterpriseAttestation uint
 	makeCredentialAttestationFormats    []attestation.AttestationStatementFormatIdentifier
@@ -419,6 +516,7 @@ type webauthnTestAuthenticator struct {
 	tokenErr               error
 	getAssertionToken      []byte
 	getAssertionClientData []byte
+	getAssertionExtensions *webauthn.GetAuthenticationExtensionsClientInputs
 	getAssertionOptions    map[protocol.Option]bool
 
 	metadataCalls int
@@ -457,7 +555,7 @@ func (a *webauthnTestAuthenticator) MakeCredential(
 	user credential.PublicKeyCredentialUserEntity,
 	pubKeyCredParams []credential.PublicKeyCredentialParameters,
 	excludeList []credential.PublicKeyCredentialDescriptor,
-	_ *webauthn.CreateAuthenticationExtensionsClientInputs,
+	extensions *webauthn.CreateAuthenticationExtensionsClientInputs,
 	options map[protocol.Option]bool,
 	enterpriseAttestation uint,
 	attestationFormatsPreference []attestation.AttestationStatementFormatIdentifier,
@@ -469,11 +567,15 @@ func (a *webauthnTestAuthenticator) MakeCredential(
 	a.makeCredentialUser = user
 	a.makeCredentialParams = append([]credential.PublicKeyCredentialParameters(nil), pubKeyCredParams...)
 	a.makeCredentialExcludeList = append([]credential.PublicKeyCredentialDescriptor(nil), excludeList...)
+	a.makeCredentialExtensions = extensions
 	if options != nil {
 		a.makeCredentialOptions = lo.Assign(options)
 	}
 	a.makeCredentialEnterpriseAttestation = enterpriseAttestation
 	a.makeCredentialAttestationFormats = slices.Clone(attestationFormatsPreference)
+	if pinUvAuthToken == nil && a.makeCredentialRequiresToken {
+		return protocol.AuthenticatorMakeCredentialResponse{}, ctapdevice.ErrPinUvAuthTokenRequired
+	}
 	if a.makeCredentialErr != nil {
 		return protocol.AuthenticatorMakeCredentialResponse{}, a.makeCredentialErr
 	}
@@ -487,14 +589,25 @@ func (a *webauthnTestAuthenticator) GetAssertion(
 	_ string,
 	clientData []byte,
 	_ []credential.PublicKeyCredentialDescriptor,
-	_ *webauthn.GetAuthenticationExtensionsClientInputs,
+	extensions *webauthn.GetAuthenticationExtensionsClientInputs,
 	options map[protocol.Option]bool,
 ) iter.Seq2[protocol.AuthenticatorGetAssertionResponse, error] {
 	return func(yield func(protocol.AuthenticatorGetAssertionResponse, error) bool) {
 		a.getAssertionCalls++
 		a.getAssertionToken = append([]byte(nil), pinUvAuthToken...)
 		a.getAssertionClientData = append([]byte(nil), clientData...)
+		a.getAssertionExtensions = extensions
 		a.getAssertionOptions = maps.Clone(options)
+		if pinUvAuthToken == nil && a.getAssertionRequiresBuiltInUV {
+			yield(protocol.AuthenticatorGetAssertionResponse{}, ctapdevice.ErrBuiltInUVRequired)
+
+			return
+		}
+		if pinUvAuthToken == nil && a.getAssertionRequiresToken {
+			yield(protocol.AuthenticatorGetAssertionResponse{}, ctapdevice.ErrPinUvAuthTokenRequired)
+
+			return
+		}
 		if a.getAssertionErr != nil {
 			yield(protocol.AuthenticatorGetAssertionResponse{}, a.getAssertionErr)
 
@@ -564,12 +677,12 @@ func sampleMakeCredentialResponse() protocol.AuthenticatorMakeCredentialResponse
 			AttestedCredentialData: &protocol.AttestedCredentialData{
 				AAGUID:       uuid.Must(uuid.Parse("00112233-4455-6677-8899-aabbccddeeff")),
 				CredentialID: []byte{0xc0, 0x5e},
-				CredentialPublicKey: key.Key{
-					iana.KeyParameterKty:    iana.KeyTypeEC2,
-					iana.KeyParameterAlg:    iana.AlgorithmES256,
-					iana.EC2KeyParameterCrv: iana.EllipticCurveP_256,
-					iana.EC2KeyParameterX:   []byte{0x01},
-					iana.EC2KeyParameterY:   []byte{0x02},
+				CredentialPublicKey: cose.Key{
+					cose.KeyParameterKty:    cose.KeyTypeEC2,
+					cose.KeyParameterAlg:    cose.AlgorithmES256,
+					cose.EC2KeyParameterCrv: cose.EllipticCurveP256,
+					cose.EC2KeyParameterX:   []byte{0x01},
+					cose.EC2KeyParameterY:   []byte{0x02},
 				},
 			},
 		},

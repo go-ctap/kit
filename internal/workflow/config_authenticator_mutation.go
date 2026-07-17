@@ -5,7 +5,6 @@ import (
 
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/errornorm"
-	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
@@ -42,13 +41,10 @@ func (r Runner) setAlwaysUV(ctx context.Context, req model.SetAlwaysUVOperation)
 		return output, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionAuthenticatorConfiguration, "")
+	err = r.runWithOptionalToken(ctx, protocol.PermissionAuthenticatorConfiguration, "", func(token []byte) error {
+		return r.configManager().ToggleAlwaysUV(ctx, token)
+	})
 	if err != nil {
-		return output, err
-	}
-	defer secret.Zero(token)
-
-	if err := r.configManager().ToggleAlwaysUV(ctx, token); err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithConfigSubCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.ConfigSubCommandToggleAlwaysUv,
@@ -100,20 +96,17 @@ func (r Runner) setMinPINLength(ctx context.Context, req model.SetMinPINLengthOp
 		return output, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionAuthenticatorConfiguration, "")
+	err = r.runWithOptionalToken(ctx, protocol.PermissionAuthenticatorConfiguration, "", func(token []byte) error {
+		return r.configManager().SetMinPINLength(
+			ctx,
+			token,
+			req.Length,
+			req.RPIDs,
+			req.ForceChangePin,
+			req.PinComplexityPolicy,
+		)
+	})
 	if err != nil {
-		return output, err
-	}
-	defer secret.Zero(token)
-
-	if err := r.configManager().SetMinPINLength(
-		ctx,
-		token,
-		req.Length,
-		req.RPIDs,
-		req.ForceChangePin,
-		req.PinComplexityPolicy,
-	); err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithConfigSubCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.ConfigSubCommandSetMinPINLength,

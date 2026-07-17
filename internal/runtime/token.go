@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	ctapdevice "github.com/go-ctap/ctap/authenticator"
-	ctapclient "github.com/go-ctap/ctap/client"
 	"github.com/go-ctap/ctap/protocol"
 	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/kit/internal/authenticator"
@@ -203,14 +202,7 @@ func (s *TokenService) acquireUsingPIN(
 	}
 	defer secret.Zero(response.PIN)
 
-	pin, err := ctapclient.NormalizeAndValidatePIN(string(response.PIN), protocol.DefaultMinPINCodePoints)
-	if err != nil {
-		return nil, failure.Wrap(failure.CodePINPolicyViolation, err,
-			failure.WithPhase(failure.PhaseInteraction),
-		)
-	}
-
-	token, err := authenticator.GetPinUvAuthTokenUsingPIN(ctx, pin, permission, rpID)
+	token, err := authenticator.GetPinUvAuthTokenUsingPIN(ctx, string(response.PIN), permission, rpID)
 	if err != nil {
 		return nil, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseTokenAcquisition,
