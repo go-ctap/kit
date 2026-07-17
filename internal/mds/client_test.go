@@ -1,7 +1,9 @@
 package mds
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"testing"
@@ -97,5 +99,39 @@ func TestLookupAllowsVerifiedStaleCacheOnRateLimit(t *testing.T) {
 	}
 	if !result.Cached {
 		t.Fatal("lookup did not report the stale verified cache")
+	}
+}
+
+func TestLookupKeepsDiskCacheWhenVerificationFails(t *testing.T) {
+	const source = "https://mds.example.test/invalid-cache"
+
+	client := &Client{
+		Source:     source,
+		HTTPClient: &http.Client{Transport: statusTransport(http.StatusServiceUnavailable)},
+		Cache:      NewCache(),
+		CacheDir:   t.TempDir(),
+	}
+	path, err := client.diskCachePath(source)
+	if err != nil {
+		t.Fatalf("disk cache path: %v", err)
+	}
+	cached := []byte("cached blob awaiting successful revalidation")
+	if err := os.WriteFile(path, cached, 0o600); err != nil {
+		t.Fatalf("write disk cache: %v", err)
+	}
+
+	_, err = client.Lookup(context.Background(), uuid.New(), LookupOptions{
+		AllowStaleOnFetchError: true,
+	})
+	if !errors.Is(err, ErrFetch) {
+		t.Fatalf("lookup error = %v, want %v", err, ErrFetch)
+	}
+
+	retained, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read retained disk cache: %v", err)
+	}
+	if !bytes.Equal(retained, cached) {
+		t.Fatalf("retained disk cache = %q, want %q", retained, cached)
 	}
 }

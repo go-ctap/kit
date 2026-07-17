@@ -279,7 +279,6 @@ func (c *Client) loadDiskCache(ctx context.Context, source string) (*Blob, bool)
 
 	blob, err := c.parseAndVerify(ctx, body)
 	if err != nil {
-		_ = os.Remove(path)
 		return nil, false
 	}
 	if info, err := os.Stat(path); err == nil {

@@ -73,7 +73,8 @@ metadata, err := ctapkit.LookupMDS(ctx, inspect.Result.Info.AAGUID)
 The runtime fetches and verifies the FIDO MDS3 blob, indexes entries by AAGUID,
 and caches the verified response in memory and on disk under the user cache
 directory. Disk cache entries are verified again before use. Consumers own any
-MDS presentation or policy decisions.
+MDS presentation or policy decisions. A disk entry that cannot currently be
+verified is retained for a later retry but is never returned as verified data.
 
 ## CTAP 2.3 Runtime Surface
 
