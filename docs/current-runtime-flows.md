@@ -112,24 +112,25 @@ cancel-aware transport command can unwind. A subsequent `Run` returns
 ## Background Metadata Enrichment
 
 The service maintains an in-memory metadata cache for the current discovery
-topology. Vendor probes are short-lived and independent from the selected
-authenticator:
+topology and a small persistent cache under the user cache directory at
+`ctapkit/devices/{fingerprint}/info.json`. Vendor probes are short-lived and
+independent from the selected authenticator:
 
 ```mermaid
 flowchart LR
-  A["Discovery snapshot"] --> B["Choose unprobed known vendor"]
-  B --> C["Open independent probe channel"]
-  C --> D["Read vendor model / serial / firmware"]
-  D --> E["Close probe channel"]
-  E --> F["Merge metadata and emit discovery-changed"]
+  A["Discovery snapshot"] --> B["Load metadata by attachment fingerprint"]
+  B -->|cache miss| C["Choose unprobed known vendor"]
+  C --> D["Open independent probe channel"]
+  D --> E["Read vendor model / serial / firmware"]
+  E --> F["Close probe channel"]
+  F --> G["Persist, merge, and emit discovery-changed"]
 ```
 
-The current attachment fingerprint is a hash of transport mode and path. It is
-stable only within the same attachment path and is explicitly not guaranteed
-across process restarts or device reinsertion. It must not be used as a durable
-disk-cache identity. A future persistent cache should use a separate identity
-derived from stable serial information, for example a hash of VID, PID, and
-serial, and should skip persistence when no stable serial is available.
+The current attachment fingerprint is a hash of transport mode and path. A
+device moved to another port may therefore create another tiny cache entry.
+That duplication is accepted: a hit avoids the much more expensive HID/PCSC
+probe, while a miss remains safe and simply refreshes metadata in the
+background.
 
 ## Safety Properties
 

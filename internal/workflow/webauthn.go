@@ -22,7 +22,7 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 		return output, err
 	}
 
-	preview, err := appwebauthn.BuildMakeCredentialPreview(r.env.Selected, r.infoProvider().GetInfo(), input)
+	preview, err := appwebauthn.BuildMakeCredentialPreview(r.env.Selected, r.env.Authenticator.GetInfo(), input)
 	if err != nil {
 		return output, err
 	}
@@ -76,8 +76,7 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 	if err != nil {
 		return output, err
 	}
-	info := r.infoProvider().GetInfo()
-	preview, err := appwebauthn.BuildGetAssertionPreview(r.env.Selected, info, input)
+	preview, err := appwebauthn.BuildGetAssertionPreview(r.env.Selected, r.env.Authenticator.GetInfo(), input)
 	if err != nil {
 		return output, err
 	}
@@ -85,7 +84,7 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 	if req.DryRun {
 		return output, nil
 	}
-	if hasLargeBlobWrite(input.Extensions) {
+	if input.Extensions != nil && input.Extensions.LargeBlobInputs != nil && input.Extensions.LargeBlob.Write != nil {
 		if err := r.confirmMutation(ctx, confirmationRequest{
 			confirmed:       req.Confirmed,
 			message:         req.ConfirmationMessage,
@@ -104,7 +103,7 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 
 	readAssertions := func(token []byte) error {
 		var index uint
-		for response, err := range r.webAuthnManager().GetAssertion(
+		for response, err := range r.env.Authenticator.GetAssertion(
 			ctx,
 			token,
 			input.RPID,
@@ -150,7 +149,7 @@ func (r Runner) callMakeCredential(
 	token []byte,
 	input appwebauthn.MakeCredentialInput,
 ) (protocol.AuthenticatorMakeCredentialResponse, error) {
-	return r.webAuthnManager().MakeCredential(
+	return r.env.Authenticator.MakeCredential(
 		ctx,
 		token,
 		input.ClientDataJSON,
@@ -269,10 +268,6 @@ func assertionResult(
 	}
 
 	return assertion
-}
-
-func hasLargeBlobWrite(input *ctapwebauthn.GetAuthenticationExtensionsClientInputs) bool {
-	return input != nil && input.LargeBlobInputs != nil && input.LargeBlob.Write != nil
 }
 
 func ctapAuthenticatorOptions(options appwebauthn.AuthenticatorOptions, withToken bool) map[protocol.Option]bool {

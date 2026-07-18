@@ -14,7 +14,7 @@ import (
 func (r Runner) setPIN(ctx context.Context, req model.SetPINOperation) (model.OperationResult, error) {
 	var output model.PINOutput
 
-	status := r.statusReport()
+	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
 
 	mode := safety.PreviewModeDryRun
 	if !req.DryRun {
@@ -41,7 +41,7 @@ func (r Runner) setPIN(ctx context.Context, req model.SetPINOperation) (model.Op
 		return output, err
 	}
 
-	err = r.configManager().SetPIN(ctx, req.NewPIN)
+	err = r.env.Authenticator.SetPIN(ctx, req.NewPIN)
 	r.env.Tokens.Invalidate()
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithClientPINSubCommand(
@@ -57,7 +57,7 @@ func (r Runner) setPIN(ctx context.Context, req model.SetPINOperation) (model.Op
 func (r Runner) changePIN(ctx context.Context, req model.ChangePINOperation) (model.OperationResult, error) {
 	var output model.PINOutput
 
-	status := r.statusReport()
+	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
 
 	mode := safety.PreviewModeDryRun
 	if !req.DryRun {
@@ -84,7 +84,7 @@ func (r Runner) changePIN(ctx context.Context, req model.ChangePINOperation) (mo
 		return output, err
 	}
 
-	err = r.configManager().ChangePIN(ctx, req.CurrentPIN, req.NewPIN)
+	err = r.env.Authenticator.ChangePIN(ctx, req.CurrentPIN, req.NewPIN)
 	r.env.Tokens.Invalidate()
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithClientPINSubCommand(

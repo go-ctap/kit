@@ -19,7 +19,7 @@ const bioEnrollmentCancelTimeout = 2 * time.Second
 func (r Runner) enrollBio(ctx context.Context, req model.BioEnrollOperation) (model.OperationResult, error) {
 	var output model.BioEnrollOutput
 
-	status := r.statusReport()
+	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
 
 	mode := safety.PreviewModeExecute
 	if req.DryRun {
@@ -46,7 +46,7 @@ func (r Runner) enrollBio(ctx context.Context, req model.BioEnrollOperation) (mo
 		return output, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionBioEnrollment, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.env.Authenticator, protocol.PermissionBioEnrollment, "")
 	if err != nil {
 		return output, err
 	}
@@ -91,7 +91,7 @@ func (r Runner) runBioEnrollment(
 	preview appconfig.BioEnrollPreview,
 	token []byte,
 ) (appconfig.BioEnrollResult, error) {
-	authenticator := r.bioEnrollmentManager()
+	authenticator := r.env.Authenticator
 	progress := r.bioEnrollmentProgress()
 	result := appconfig.BioEnrollResult{
 		DeviceFingerprint: preview.Device.Fingerprint,
@@ -137,7 +137,7 @@ func (r Runner) runBioEnrollment(
 	if err != nil {
 		return appconfig.BioEnrollResult{}, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 			failure.PhaseAuthenticatorCommand,
-			bioEnrollmentCommand(r.statusReport()),
+			bioEnrollmentCommand(appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())),
 			protocol.BioEnrollmentSubCommandEnrollBegin,
 		))
 	}
@@ -150,7 +150,7 @@ func (r Runner) runBioEnrollment(
 		if err := ctx.Err(); err != nil {
 			return cancelAfterFailure(errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 				failure.PhaseAuthenticatorCommand,
-				bioEnrollmentCommand(r.statusReport()),
+				bioEnrollmentCommand(appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())),
 				protocol.BioEnrollmentSubCommandEnrollCaptureNextSample,
 			)))
 		}
@@ -159,7 +159,7 @@ func (r Runner) runBioEnrollment(
 		if err != nil {
 			return cancelAfterFailure(errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 				failure.PhaseAuthenticatorCommand,
-				bioEnrollmentCommand(r.statusReport()),
+				bioEnrollmentCommand(appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())),
 				protocol.BioEnrollmentSubCommandEnrollCaptureNextSample,
 			)))
 		}

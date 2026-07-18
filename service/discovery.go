@@ -111,6 +111,7 @@ func (s *Service) updateDiscovery(
 	var nextReports []report.DeviceReport
 	authoritative := scanErr == nil
 	if authoritative {
+		s.restoreDeviceMetadata(deviceReports(devices))
 		nextReports = s.deviceReportsWithMetadata(devices)
 	}
 	releaseSelection, err := s.lockSelection(ctx)

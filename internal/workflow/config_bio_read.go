@@ -12,17 +12,13 @@ import (
 	"github.com/samber/lo"
 )
 
-func (r Runner) bioSensorInfo(ctx context.Context) (appconfig.BioSensorReport, error) {
-	return r.bioSensorReport(ctx)
-}
-
 func (r Runner) bioList(ctx context.Context) (appconfig.BioListReport, error) {
-	status, err := r.configStatus(ctx)
+	status, err := r.statusWithRetries(ctx)
 	if err != nil {
 		return appconfig.BioListReport{}, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionBioEnrollment, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.env.Authenticator, protocol.PermissionBioEnrollment, "")
 	if err != nil {
 		return appconfig.BioListReport{}, err
 	}
@@ -36,15 +32,14 @@ func (r Runner) bioSensorReport(ctx context.Context) (appconfig.BioSensorReport,
 		return appconfig.BioSensorReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseDiscovery))
 	}
 
-	authenticator := r.bioEnrollmentManager()
-	status := r.statusReport()
+	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
 	if !status.Bio.Supported {
 		return appconfig.BioSensorReport{}, failure.New(failure.CodeBioUnsupported,
 			failure.WithPhase(failure.PhaseDiscovery),
 		)
 	}
 
-	modality, err := authenticator.GetBioModality(ctx)
+	modality, err := r.env.Authenticator.GetBioModality(ctx)
 	if err != nil {
 		return appconfig.BioSensorReport{}, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseDiscovery,
@@ -52,7 +47,7 @@ func (r Runner) bioSensorReport(ctx context.Context) (appconfig.BioSensorReport,
 		))
 	}
 
-	sensor, err := authenticator.GetFingerprintSensorInfo(ctx)
+	sensor, err := r.env.Authenticator.GetFingerprintSensorInfo(ctx)
 	if err != nil {
 		return appconfig.BioSensorReport{}, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 			failure.PhaseDiscovery,
@@ -113,7 +108,7 @@ func (r Runner) bioListReport(ctx context.Context, status appconfig.StatusReport
 		)
 	}
 
-	resp, err := r.bioEnrollmentManager().EnumerateEnrollments(ctx, token)
+	resp, err := r.env.Authenticator.EnumerateEnrollments(ctx, token)
 	if err != nil {
 		return appconfig.BioListReport{}, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 			failure.PhaseDiscovery,

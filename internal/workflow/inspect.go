@@ -14,5 +14,5 @@ func (r Runner) inspect(ctx context.Context) (model.InspectResult, error) {
 		selected.Metadata = metadata
 	}
 
-	return model.NewInspectResult(selected, r.infoProvider().GetInfo()), nil
+	return model.NewInspectResult(selected, r.env.Authenticator.GetInfo()), nil
 }

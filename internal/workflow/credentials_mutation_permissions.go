@@ -12,7 +12,7 @@ import (
 func (r Runner) inventoryMutationPermissions(
 	required protocol.Permission,
 ) (protocol.Permission, protocol.Permission, error) {
-	inventory, err := inventoryPermission(r.infoProvider().GetInfo())
+	inventory, err := inventoryPermission(r.env.Authenticator.GetInfo())
 	if err != nil {
 		return protocol.PermissionNone, protocol.PermissionNone, err
 	}

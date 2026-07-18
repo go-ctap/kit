@@ -1,11 +1,72 @@
 package service
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 )
+
+func TestDeviceMetadataCacheRoundTrip(t *testing.T) {
+	cacheDir := t.TempDir()
+	metadata := report.DeviceMetadata{
+		Model:    "YubiKey 5",
+		Serial:   "1234567",
+		Firmware: "5.7.4",
+		Interfaces: []report.InterfaceReport{{
+			Interface: report.InterfaceUSB,
+			Enabled:   []report.Capability{report.CapabilityCTAP2},
+		}},
+	}
+
+	if err := writeDeviceMetadata(cacheDir, "fingerprint-1", metadata); err != nil {
+		t.Fatalf("write metadata: %v", err)
+	}
+	path := filepath.Join(cacheDir, "fingerprint-1", "info.json")
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("stat %s: %v", path, err)
+	}
+
+	cached, ok := readDeviceMetadata(cacheDir, "fingerprint-1")
+	if !ok || !deviceMetadataEqual(cached, metadata) {
+		t.Fatalf("cached metadata = %#v, ok = %v", cached, ok)
+	}
+}
+
+func TestRestoredDeviceMetadataSkipsProbe(t *testing.T) {
+	service := New()
+	service.deviceMetadataCacheDir = t.TempDir()
+	device := report.DeviceReport{
+		Fingerprint: "fingerprint-1",
+		Transport:   transport.ModeHID,
+		Vendor:      report.VendorYubico,
+	}
+	metadata := report.DeviceMetadata{Model: "YubiKey 5"}
+	if err := writeDeviceMetadata(service.deviceMetadataCacheDir, device.Fingerprint, metadata); err != nil {
+		t.Fatalf("write metadata: %v", err)
+	}
+
+	service.restoreDeviceMetadata([]report.DeviceReport{device})
+	if candidate, ok := takeEnrichmentCandidate(
+		[]report.DeviceReport{device},
+		service.enrichment.cache,
+		make(map[string]struct{}),
+	); ok {
+		t.Fatalf("cached device selected for probe: %#v", candidate)
+	}
+}
+
+func TestDeviceMetadataCacheRejectsUnsafeFingerprint(t *testing.T) {
+	cacheDir := t.TempDir()
+	if err := writeDeviceMetadata(cacheDir, "../outside", report.DeviceMetadata{Model: "unsafe"}); err != nil {
+		t.Fatalf("write unsafe fingerprint: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(cacheDir, "outside", "info.json")); !os.IsNotExist(err) {
+		t.Fatalf("unsafe cache path exists or stat failed unexpectedly: %v", err)
+	}
+}
 
 func TestTakeEnrichmentCandidateAttemptsAvailableKnownVendors(t *testing.T) {
 	cache := make(map[string]report.DeviceMetadata)

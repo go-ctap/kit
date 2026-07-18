@@ -10,6 +10,7 @@ import (
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
+	"github.com/google/uuid"
 )
 
 type selection struct {
@@ -72,8 +73,10 @@ func (s *Service) SetSelection(ctx context.Context, req SelectionRequest) (Selec
 		return SelectionSnapshot{}, err
 	}
 
-	if selected := s.currentSelection(); selected != nil && sameDevice(selected.device, device.report) {
-		snapshot := selected.snapshot()
+	if selected := s.currentSelection(); selected != nil &&
+		selected.device.Transport == device.report.Transport &&
+		selected.device.Fingerprint == device.report.Fingerprint {
+		snapshot := ActiveSelection{ID: selected.id}
 
 		return SelectionSnapshot{Selection: &snapshot}, nil
 	}
@@ -90,7 +93,7 @@ func (s *Service) SetSelection(ctx context.Context, req SelectionRequest) (Selec
 	s.selected = selected
 	s.mu.Unlock()
 
-	snapshot := selected.snapshot()
+	snapshot := ActiveSelection{ID: selected.id}
 
 	return SelectionSnapshot{Selection: &snapshot}, nil
 }
@@ -162,7 +165,7 @@ func (s *Service) openSelection(
 	req SelectionRequest,
 	device selectedDevice,
 ) (selected *selection, returnErr error) {
-	selectionID := newSelectionID()
+	selectionID := SelectionID(uuid.NewString())
 	started := time.Now()
 	defer func() {
 		entry := model.LogEntry{
@@ -173,7 +176,7 @@ func (s *Service) openSelection(
 			SelectionID: string(selectionID),
 		}
 		if selected != nil {
-			entry.Response = kitlog.Payload(kitlog.SafeValue(selected.snapshot()))
+			entry.Response = kitlog.Payload(kitlog.SafeValue(ActiveSelection{ID: selected.id}))
 		}
 		s.logs.Append(kitlog.Finish(entry, started, returnErr))
 	}()
@@ -206,7 +209,7 @@ func (s *Service) closeSelection(selected *selection) (returnErr error) {
 			Layer:       model.LogLayerSelection,
 			Code:        model.LogCodeSelectionClose,
 			Request:     kitlog.Payload(kitlog.SafeValue(map[string]any{"selectionId": selected.id})),
-			Response:    kitlog.Payload(kitlog.SafeValue(selected.snapshot())),
+			Response:    kitlog.Payload(kitlog.SafeValue(ActiveSelection{ID: selected.id})),
 			SelectionID: string(selected.id),
 		}, started, returnErr))
 	}()
@@ -225,10 +228,6 @@ func (s *Service) lockSelection(ctx context.Context) (func(), error) {
 	}
 }
 
-func (s *selection) snapshot() ActiveSelection {
-	return ActiveSelection{ID: s.id}
-}
-
 func (s *Service) cancelAndWait(selected *selection) {
 	s.mu.Lock()
 	operations := make([]*operationState, 0, len(selected.operations))
@@ -243,8 +242,4 @@ func (s *Service) cancelAndWait(selected *selection) {
 	for _, operation := range operations {
 		<-operation.done
 	}
-}
-
-func sameDevice(first report.DeviceReport, second report.DeviceReport) bool {
-	return first.Transport == second.Transport && first.Fingerprint == second.Fingerprint
 }

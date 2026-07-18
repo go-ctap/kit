@@ -17,12 +17,12 @@ func (r Runner) credentialStoreState(ctx context.Context) (appcredentials.StoreS
 	var state ctapauthenticator.PersistentCredentialStoreState
 	err := r.env.Tokens.Use(
 		ctx,
-		r.tokenProvider(),
+		r.env.Authenticator,
 		protocol.PermissionPersistentCredentialManagementReadOnly,
 		"",
 		func(token []byte) error {
 			var err error
-			state, err = r.credentialManager().GetPersistentCredentialStoreState(ctx, token)
+			state, err = r.env.Authenticator.GetPersistentCredentialStoreState(ctx, token)
 
 			return err
 		},

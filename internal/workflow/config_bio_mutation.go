@@ -15,7 +15,7 @@ import (
 func (r Runner) renameBio(ctx context.Context, req model.BioRenameOperation) (model.OperationResult, error) {
 	var output model.BioMutationOutput
 
-	status := r.statusReport()
+	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
 
 	mode := safety.PreviewModeExecute
 	if req.DryRun {
@@ -47,13 +47,13 @@ func (r Runner) renameBio(ctx context.Context, req model.BioRenameOperation) (mo
 		return output, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionBioEnrollment, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.env.Authenticator, protocol.PermissionBioEnrollment, "")
 	if err != nil {
 		return output, err
 	}
 	defer secret.Zero(token)
 
-	if err := r.bioEnrollmentManager().SetFriendlyName(ctx, token, templateID, req.FriendlyName); err != nil {
+	if err := r.env.Authenticator.SetFriendlyName(ctx, token, templateID, req.FriendlyName); err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 			failure.PhaseAuthenticatorCommand,
 			bioEnrollmentCommand(status),
@@ -76,7 +76,7 @@ func (r Runner) renameBio(ctx context.Context, req model.BioRenameOperation) (mo
 func (r Runner) removeBio(ctx context.Context, req model.BioRemoveOperation) (model.OperationResult, error) {
 	var output model.BioMutationOutput
 
-	status := r.statusReport()
+	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
 
 	mode := safety.PreviewModeExecute
 	if req.DryRun {
@@ -108,13 +108,13 @@ func (r Runner) removeBio(ctx context.Context, req model.BioRemoveOperation) (mo
 		return output, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), protocol.PermissionBioEnrollment, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.env.Authenticator, protocol.PermissionBioEnrollment, "")
 	if err != nil {
 		return output, err
 	}
 	defer secret.Zero(token)
 
-	err = r.bioEnrollmentManager().RemoveEnrollment(ctx, token, templateID)
+	err = r.env.Authenticator.RemoveEnrollment(ctx, token, templateID)
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 			failure.PhaseAuthenticatorCommand,

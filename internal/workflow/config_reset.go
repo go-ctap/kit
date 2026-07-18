@@ -14,7 +14,7 @@ import (
 func (r Runner) resetFactory(ctx context.Context, req model.ResetFactoryOperation) (model.OperationResult, error) {
 	var output model.ResetFactoryOutput
 
-	status := r.statusReport()
+	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
 	preview := appconfig.BuildResetFactoryPreview(status)
 
 	output.Preview = preview
@@ -44,7 +44,7 @@ func (r Runner) resetFactory(ctx context.Context, req model.ResetFactoryOperatio
 		return output, err
 	}
 
-	err := r.configManager().Reset(ctx)
+	err := r.env.Authenticator.Reset(ctx)
 	r.env.Tokens.Invalidate()
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCommand(

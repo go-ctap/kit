@@ -16,7 +16,7 @@ import (
 )
 
 func (r Runner) listLargeBlobs(ctx context.Context, req model.ListLargeBlobsOperation) (applargeblobs.ListReport, error) {
-	inventory, err := r.freshCredentialInventoryReport(ctx, protocol.PermissionNone)
+	inventory, err := r.credentialInventoryReport(ctx, protocol.PermissionNone)
 	if err != nil {
 		return applargeblobs.ListReport{}, err
 	}
@@ -52,8 +52,7 @@ func (r Runner) listLargeBlobsFromInventory(
 		return applargeblobs.ListReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseDiscovery))
 	}
 
-	authenticator := r.largeBlobManager()
-	support := buildLargeBlobSupportReport(authenticator.GetInfo())
+	support := buildLargeBlobSupportReport(r.env.Authenticator.GetInfo())
 	report := applargeblobs.ListReport{
 		Device:  r.env.Selected,
 		Support: support,

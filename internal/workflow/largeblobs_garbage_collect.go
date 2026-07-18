@@ -66,13 +66,13 @@ func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageC
 		return output, nil
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), mutationPermission, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.env.Authenticator, mutationPermission, "")
 	if err != nil {
 		return output, err
 	}
 	defer secret.Zero(token)
 
-	err = r.largeBlobManager().SetLargeBlobs(ctx, token, state.replacement)
+	err = r.env.Authenticator.SetLargeBlobs(ctx, token, state.replacement)
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,
@@ -89,13 +89,13 @@ func (r Runner) loadGarbageCollectState(
 	ctx context.Context,
 	grantPermission protocol.Permission,
 ) (garbageCollectState, error) {
-	inventory, err := r.readCredentialInventoryReportWithGrant(ctx, grantPermission)
+	inventory, err := r.credentialInventoryReport(ctx, grantPermission)
 	if err != nil {
 		return garbageCollectState{}, err
 	}
 	defer zeroCredentialInventoryReport(&inventory)
 
-	support := buildLargeBlobSupportReport(r.largeBlobManager().GetInfo())
+	support := buildLargeBlobSupportReport(r.env.Authenticator.GetInfo())
 	if !support.LargeBlobs {
 		return garbageCollectState{}, failure.New(failure.CodeLargeBlobUnsupported,
 			failure.WithPhase(failure.PhaseDiscovery),

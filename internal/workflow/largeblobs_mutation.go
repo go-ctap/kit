@@ -20,7 +20,7 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 		return output, err
 	}
 
-	inventory, err := r.readCredentialInventoryReportWithGrant(
+	inventory, err := r.credentialInventoryReport(
 		ctx,
 		inventoryPermission,
 	)
@@ -65,13 +65,13 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 		return output, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), mutationPermission, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.env.Authenticator, mutationPermission, "")
 	if err != nil {
 		return output, err
 	}
 	defer secret.Zero(token)
 
-	err = r.largeBlobManager().SetLargeBlobs(ctx, token, replacement)
+	err = r.env.Authenticator.SetLargeBlobs(ctx, token, replacement)
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,
@@ -94,7 +94,7 @@ func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOp
 		return output, err
 	}
 
-	inventory, err := r.readCredentialInventoryReportWithGrant(
+	inventory, err := r.credentialInventoryReport(
 		ctx,
 		inventoryPermission,
 	)
@@ -142,13 +142,13 @@ func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOp
 		return output, nil
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), mutationPermission, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.env.Authenticator, mutationPermission, "")
 	if err != nil {
 		return output, err
 	}
 	defer secret.Zero(token)
 
-	err = r.largeBlobManager().SetLargeBlobs(ctx, token, replacement)
+	err = r.env.Authenticator.SetLargeBlobs(ctx, token, replacement)
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,

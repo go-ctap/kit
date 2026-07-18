@@ -127,6 +127,8 @@ func (s *Service) finishEnrichmentLocked() {
 }
 
 func (s *Service) applyEnrichment(device report.DeviceReport, metadata report.DeviceMetadata) {
+	s.persistDeviceMetadata(device.Fingerprint, metadata)
+
 	s.mu.Lock()
 	if s.closed || !deviceReportPresent(deviceReports(s.devices), device) {
 		s.mu.Unlock()

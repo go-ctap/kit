@@ -6,7 +6,6 @@ import (
 
 	ctapdevice "github.com/go-ctap/ctap/authenticator"
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
@@ -16,44 +15,12 @@ type Runner struct {
 	env Environment
 }
 
-func (r Runner) infoProvider() authenticator.InfoProvider {
-	return r.env.Authenticator
-}
-
-func (r Runner) tokenProvider() authenticator.TokenProvider {
-	return r.env.Authenticator
-}
-
-func (r Runner) credentialManager() authenticator.CredentialManager {
-	return r.env.Authenticator
-}
-
-func (r Runner) webAuthnManager() authenticator.WebAuthnManager {
-	return r.env.Authenticator
-}
-
-func (r Runner) largeBlobManager() authenticator.LargeBlobManager {
-	return r.env.Authenticator
-}
-
-func (r Runner) configManager() authenticator.ConfigManager {
-	return r.env.Authenticator
-}
-
-func (r Runner) bioEnrollmentManager() authenticator.BioEnrollmentManager {
-	return r.env.Authenticator
-}
-
 func Run(
 	ctx context.Context,
 	env Environment,
 	operation model.Operation,
 ) (model.OperationResult, error) {
-	return Runner{env: env}.runOperation(ctx, operation)
-}
-
-func (r Runner) runOperation(ctx context.Context, operation model.Operation) (model.OperationResult, error) {
-	return r.runOperationBody(ctx, operation)
+	return (Runner{env: env}).runOperationBody(ctx, operation)
 }
 
 func (r Runner) runWithOptionalToken(
@@ -70,7 +37,7 @@ func (r Runner) runWithOptionalToken(
 		return err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), permission, rpID)
+	token, err := r.env.Tokens.Acquire(ctx, r.env.Authenticator, permission, rpID)
 	if err != nil {
 		return err
 	}
@@ -86,7 +53,7 @@ func (r Runner) runOperationBody(ctx context.Context, operation model.Operation)
 
 		return model.InspectOutput{Result: result}, err
 	case model.ListCredentialsOperation:
-		result, err := r.listCredentials(ctx, req)
+		result, err := r.credentialInventoryReport(ctx, protocol.PermissionNone)
 
 		return model.CredentialsOutput{Report: result}, err
 	case model.CredentialStoreStateOperation:
@@ -102,11 +69,11 @@ func (r Runner) runOperationBody(ctx context.Context, operation model.Operation)
 
 		return model.LargeBlobListOutput{Report: result}, err
 	case model.ConfigStatusOperation:
-		result, err := r.configStatus(ctx)
+		result, err := r.statusWithRetries(ctx)
 
 		return model.ConfigStatusOutput{Report: result}, err
 	case model.BioSensorInfoOperation:
-		result, err := r.bioSensorInfo(ctx)
+		result, err := r.bioSensorReport(ctx)
 
 		return model.BioSensorOutput{Report: result}, err
 	case model.BioListOperation:

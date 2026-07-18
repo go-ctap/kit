@@ -14,7 +14,7 @@ import (
 func (r Runner) setAlwaysUV(ctx context.Context, req model.SetAlwaysUVOperation) (model.OperationResult, error) {
 	var output model.AuthenticatorConfigOutput
 
-	status := r.statusReport()
+	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
 
 	mode := safety.PreviewModeDryRun
 	if !req.DryRun {
@@ -42,7 +42,7 @@ func (r Runner) setAlwaysUV(ctx context.Context, req model.SetAlwaysUVOperation)
 	}
 
 	err = r.runWithOptionalToken(ctx, protocol.PermissionAuthenticatorConfiguration, "", func(token []byte) error {
-		return r.configManager().ToggleAlwaysUV(ctx, token)
+		return r.env.Authenticator.ToggleAlwaysUV(ctx, token)
 	})
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithConfigSubCommand(
@@ -62,7 +62,7 @@ func (r Runner) setAlwaysUV(ctx context.Context, req model.SetAlwaysUVOperation)
 func (r Runner) setMinPINLength(ctx context.Context, req model.SetMinPINLengthOperation) (model.OperationResult, error) {
 	var output model.AuthenticatorConfigOutput
 
-	status := r.statusReport()
+	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
 	minReq := appconfig.MinPINLengthRequest{
 		NewMinPINLength:     req.NewMinPINLength,
 		MinPINLengthRPIDs:   req.MinPINLengthRPIDs,
@@ -96,7 +96,7 @@ func (r Runner) setMinPINLength(ctx context.Context, req model.SetMinPINLengthOp
 	}
 
 	err = r.runWithOptionalToken(ctx, protocol.PermissionAuthenticatorConfiguration, "", func(token []byte) error {
-		return r.configManager().SetMinPINLength(ctx, token, protocol.SetMinPINLengthConfigSubCommandParams{
+		return r.env.Authenticator.SetMinPINLength(ctx, token, protocol.SetMinPINLengthConfigSubCommandParams{
 			NewMinPINLength:     req.NewMinPINLength,
 			MinPINLengthRPIDs:   req.MinPINLengthRPIDs,
 			ForceChangePIN:      req.ForceChangePIN,

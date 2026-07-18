@@ -45,10 +45,10 @@ func (s *Service) mergeInspectMetadata(selectionID SelectionID, result *model.In
 	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	selected := s.selected
 	if selected == nil || selected.id != selectionID {
+		s.mu.Unlock()
+
 		return nil
 	}
 
@@ -59,11 +59,13 @@ func (s *Service) mergeInspectMetadata(selectionID SelectionID, result *model.In
 			metadata := cloneDeviceMetadata(cached)
 			result.Result.Device.Metadata = &metadata
 		}
+		s.mu.Unlock()
 
 		return nil
 	}
 
 	metadata := cloneDeviceMetadata(*result.Result.Device.Metadata)
+	fingerprint := selected.device.Fingerprint
 	changed := !cachedOK || !deviceMetadataEqual(cached, metadata)
 	s.enrichment.cache[key] = metadata
 
@@ -71,11 +73,14 @@ func (s *Service) mergeInspectMetadata(selectionID SelectionID, result *model.In
 	selected.device.Metadata = &selectionMetadata
 	resultMetadata := cloneDeviceMetadata(metadata)
 	result.Result.Device.Metadata = &resultMetadata
-	if !changed {
-		return nil
+	var snapshot *DiscoverySnapshot
+	if changed {
+		snapshot = &DiscoverySnapshot{Devices: s.deviceReportsWithMetadataLocked(s.devices)}
 	}
+	s.mu.Unlock()
 
-	return &DiscoverySnapshot{Devices: s.deviceReportsWithMetadataLocked(s.devices)}
+	s.persistDeviceMetadata(fingerprint, metadata)
+	return snapshot
 }
 
 func (s *Service) pruneEnrichmentCacheLocked(devices []ctapkit.Device) {

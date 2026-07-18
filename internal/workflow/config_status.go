@@ -7,30 +7,16 @@ import (
 	"github.com/go-ctap/kit/internal/errornorm"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
-	"github.com/go-ctap/kit/model/report"
 )
-
-func (r Runner) configStatus(ctx context.Context) (appconfig.StatusReport, error) {
-	return r.statusWithRetries(ctx)
-}
-
-func (r Runner) statusReport() appconfig.StatusReport {
-	return buildStatusReport(r.env.Selected, r.infoProvider().GetInfo())
-}
-
-func buildStatusReport(selected report.DeviceReport, info protocol.AuthenticatorGetInfoResponse) appconfig.StatusReport {
-	return appconfig.BuildStatusReport(selected, info)
-}
 
 func (r Runner) statusWithRetries(ctx context.Context) (appconfig.StatusReport, error) {
 	if err := ctx.Err(); err != nil {
 		return appconfig.StatusReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseAuthenticatorCommand))
 	}
 
-	authenticator := r.configManager()
-	rep := r.statusReport()
+	rep := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
 	if rep.PIN.Supported {
-		retries, powerCycle, err := authenticator.GetPINRetries(ctx)
+		retries, powerCycle, err := r.env.Authenticator.GetPINRetries(ctx)
 		rep.PIN.Retries = retryState(
 			retries,
 			powerCycle,
@@ -42,7 +28,7 @@ func (r Runner) statusWithRetries(ctx context.Context) (appconfig.StatusReport, 
 	if rep.UV.Supported &&
 		rep.UV.Configured != nil &&
 		*rep.UV.Configured {
-		retries, err := authenticator.GetUVRetries(ctx)
+		retries, err := r.env.Authenticator.GetUVRetries(ctx)
 		rep.UV.Retries = retryState(
 			retries,
 			nil,

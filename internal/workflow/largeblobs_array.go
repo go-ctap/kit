@@ -53,7 +53,7 @@ func checkSerializedArrayLimit(limit uint, size int) error {
 }
 
 func (r Runner) readLargeBlobArray(ctx context.Context) ([]protocol.LargeBlob, error) {
-	blobs, err := r.largeBlobManager().GetLargeBlobs(ctx)
+	blobs, err := r.env.Authenticator.GetLargeBlobs(ctx)
 	if err != nil {
 		return nil, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,

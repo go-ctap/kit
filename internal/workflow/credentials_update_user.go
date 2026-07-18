@@ -23,7 +23,7 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 		return output, err
 	}
 
-	report, err := r.readCredentialInventoryReportWithGrant(
+	report, err := r.credentialInventoryReport(
 		ctx,
 		inventoryPermission,
 	)
@@ -93,7 +93,7 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 
 	token, err := r.env.Tokens.Acquire(
 		ctx,
-		r.tokenProvider(),
+		r.env.Authenticator,
 		mutationPermission,
 		r.credentialMutationRPID(publicTarget),
 	)
@@ -102,11 +102,11 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 	}
 	defer secret.Zero(token)
 
-	err = r.credentialManager().UpdateUserInformation(ctx, token, descriptor, updatedUser)
+	err = r.env.Authenticator.UpdateUserInformation(ctx, token, descriptor, updatedUser)
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 			failure.PhaseAuthenticatorCommand,
-			credentialManagementCommand(r.infoProvider().GetInfo()),
+			credentialManagementCommand(r.env.Authenticator.GetInfo()),
 			protocol.CredentialManagementSubCommandUpdateUserInformation,
 		))
 	}

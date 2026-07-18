@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/go-ctap/ctap/crypto"
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
@@ -15,7 +16,7 @@ import (
 )
 
 func (r Runner) readLargeBlob(ctx context.Context, req model.ReadLargeBlobOperation) (applargeblobs.ReadReport, error) {
-	report, err := r.readCredentialInventoryReport(ctx)
+	report, err := r.credentialInventoryReport(ctx, protocol.PermissionNone)
 	if err != nil {
 		return applargeblobs.ReadReport{}, err
 	}
@@ -41,8 +42,7 @@ func (r Runner) readLargeBlobFromInventory(
 		return applargeblobs.ReadReport{}, err
 	}
 
-	authenticator := r.largeBlobManager()
-	support := buildLargeBlobSupportReport(authenticator.GetInfo())
+	support := buildLargeBlobSupportReport(r.env.Authenticator.GetInfo())
 	result := applargeblobs.ReadReport{
 		Device:  r.env.Selected,
 		Support: support,

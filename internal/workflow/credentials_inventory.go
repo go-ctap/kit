@@ -17,29 +17,11 @@ import (
 	"github.com/samber/lo"
 )
 
-func (r Runner) listCredentials(
-	ctx context.Context,
-	_ model.ListCredentialsOperation,
-) (appcredentials.InventoryReport, error) {
-	return r.freshCredentialInventoryReport(ctx, protocol.PermissionNone)
-}
-
-func (r Runner) readCredentialInventoryReport(ctx context.Context) (appcredentials.InventoryReport, error) {
-	return r.freshCredentialInventoryReport(ctx, protocol.PermissionNone)
-}
-
-func (r Runner) readCredentialInventoryReportWithGrant(
+func (r Runner) credentialInventoryReport(
 	ctx context.Context,
 	grantPermission protocol.Permission,
 ) (appcredentials.InventoryReport, error) {
-	return r.freshCredentialInventoryReport(ctx, grantPermission)
-}
-
-func (r Runner) freshCredentialInventoryReport(
-	ctx context.Context,
-	grantPermission protocol.Permission,
-) (appcredentials.InventoryReport, error) {
-	permission, err := inventoryPermission(r.infoProvider().GetInfo())
+	permission, err := inventoryPermission(r.env.Authenticator.GetInfo())
 	if err != nil {
 		return appcredentials.InventoryReport{}, err
 	}
@@ -54,7 +36,7 @@ func (r Runner) freshCredentialInventoryReport(
 	}
 
 	var report appcredentials.InventoryReport
-	err = r.env.Tokens.Use(ctx, r.tokenProvider(), grantPermission, "", func(token []byte) error {
+	err = r.env.Tokens.Use(ctx, r.env.Authenticator, grantPermission, "", func(token []byte) error {
 		current, err := r.buildCredentialInventoryReport(ctx, token, permission)
 		if err != nil {
 			return err
@@ -97,7 +79,7 @@ func (r Runner) buildCredentialInventoryReport(
 		return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseMetadata))
 	}
 
-	authenticator := r.credentialManager()
+	authenticator := r.env.Authenticator
 	info := authenticator.GetInfo()
 
 	metadata, err := authenticator.GetCredsMetadata(ctx, token)

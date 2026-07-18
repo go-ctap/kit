@@ -34,8 +34,7 @@ func (r Runner) loadTargetBlobState(
 		return targetBlobState{}, err
 	}
 
-	authenticator := r.largeBlobManager()
-	support := buildLargeBlobSupportReport(authenticator.GetInfo())
+	support := buildLargeBlobSupportReport(r.env.Authenticator.GetInfo())
 	if !support.LargeBlobs {
 		return targetBlobState{}, failure.New(failure.CodeLargeBlobUnsupported,
 			failure.WithPhase(failure.PhaseDiscovery),

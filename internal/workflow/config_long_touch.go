@@ -18,7 +18,7 @@ func (r Runner) enableLongTouchForReset(ctx context.Context, req model.EnableLon
 	if !req.DryRun {
 		mode = safety.PreviewModeExecute
 	}
-	preview, err := appconfig.BuildEnableLongTouchForResetPreview(r.statusReport(), mode)
+	preview, err := appconfig.BuildEnableLongTouchForResetPreview(appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo()), mode)
 	if err != nil {
 		return output, err
 	}
@@ -38,7 +38,7 @@ func (r Runner) enableLongTouchForReset(ctx context.Context, req model.EnableLon
 	}
 
 	err = r.runWithOptionalToken(ctx, protocol.PermissionAuthenticatorConfiguration, "", func(token []byte) error {
-		return r.configManager().EnableLongTouchForReset(ctx, token)
+		return r.env.Authenticator.EnableLongTouchForReset(ctx, token)
 	})
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithConfigSubCommand(

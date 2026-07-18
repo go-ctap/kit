@@ -23,19 +23,21 @@ type EventEmitter interface {
 type Option func(*Service)
 
 type Service struct {
-	mu                sync.Mutex
-	emitter           EventEmitter
-	strictPermissions bool
-	closed            bool
-	lastDiscoverMode  transport.Mode
-	monitorCancel     context.CancelFunc
-	monitorDone       chan struct{}
-	scanDevices       func(context.Context, transport.Mode) ([]ctapkit.Device, error)
-	openMonitor       func(context.Context, transport.Mode) (<-chan ctapdiscover.Event, error)
-	resolveDevice     func([]ctapkit.Device, string) (selectedDevice, error)
-	openAuthenticator openAuthenticatorFunc
-	enrichment        discoveryEnrichment
-	selectionGate     chan struct{}
+	mu                     sync.Mutex
+	deviceMetadataCacheMu  sync.Mutex
+	emitter                EventEmitter
+	strictPermissions      bool
+	closed                 bool
+	lastDiscoverMode       transport.Mode
+	monitorCancel          context.CancelFunc
+	monitorDone            chan struct{}
+	scanDevices            func(context.Context, transport.Mode) ([]ctapkit.Device, error)
+	openMonitor            func(context.Context, transport.Mode) (<-chan ctapdiscover.Event, error)
+	resolveDevice          func([]ctapkit.Device, string) (selectedDevice, error)
+	openAuthenticator      openAuthenticatorFunc
+	enrichment             discoveryEnrichment
+	deviceMetadataCacheDir string
+	selectionGate          chan struct{}
 
 	devices      []ctapkit.Device
 	selected     *selection
@@ -78,9 +80,10 @@ func New(opts ...Option) *Service {
 		) (authenticatorRuntime, error) {
 			return ctapkit.OpenAuthenticator(ctx, device, opts...)
 		},
-		enrichment:    newDiscoveryEnrichment(),
-		selectionGate: make(chan struct{}, 1),
-		logs:          ctapkit.NewLogJournal(),
+		enrichment:             newDiscoveryEnrichment(),
+		deviceMetadataCacheDir: defaultDeviceMetadataCacheDir(),
+		selectionGate:          make(chan struct{}, 1),
+		logs:                   ctapkit.NewLogJournal(),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -117,7 +120,7 @@ func (s *Service) Discover(ctx context.Context, req DiscoverRequest) (DiscoveryS
 }
 
 func (s *Service) runOperation(ctx context.Context, req OperationRequest, operation model.Operation) (envelope operationEnvelope, returnErr error) {
-	operationID := newOperationID()
+	operationID := OperationID(uuid.NewString())
 	request := operationRequestLogValue(req, operation)
 	started := time.Now()
 	var operationErr error
@@ -428,7 +431,7 @@ func (h interactionHandler) RequestInteraction(req model.InteractionRequest) (an
 	request := interactionRequestLogValue(req)
 	requestStarted := time.Now()
 	prompt := InteractionPrompt{
-		InteractionID: newInteractionID(),
+		InteractionID: InteractionID(uuid.NewString()),
 		OperationID:   h.operationID,
 		SelectionID:   h.selectionID,
 		Request:       req,
@@ -506,16 +509,4 @@ func deviceReports(devices []ctapkit.Device) []report.DeviceReport {
 	}
 
 	return reports
-}
-
-func newSelectionID() SelectionID {
-	return SelectionID(uuid.NewString())
-}
-
-func newOperationID() OperationID {
-	return OperationID(uuid.NewString())
-}
-
-func newInteractionID() InteractionID {
-	return InteractionID(uuid.NewString())
 }
