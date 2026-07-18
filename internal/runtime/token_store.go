@@ -62,6 +62,7 @@ func (s *TokenStore) InvalidateTokenUnlessPermission(permission protocol.Permiss
 	if s.secret == nil {
 		return
 	}
+
 	if permission == protocol.PermissionPersistentCredentialManagementReadOnly &&
 		s.key.Permission != permission {
 		s.invalidateLocked()

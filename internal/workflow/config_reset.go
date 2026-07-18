@@ -18,6 +18,7 @@ func (r Runner) resetFactory(ctx context.Context, req model.ResetFactoryOperatio
 	preview := appconfig.BuildResetFactoryPreview(status)
 
 	output.Preview = preview
+
 	if req.DryRun {
 		preview.Mode = safety.PreviewModeDryRun
 		output.Preview = preview
@@ -46,6 +47,7 @@ func (r Runner) resetFactory(ctx context.Context, req model.ResetFactoryOperatio
 
 	err := r.env.Authenticator.Reset(ctx)
 	r.env.Tokens.Invalidate()
+
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,

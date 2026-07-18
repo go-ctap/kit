@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	ctapkit "github.com/go-ctap/kit"
 	kitlog "github.com/go-ctap/kit/internal/logging"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
@@ -17,6 +16,7 @@ func (s *Service) discoverSnapshot(ctx context.Context, req DiscoverRequest) (Di
 	if err != nil {
 		return DiscoverySnapshot{}, err
 	}
+
 	if result.snapshot == nil {
 		return DiscoverySnapshot{}, result.err
 	}
@@ -59,6 +59,7 @@ func (s *Service) reconcileTopology(
 
 	if force || result.changed || envelope.Error != nil {
 		s.emit(EventDiscoveryChanged, envelope)
+
 		entry := model.LogEntry{
 			Timestamp:    time.Now().UTC(),
 			Layer:        model.LogLayerService,
@@ -70,12 +71,15 @@ func (s *Service) reconcileTopology(
 			Error:        envelope.Error,
 			ErrorMessage: kitlog.TransportErrorMessage(result.err),
 		}
+
 		if envelope.Error != nil {
 			entry.Level = model.LogLevelError
 			entry.Outcome = model.LogOutcomeFailed
 		}
+
 		s.logs.Append(entry)
 	}
+
 	if result.snapshot != nil {
 		s.startEnrichment()
 	}
@@ -99,7 +103,7 @@ func (s *Service) updateDiscovery(
 	}
 
 	s.mu.Lock()
-	previousDevices := append([]ctapkit.Device(nil), s.devices...)
+	previousDevices := s.devices
 	s.mu.Unlock()
 	previousReports := s.deviceReportsWithMetadata(previousDevices)
 
@@ -114,6 +118,7 @@ func (s *Service) updateDiscovery(
 		s.restoreDeviceMetadata(deviceReports(devices))
 		nextReports = s.deviceReportsWithMetadata(devices)
 	}
+
 	releaseSelection, err := s.lockSelection(ctx)
 	if err != nil {
 		return result, err
@@ -126,6 +131,7 @@ func (s *Service) updateDiscovery(
 
 		return result, closedServiceError(failure.PhaseDiscovery)
 	}
+
 	var affected *selection
 	if authoritative {
 		s.pruneEnrichmentCacheLocked(devices)
@@ -139,10 +145,12 @@ func (s *Service) updateDiscovery(
 	if affected != nil {
 		closeErr = s.closeSelection(affected)
 	}
+
 	result.err = scanErr
 	if result.err == nil {
 		result.err = closeErr
 	}
+
 	if authoritative {
 		snapshot := DiscoverySnapshot{Devices: nextReports}
 		result.snapshot = &snapshot

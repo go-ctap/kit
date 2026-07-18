@@ -125,6 +125,7 @@ func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {
 			if !failure.IsCode(err, tt.wantCode) {
 				t.Fatalf("NormalizeMakeCredentialInput error = %v, want %s", err, tt.wantCode)
 			}
+
 			if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
 				t.Fatalf("NormalizeMakeCredentialInput phase = %q, want %q", got, failure.PhaseValidation)
 			}
@@ -168,6 +169,7 @@ func TestNormalizeInputsTrimAndDefaultCredentialTypes(t *testing.T) {
 	if input.PubKeyCredParams[0].Type != PublicKeyCredentialTypePublicKey {
 		t.Fatalf("param type = %q, want public-key", input.PubKeyCredParams[0].Type)
 	}
+
 	if input.PubKeyCredParams[1].Type != "future-key" {
 		t.Fatalf("param type = %q, want future-key", input.PubKeyCredParams[1].Type)
 	}
@@ -176,6 +178,7 @@ func TestNormalizeInputsTrimAndDefaultCredentialTypes(t *testing.T) {
 		!bytes.Equal(input.ExcludeList[0].ID, credentialID) {
 		t.Fatalf("exclude descriptor = %#v, want default public-key with original id", input.ExcludeList[0])
 	}
+
 	if !slices.Equal(input.AttestationFormatsPreference, formats) {
 		t.Fatalf("attestation formats = %#v, want original formats", input.AttestationFormatsPreference)
 	}
@@ -192,6 +195,7 @@ func TestNormalizeGetAssertionInputValidatesAllowListID(t *testing.T) {
 	if !failure.IsCode(err, failure.CodeCredentialIDRequired) {
 		t.Fatalf("NormalizeGetAssertionInput error = %v, want %s", err, failure.CodeCredentialIDRequired)
 	}
+
 	if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
 		t.Fatalf("NormalizeGetAssertionInput phase = %q, want %q", got, failure.PhaseValidation)
 	}
@@ -225,6 +229,7 @@ func TestNormalizeGetAssertionInputRequiresCoreFields(t *testing.T) {
 			if !failure.IsCode(err, tt.wantCode) {
 				t.Fatalf("NormalizeGetAssertionInput error = %v, want %s", err, tt.wantCode)
 			}
+
 			if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
 				t.Fatalf("NormalizeGetAssertionInput phase = %q, want %q", got, failure.PhaseValidation)
 			}

@@ -21,10 +21,12 @@ func TestWebAuthnExtensionJSONUsesLevel3Shapes(t *testing.T) {
 			Eval: ctapwebauthn.AuthenticationExtensionsPRFValues{First: []byte("first")},
 		}},
 	}
+
 	raw, err := json.Marshal(input)
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
+
 	for _, want := range []string{`"credProps":true`, `"prf":{"eval":{"first":"Zmlyc3Q="}}`} {
 		if !bytes.Contains(raw, []byte(want)) {
 			t.Fatalf("JSON = %s, want %s", raw, want)
@@ -46,6 +48,7 @@ func TestBuildWebAuthnPreviewsKeepRawWarningsAndPRFSemantics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildMakeCredentialPreview: %v", err)
 	}
+
 	if len(makePreview.Warnings) != 4 || makePreview.Warnings[3].Code != "webauthn.extension.prf.not_advertised" {
 		t.Fatalf("Make warnings = %#v, want mutation plus raw and PRF warnings", makePreview.Warnings)
 	}
@@ -55,6 +58,7 @@ func TestBuildWebAuthnPreviewsKeepRawWarningsAndPRFSemantics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildMakeCredentialPreview with PRF support: %v", err)
 	}
+
 	for _, warning := range supportedPreview.Warnings {
 		if warning.Code == "webauthn.extension.prf.not_advertised" {
 			t.Fatalf("Make warnings = %#v, hmac-secret advertises PRF support", supportedPreview.Warnings)
@@ -69,6 +73,7 @@ func TestBuildWebAuthnPreviewsKeepRawWarningsAndPRFSemantics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildGetAssertionPreview: %v", err)
 	}
+
 	if len(getPreview.Warnings) != 0 {
 		t.Fatalf("Get warnings = %#v, want no warning for an empty PRF request", getPreview.Warnings)
 	}
@@ -85,6 +90,7 @@ func TestBuildMakeCredentialPreviewDefersCredentialBlobLimitToCTAP(t *testing.T)
 	if err != nil {
 		t.Fatalf("BuildMakeCredentialPreview: %v", err)
 	}
+
 	if got := string(preview.Input.Extensions.CredBlob); got != "four" {
 		t.Fatalf("credential blob = %q, want preserved for ctap validation", got)
 	}

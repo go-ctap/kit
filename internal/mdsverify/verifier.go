@@ -66,6 +66,7 @@ func (v *Verifier) Verify(ctx context.Context, raw []byte) (*Blob, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrVerify, err)
 	}
+
 	if !token.Valid {
 		return nil, fmt.Errorf("%w: invalid JWT signature", ErrVerify)
 	}
@@ -74,9 +75,11 @@ func (v *Verifier) Verify(ctx context.Context, raw []byte) (*Blob, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if claims.Number == nil {
 		return nil, fmt.Errorf("%w: missing required payload field no", ErrVerify)
 	}
+
 	if claims.Entries == nil {
 		return nil, fmt.Errorf("%w: missing required payload field entries", ErrVerify)
 	}
@@ -93,17 +96,20 @@ func (v *Verifier) signingKey(ctx context.Context, token *jwt.Token) (any, error
 	if err != nil {
 		return nil, err
 	}
+
 	if len(certs) == 0 {
 		anchors, err := v.trustAnchors()
 		if err != nil {
 			return nil, err
 		}
+
 		if len(anchors) != 1 {
 			return nil, fmt.Errorf("%w: exactly one trust anchor is required when JWT header has neither x5u nor x5c", ErrVerify)
 		}
 
 		return anchors[0].PublicKey, nil
 	}
+
 	if err := v.verifyCertificateChain(ctx, certs); err != nil {
 		return nil, err
 	}
@@ -125,6 +131,7 @@ func (v *Verifier) headerCertificates(ctx context.Context, token *jwt.Token) ([]
 	if !ok {
 		return nil, nil
 	}
+
 	if len(rawValues) == 0 {
 		return nil, fmt.Errorf("%w: x5c certificate chain is empty", ErrVerify)
 	}
@@ -156,13 +163,16 @@ func (v *Verifier) fetchX5UCertificates(ctx context.Context, rawURL string) ([]*
 	if err != nil {
 		return nil, fmt.Errorf("%w: parse metadata source URL: %w", ErrVerify, err)
 	}
+
 	certURL, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, fmt.Errorf("%w: parse x5u certificate URL: %w", ErrVerify, err)
 	}
+
 	if !certURL.IsAbs() || certURL.Fragment != "" {
 		return nil, fmt.Errorf("%w: x5u certificate URL must be absolute and must not include a fragment", ErrVerify)
 	}
+
 	if !sameWebOrigin(sourceURL, certURL) {
 		return nil, fmt.Errorf("%w: x5u certificate URL must have the same web origin as the metadata source", ErrVerify)
 	}
@@ -219,6 +229,7 @@ func (v *Verifier) verifyCertificateChain(ctx context.Context, certs []*x509.Cer
 	if err != nil {
 		return fmt.Errorf("%w: certificate chain: %w", ErrVerify, err)
 	}
+
 	if len(chains) == 0 {
 		return fmt.Errorf("%w: certificate chain verification returned no chains", ErrVerify)
 	}
@@ -248,6 +259,7 @@ func (v *Verifier) verifyCertificateNotRevoked(ctx context.Context, cert, issuer
 			lastErr = err
 			continue
 		}
+
 		if err := crl.CheckSignatureFrom(issuer); err != nil {
 			lastErr = fmt.Errorf("%w: CRL signature for certificate %s: %w", ErrVerify, cert.Subject.String(), err)
 			continue
@@ -257,6 +269,7 @@ func (v *Verifier) verifyCertificateNotRevoked(ctx context.Context, cert, issuer
 		if now.Before(crl.ThisUpdate) {
 			return fmt.Errorf("%w: CRL for certificate %s is not valid yet", ErrVerify, cert.Subject.String())
 		}
+
 		if !crl.NextUpdate.IsZero() && now.After(crl.NextUpdate) {
 			return fmt.Errorf("%w: CRL for certificate %s is expired", ErrVerify, cert.Subject.String())
 		}
@@ -269,6 +282,7 @@ func (v *Verifier) verifyCertificateNotRevoked(ctx context.Context, cert, issuer
 
 		return nil
 	}
+
 	if lastErr != nil {
 		return lastErr
 	}
@@ -281,9 +295,11 @@ func (v *Verifier) fetchRevocationList(ctx context.Context, rawURL string) (*x50
 	if err != nil {
 		return nil, fmt.Errorf("%w: parse CRL URL: %w", ErrVerify, err)
 	}
+
 	if !crlURL.IsAbs() || crlURL.Fragment != "" {
 		return nil, fmt.Errorf("%w: CRL URL must be absolute and must not include a fragment", ErrVerify)
 	}
+
 	scheme := strings.ToLower(crlURL.Scheme)
 	if scheme != "http" && scheme != "https" {
 		return nil, fmt.Errorf("%w: unsupported CRL URL scheme %q", ErrVerify, crlURL.Scheme)
@@ -308,6 +324,7 @@ func (v *Verifier) fetchRevocationList(ctx context.Context, rawURL string) (*x50
 	if err != nil {
 		return nil, fmt.Errorf("%w: read CRL: %w", ErrVerify, err)
 	}
+
 	if block, _ := pem.Decode(body); block != nil {
 		body = block.Bytes
 	}
@@ -331,6 +348,7 @@ func (v *Verifier) trustAnchors() ([]*x509.Certificate, error) {
 			anchors = append(anchors, anchor)
 		}
 	}
+
 	if len(anchors) == 0 {
 		return nil, fmt.Errorf("%w: trust anchor set is empty", ErrVerify)
 	}
@@ -381,9 +399,11 @@ func tokenIssuedAt(rawHeader any, payloadIssuedAt *jwt.NumericDate) (time.Time, 
 	if err != nil {
 		return time.Time{}, err
 	}
+
 	if !headerIssuedAt.IsZero() {
 		return headerIssuedAt, nil
 	}
+
 	if payloadIssuedAt != nil {
 		return payloadIssuedAt.Time.UTC(), nil
 	}
@@ -434,6 +454,7 @@ func parseCertificateChain(data []byte) ([]*x509.Certificate, error) {
 		if block == nil {
 			break
 		}
+
 		rest = remaining
 		if block.Type != "CERTIFICATE" {
 			continue
@@ -445,6 +466,7 @@ func parseCertificateChain(data []byte) ([]*x509.Certificate, error) {
 		}
 		certs = append(certs, cert)
 	}
+
 	if len(certs) > 0 {
 		return certs, nil
 	}
@@ -453,6 +475,7 @@ func parseCertificateChain(data []byte) ([]*x509.Certificate, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: parse certificate chain: %w", ErrVerify, err)
 	}
+
 	if len(derCerts) == 0 {
 		return nil, fmt.Errorf("%w: certificate chain is empty", ErrVerify)
 	}
@@ -466,6 +489,7 @@ func readLimited(r io.Reader, limit int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if n > limit {
 		return nil, fmt.Errorf("object exceeds %d bytes", limit)
 	}
@@ -483,6 +507,7 @@ func originPort(u *url.URL) string {
 	if port := u.Port(); port != "" {
 		return port
 	}
+
 	switch strings.ToLower(u.Scheme) {
 	case "http":
 		return "80"

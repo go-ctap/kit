@@ -38,6 +38,7 @@ func DecodeLargeBlob(raw []byte, blobPresent bool, mode DecodeMode) DecodeStatus
 		Requested: mode != DecodeModeNone,
 		Mode:      mode,
 	}
+
 	if !status.Requested {
 		return status
 	}

@@ -30,6 +30,7 @@ func TestCanProbe(t *testing.T) {
 	if !CanProbe(report.DeviceReport{Vendor: report.VendorYubico}) {
 		t.Fatal("Yubico probe is unavailable")
 	}
+
 	if !CanProbe(report.DeviceReport{Vendor: report.VendorToken2}) {
 		t.Fatal("Token2 probe is unavailable")
 	}
@@ -56,9 +57,11 @@ func TestEnrichYubicoNormalizesMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Enrich: %v", err)
 	}
+
 	if metadata.Model != "YubiKey 5C NFC" || metadata.Serial != "12345678" || metadata.Firmware != "5.7.1" {
 		t.Fatalf("metadata = %#v", metadata)
 	}
+
 	if len(metadata.Interfaces) != 2 {
 		t.Fatalf("interfaces = %#v", metadata.Interfaces)
 	}
@@ -87,6 +90,7 @@ func TestEnrichYubicoPropagatesContext(t *testing.T) {
 	if _, err := Enrich(ctx, report.DeviceReport{Vendor: report.VendorYubico}, provider); err != nil {
 		t.Fatalf("Enrich: %v", err)
 	}
+
 	if got := provider.ctx.Value(contextKey{}); got != marker {
 		t.Fatalf("provider context value = %v, want marker", got)
 	}
@@ -276,6 +280,7 @@ func TestEnrichYubicoIgnoresKnownInvalidNFCMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Enrich: %v", err)
 	}
+
 	if metadata.Model != "YubiKey 5C" || len(metadata.Interfaces) != 1 {
 		t.Fatalf("metadata = %#v", metadata)
 	}
@@ -306,9 +311,11 @@ func (p *fakeYubicoProvider) GetYubiKeyDeviceInfo(ctx context.Context) (yubico.D
 
 func assertCapabilities(t *testing.T, got, want []report.Capability) {
 	t.Helper()
+
 	if len(got) != len(want) {
 		t.Fatalf("capabilities = %v, want %v", got, want)
 	}
+
 	for index := range want {
 		if got[index] != want[index] {
 			t.Fatalf("capabilities = %v, want %v", got, want)

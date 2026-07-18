@@ -42,22 +42,22 @@ func canonicalCTAP(detail *CTAPDetail) *CTAPDetail {
 		return nil
 	}
 
-	canonical := cloneCTAP(detail)
-	command := protocol.Command(canonical.CommandCode)
-	canonical.Command, _ = command.Name()
-	canonical.Status, _ = ctaptransport.StatusCode(canonical.StatusCode).Name()
-	canonical.SubCommandFamily = ""
-	canonical.SubCommand = ""
-	if canonical.SubCommandCode == nil {
-		return canonical
+	command := protocol.Command(detail.CommandCode)
+	detail.Command, _ = command.Name()
+	detail.Status, _ = ctaptransport.StatusCode(detail.StatusCode).Name()
+	detail.SubCommandFamily = ""
+	detail.SubCommand = ""
+
+	if detail.SubCommandCode == nil {
+		return detail
 	}
 
-	canonical.SubCommandFamily, canonical.SubCommand = canonicalSubCommand(
+	detail.SubCommandFamily, detail.SubCommand = canonicalSubCommand(
 		command,
-		*canonical.SubCommandCode,
+		*detail.SubCommandCode,
 	)
 
-	return canonical
+	return detail
 }
 
 func canonicalSubCommand(command protocol.Command, value uint64) (string, string) {

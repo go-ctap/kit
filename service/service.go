@@ -85,11 +85,13 @@ func New(opts ...Option) *Service {
 		selectionGate:          make(chan struct{}, 1),
 		logs:                   ctapkit.NewLogJournal(),
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt(service)
 		}
 	}
+
 	return service
 }
 
@@ -250,6 +252,7 @@ func (s *Service) ResolveInteraction(ctx context.Context, answer InteractionAnsw
 		Confirmed: answer.Confirmed,
 		Canceled:  answer.Canceled,
 	}
+
 	select {
 	case pending.response <- response:
 		return true, nil
@@ -289,9 +292,11 @@ func (s *Service) LookupMDS(ctx context.Context, req MDSLookupRequest) (envelope
 	if req.Source != "" {
 		opts = append(opts, ctapkit.WithMDSSource(req.Source))
 	}
+
 	if req.CacheDir != "" {
 		opts = append(opts, ctapkit.WithMDSCacheDir(req.CacheDir))
 	}
+
 	if req.Refresh {
 		opts = append(opts, ctapkit.WithMDSRefresh())
 	}
@@ -401,10 +406,12 @@ func (s *Service) emitOperationEvent(selectionID SelectionID, event model.Operat
 			break
 		}
 	}
+
 	s.mu.Unlock()
 	if !ok {
 		return
 	}
+
 	operationID := OperationID("")
 	if operation != nil {
 		operationID = operation.id
@@ -462,6 +469,7 @@ func (h interactionHandler) RequestInteraction(req model.InteractionRequest) (an
 				response["confirmed"] = kitlog.Redacted
 				resolveRedacted = append(resolveRedacted, "response.confirmed")
 			}
+
 			if len(answer.PIN) != 0 {
 				response["pin"] = kitlog.Redacted
 				resolveRedacted = append(resolveRedacted, "response.pin")

@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"context"
-	"slices"
 
 	"github.com/go-ctap/ctap/crypto"
 	"github.com/go-ctap/ctap/protocol"
@@ -26,6 +25,7 @@ func (r Runner) listLargeBlobs(ctx context.Context, req model.ListLargeBlobsOper
 	if err != nil {
 		return applargeblobs.ListReport{}, err
 	}
+
 	if err := ctx.Err(); err != nil {
 		return applargeblobs.ListReport{}, errornorm.Annotate(
 			err,
@@ -134,13 +134,14 @@ func buildListCredentialRow(
 	}
 
 	row.LargeBlobKeyState = applargeblobs.LargeBlobKeyAvailable
+
 	if !ctx.support.LargeBlobs {
 		return row, nil
 	}
 
 	row.BlobState = applargeblobs.BlobStateMissing
 
-	key := slices.Clone(record.LargeBlobKey)
+	key := record.LargeBlobKey
 	defer secret.Zero(key)
 
 	for index, candidate := range ctx.blobs {

@@ -33,6 +33,7 @@ func TestTokenStoreCompositeGrantCoversSubset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetToken: %v", err)
 	}
+
 	defer secret.Zero(token)
 	if !ok {
 		t.Fatal("composite grant did not cover permission subset")
@@ -55,6 +56,7 @@ func TestTokenStoreInvalidateUnlessPermissionNarrowsGrant(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetToken: %v", err)
 	}
+
 	defer secret.Zero(token)
 	if !ok {
 		t.Fatal("retained permission was invalidated")

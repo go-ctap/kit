@@ -93,9 +93,11 @@ func openAuthenticatorHandle(
 			opt(&config)
 		}
 	}
+
 	if config.events == nil {
 		config.events = model.NoopEventSink{}
 	}
+
 	if !device.valid {
 		return nil, failure.New(failure.CodeDeviceHandleInvalid,
 			failure.WithPhase(failure.PhaseAuthenticator),
@@ -190,6 +192,7 @@ func (a *Authenticator) run(
 func (a *Authenticator) Close() error {
 	a.stateMu.Lock()
 	a.closed = true
+
 	if a.cancel != nil {
 		a.cancel()
 	}
@@ -200,6 +203,7 @@ func (a *Authenticator) Close() error {
 		defer a.runMu.Unlock()
 
 		a.tokens.InvalidateToken()
+
 		if a.device != nil {
 			a.closeErr = a.device.Close()
 		}

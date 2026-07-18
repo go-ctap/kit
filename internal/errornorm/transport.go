@@ -11,18 +11,15 @@ import (
 )
 
 func transportCode(err error) (failure.Code, bool) {
-	var response *ctaphid.ErrorResponse
-	if errors.As(err, &response) {
+	if _, ok := errors.AsType[*ctaphid.ErrorResponse](err); ok {
 		return failure.CodeTransportFailure, true
 	}
 
-	var ioErr *ctaptransport.IOError
-	if errors.As(err, &ioErr) {
+	if _, ok := errors.AsType[*ctaptransport.IOError](err); ok {
 		return failure.CodeTransportFailure, true
 	}
 
-	var apduErr *ctaptoken2.APDUError
-	if errors.As(err, &apduErr) {
+	if _, ok := errors.AsType[*ctaptoken2.APDUError](err); ok {
 		return failure.CodeTransportFailure, true
 	}
 

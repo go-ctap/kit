@@ -3,7 +3,6 @@ package workflow
 import (
 	"context"
 	"encoding/hex"
-	"slices"
 	"sort"
 	"strings"
 
@@ -25,9 +24,11 @@ func (r Runner) credentialInventoryReport(
 	if err != nil {
 		return appcredentials.InventoryReport{}, err
 	}
+
 	if grantPermission == protocol.PermissionNone {
 		grantPermission = permission
 	}
+
 	if !grantCoversInventoryPermission(grantPermission, permission) {
 		return appcredentials.InventoryReport{}, failure.New(
 			failure.CodeInternalError,
@@ -41,6 +42,7 @@ func (r Runner) credentialInventoryReport(
 		if err != nil {
 			return err
 		}
+
 		if err := ctx.Err(); err != nil {
 			zeroCredentialInventoryReport(&current)
 
@@ -90,6 +92,7 @@ func (r Runner) buildCredentialInventoryReport(
 			protocol.CredentialManagementSubCommandGetCredsMetadata,
 		))
 	}
+
 	if err := ctx.Err(); err != nil {
 		return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 			failure.PhaseMetadata,
@@ -97,6 +100,7 @@ func (r Runner) buildCredentialInventoryReport(
 			protocol.CredentialManagementSubCommandGetCredsMetadata,
 		))
 	}
+
 	if metadata.ExistingResidentCredentialsCount == nil ||
 		metadata.MaxPossibleRemainingResidentCredentialsCount == nil {
 		return appcredentials.InventoryReport{}, failure.New(
@@ -137,6 +141,7 @@ func (r Runner) buildCredentialInventoryReport(
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			err = ctxErr
 		}
+
 		if err != nil {
 			subCommand := protocol.CredentialManagementSubCommandEnumerateRPsBegin
 			if len(rpResponses) > 0 {
@@ -186,6 +191,7 @@ func (r Runner) buildCredentialInventoryReport(
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				err = ctxErr
 			}
+
 			if err != nil {
 				subCommand := protocol.CredentialManagementSubCommandEnumerateCredentialsBegin
 				if len(group.Credentials) > 0 {
@@ -198,6 +204,7 @@ func (r Runner) buildCredentialInventoryReport(
 					subCommand,
 				))
 			}
+
 			record := appcredentials.CredentialRecord{
 				CredentialIDHex:      hex.EncodeToString(credentialResponse.CredentialID.ID),
 				CredentialType:       string(credentialResponse.CredentialID.Type),
@@ -206,9 +213,10 @@ func (r Runner) buildCredentialInventoryReport(
 				UserName:             strings.TrimSpace(credentialResponse.User.Name),
 				DisplayName:          strings.TrimSpace(credentialResponse.User.DisplayName),
 				CredProtect:          credentialResponse.CredProtect,
-				LargeBlobKey:         slices.Clone(credentialResponse.LargeBlobKey),
+				LargeBlobKey:         credentialResponse.LargeBlobKey,
 				ThirdPartyPayment:    credentialResponse.ThirdPartyPayment,
 			}
+
 			if len(credentialResponse.LargeBlobKey) > 0 {
 				record.LargeBlobKeyState = "available"
 			} else {

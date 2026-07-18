@@ -57,6 +57,7 @@ func TestDirectServiceErrorIsTypedAndMachineReadable(t *testing.T) {
 	if !errors.As(err, &typed) {
 		t.Fatalf("SetSelection error type = %T, want *failure.Error", err)
 	}
+
 	if !failure.IsCode(err, failure.CodeDeviceUnavailable) {
 		t.Fatalf("SetSelection error = %v, want %s", err, failure.CodeDeviceUnavailable)
 	}
@@ -84,9 +85,11 @@ func TestBioEnrollEnvelopeKeepsPartialResultWithFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BioEnroll: %v", err)
 	}
+
 	if envelope.Error == nil || envelope.Error.Code != failure.CodeBioInteractionTimeout {
 		t.Fatalf("error = %#v, want %s", envelope.Error, failure.CodeBioInteractionTimeout)
 	}
+
 	if envelope.Result == nil || envelope.Result.Result == nil || envelope.Result.Result.TemplateIDHex != "aabb" {
 		t.Fatalf("partial result = %#v, want template aabb", envelope.Result)
 	}

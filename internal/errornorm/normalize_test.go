@@ -91,9 +91,11 @@ func TestNormalizeCTAPProvenance(t *testing.T) {
 	if detail == nil {
 		t.Fatal("CTAP detail = nil")
 	}
+
 	if detail.Command != "" || detail.CommandCode != 0x7e {
 		t.Fatalf("command = %#v, want unknown command byte 0x7e", detail)
 	}
+
 	if detail.Status != "CTAP2_ERR_PIN_INVALID" || detail.StatusCode != uint8(ctaptransport.CTAP2_ERR_PIN_INVALID) {
 		t.Fatalf("status = %#v, want CTAP2_ERR_PIN_INVALID", detail)
 	}
@@ -144,10 +146,12 @@ func TestNormalizeTransportIOError(t *testing.T) {
 	if failure.Snapshot(err).CTAP != nil {
 		t.Fatalf("device I/O error acquired CTAP detail: %#v", failure.Snapshot(err).CTAP)
 	}
+
 	var gotIOErr *ctaptransport.IOError
 	if !errors.As(err, &gotIOErr) || gotIOErr != raw {
 		t.Fatalf("errors.As IOError = %p, want %p", gotIOErr, raw)
 	}
+
 	if !errors.Is(err, rawCause) {
 		t.Fatal("device I/O cause not preserved")
 	}
@@ -246,6 +250,7 @@ func TestNormalizeCommandOverrideProvenance(t *testing.T) {
 	if detail == nil || detail.CommandCode != uint8(protocol.AuthenticatorGetNextAssertion) {
 		t.Fatalf("CTAP detail = %#v, want getNextAssertion command", detail)
 	}
+
 	var gotRaw *ctaptransport.CTAPError
 	if !errors.As(err, &gotRaw) || gotRaw != raw {
 		t.Fatalf("raw CTAP error not preserved: %v", err)
@@ -287,6 +292,7 @@ func TestNormalizeGeneralErrors(t *testing.T) {
 		if failure.Snapshot(err).CTAP != nil {
 			t.Fatalf("plain command error acquired CTAP detail: %#v", failure.Snapshot(err).CTAP)
 		}
+
 		if !errors.Is(err, raw) {
 			t.Fatal("plain command cause not preserved")
 		}
@@ -451,12 +457,15 @@ func assertFailure(
 	if snapshot == nil {
 		t.Fatal("failure snapshot = nil")
 	}
+
 	if snapshot.Code != code {
 		t.Fatalf("failure code = %s, want %s", snapshot.Code, code)
 	}
+
 	if snapshot.Operation != operation {
 		t.Fatalf("operation = %q, want %q", snapshot.Operation, operation)
 	}
+
 	if snapshot.Phase != phase {
 		t.Fatalf("phase = %q, want %q", snapshot.Phase, phase)
 	}

@@ -27,6 +27,7 @@ func (r Runner) setAlwaysUV(ctx context.Context, req model.SetAlwaysUVOperation)
 	}
 
 	output.Preview = preview
+
 	if req.DryRun {
 		return output, nil
 	}
@@ -81,6 +82,7 @@ func (r Runner) setMinPINLength(ctx context.Context, req model.SetMinPINLengthOp
 	}
 
 	output.Preview = preview
+
 	if req.DryRun {
 		return output, nil
 	}

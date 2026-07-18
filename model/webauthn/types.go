@@ -142,12 +142,15 @@ func NormalizeMakeCredentialInput(input MakeCredentialInput) (MakeCredentialInpu
 	if len(input.User.ID) == 0 {
 		return MakeCredentialInput{}, failure.New(failure.CodeUserIDRequired, failure.WithPhase(failure.PhaseValidation))
 	}
+
 	if len(input.User.ID) > 64 {
 		return MakeCredentialInput{}, failure.New(failure.CodeCTAPLengthInvalid, failure.WithPhase(failure.PhaseValidation))
 	}
+
 	if len(input.ClientDataJSON) == 0 {
 		return MakeCredentialInput{}, failure.New(failure.CodeClientDataJSONRequired, failure.WithPhase(failure.PhaseValidation))
 	}
+
 	if len(input.PubKeyCredParams) == 0 {
 		return MakeCredentialInput{}, failure.New(failure.CodePublicKeyCredentialParametersRequired, failure.WithPhase(failure.PhaseValidation))
 	}
@@ -158,6 +161,7 @@ func NormalizeMakeCredentialInput(input MakeCredentialInput) (MakeCredentialInpu
 		if param.Algorithm == 0 {
 			return credential.PublicKeyCredentialParameters{}, failure.New(failure.CodePublicKeyCredentialAlgorithmRequired, failure.WithPhase(failure.PhaseValidation))
 		}
+
 		if _, duplicate := seenParameters[param]; duplicate {
 			return credential.PublicKeyCredentialParameters{}, failure.New(failure.CodeCTAPParameterInvalid, failure.WithPhase(failure.PhaseValidation))
 		}
@@ -168,13 +172,16 @@ func NormalizeMakeCredentialInput(input MakeCredentialInput) (MakeCredentialInpu
 	if err != nil {
 		return MakeCredentialInput{}, err
 	}
+
 	input.PubKeyCredParams = pubKeyCredParams
 	if input.Options.UserPresence != nil && !*input.Options.UserPresence {
 		return MakeCredentialInput{}, failure.New(failure.CodeCTAPOptionInvalid, failure.WithPhase(failure.PhaseValidation))
 	}
+
 	if input.EnterpriseAttestation > 2 {
 		return MakeCredentialInput{}, failure.New(failure.CodeCTAPOptionInvalid, failure.WithPhase(failure.PhaseValidation))
 	}
+
 	for index, format := range input.AttestationFormatsPreference {
 		normalized := attestation.AttestationStatementFormatIdentifier(strings.TrimSpace(string(format)))
 		if normalized == "" {
@@ -201,6 +208,7 @@ func NormalizeGetAssertionInput(input GetAssertionInput) (GetAssertionInput, err
 	if len(input.ClientDataJSON) == 0 {
 		return GetAssertionInput{}, failure.New(failure.CodeClientDataJSONRequired, failure.WithPhase(failure.PhaseValidation))
 	}
+
 	allowList, err := normalizeDescriptors(input.AllowList)
 	if err != nil {
 		return GetAssertionInput{}, err
@@ -216,6 +224,7 @@ func normalizeDescriptors(in []credential.PublicKeyCredentialDescriptor) ([]cred
 		if len(descriptor.ID) == 0 {
 			return credential.PublicKeyCredentialDescriptor{}, failure.New(failure.CodeCredentialIDRequired, failure.WithPhase(failure.PhaseValidation))
 		}
+
 		return descriptor, nil
 	})
 }

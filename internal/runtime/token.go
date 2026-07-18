@@ -24,6 +24,7 @@ func (granted TokenKey) Covers(requested TokenKey) bool {
 	if requested.Permission == protocol.PermissionNone || granted.RPID != requested.RPID {
 		return false
 	}
+
 	if requested.Permission == protocol.PermissionPersistentCredentialManagementReadOnly &&
 		granted.Permission&protocol.PermissionCredentialManagement != 0 {
 		return true
@@ -166,6 +167,7 @@ func (s *TokenService) Use(
 		}
 
 		s.cache.InvalidateToken()
+
 		if retriedRejectedToken {
 			return err
 		}

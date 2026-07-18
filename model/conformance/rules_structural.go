@@ -173,6 +173,7 @@ func structuralRules() []getInfoRule {
 					if validRange.fromCTAP == SpecificationCTAP23 && context.target.Specification != SpecificationCTAP23 {
 						continue
 					}
+
 					level, present := context.info.Certifications[validRange.id]
 					if !present || (level >= validRange.minimum && level <= validRange.maximum) {
 						continue

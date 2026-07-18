@@ -59,6 +59,7 @@ func TestAuthenticatorPreCompletedContextHasAuthenticatorPhase(t *testing.T) {
 			if snapshot.Operation != string(model.OperationConfigStatus) {
 				t.Fatalf("operation = %q, want %q", snapshot.Operation, model.OperationConfigStatus)
 			}
+
 			if snapshot.Phase != failure.PhaseAuthenticator {
 				t.Fatalf("phase = %q, want %q", snapshot.Phase, failure.PhaseAuthenticator)
 			}
@@ -314,6 +315,7 @@ func TestTransportConnectionFailureClosesAuthenticator(t *testing.T) {
 			if !opened.Closed() {
 				t.Fatal("opened remained open after transport connection failure")
 			}
+
 			if got := a.closeCount.Load(); got != 1 {
 				t.Fatalf("authenticator close count = %d, want 1", got)
 			}
@@ -324,6 +326,7 @@ func TestTransportConnectionFailureClosesAuthenticator(t *testing.T) {
 			if err := opened.Close(); err != nil {
 				t.Fatalf("Close: %v", err)
 			}
+
 			if got := a.closeCount.Load(); got != 1 {
 				t.Fatalf("authenticator close count after duplicate Close = %d, want 1", got)
 			}
@@ -354,6 +357,7 @@ func TestTransportFailureWithoutDeviceInvalidationKeepsAuthenticatorOpen(t *test
 			if opened.Closed() {
 				t.Fatal("opened closed without device invalidation")
 			}
+
 			if got := a.closeCount.Load(); got != 0 {
 				t.Fatalf("authenticator close count = %d, want 0", got)
 			}
@@ -361,6 +365,7 @@ func TestTransportFailureWithoutDeviceInvalidationKeepsAuthenticatorOpen(t *test
 			if err := opened.Close(); err != nil {
 				t.Fatalf("Close: %v", err)
 			}
+
 			if got := a.closeCount.Load(); got != 1 {
 				t.Fatalf("authenticator close count after Close = %d, want 1", got)
 			}
@@ -387,6 +392,7 @@ func TestCanceledTransmitWithoutDeviceInvalidationKeepsAuthenticatorOpen(t *test
 	if opened.Closed() {
 		t.Fatal("opened closed after a canceled transmit without device invalidation")
 	}
+
 	if got := a.closeCount.Load(); got != 0 {
 		t.Fatalf("authenticator close count = %d, want 0", got)
 	}
@@ -417,6 +423,7 @@ func (a *transportFailureAuthenticator) SetPIN(context.Context, string) error {
 		Operation: a.operation,
 		Err:       cause,
 	}
+
 	if a.invalidated {
 		return &ctaptransport.DeviceInvalidatedError{Err: err}
 	}
@@ -440,6 +447,7 @@ func TestAuthenticatorEventSinksAreScopedToOpenedAuthenticator(t *testing.T) {
 	if _, err := first.Run(context.Background(), model.ListCredentialsOperation{}, userVerificationHandler(t)); err != nil {
 		t.Fatalf("first Run: %v", err)
 	}
+
 	if err := first.Close(); err != nil {
 		t.Fatalf("first Close: %v", err)
 	}
@@ -448,6 +456,7 @@ func TestAuthenticatorEventSinksAreScopedToOpenedAuthenticator(t *testing.T) {
 	if firstEventCount == 0 {
 		t.Fatal("first opened emitted no events")
 	}
+
 	if got := len(secondEvents.Events()); got != 0 {
 		t.Fatalf("second sink events before second opened = %d, want 0", got)
 	}
@@ -458,6 +467,7 @@ func TestAuthenticatorEventSinksAreScopedToOpenedAuthenticator(t *testing.T) {
 	if _, err := second.Run(context.Background(), model.ListCredentialsOperation{}, userVerificationHandler(t)); err != nil {
 		t.Fatalf("second Run: %v", err)
 	}
+
 	if err := second.Close(); err != nil {
 		t.Fatalf("second Close: %v", err)
 	}
@@ -465,6 +475,7 @@ func TestAuthenticatorEventSinksAreScopedToOpenedAuthenticator(t *testing.T) {
 	if got := len(firstEvents.Events()); got != firstEventCount {
 		t.Fatalf("first sink events after second opened = %d, want %d", got, firstEventCount)
 	}
+
 	if got := len(secondEvents.Events()); got == 0 {
 		t.Fatal("second opened emitted no events")
 	}

@@ -97,6 +97,7 @@ func evaluateGetInfo(info protocol.AuthenticatorGetInfoResponse, target Target) 
 		if !rule.selector(&context) {
 			continue
 		}
+
 		if activeRules[rule.id] {
 			panic("conformance: multiple rule variants selected for " + string(rule.id))
 		}
@@ -229,6 +230,7 @@ func observedOption(info protocol.AuthenticatorGetInfoResponse, option protocol.
 	if !ok {
 		return observed(path, EvidenceAbsent)
 	}
+
 	if value {
 		return observed(path, EvidenceTrue)
 	}
@@ -240,6 +242,7 @@ func observedStrings(path FieldPath, known bool, values []string) Evidence {
 	if !known {
 		return observed(path, EvidenceAbsent)
 	}
+
 	if len(values) == 0 {
 		return observed(path, EvidencePresentEmpty)
 	}

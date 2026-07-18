@@ -33,9 +33,11 @@ func TestResolveWindowsMode(t *testing.T) {
 
 				return
 			}
+
 			if err != nil {
 				t.Fatalf("resolve mode: %v", err)
 			}
+
 			if got != test.want {
 				t.Fatalf("resolved mode = %q, want %q", got, test.want)
 			}

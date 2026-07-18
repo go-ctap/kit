@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"encoding/hex"
-	"slices"
 
 	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
@@ -30,6 +29,7 @@ func makeCredentialExtensionResults(
 		hasClientResult = true
 		client.CredentialProperties = &output.CredentialProperties
 	}
+
 	if authenticatorOutput != nil && authenticatorOutput.CredProtect != 0 {
 		hasAuthenticatorOutput = true
 		policy := extension.CredentialProtectionPolicy("")
@@ -43,18 +43,22 @@ func makeCredentialExtensionResults(
 		}
 		authenticator.CredentialProtection = &appwebauthn.CredentialProtectionOutput{Policy: policy}
 	}
+
 	if output != nil && output.CreateCredentialBlobOutputs != nil {
 		hasClientResult = true
 		client.CredentialBlob = &appwebauthn.CredentialBlobCreateOutput{Accepted: output.CredBlob}
 	}
+
 	if output != nil && output.CreateHMACSecretOutputs != nil {
 		hasClientResult = true
 		client.HMACSecret = &appwebauthn.HMACSecretCreateOutput{Enabled: output.HMACCreateSecret}
 	}
+
 	if output != nil && output.LargeBlobOutputs != nil && output.LargeBlob.Supported != nil {
 		hasClientResult = true
 		client.LargeBlob = &appwebauthn.LargeBlobCreateOutput{Supported: *output.LargeBlob.Supported}
 	}
+
 	if output != nil && output.CreateHMACSecretMCOutputs != nil {
 		hasClientResult = true
 		client.HMACSecretMC = hmacSecretOutput(output.CreateHMACSecretMCOutputs.HMACGetSecret)
@@ -65,31 +69,37 @@ func makeCredentialExtensionResults(
 			Output2Hex: hex.EncodeToString(output.PRF.Results.Second),
 		}
 	}
+
 	if authenticatorOutput != nil && authenticatorOutput.MinPinLength != 0 {
 		hasAuthenticatorOutput = true
 		authenticator.MinPINLength = &appwebauthn.MinPINLengthOutput{
 			Value: authenticatorOutput.MinPinLength,
 		}
 	}
+
 	if authenticatorOutput != nil && authenticatorOutput.CreatePinComplexityPolicyOutput != nil {
 		hasAuthenticatorOutput = true
 		authenticator.PINComplexityPolicy = &appwebauthn.PINComplexityPolicyOutput{
 			Enabled: authenticatorOutput.CreatePinComplexityPolicyOutput.PinComplexityPolicy,
 		}
 	}
+
 	if !rawHMACMCRequested && output != nil && output.CreatePRFOutputs != nil {
 		hasClientResult = true
 		client.PRF = &appwebauthn.MakeCredentialPRFOutput{
 			Enabled: output.PRF.Enabled,
-			Results: prfOutputValues(output.PRF.Results),
+			Results: output.PRF.Results,
 		}
 	}
+
 	if hasClientResult {
 		result.Client = client
 	}
+
 	if hasAuthenticatorOutput {
 		result.Authenticator = authenticator
 	}
+
 	if !hasClientResult && !hasAuthenticatorOutput {
 		return nil
 	}
@@ -109,21 +119,25 @@ func getAssertionExtensionResults(
 			ValueHex: hex.EncodeToString(output.GetCredBlob),
 		}
 	}
+
 	if output != nil && output.GetHMACSecretOutputs != nil {
 		hasClientResult = true
 		client.HMACSecret = hmacSecretOutput(output.GetHMACSecretOutputs.HMACGetSecret)
 	}
+
 	if output != nil && output.GetPRFOutputs != nil {
 		hasClientResult = true
 		client.PRF = &appwebauthn.GetAssertionPRFOutput{
-			Results: prfOutputValues(output.PRF.Results),
+			Results: output.PRF.Results,
 		}
 	}
+
 	if output != nil && output.LargeBlobOutputs != nil {
 		hasClientResult = true
 		largeBlob := &appwebauthn.LargeBlobGetOutput{
 			Written: output.LargeBlob.Written,
 		}
+
 		if output.LargeBlob.Blob != nil {
 			largeBlob.BlobHex = new(hex.EncodeToString(output.LargeBlob.Blob))
 		}
@@ -137,6 +151,7 @@ func getAssertionExtensionResults(
 		hasAuthenticatorResult = true
 		authenticator.ThirdPartyPayment = &response.AuthData.Extensions.GetThirdPartyPaymentOutput.ThirdPartyPayment
 	}
+
 	if !hasClientResult && !hasAuthenticatorResult {
 		return nil
 	}
@@ -145,6 +160,7 @@ func getAssertionExtensionResults(
 	if hasClientResult {
 		result.Client = client
 	}
+
 	if hasAuthenticatorResult {
 		result.Authenticator = authenticator
 	}
@@ -156,14 +172,5 @@ func hmacSecretOutput(output ctapwebauthn.HMACGetSecretOutput) *appwebauthn.HMAC
 	return &appwebauthn.HMACSecretOutput{
 		Output1Hex: hex.EncodeToString(output.Output1),
 		Output2Hex: hex.EncodeToString(output.Output2),
-	}
-}
-
-func prfOutputValues(
-	output ctapwebauthn.AuthenticationExtensionsPRFValues,
-) ctapwebauthn.AuthenticationExtensionsPRFValues {
-	return ctapwebauthn.AuthenticationExtensionsPRFValues{
-		First:  slices.Clone(output.First),
-		Second: slices.Clone(output.Second),
 	}
 }

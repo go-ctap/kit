@@ -89,6 +89,7 @@ func (s *Service) SetSelection(ctx context.Context, req SelectionRequest) (Selec
 	if err != nil {
 		return SelectionSnapshot{}, err
 	}
+
 	s.mu.Lock()
 	s.selected = selected
 	s.mu.Unlock()
@@ -108,6 +109,7 @@ func (s *Service) Close() error {
 
 		return nil
 	}
+
 	s.closed = true
 	monitorCancel, monitorDone := s.monitorCancel, s.monitorDone
 	enrichmentCancel, enrichmentDone := s.enrichment.cancel, s.enrichment.done
@@ -119,15 +121,19 @@ func (s *Service) Close() error {
 	if enrichmentCancel != nil {
 		enrichmentCancel()
 	}
+
 	if monitorCancel != nil {
 		monitorCancel()
 	}
+
 	if monitorDone != nil {
 		<-monitorDone
 	}
+
 	if enrichmentDone != nil {
 		<-enrichmentDone
 	}
+
 	if selected != nil {
 		return s.closeSelection(selected)
 	}
@@ -137,7 +143,7 @@ func (s *Service) Close() error {
 
 func (s *Service) selectDevice(selector string) (selectedDevice, error) {
 	s.mu.Lock()
-	devices := append([]ctapkit.Device(nil), s.devices...)
+	devices := s.devices
 	s.mu.Unlock()
 
 	return s.resolveDevice(devices, selector)
@@ -175,6 +181,7 @@ func (s *Service) openSelection(
 			Request:     kitlog.Payload(kitlog.SafeValue(req)),
 			SelectionID: string(selectionID),
 		}
+
 		if selected != nil {
 			entry.Response = kitlog.Payload(kitlog.SafeValue(ActiveSelection{ID: selected.id}))
 		}
@@ -185,6 +192,7 @@ func (s *Service) openSelection(
 		ctapkit.WithEventSink(selectionEventSink{service: s, selectionID: selectionID}),
 		ctapkit.WithLogJournal(s.logs),
 	}
+
 	if s.strictPermissions {
 		opts = append(opts, ctapkit.WithStrictPermissions())
 	}
@@ -239,6 +247,7 @@ func (s *Service) cancelAndWait(selected *selection) {
 	for _, operation := range operations {
 		operation.cancel()
 	}
+
 	for _, operation := range operations {
 		<-operation.done
 	}

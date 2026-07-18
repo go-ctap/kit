@@ -49,6 +49,7 @@ func TestSetSelectionSerializesAndReuses(t *testing.T) {
 	if first.Selection == nil || second.Selection == nil || first.Selection.ID != second.Selection.ID {
 		t.Fatalf("concurrent selections = (%#v, %#v), want one selection", first, second)
 	}
+
 	if opens.Load() != 1 {
 		t.Fatalf("physical opens = %d, want 1", opens.Load())
 	}
@@ -57,6 +58,7 @@ func TestSetSelectionSerializesAndReuses(t *testing.T) {
 	if replacement.ID == first.Selection.ID || !firstRuntime.closed.Load() {
 		t.Fatalf("replacement = %#v, old closed = %v", replacement, firstRuntime.closed.Load())
 	}
+
 	if service.selected == nil || service.selected.device.Fingerprint != "device-2" {
 		t.Fatalf("final selection = %#v, want device-2", service.selected)
 	}
@@ -120,10 +122,12 @@ func selectionTestService() *Service {
 
 func mustSelect(t *testing.T, service *Service, selector string) ActiveSelection {
 	t.Helper()
+
 	snapshot, err := service.SetSelection(t.Context(), SelectionRequest{Selector: selector})
 	if err != nil {
 		t.Fatalf("SetSelection(%q): %v", selector, err)
 	}
+
 	if snapshot.Selection == nil {
 		t.Fatalf("SetSelection(%q) returned no selection", selector)
 	}

@@ -18,12 +18,14 @@ func Normalize(err error, operation string) *failure.Error {
 		if operation != "" {
 			existing.Operation = operation
 		}
+
 		if existing.Phase == "" {
 			existing.Phase = ctx.phase
 		}
 
 		return existing
 	}
+
 	if errors.Is(err, context.Canceled) {
 		return failure.Wrap(
 			failure.CodeOperationCanceled,
@@ -31,6 +33,7 @@ func Normalize(err error, operation string) *failure.Error {
 			failureOptions(operation, ctx.phase, nil)...,
 		)
 	}
+
 	if errors.Is(err, context.DeadlineExceeded) {
 		return failure.Wrap(
 			failure.CodeOperationTimeout,
@@ -46,6 +49,7 @@ func Normalize(err error, operation string) *failure.Error {
 	if code, ok := upstreamCode(err, ctx); ok {
 		return failure.Wrap(code, err, failureOptions(operation, ctx.phase, nil)...)
 	}
+
 	if code, ok := transportCode(err); ok {
 		return failure.Wrap(code, err, failureOptions(operation, ctx.phase, nil)...)
 	}
@@ -67,6 +71,7 @@ func normalizeCTAP(
 	if ctx.phase == "" {
 		ctx.phase = failure.PhaseAuthenticatorCommand
 	}
+
 	if ctx.command == protocol.AuthenticatorGetNextAssertion {
 		ctx.phase = failure.PhaseAssertionContinuation
 	}
@@ -85,6 +90,7 @@ func ctapDetail(ctapErr *ctaptransport.CTAPError, ctx errorContext) *failure.CTA
 		CommandCode: uint8(ctx.command),
 		StatusCode:  uint8(ctapErr.StatusCode),
 	}
+
 	if ctx.subCommand != 0 {
 		subCommand := ctx.subCommand
 		detail.SubCommandCode = &subCommand

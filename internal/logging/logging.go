@@ -137,6 +137,7 @@ func FinishFailure(entry model.LogEntry, started time.Time, snapshot *failure.Fa
 
 		return entry
 	}
+
 	if entry.Error.Category == failure.CategoryCanceled {
 		entry.Outcome = model.LogOutcomeCanceled
 		entry.Level = model.LogLevelWarning

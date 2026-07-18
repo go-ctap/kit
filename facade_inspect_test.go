@@ -21,6 +21,7 @@ func TestInspectEmitsNoEventsWithoutProgressOrStateChanges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
+
 	if _, ok := output.(model.InspectOutput); !ok {
 		t.Fatalf("unexpected output: %#v", output)
 	}
@@ -49,6 +50,7 @@ func TestInspectNormalizesYubicoMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
+
 	metadata := result.(model.InspectOutput).Result.Device.Metadata
 	if metadata == nil || metadata.Model != "YubiKey 5C NFC" || metadata.Serial != "12345678" || metadata.Firmware != "5.7.1" {
 		t.Fatalf("metadata = %#v", metadata)
@@ -64,6 +66,7 @@ func TestInspectKeepsBaseResultWhenYubicoMetadataFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
+
 	device := result.(model.InspectOutput).Result.Device
 	if device.Vendor != report.VendorYubico || device.Metadata != nil {
 		t.Fatalf("device = %#v", device)

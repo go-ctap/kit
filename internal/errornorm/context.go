@@ -1,6 +1,8 @@
 package errornorm
 
 import (
+	"errors"
+
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/model/failure"
 )
@@ -82,7 +84,7 @@ func (e *annotatedError) Unwrap() error {
 // Annotate records safe runtime context without changing the error identity.
 // Context closest to the source wins over broader boundary context.
 func Annotate(err error, ctx errorContext) error {
-	if annotated, ok := err.(*annotatedError); ok {
+	if annotated, ok := errors.AsType[*annotatedError](err); ok {
 		return annotated
 	}
 

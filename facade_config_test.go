@@ -56,9 +56,11 @@ func TestBioSensorInfoReportsSpecNamedEnums(t *testing.T) {
 			if !ok {
 				t.Fatalf("output = %#v, want BioSensorOutput", output)
 			}
+
 			if typed.Report.Modality != appconfig.BioModalityFingerprint {
 				t.Fatalf("modality = %#v, want fingerprint", typed.Report.Modality)
 			}
+
 			if typed.Report.FingerprintKind != tt.want {
 				t.Fatalf("fingerprintKind = %#v, want %s", typed.Report.FingerprintKind, tt.want)
 			}
@@ -67,10 +69,12 @@ func TestBioSensorInfoReportsSpecNamedEnums(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Marshal: %v", err)
 			}
+
 			text := string(raw)
 			if !strings.Contains(text, `"modality":"fingerprint"`) {
 				t.Fatalf("JSON = %s, want string modality", text)
 			}
+
 			if !strings.Contains(text, `"fingerprintKind":"`+string(tt.want)+`"`) {
 				t.Fatalf("JSON = %s, want string fingerprint kind", text)
 			}
@@ -114,9 +118,11 @@ func TestBioSensorInfoOmitsUnknownSpecValues(t *testing.T) {
 			if !ok {
 				t.Fatalf("output = %#v, want BioSensorOutput", output)
 			}
+
 			if typed.Report.Modality != "" {
 				t.Fatalf("modality = %#v, want empty", typed.Report.Modality)
 			}
+
 			if typed.Report.FingerprintKind != "" {
 				t.Fatalf("fingerprintKind = %#v, want empty", typed.Report.FingerprintKind)
 			}
@@ -125,6 +131,7 @@ func TestBioSensorInfoOmitsUnknownSpecValues(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Marshal: %v", err)
 			}
+
 			text := string(raw)
 			if strings.Contains(text, `"modality"`) || strings.Contains(text, `"fingerprintKind"`) {
 				t.Fatalf("JSON = %s, want modality and fingerprintKind omitted", text)
@@ -145,6 +152,7 @@ func TestResetDeclinedConfirmDoesNotEmitTouchOrReset(t *testing.T) {
 		if req.Kind != model.InteractionKindConfirm {
 			t.Fatalf("interaction kind = %s, want confirm", req.Kind)
 		}
+
 		if !req.Destructive {
 			t.Fatal("reset confirm interaction destructive = false, want true")
 		}
@@ -266,6 +274,7 @@ func TestRunContextReachesTokenAndAuthenticatorCommand(t *testing.T) {
 	if got := a.tokenCtx.Value(contextKey{}); got != marker {
 		t.Fatalf("token context value = %v, want marker", got)
 	}
+
 	if got := a.commandCtx.Value(contextKey{}); got != marker {
 		t.Fatalf("command context value = %v, want marker", got)
 	}
@@ -291,23 +300,29 @@ func TestBioEnrollmentCleanupUsesBoundedIndependentContext(t *testing.T) {
 	if !errors.Is(err, operationErr) {
 		t.Fatalf("Run error = %v, want original capture error", err)
 	}
+
 	output := result.(model.BioEnrollOutput)
 	if output.Result == nil || !output.Result.CancelAttempted || output.Result.CancelSucceeded {
 		t.Fatalf("bio result = %#v, want failed cleanup attempt", output.Result)
 	}
+
 	if a.cleanupCtx == nil {
 		t.Fatal("cleanup context was not recorded")
 	}
+
 	if err := a.cleanupContextErr; err != nil {
 		t.Fatalf("cleanup context was already canceled during command: %v", err)
 	}
+
 	if got := a.cleanupCtx.Value(contextKey{}); got != "marker" {
 		t.Fatalf("cleanup context value = %v, want marker", got)
 	}
+
 	deadline, ok := a.cleanupCtx.Deadline()
 	if !ok {
 		t.Fatal("cleanup context has no deadline")
 	}
+
 	remaining := time.Until(deadline)
 	if remaining <= 0 || remaining > 2*time.Second {
 		t.Fatalf("cleanup deadline remaining = %v, want within two seconds", remaining)
@@ -326,6 +341,7 @@ func TestBioEnrollmentSuccessfulCleanupIsReported(t *testing.T) {
 	if !errors.Is(err, operationErr) {
 		t.Fatalf("Run error = %v, want original capture error", err)
 	}
+
 	output := result.(model.BioEnrollOutput)
 	if output.Result == nil || !output.Result.CancelAttempted || !output.Result.CancelSucceeded {
 		t.Fatalf("bio result = %#v, want successful cleanup", output.Result)

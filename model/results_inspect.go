@@ -31,6 +31,7 @@ func NewInspectResult(device report.DeviceReport, info protocol.AuthenticatorGet
 			Conformance:                  conformance.EvaluateGetInfo(info),
 		},
 	}
+
 	if info.UvModality != nil {
 		result.Info.UVModalityLabel = info.UvModality.String()
 	}

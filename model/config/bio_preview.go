@@ -67,6 +67,7 @@ func buildBioMutationPreview(
 	if !status.Bio.Supported {
 		return BioMutationPreview{}, failure.New(failure.CodeBioUnsupported, failure.WithPhase(failure.PhaseValidation))
 	}
+
 	if status.Bio.Configured != nil && !*status.Bio.Configured {
 		return BioMutationPreview{}, failure.New(failure.CodeBioNoEnrollments, failure.WithPhase(failure.PhaseValidation))
 	}
@@ -80,6 +81,7 @@ func buildBioMutationPreview(
 		Code:     warningBioRenameMutation,
 		Message:  "The friendly name metadata for this biometric enrollment will be changed.",
 	}
+
 	if operation == BioMutationRemove {
 		warning = safety.Warning{
 			Severity: safety.SeverityDestructive,

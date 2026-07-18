@@ -64,18 +64,22 @@ func getAssertionExtensionWarnings(
 		warnings = append(warnings, unsupportedExtensionWarning(
 			"webauthn.extension.cred_blob.not_advertised", "credBlob"))
 	}
+
 	if input.GetHMACSecretInputs != nil && !slices.Contains(info.Extensions, extension.ExtensionIdentifierHMACSecret) {
 		warnings = append(warnings, unsupportedExtensionWarning(
 			"webauthn.extension.hmac_secret.not_advertised", "hmac-secret"))
 	}
+
 	if hasPRFEvaluation(input.PRFInputs) && !slices.Contains(info.Extensions, extension.ExtensionIdentifierHMACSecret) {
 		warnings = append(warnings, unsupportedExtensionWarning(
 			"webauthn.extension.prf.not_advertised", "prf"))
 	}
+
 	if input.LargeBlobInputs != nil && !slices.Contains(info.Extensions, extension.ExtensionIdentifierLargeBlobKey) {
 		warnings = append(warnings, unsupportedExtensionWarning(
 			"webauthn.extension.large_blob.not_advertised", "largeBlob"))
 	}
+
 	if input.PaymentInputs != nil && input.Payment.IsPayment &&
 		!slices.Contains(info.Extensions, extension.ExtensionIdentifierThirdPartyPayment) {
 		warnings = append(warnings, unsupportedExtensionWarning(

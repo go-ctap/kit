@@ -118,6 +118,7 @@ func TestLargeBlobWriteUsesSeparateGrantForReadOnlyInventory(t *testing.T) {
 		protocol.PermissionPersistentCredentialManagementReadOnly,
 		protocol.PermissionLargeBlobWrite,
 	}
+
 	if !slices.Equal(a.tokenPermissions, wantPermissions) {
 		t.Fatalf("token permissions = %#v, want %#v", a.tokenPermissions, wantPermissions)
 	}
@@ -141,9 +142,11 @@ func TestLargeBlobWriteCapacityErrorKeepsPreview(t *testing.T) {
 	if !ok {
 		t.Fatalf("result = %T, want LargeBlobMutationOutput", result)
 	}
+
 	if output.Preview.SerializedLargeBlobArrayLimit != 16 {
 		t.Fatalf("preview limit = %#v, want 16", output.Preview.SerializedLargeBlobArrayLimit)
 	}
+
 	if output.Preview.SerializedLargeBlobArraySizeAfter <= int(output.Preview.SerializedLargeBlobArrayLimit) {
 		t.Fatalf("preview size after = %d, want over limit %d",
 			output.Preview.SerializedLargeBlobArraySizeAfter,
@@ -172,6 +175,7 @@ func TestLargeBlobWriteZeroCapacityMeansUnknownLimit(t *testing.T) {
 	if !ok {
 		t.Fatalf("result = %T, want LargeBlobMutationOutput", result)
 	}
+
 	if output.Preview.SerializedLargeBlobArrayLimit != 0 {
 		t.Fatalf("preview limit = %#v, want unknown", output.Preview.SerializedLargeBlobArrayLimit)
 	}
@@ -201,9 +205,11 @@ func TestLargeBlobReadAndPreviewReadFreshAuthenticatorState(t *testing.T) {
 	if got := a.rpEnumerations.Load(); got != 2 {
 		t.Fatalf("RP enumerations = %d, want 2", got)
 	}
+
 	if got := a.credentialEnumerations.Load(); got != 2 {
 		t.Fatalf("credential enumerations = %d, want 2", got)
 	}
+
 	if got := a.largeBlobReads.Load(); got != 2 {
 		t.Fatalf("large blob reads = %d, want 2", got)
 	}
@@ -227,9 +233,11 @@ func TestLargeBlobListReadsFreshReport(t *testing.T) {
 	if got := a.rpEnumerations.Load(); got != 2 {
 		t.Fatalf("RP enumerations = %d, want 2", got)
 	}
+
 	if got := a.credentialEnumerations.Load(); got != 2 {
 		t.Fatalf("credential enumerations = %d, want 2", got)
 	}
+
 	if got := a.largeBlobReads.Load(); got != 2 {
 		t.Fatalf("large blob reads = %d, want 2", got)
 	}
@@ -256,6 +264,7 @@ func TestLargeBlobListAlwaysObservesCurrentAuthenticatorState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("refreshed ListLargeBlobs: %v", err)
 	}
+
 	output, ok := result.(model.LargeBlobListOutput)
 	if !ok || len(output.Report.Credentials) != 1 || !output.Report.Credentials[0].BlobPresent {
 		t.Fatalf("refreshed large blob output = %#v, want one present credential blob", result)
@@ -265,6 +274,7 @@ func TestLargeBlobListAlwaysObservesCurrentAuthenticatorState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cached ListLargeBlobs after refresh: %v", err)
 	}
+
 	cachedOutput, ok := cached.(model.LargeBlobListOutput)
 	if !ok || len(cachedOutput.Report.Credentials) != 1 || !cachedOutput.Report.Credentials[0].BlobPresent {
 		t.Fatalf("cached large blob output = %#v, want refreshed report", cached)
@@ -273,12 +283,15 @@ func TestLargeBlobListAlwaysObservesCurrentAuthenticatorState(t *testing.T) {
 	if got := a.rpEnumerations.Load(); got != 3 {
 		t.Fatalf("RP enumerations = %d, want 3", got)
 	}
+
 	if got := a.credentialEnumerations.Load(); got != 3 {
 		t.Fatalf("credential enumerations = %d, want 3", got)
 	}
+
 	if got := a.tokenCalls.Load(); got != 1 {
 		t.Fatalf("token calls = %d, want 1", got)
 	}
+
 	if got := a.largeBlobReads.Load(); got != 3 {
 		t.Fatalf("large blob reads = %d, want 3", got)
 	}
@@ -310,21 +323,27 @@ func TestLargeBlobDeleteLastBlobWritesEmptyArray(t *testing.T) {
 	if !ok {
 		t.Fatalf("result = %T, want LargeBlobMutationOutput", result)
 	}
+
 	if output.Result == nil {
 		t.Fatal("delete result = nil")
 	}
+
 	if output.Result.Operation != applargeblobs.MutationDelete {
 		t.Fatalf("operation = %s, want delete", output.Result.Operation)
 	}
+
 	if output.Result.BlobCountAfter != 0 {
 		t.Fatalf("blob count after = %d, want 0", output.Result.BlobCountAfter)
 	}
+
 	if got := a.largeBlobWrites.Load(); got != 1 {
 		t.Fatalf("large blob writes = %d, want 1", got)
 	}
+
 	if a.lastSetLargeBlobs == nil {
 		t.Fatal("replacement blobs = nil, want empty slice")
 	}
+
 	if got := len(a.lastSetLargeBlobs); got != 0 {
 		t.Fatalf("replacement blob count = %d, want 0", got)
 	}
@@ -333,10 +352,12 @@ func TestLargeBlobDeleteLastBlobWritesEmptyArray(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CBOR enc mode: %v", err)
 	}
+
 	raw, err := encMode.Marshal(a.lastSetLargeBlobs)
 	if err != nil {
 		t.Fatalf("marshal replacement blobs: %v", err)
 	}
+
 	if !bytes.Equal(raw, []byte{0x80}) {
 		t.Fatalf("replacement CBOR = %x, want 80 empty array", raw)
 	}
@@ -367,21 +388,27 @@ func TestLargeBlobGarbageCollectNoopDoesNotWrite(t *testing.T) {
 	if !ok {
 		t.Fatalf("result = %T, want LargeBlobMutationOutput", result)
 	}
+
 	if output.Result == nil {
 		t.Fatal("garbage collect result = nil")
 	}
+
 	if !output.Result.Noop {
 		t.Fatal("garbage collect result noop = false, want true")
 	}
+
 	if got := a.largeBlobWrites.Load(); got != 0 {
 		t.Fatalf("large blob writes = %d, want 0", got)
 	}
+
 	if got := a.rpEnumerations.Load(); got != 1 {
 		t.Fatalf("RP enumerations = %d, want 1", got)
 	}
+
 	if got := a.credentialEnumerations.Load(); got != 1 {
 		t.Fatalf("credential enumerations = %d, want 1", got)
 	}
+
 	if got := a.largeBlobReads.Load(); got != 1 {
 		t.Fatalf("large blob reads = %d, want 1", got)
 	}
@@ -412,18 +439,23 @@ func TestLargeBlobGarbageCollectSkipsNonConformingEntries(t *testing.T) {
 	if !ok {
 		t.Fatalf("result = %T, want LargeBlobMutationOutput", result)
 	}
+
 	if output.Result == nil {
 		t.Fatal("garbage collect result = nil")
 	}
+
 	if !output.Result.Noop {
 		t.Fatal("garbage collect result noop = false, want true")
 	}
+
 	if output.Result.BlobCountAfter != 1 {
 		t.Fatalf("blob count after = %d, want 1", output.Result.BlobCountAfter)
 	}
+
 	if output.Result.UnmatchedBlobCount != 0 {
 		t.Fatalf("unmatched blob count = %d, want 0", output.Result.UnmatchedBlobCount)
 	}
+
 	if got := a.largeBlobWrites.Load(); got != 0 {
 		t.Fatalf("large blob writes = %d, want 0", got)
 	}
@@ -458,27 +490,35 @@ func TestLargeBlobGarbageCollectRemovesOnlyUnmatchedEntries(t *testing.T) {
 	if !ok {
 		t.Fatalf("result = %T, want LargeBlobMutationOutput", result)
 	}
+
 	if output.Result == nil {
 		t.Fatal("garbage collect result = nil")
 	}
+
 	if output.Result.DeletedBlobCount != 1 {
 		t.Fatalf("deleted blob count = %d, want 1", output.Result.DeletedBlobCount)
 	}
+
 	if got := a.largeBlobWrites.Load(); got != 1 {
 		t.Fatalf("large blob writes = %d, want 1", got)
 	}
+
 	if got := len(a.lastSetLargeBlobs); got != 1 {
 		t.Fatalf("replacement blob count = %d, want 1", got)
 	}
+
 	if _, err := crypto.DecryptLargeBlob(bytes.Repeat([]byte{0x01}, 32), a.lastSetLargeBlobs[0]); err != nil {
 		t.Fatalf("replacement blob is not decryptable by known largeBlobKey: %v", err)
 	}
+
 	if got := a.rpEnumerations.Load(); got != 1 {
 		t.Fatalf("RP enumerations = %d, want 1", got)
 	}
+
 	if got := a.credentialEnumerations.Load(); got != 1 {
 		t.Fatalf("credential enumerations = %d, want 1", got)
 	}
+
 	if got := a.largeBlobReads.Load(); got != 1 {
 		t.Fatalf("large blob reads = %d, want 1", got)
 	}
@@ -509,24 +549,31 @@ func TestLargeBlobGarbageCollectAllUnmatchedWritesEmptyArray(t *testing.T) {
 	if !ok {
 		t.Fatalf("result = %T, want LargeBlobMutationOutput", result)
 	}
+
 	if output.Result == nil {
 		t.Fatal("garbage collect result = nil")
 	}
+
 	if output.Result.Noop {
 		t.Fatal("garbage collect result noop = true, want false")
 	}
+
 	if output.Result.DeletedBlobCount != 1 {
 		t.Fatalf("deleted blob count = %d, want 1", output.Result.DeletedBlobCount)
 	}
+
 	if output.Result.BlobCountAfter != 0 {
 		t.Fatalf("blob count after = %d, want 0", output.Result.BlobCountAfter)
 	}
+
 	if got := a.largeBlobWrites.Load(); got != 1 {
 		t.Fatalf("large blob writes = %d, want 1", got)
 	}
+
 	if a.lastSetLargeBlobs == nil {
 		t.Fatal("replacement blobs = nil, want empty slice")
 	}
+
 	if got := len(a.lastSetLargeBlobs); got != 0 {
 		t.Fatalf("replacement blob count = %d, want 0", got)
 	}
@@ -585,6 +632,7 @@ func TestLargeBlobWritePINOnlyFlowDoesNotRequestUserVerification(t *testing.T) {
 			t.Fatalf("events = %v, want %v", got, want)
 		}
 	}
+
 	if got := a.largeBlobReads.Load(); got != 1 {
 		t.Fatalf("large blob reads = %d, want 1", got)
 	}
@@ -620,6 +668,7 @@ func TestLargeBlobWritePreparedRefreshRequestsPINOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WriteLargeBlob: %v", err)
 	}
+
 	if _, err := session.Run(
 		context.Background(),
 		model.ListLargeBlobsOperation{},
@@ -631,9 +680,11 @@ func TestLargeBlobWritePreparedRefreshRequestsPINOnce(t *testing.T) {
 	if got := a.pinCalls.Load(); got != 1 {
 		t.Fatalf("PIN token calls = %d, want 1", got)
 	}
+
 	if len(requests) != 1 {
 		t.Fatalf("PIN requests = %d, want 1", len(requests))
 	}
+
 	if got, want := requests[0].Permission, "credentialManagement,largeBlobWrite"; got != want {
 		t.Fatalf("PIN permission = %q, want %q", got, want)
 	}

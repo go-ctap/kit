@@ -15,6 +15,7 @@ func configRules() []getInfoRule {
 				references := []RequirementRef{
 					getInfoRequirement(context.target, "authnr-cfg-true-means-authenticator-config-supported", RequirementConstraint),
 				}
+
 				if context.target.Specification == SpecificationCTAP23 {
 					references = append(references, getInfoRequirement(context.target, "authenticator-config-commands-indicate-command-support", RequirementConstraint))
 				}
@@ -36,6 +37,7 @@ func configRules() []getInfoRule {
 					observedOption(context.info, protocol.OptionEnterpriseAttestation),
 					observedStrings("vendorPrototypeConfigCommands", context.info.VendorPrototypeConfigCommands != nil, unsignedValues(context.info.VendorPrototypeConfigCommands)),
 				}
+
 				if context.target.Specification == SpecificationCTAP23 {
 					evidence = append(evidence, observedStrings("authenticatorConfigCommands", context.commandsKnown, unsignedValues(context.info.AuthenticatorConfigCommands)))
 				}

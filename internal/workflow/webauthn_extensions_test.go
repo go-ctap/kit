@@ -46,16 +46,19 @@ func TestMakeCredentialExtensionResultsKeepRawOutputsAndMapLevel3Results(t *test
 	if got == nil || got.Client == nil || got.Authenticator == nil {
 		t.Fatalf("extension results = %#v, want client and authenticator sections", got)
 	}
+
 	if got.Client.CredentialProperties == nil || got.Client.CredentialProperties.ResidentKey == nil ||
 		*got.Client.CredentialProperties.ResidentKey || got.Client.CredentialBlob == nil ||
 		!got.Client.CredentialBlob.Accepted || got.Client.HMACSecret == nil ||
 		!got.Client.HMACSecret.Enabled {
 		t.Fatalf("client raw/credProps results = %#v", got.Client)
 	}
+
 	if got.Client.PRF == nil || !got.Client.PRF.Enabled ||
 		len(got.Client.PRF.Results.First) != 2 || len(got.Client.PRF.Results.Second) != 2 {
 		t.Fatalf("PRF result = %#v", got.Client.PRF)
 	}
+
 	if got.Authenticator.CredentialProtection == nil ||
 		got.Authenticator.CredentialProtection.Policy != extension.CredentialProtectionPolicyUserVerificationRequired ||
 		got.Authenticator.MinPINLength == nil || got.Authenticator.MinPINLength.Value != 8 ||

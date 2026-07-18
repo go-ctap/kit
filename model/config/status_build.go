@@ -78,6 +78,7 @@ func formatUVModalityLabel[T uvModalityStringer](modality T) string {
 		if raw&bit == 0 {
 			continue
 		}
+
 		if label := T(bit).String(); label != "" {
 			labels = append(labels, label)
 			continue
@@ -129,6 +130,7 @@ func configuredOptionCapability(info protocol.AuthenticatorGetInfoResponse, opti
 		Configured:  new(value),
 		PreviewOnly: previewOnly,
 	}
+
 	if previewOnly {
 		state.State = StatePreviewOnly
 	} else if value {
@@ -151,6 +153,7 @@ func requiredOptionCapability(info protocol.AuthenticatorGetInfoResponse, option
 		Supported:   true,
 		PreviewOnly: previewOnly,
 	}
+
 	if previewOnly {
 		state.State = StatePreviewOnly
 	}
@@ -216,6 +219,7 @@ func boolConfiguredState(value *bool) StateValue {
 	if value == nil {
 		return StateUnknown
 	}
+
 	if *value {
 		return StateConfigured
 	}

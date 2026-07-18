@@ -148,6 +148,7 @@ func TestResetConfirmInteractionCanceledReturnsCanceledFailure(t *testing.T) {
 		if req.Kind != model.InteractionKindConfirm {
 			t.Fatalf("interaction kind = %s, want confirm", req.Kind)
 		}
+
 		if !req.Destructive {
 			t.Fatal("reset confirm interaction destructive = false, want true")
 		}

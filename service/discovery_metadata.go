@@ -18,9 +18,8 @@ func (s *Service) deviceReportsWithMetadata(devices []ctapkit.Device) []report.D
 func (s *Service) deviceReportsWithMetadataLocked(devices []ctapkit.Device) []report.DeviceReport {
 	reports := deviceReports(devices)
 	for index := range reports {
-		if cached, ok := s.enrichment.cache[enrichmentKey(reports[index])]; ok {
-			metadata := cloneDeviceMetadata(cached)
-			reports[index].Metadata = &metadata
+		if cached, ok := s.enrichment.cache[reports[index].Fingerprint]; ok {
+			reports[index].Metadata = cached
 		}
 	}
 
@@ -31,9 +30,8 @@ func (s *Service) reportWithMetadata(device report.DeviceReport) report.DeviceRe
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if cached, ok := s.enrichment.cache[enrichmentKey(device)]; ok {
-		metadata := cloneDeviceMetadata(cached)
-		device.Metadata = &metadata
+	if cached, ok := s.enrichment.cache[device.Fingerprint]; ok {
+		device.Metadata = cached
 	}
 
 	return device
@@ -52,42 +50,40 @@ func (s *Service) mergeInspectMetadata(selectionID SelectionID, result *model.In
 		return nil
 	}
 
-	key := enrichmentKey(selected.device)
+	key := selected.device.Fingerprint
 	cached, cachedOK := s.enrichment.cache[key]
 	if result.Result.Device.Metadata == nil {
 		if cachedOK {
-			metadata := cloneDeviceMetadata(cached)
-			result.Result.Device.Metadata = &metadata
+			result.Result.Device.Metadata = cached
 		}
 		s.mu.Unlock()
 
 		return nil
 	}
 
-	metadata := cloneDeviceMetadata(*result.Result.Device.Metadata)
+	metadata := result.Result.Device.Metadata
 	fingerprint := selected.device.Fingerprint
-	changed := !cachedOK || !deviceMetadataEqual(cached, metadata)
+	changed := !cachedOK || !deviceMetadataEqual(*cached, *metadata)
 	s.enrichment.cache[key] = metadata
 
-	selectionMetadata := cloneDeviceMetadata(metadata)
-	selected.device.Metadata = &selectionMetadata
-	resultMetadata := cloneDeviceMetadata(metadata)
-	result.Result.Device.Metadata = &resultMetadata
+	selected.device.Metadata = result.Result.Device.Metadata
+
 	var snapshot *DiscoverySnapshot
 	if changed {
 		snapshot = &DiscoverySnapshot{Devices: s.deviceReportsWithMetadataLocked(s.devices)}
 	}
 	s.mu.Unlock()
 
-	s.persistDeviceMetadata(fingerprint, metadata)
+	s.persistDeviceMetadata(fingerprint, *metadata)
 	return snapshot
 }
 
 func (s *Service) pruneEnrichmentCacheLocked(devices []ctapkit.Device) {
 	present := make(map[string]struct{}, len(devices))
 	for _, device := range devices {
-		present[enrichmentKey(device.Report())] = struct{}{}
+		present[device.Report().Fingerprint] = struct{}{}
 	}
+
 	for key := range s.enrichment.cache {
 		if _, ok := present[key]; !ok {
 			delete(s.enrichment.cache, key)
@@ -95,32 +91,18 @@ func (s *Service) pruneEnrichmentCacheLocked(devices []ctapkit.Device) {
 	}
 }
 
-func enrichmentKey(device report.DeviceReport) string {
-	return string(device.Transport) + "\x00" + device.Fingerprint
-}
-
-func cloneDeviceMetadata(metadata report.DeviceMetadata) report.DeviceMetadata {
-	clone := metadata
-	clone.Interfaces = make([]report.InterfaceReport, len(metadata.Interfaces))
-	for index, interfaceReport := range metadata.Interfaces {
-		clone.Interfaces[index] = interfaceReport
-		clone.Interfaces[index].Supported = append([]report.Capability(nil), interfaceReport.Supported...)
-		clone.Interfaces[index].Enabled = append([]report.Capability(nil), interfaceReport.Enabled...)
-	}
-
-	return clone
-}
-
 func deviceReportsEqual(first, second []report.DeviceReport) bool {
 	return slices.EqualFunc(first, second, func(left, right report.DeviceReport) bool {
 		leftMetadata := left.Metadata
 		rightMetadata := right.Metadata
+
 		left.Metadata = nil
 		right.Metadata = nil
 
 		if left != right {
 			return false
 		}
+
 		if leftMetadata == nil || rightMetadata == nil {
 			return leftMetadata == rightMetadata
 		}

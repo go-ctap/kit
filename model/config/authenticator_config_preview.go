@@ -59,6 +59,7 @@ func BuildEnableLongTouchForResetPreview(status StatusReport, mode safety.Previe
 			failure.WithPhase(failure.PhaseValidation),
 		)
 	}
+
 	if *capability.Configured {
 		return AuthenticatorConfigPreview{}, failure.New(
 			failure.CodeAuthenticatorOperationNotAllowed,
@@ -103,6 +104,7 @@ func BuildMinPINLengthPreview(status StatusReport, req MinPINLengthRequest, mode
 			failure.WithPhase(failure.PhaseValidation),
 		)
 	}
+
 	if req.NewMinPINLength != nil && *req.NewMinPINLength > status.PIN.MaxPINLength {
 		return AuthenticatorConfigPreview{}, failure.New(failure.CodeCTAPParameterInvalid, failure.WithPhase(failure.PhaseValidation))
 	}
@@ -119,6 +121,7 @@ func BuildMinPINLengthPreview(status StatusReport, req MinPINLengthRequest, mode
 			Message:  "Some authenticators may reject later attempts to lower the minimum PIN length or may require PIN change after policy updates.",
 		},
 	}
+
 	if len(req.MinPINLengthRPIDs) > 0 {
 		warnings = append(warnings, safety.Warning{
 			Severity: safety.SeverityWarning,

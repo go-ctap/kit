@@ -28,6 +28,7 @@ func (r Runner) renameBio(ctx context.Context, req model.BioRenameOperation) (mo
 	}
 
 	output.Preview = preview
+
 	if req.DryRun {
 		return output, nil
 	}
@@ -89,6 +90,7 @@ func (r Runner) removeBio(ctx context.Context, req model.BioRemoveOperation) (mo
 	}
 
 	output.Preview = preview
+
 	if req.DryRun {
 		return output, nil
 	}

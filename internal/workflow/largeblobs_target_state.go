@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"context"
-	"slices"
 
 	"github.com/go-ctap/ctap/crypto"
 	"github.com/go-ctap/ctap/protocol"
@@ -47,19 +46,15 @@ func (r Runner) loadTargetBlobState(
 		)
 	}
 
-	key := slices.Clone(target.Record.LargeBlobKey)
+	key := target.Record.LargeBlobKey
 
 	blobs, err := r.readLargeBlobArray(ctx)
 	if err != nil {
-		secret.Zero(key)
-
 		return targetBlobState{}, err
 	}
 
 	sizeBefore, err := serializedLargeBlobArraySize(blobs)
 	if err != nil {
-		secret.Zero(key)
-
 		return targetBlobState{}, err
 	}
 
@@ -68,7 +63,7 @@ func (r Runner) loadTargetBlobState(
 		support:                   support,
 		target:                    target,
 		key:                       key,
-		blobs:                     cloneLargeBlobs(blobs),
+		blobs:                     blobs,
 		currentBlobIndex:          -1,
 		serializedArraySizeBefore: sizeBefore,
 	}
@@ -80,9 +75,7 @@ func (r Runner) loadTargetBlobState(
 		}
 
 		state.currentBlobIndex = index
-
-		state.currentBytes = slices.Clone(raw)
-		secret.Zero(raw)
+		state.currentBytes = raw
 
 		break
 	}

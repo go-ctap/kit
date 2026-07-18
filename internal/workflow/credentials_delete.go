@@ -36,6 +36,7 @@ func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredential
 	}
 
 	output.Preview = preview
+
 	if req.DryRun {
 		return output, nil
 	}

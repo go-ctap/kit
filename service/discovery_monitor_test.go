@@ -34,6 +34,7 @@ func TestTopologyReconciliationClosesMissingSelection(t *testing.T) {
 	if !firstRuntime.closed.Load() {
 		t.Fatal("missing selection runtime was not closed")
 	}
+
 	if service.selected != nil {
 		t.Fatal("missing selection was retained")
 	}
@@ -52,6 +53,7 @@ func TestDiscoverKeepsCurrentSelection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Discover: %v", err)
 	}
+
 	if len(snapshot.Devices) != 0 || !runtime.closed.Load() {
 		t.Fatalf("snapshot = %#v, runtime closed = %v", snapshot, runtime.closed.Load())
 	}
@@ -71,6 +73,7 @@ func TestRefreshDiscoveryPublishesFailureAndRetainsMode(t *testing.T) {
 	if err := service.RefreshDiscovery(context.Background(), DiscoverRequest{}); err != nil {
 		t.Fatalf("RefreshDiscovery: %v", err)
 	}
+
 	if service.lastDiscoverMode != transport.ModeHID {
 		t.Fatalf("last mode = %q, want HID", service.lastDiscoverMode)
 	}
@@ -157,9 +160,11 @@ func TestDiscoveryMonitorCoalescesEventBurst(t *testing.T) {
 	if err := service.StartDiscoveryMonitoring(context.Background()); err != nil {
 		t.Fatalf("StartDiscoveryMonitoring: %v", err)
 	}
+
 	if err := service.StartDiscoveryMonitoring(context.Background()); err != nil {
 		t.Fatalf("second StartDiscoveryMonitoring: %v", err)
 	}
+
 	if opens.Load() != 1 {
 		t.Fatalf("monitor opens = %d, want 1", opens.Load())
 	}
@@ -178,6 +183,7 @@ func TestDiscoveryMonitorCoalescesEventBurst(t *testing.T) {
 	if err := service.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
+
 	if !monitor.isCanceled() {
 		t.Fatal("discovery monitor context was not canceled")
 	}
@@ -298,6 +304,7 @@ func testSelection(id SelectionID, device report.DeviceReport, runtime authentic
 
 func waitForScan(t *testing.T, scans <-chan struct{}) {
 	t.Helper()
+
 	select {
 	case <-scans:
 	case <-time.After(time.Second):
@@ -313,6 +320,7 @@ func (e *recordingEmitter) Emit(name string, payload any) {
 	if name != EventDiscoveryChanged {
 		return
 	}
+
 	if envelope, ok := payload.(DiscoveryChangedEnvelope); ok {
 		e.events <- envelope
 	}

@@ -59,6 +59,7 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 
 		return output, annotateMakeCredentialError(err)
 	}
+
 	result, err := makeCredentialResult(r.env.Selected.Fingerprint, input.RP.ID, input.Extensions, response)
 	if err != nil {
 		return output, err
@@ -76,14 +77,17 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 	if err != nil {
 		return output, err
 	}
+
 	preview, err := appwebauthn.BuildGetAssertionPreview(r.env.Selected, r.env.Authenticator.GetInfo(), input)
 	if err != nil {
 		return output, err
 	}
 	output.Preview = preview
+
 	if req.DryRun {
 		return output, nil
 	}
+
 	if input.Extensions != nil && input.Extensions.LargeBlobInputs != nil && input.Extensions.LargeBlob.Write != nil {
 		if err := r.confirmMutation(ctx, confirmationRequest{
 			confirmed:       req.Confirmed,
@@ -122,6 +126,7 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 
 		return nil
 	}
+
 	if err := r.runWithOptionalToken(ctx, protocol.PermissionGetAssertion, input.RPID, readAssertions); err != nil {
 		return output, err
 	}
@@ -262,9 +267,7 @@ func assertionResult(
 	}
 
 	if response.User != nil {
-		user := *response.User
-		user.ID = append([]byte(nil), response.User.ID...)
-		assertion.User = &user
+		assertion.User = response.User
 	}
 
 	return assertion
@@ -275,9 +278,11 @@ func ctapAuthenticatorOptions(options appwebauthn.AuthenticatorOptions, withToke
 	if options.ResidentKey != nil {
 		out[protocol.OptionResidentKeys] = lo.FromPtr(options.ResidentKey)
 	}
+
 	if options.UserPresence != nil {
 		out[protocol.OptionUserPresence] = lo.FromPtr(options.UserPresence)
 	}
+
 	if options.UserVerification != nil && !withToken {
 		out[protocol.OptionUserVerification] = lo.FromPtr(options.UserVerification)
 	}

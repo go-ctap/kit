@@ -17,8 +17,10 @@ func requireFailureCode(t *testing.T, err error, code failure.Code) *failure.Err
 	if !ok {
 		t.Fatalf("error = %T(%v), want *failure.Error", err, err)
 	}
+
 	if typed.Code != code {
 		t.Fatalf("failure code = %s, want %s (failure = %#v)", typed.Code, code, typed.Failure)
 	}
+
 	return typed
 }

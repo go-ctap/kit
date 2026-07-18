@@ -31,6 +31,7 @@ func TestCredentialInventoryReadsFreshStateAndReusesToken(t *testing.T) {
 	if got := credentialIDFromInventory(t, first); got != "01" {
 		t.Fatalf("first credential ID = %q, want 01", got)
 	}
+
 	if got := credentialIDFromInventory(t, second); got != "01" {
 		t.Fatalf("cached credential ID = %q, want 01", got)
 	}
@@ -40,9 +41,11 @@ func TestCredentialInventoryReadsFreshStateAndReusesToken(t *testing.T) {
 	if got := credentialIDFromInventory(t, refreshed); got != "02" {
 		t.Fatalf("refreshed credential ID = %q, want 02", got)
 	}
+
 	if got := a.metadataCalls.Load(); got != 3 {
 		t.Fatalf("metadata calls = %d, want 3", got)
 	}
+
 	if got := a.tokenCalls.Load(); got != 1 {
 		t.Fatalf("token calls = %d, want 1", got)
 	}
@@ -70,9 +73,11 @@ func TestCredentialInventoryReturnsEmptyReportWithoutEnumeratingRPs(t *testing.T
 	if output.Report.Summary.ExistingResidentCredentialsCount != 0 {
 		t.Fatalf("existing credential count = %d, want 0", output.Report.Summary.ExistingResidentCredentialsCount)
 	}
+
 	if output.Report.Summary.TotalCredentials != 0 || len(output.Report.Groups) != 0 {
 		t.Fatalf("empty inventory = %#v, want no groups or credentials", output.Report)
 	}
+
 	if got := a.rpEnumerations.Load(); got != 0 {
 		t.Fatalf("RP enumerations = %d, want 0", got)
 	}
@@ -89,12 +94,15 @@ func TestCredentialInventoryReacquiresRejectedTokenOnce(t *testing.T) {
 	if output.Report.Summary.ExistingResidentCredentialsCount != 0 {
 		t.Fatalf("existing credential count = %d, want 0", output.Report.Summary.ExistingResidentCredentialsCount)
 	}
+
 	if got := a.tokenCalls.Load(); got != 2 {
 		t.Fatalf("token calls = %d, want 2", got)
 	}
+
 	if got := a.metadataCalls.Load(); got != 2 {
 		t.Fatalf("metadata calls = %d, want 2", got)
 	}
+
 	if len(a.metadataTokens) != 2 || !bytes.Equal(a.metadataTokens[0], []byte{1}) || !bytes.Equal(a.metadataTokens[1], []byte{2}) {
 		t.Fatalf("metadata tokens = %#v, want [[1] [2]]", a.metadataTokens)
 	}
@@ -115,9 +123,11 @@ func TestCredentialInventoryStopsAfterSecondRejectedToken(t *testing.T) {
 	if !failure.IsCode(err, failure.CodePINUVAuthInvalid) {
 		t.Fatalf("ListCredentials error = %v, want %s", err, failure.CodePINUVAuthInvalid)
 	}
+
 	if got := a.tokenCalls.Load(); got != 2 {
 		t.Fatalf("token calls = %d, want 2", got)
 	}
+
 	if got := a.metadataCalls.Load(); got != 2 {
 		t.Fatalf("metadata calls = %d, want 2", got)
 	}
@@ -143,6 +153,7 @@ func TestCredentialMutationUsesInventoryFromSuccessfulRefresh(t *testing.T) {
 	}, userVerificationHandler(t)); err != nil {
 		t.Fatalf("DeleteCredential: %v", err)
 	}
+
 	if len(a.deletedCredentialIDs) != 1 || !bytes.Equal(a.deletedCredentialIDs[0], []byte{2}) {
 		t.Fatalf("deleted credential IDs = %x, want [02]", a.deletedCredentialIDs)
 	}
@@ -313,6 +324,7 @@ func (a *rejectedCredentialTokenAuthenticator) GetCredsMetadata(
 ) (protocol.AuthenticatorCredentialManagementResponse, error) {
 	a.metadataCalls.Add(1)
 	a.metadataTokens = append(a.metadataTokens, slices.Clone(token))
+
 	if a.rejectEveryToken || bytes.Equal(token, []byte{1}) {
 		return protocol.AuthenticatorCredentialManagementResponse{}, &ctaptransport.CTAPError{
 			Command:    protocol.AuthenticatorCredentialManagement,
@@ -385,6 +397,7 @@ func (a *refreshCredentialAuthenticator) GetPinUvAuthTokenUsingUV(context.Contex
 
 func (a *refreshCredentialAuthenticator) GetCredsMetadata(context.Context, []byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
 	a.metadataCalls.Add(1)
+
 	if a.metadataErr != nil {
 		return protocol.AuthenticatorCredentialManagementResponse{}, a.metadataErr
 	}
@@ -558,6 +571,7 @@ func (a *credentialMutationTokenAuthenticator) GetInfo() protocol.AuthenticatorG
 		protocol.OptionPinUvAuthToken:       true,
 		protocol.OptionUserVerification:     true,
 	}
+
 	if a.credentialManagementReadOnly {
 		options[protocol.OptionCredentialManagementReadOnly] = true
 	}

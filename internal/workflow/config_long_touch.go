@@ -18,11 +18,13 @@ func (r Runner) enableLongTouchForReset(ctx context.Context, req model.EnableLon
 	if !req.DryRun {
 		mode = safety.PreviewModeExecute
 	}
+
 	preview, err := appconfig.BuildEnableLongTouchForResetPreview(appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo()), mode)
 	if err != nil {
 		return output, err
 	}
 	output.Preview = preview
+
 	if req.DryRun {
 		return output, nil
 	}

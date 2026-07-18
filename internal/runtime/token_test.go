@@ -59,9 +59,11 @@ func TestTokenServiceCompositeGrantCoversPermissionSubsets(t *testing.T) {
 	if got := len(authenticator.uvRPIDs); got != 1 {
 		t.Fatalf("UV token calls = %d, want 1", got)
 	}
+
 	if got := len(requests); got != 1 {
 		t.Fatalf("interactions = %d, want 1", got)
 	}
+
 	if got, want := requests[0].Permission, "credentialManagement,largeBlobWrite"; got != want {
 		t.Fatalf("interaction permission = %q, want %q", got, want)
 	}
@@ -167,6 +169,7 @@ func TestTokenServiceDefaultFlowFallsBackToPINAfterUVFallbackError(t *testing.T)
 		model.InteractionKindUserVerification,
 		model.InteractionKindPIN,
 	}
+
 	if !slices.Equal(interactionKinds(requests), wantKinds) {
 		t.Fatalf("interaction kinds = %v, want %v", interactionKinds(requests), wantKinds)
 	}
@@ -234,16 +237,20 @@ func TestTokenServicePINInvalidRequestsAnotherPINWithRetryState(t *testing.T) {
 	if len(requests) != 2 {
 		t.Fatalf("interactions = %d, want 2", len(requests))
 	}
+
 	initial := requests[0].PINState
 	if initial == nil {
 		t.Fatal("initial PIN interaction state = nil")
 	}
+
 	if initial.Failure != nil {
 		t.Fatalf("initial PIN failure = %#v, want nil", initial.Failure)
 	}
+
 	if initial.RetriesRemaining == nil || *initial.RetriesRemaining != 7 {
 		t.Fatalf("initial retries remaining = %#v, want 7", initial.RetriesRemaining)
 	}
+
 	if initial.PowerCycleState == nil || *initial.PowerCycleState {
 		t.Fatalf("initial power cycle state = %#v, want false", initial.PowerCycleState)
 	}
@@ -252,27 +259,35 @@ func TestTokenServicePINInvalidRequestsAnotherPINWithRetryState(t *testing.T) {
 	if retry == nil {
 		t.Fatal("retry PIN interaction state = nil")
 	}
+
 	if retry.Failure == nil || retry.Failure.Code != failure.CodePINInvalid {
 		t.Fatalf("retry failure = %#v, want %s", retry.Failure, failure.CodePINInvalid)
 	}
+
 	if retry.Failure.Phase != failure.PhaseTokenAcquisition {
 		t.Fatalf("retry failure phase = %s, want %s", retry.Failure.Phase, failure.PhaseTokenAcquisition)
 	}
+
 	if retry.Failure.CTAP == nil || retry.Failure.CTAP.StatusCode != uint8(ctaptransport.CTAP2_ERR_PIN_INVALID) {
 		t.Fatalf("retry CTAP failure = %#v, want PIN_INVALID provenance", retry.Failure.CTAP)
 	}
+
 	if retry.RetriesRemaining == nil || *retry.RetriesRemaining != 6 {
 		t.Fatalf("retries remaining = %#v, want 6", retry.RetriesRemaining)
 	}
+
 	if retry.PowerCycleState == nil || *retry.PowerCycleState {
 		t.Fatalf("power cycle state = %#v, want false", retry.PowerCycleState)
 	}
+
 	if authenticator.pinRetriesCalls != 2 {
 		t.Fatalf("GetPINRetries calls = %d, want 2", authenticator.pinRetriesCalls)
 	}
+
 	if len(authenticator.pinRPIDs) != 2 {
 		t.Fatalf("PIN token calls = %d, want 2", len(authenticator.pinRPIDs))
 	}
+
 	for _, pin := range returnedPINs {
 		if !slices.Equal(pin, []byte{0, 0, 0, 0}) {
 			t.Fatalf("handler-owned PIN was not wiped: %#v", pin)
@@ -300,12 +315,15 @@ func TestTokenServicePINBlockedDoesNotRequestAnotherPIN(t *testing.T) {
 		secret.Zero(token)
 		t.Fatalf("token = %q, want nil", token)
 	}
+
 	if !failure.IsCode(err, failure.CodePINBlocked) {
 		t.Fatalf("Acquire error = %v, want %s", err, failure.CodePINBlocked)
 	}
+
 	if len(requests) != 1 {
 		t.Fatalf("interactions = %d, want 1", len(requests))
 	}
+
 	if authenticator.pinRetriesCalls != 1 {
 		t.Fatalf("GetPINRetries calls = %d, want 1", authenticator.pinRetriesCalls)
 	}
@@ -339,19 +357,24 @@ func TestTokenServicePINRetriesFailureStopsRetryFlow(t *testing.T) {
 		secret.Zero(token)
 		t.Fatalf("token = %q, want nil", token)
 	}
+
 	if !failure.IsCode(err, failure.CodeAuthenticatorTimeout) {
 		t.Fatalf("Acquire error = %v, want %s", err, failure.CodeAuthenticatorTimeout)
 	}
+
 	snapshot := failure.Snapshot(err)
 	if snapshot.Phase != failure.PhaseTokenAcquisition {
 		t.Fatalf("failure phase = %s, want %s", snapshot.Phase, failure.PhaseTokenAcquisition)
 	}
+
 	if snapshot.CTAP == nil || snapshot.CTAP.SubCommand != "getPINRetries" {
 		t.Fatalf("CTAP detail = %#v, want getPINRetries provenance", snapshot.CTAP)
 	}
+
 	if len(requests) != 1 {
 		t.Fatalf("interactions = %d, want 1", len(requests))
 	}
+
 	if authenticator.pinRetriesCalls != 2 {
 		t.Fatalf("GetPINRetries calls = %d, want 2", authenticator.pinRetriesCalls)
 	}
@@ -375,9 +398,11 @@ func TestTokenServiceDelegatesPINValidationToAuthenticator(t *testing.T) {
 		secret.Zero(token)
 		t.Fatalf("token = %q, want nil", token)
 	}
+
 	if !failure.IsCode(err, failure.CodeInternalError) || !errors.Is(err, validationErr) {
 		t.Fatalf("Acquire error = %v, want delegated validation error", err)
 	}
+
 	if len(authenticator.pinRPIDs) != 1 {
 		t.Fatalf("PIN token calls = %d, want 1", len(authenticator.pinRPIDs))
 	}
@@ -440,12 +465,15 @@ func TestTokenServiceUseReacquiresRejectedTokenOnce(t *testing.T) {
 	if got := len(usedTokens); got != 2 {
 		t.Fatalf("token uses = %d, want 2", got)
 	}
+
 	if got := len(requests); got != 2 {
 		t.Fatalf("interactions = %d, want 2", got)
 	}
+
 	if want := []string{"", ""}; !slices.Equal(authenticator.uvRPIDs, want) {
 		t.Fatalf("UV token rpIds = %v, want %v", authenticator.uvRPIDs, want)
 	}
+
 	for index, token := range usedTokens {
 		if !slices.Equal(token, make([]byte, len(token))) {
 			t.Fatalf("used token %d was not zeroed", index)
@@ -502,9 +530,11 @@ func TestTokenServiceUseKeepsTokenAfterOtherConsumerFailures(t *testing.T) {
 			if !errors.Is(err, consumerErr) {
 				t.Fatalf("Use error = %v, want consumer error", err)
 			}
+
 			if uses != 1 {
 				t.Fatalf("token uses = %d, want 1", uses)
 			}
+
 			if _, present, _ := cache.GetToken(key); !present {
 				t.Fatal("cached token was invalidated")
 			}
@@ -552,7 +582,7 @@ func recordingInteractionHandler(
 		if req.Kind != model.InteractionKindPIN {
 			out.PIN = nil
 		} else if len(out.PIN) != 0 {
-			out.PIN = append([]byte(nil), out.PIN...)
+			out.PIN = slices.Clone(out.PIN)
 		}
 
 		return out, nil
@@ -626,6 +656,7 @@ func (c *testTokenCache) InvalidateTokenUnlessPermission(permission protocol.Per
 	if c.secret == nil {
 		return
 	}
+
 	if permission == protocol.PermissionPersistentCredentialManagementReadOnly &&
 		c.key.Permission != permission {
 		c.InvalidateToken()
@@ -682,7 +713,9 @@ func (d *recordingTokenDevice) GetPinUvAuthTokenUsingUV(_ context.Context, _ pro
 		last := (*d.requests)[len(*d.requests)-1]
 		d.uvSawInteraction = last.Kind == model.InteractionKindUserVerification
 	}
+
 	d.uvRPIDs = append(d.uvRPIDs, rpID)
+
 	if d.uvErr != nil {
 		return nil, d.uvErr
 	}
@@ -697,6 +730,7 @@ func (d *recordingTokenDevice) GetPINRetries(context.Context) (uint, *bool, erro
 	if call < len(d.pinRetryCounts) {
 		retries = d.pinRetryCounts[call]
 	}
+
 	var err error
 	if call < len(d.pinRetriesErrs) {
 		err = d.pinRetriesErrs[call]

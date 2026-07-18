@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"context"
-	"slices"
 
 	"github.com/go-ctap/ctap/crypto"
 	"github.com/go-ctap/ctap/protocol"
@@ -45,6 +44,7 @@ func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageC
 
 	preview := r.buildGarbageCollectPreview(state)
 	output.Preview = preview
+
 	if req.DryRun {
 		return output, nil
 	}
@@ -117,14 +117,16 @@ func (r Runner) loadGarbageCollectState(
 	var matchedCount, unmatchedCount int
 	for _, blob := range blobs {
 		if !largeBlobMapConforming(blob) {
-			replacement = append(replacement, cloneLargeBlob(blob))
+			replacement = append(replacement, blob)
 			continue
 		}
+
 		if blobMatchesAnyKey(blob, keys) {
 			matchedCount++
-			replacement = append(replacement, cloneLargeBlob(blob))
+			replacement = append(replacement, blob)
 			continue
 		}
+
 		unmatchedCount++
 	}
 	zeroKeys(keys)
@@ -133,13 +135,14 @@ func (r Runner) loadGarbageCollectState(
 	if err != nil {
 		return garbageCollectState{}, err
 	}
+
 	if err := checkSerializedArrayLimit(support.MaxSerializedLargeBlobArray, sizeAfter); err != nil {
 		return garbageCollectState{}, err
 	}
 
 	return garbageCollectState{
 		support:        support,
-		blobs:          cloneLargeBlobs(blobs),
+		blobs:          blobs,
 		replacement:    replacement,
 		matchedCount:   matchedCount,
 		unmatchedCount: unmatchedCount,
@@ -192,7 +195,7 @@ func largeBlobKeys(inventory appcredentials.InventoryReport) [][]byte {
 	for _, group := range inventory.Groups {
 		for _, record := range group.Credentials {
 			if len(record.LargeBlobKey) == 32 {
-				keys = append(keys, slices.Clone(record.LargeBlobKey))
+				keys = append(keys, record.LargeBlobKey)
 			}
 		}
 	}
@@ -224,13 +227,5 @@ func largeBlobMapConforming(blob protocol.LargeBlob) bool {
 func zeroKeys(keys [][]byte) {
 	for _, key := range keys {
 		secret.Zero(key)
-	}
-}
-
-func cloneLargeBlob(blob protocol.LargeBlob) protocol.LargeBlob {
-	return protocol.LargeBlob{
-		Ciphertext: slices.Clone(blob.Ciphertext),
-		Nonce:      slices.Clone(blob.Nonce),
-		OrigSize:   blob.OrigSize,
 	}
 }

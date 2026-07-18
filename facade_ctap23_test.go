@@ -33,6 +33,7 @@ func TestCredentialStoreStateUsesStandalonePCMRToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CredentialStoreState: %v", err)
 	}
+
 	output := result.(model.CredentialStoreStateOutput)
 	if output.Result.AuthenticatorIdentifierHex != "000102030405060708090a0b0c0d0e0f" ||
 		output.Result.CredentialStoreStateHex != "101112131415161718191a1b1c1d1e1f" {
@@ -42,9 +43,11 @@ func TestCredentialStoreStateUsesStandalonePCMRToken(t *testing.T) {
 		protocol.PermissionCredentialManagement,
 		protocol.PermissionPersistentCredentialManagementReadOnly,
 	}
+
 	if !slices.Equal(a.permissions, wantPermissions) {
 		t.Fatalf("token permissions = %v, want %v", a.permissions, wantPermissions)
 	}
+
 	if a.stateTokenPermission != protocol.PermissionPersistentCredentialManagementReadOnly {
 		t.Fatalf("state token permission = %s, want standalone pcmr", a.stateTokenPermission)
 	}
@@ -78,6 +81,7 @@ func TestEnableLongTouchForResetDryRunAndRefreshFailureCacheEffects(t *testing.T
 	if err != nil {
 		t.Fatalf("dry run: %v", err)
 	}
+
 	if dryRun.(model.AuthenticatorConfigOutput).Result != nil || a.enableCalls.Load() != 0 {
 		t.Fatalf("dry run result/calls = %#v/%d", dryRun, a.enableCalls.Load())
 	}
@@ -86,6 +90,7 @@ func TestEnableLongTouchForResetDryRunAndRefreshFailureCacheEffects(t *testing.T
 	if !failure.IsCode(err, failure.CodeInternalError) || !errors.Is(err, refreshErr) {
 		t.Fatalf("execute error = %v, want refresh failure", err)
 	}
+
 	if result.(model.AuthenticatorConfigOutput).Result != nil || a.enableCalls.Load() != 1 {
 		t.Fatalf("execute result/calls = %#v/%d", result, a.enableCalls.Load())
 	}
@@ -94,9 +99,11 @@ func TestEnableLongTouchForResetDryRunAndRefreshFailureCacheEffects(t *testing.T
 	if err != nil {
 		t.Fatalf("ConfigStatus after refresh failure: %v", err)
 	}
+
 	if got := status.(model.ConfigStatusOutput).Report.ResetHints.LongTouchForReset; got != "configured" {
 		t.Fatalf("long touch status = %s, want configured", got)
 	}
+
 	if a.infoCalls.Load() != 4 {
 		t.Fatalf("GetInfo calls = %d, want cache refresh after mutation error", a.infoCalls.Load())
 	}
@@ -113,6 +120,7 @@ func TestEnableLongTouchForResetSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnableLongTouchForReset: %v", err)
 	}
+
 	output := result.(model.AuthenticatorConfigOutput)
 	if output.Result == nil || output.Result.State != "configured" || a.enableCalls.Load() != 1 {
 		t.Fatalf("output/calls = %#v/%d", output, a.enableCalls.Load())
@@ -135,10 +143,12 @@ func TestSetMinPINLengthPassesParametersWithoutDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetMinPINLength: %v", err)
 	}
+
 	if a.params.NewMinPINLength != nil || len(a.params.MinPINLengthRPIDs) != 1 ||
 		!a.params.ForceChangePIN || !a.params.PINComplexityPolicy {
 		t.Fatalf("upstream params = %#v", a.params)
 	}
+
 	output := result.(model.AuthenticatorConfigOutput)
 	if output.Result == nil || len(output.Result.MinPINLengthRPIDs) != 1 ||
 		!output.Result.ForceChangePIN || !output.Result.PINComplexityPolicy {
@@ -160,6 +170,7 @@ func (a *storeStateAuthenticator) GetInfo() protocol.AuthenticatorGetInfoRespons
 		protocol.OptionPinUvAuthToken:       true,
 		protocol.OptionUserVerification:     true,
 	}
+
 	if a.readOnly.Load() {
 		options[protocol.OptionCredentialManagementReadOnly] = true
 	}
@@ -173,6 +184,7 @@ func (a *storeStateAuthenticator) GetPinUvAuthTokenUsingUV(
 	_ string,
 ) ([]byte, error) {
 	a.permissions = append(a.permissions, permission)
+
 	if a.tokenPermissions == nil {
 		a.tokenPermissions = make(map[string]protocol.Permission)
 	}

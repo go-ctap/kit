@@ -47,6 +47,7 @@ func Open(ctx context.Context, mode transport.Mode, path string) (Device, error)
 			}
 		}
 	}
+
 	if err != nil {
 		switch {
 		case errors.Is(err, context.Canceled):

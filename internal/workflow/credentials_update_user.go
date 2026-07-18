@@ -49,6 +49,7 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 	}
 
 	output.Preview = preview
+
 	if req.DryRun {
 		return output, nil
 	}

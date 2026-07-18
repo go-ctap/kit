@@ -101,11 +101,10 @@ type Blob struct {
 	// jwt.RegisteredClaims. It is zero when both are absent.
 	IssuedAt time.Time
 
-	Entries map[uuid.UUID]appmds.PayloadEntry
+	Entries map[uuid.UUID]*appmds.PayloadEntry
 
 	CachedAt time.Time
 	ETag     string
-	Raw      []byte
 }
 
 // Lookup returns verified MDS data for one AAGUID.
@@ -129,8 +128,9 @@ func (c *Client) Lookup(ctx context.Context, aaguid uuid.UUID, opts LookupOption
 		Cached:     cached,
 		CachedAt:   blob.CachedAt,
 	}
+
 	if found {
-		result.Entry = &entry
+		result.Entry = entry
 	}
 
 	return result, nil
@@ -148,6 +148,7 @@ func (c *Client) blob(ctx context.Context, source string, opts LookupOptions) (*
 		if local != nil && opts.AllowStaleOnFetchError {
 			return local, true, nil
 		}
+
 		return nil, false, err
 	}
 
@@ -162,6 +163,7 @@ func (c *Client) blob(ctx context.Context, source string, opts LookupOptions) (*
 	if local != nil && remote.Number == local.Number {
 		return c.markLocalFresh(source, cacheKey, local), true, nil
 	}
+
 	if local != nil && remote.Number < local.Number {
 		c.cache().Set(cacheKey, local)
 		return local, true, nil
@@ -174,23 +176,21 @@ func (c *Client) blob(ctx context.Context, source string, opts LookupOptions) (*
 		cachedAt = c.now()
 	}
 	remote.CachedAt = cachedAt
-	remote.Raw = append([]byte(nil), raw...)
 
 	c.cache().Set(cacheKey, remote)
 	return remote, false, nil
 }
 
 func (c *Client) markLocalFresh(source, cacheKey string, local *Blob) *Blob {
-	checked := *local
-	checked.CachedAt = c.now()
-	c.cache().Set(cacheKey, &checked)
+	local.CachedAt = c.now()
+	c.cache().Set(cacheKey, local)
 
 	path, err := c.diskCachePath(source)
 	if err == nil {
-		_ = os.Chtimes(path, checked.CachedAt, checked.CachedAt)
+		_ = os.Chtimes(path, local.CachedAt, local.CachedAt)
 	}
 
-	return &checked
+	return local
 }
 
 func (c *Client) loadLocal(ctx context.Context, source, cacheKey string) *Blob {
@@ -217,9 +217,11 @@ func (c *Client) shouldRefresh(local *Blob, opts LookupOptions) bool {
 	if maxAge == 0 {
 		maxAge = c.refreshInterval()
 	}
+
 	if maxAge < 0 {
 		return false
 	}
+
 	if local.CachedAt.IsZero() {
 		return true
 	}
@@ -247,6 +249,7 @@ func (c *Client) fetchAndVerify(ctx context.Context, source string, local *Blob)
 	if resp.StatusCode == http.StatusNotModified {
 		return nil, nil, true, nil
 	}
+
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return nil, nil, false, &HTTPStatusError{StatusCode: resp.StatusCode}
 	}
@@ -261,7 +264,6 @@ func (c *Client) fetchAndVerify(ctx context.Context, source string, local *Blob)
 		return nil, nil, false, err
 	}
 	blob.ETag = resp.Header.Get("ETag")
-	blob.Raw = append([]byte(nil), body...)
 
 	return blob, body, false, nil
 }
@@ -281,10 +283,10 @@ func (c *Client) loadDiskCache(ctx context.Context, source string) (*Blob, bool)
 	if err != nil {
 		return nil, false
 	}
+
 	if info, err := os.Stat(path); err == nil {
 		blob.CachedAt = info.ModTime()
 	}
-	blob.Raw = append([]byte(nil), body...)
 
 	return blob, true
 }
@@ -316,17 +318,21 @@ func (c *Client) storeDiskCache(source string, body []byte) (time.Time, error) {
 		_ = temp.Close()
 		return time.Time{}, err
 	}
+
 	if _, err := temp.Write(body); err != nil {
 		_ = temp.Close()
 		return time.Time{}, err
 	}
+
 	if err := temp.Sync(); err != nil {
 		_ = temp.Close()
 		return time.Time{}, err
 	}
+
 	if err := temp.Close(); err != nil {
 		return time.Time{}, err
 	}
+
 	if err := os.Rename(tempPath, path); err != nil {
 		return time.Time{}, err
 	}
@@ -361,8 +367,9 @@ func (c *Client) parseAndVerify(ctx context.Context, raw []byte) (*Blob, error) 
 }
 
 func blobFromVerified(verified *mdsverify.Blob) *Blob {
-	entries := make(map[uuid.UUID]appmds.PayloadEntry, len(verified.Entries))
-	for _, entry := range verified.Entries {
+	entries := make(map[uuid.UUID]*appmds.PayloadEntry, len(verified.Entries))
+	for index := range verified.Entries {
+		entry := &verified.Entries[index]
 		if entry.AAGUID != uuid.Nil {
 			entries[entry.AAGUID] = entry
 		}
@@ -493,6 +500,7 @@ func readLimited(r io.Reader, limit int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if n > limit {
 		return nil, fmt.Errorf("object exceeds %d bytes", limit)
 	}

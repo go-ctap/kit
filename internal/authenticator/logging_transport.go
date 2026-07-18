@@ -238,6 +238,7 @@ func normalizedCommandError(err error, entry model.LogEntry) error {
 	if entry.CommandCode == uint8(protocol.AuthenticatorGetNextAssertion) {
 		phase = failure.PhaseAssertionContinuation
 	}
+
 	context := errornorm.WithCommand(phase, protocol.Command(entry.CommandCode))
 	if entry.SubCommandCode != nil {
 		switch entry.SubCommandFamily {

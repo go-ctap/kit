@@ -21,6 +21,7 @@ func (d *fakeTransportDiscovery) discover(
 	requested transport.Mode,
 ) (transport.Mode, []transport.Descriptor, error) {
 	d.requested = requested
+
 	if d.err != nil {
 		return "", nil, d.err
 	}
@@ -55,6 +56,7 @@ func TestDiscoverDevicesReturnsOpaqueDevicesWithReports(t *testing.T) {
 	if report.Fingerprint == "" || report.OrdinalAlias != "1" || report.Transport != transport.ModeHID || report.Path != "hid://one" || report.Manufacturer != "Yubico" || report.Product != "YubiKey 5C NFC" || report.Serial != "12345678" || report.VendorID != 0x1050 || report.ProductID != 0x0407 {
 		t.Fatalf("unexpected report: %+v", report)
 	}
+
 	if report.Vendor != modelreport.VendorYubico {
 		t.Fatalf("vendor = %q, want %q", report.Vendor, modelreport.VendorYubico)
 	}
@@ -80,6 +82,7 @@ func TestDiscoverDevicesFingerprintTracksTransportAttachment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DiscoverDevices: %v", err)
 	}
+
 	if first, second := devices[0].Report().Fingerprint, devices[1].Report().Fingerprint; first == second {
 		t.Fatalf("fingerprints for different transport paths collide: %q", first)
 	}
@@ -89,6 +92,7 @@ func TestDiscoverDevicesFingerprintTracksTransportAttachment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DiscoverDevices after path change: %v", err)
 	}
+
 	if got, previous := repeated[0].Report().Fingerprint, devices[0].Report().Fingerprint; got == previous {
 		t.Fatalf("fingerprint did not change with transport path: %q", got)
 	}
@@ -132,6 +136,7 @@ func TestSelectDeviceUsesDiscoverySnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SelectDevice(fingerprint): %v", err)
 	}
+
 	if selected.Report().Path != "hid://one" {
 		t.Fatalf("selected by fingerprint path = %q, want hid://one", selected.Report().Path)
 	}
@@ -140,6 +145,7 @@ func TestSelectDeviceUsesDiscoverySnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SelectDevice(alias): %v", err)
 	}
+
 	if selected.Report().Path != "hid://two" {
 		t.Fatalf("selected by alias path = %q, want hid://two", selected.Report().Path)
 	}
@@ -160,6 +166,7 @@ func TestSelectDeviceUsesDiscoverySnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SelectDevice(empty,single): %v", err)
 	}
+
 	if selected.Report().Path != "hid://one" {
 		t.Fatalf("auto-selected path = %q, want hid://one", selected.Report().Path)
 	}

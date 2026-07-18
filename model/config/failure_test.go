@@ -45,6 +45,7 @@ func TestPINPreviewFailuresUseStableCodes(t *testing.T) {
 			if !failure.IsCode(err, tt.wantCode) {
 				t.Fatalf("buildPINPreview error = %v, want %s", err, tt.wantCode)
 			}
+
 			if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
 				t.Fatalf("buildPINPreview phase = %q, want %q", got, failure.PhaseValidation)
 			}
@@ -60,6 +61,7 @@ func TestBioPreviewFailuresUseStableCodes(t *testing.T) {
 	if _, err := DecodeTemplateID(""); !failure.IsCode(err, failure.CodeBioTemplateIDRequired) {
 		t.Fatalf("DecodeTemplateID(empty) error = %v, want %s", err, failure.CodeBioTemplateIDRequired)
 	}
+
 	if _, err := DecodeTemplateID("not-hex"); !failure.IsCode(err, failure.CodeBioTemplateIDInvalid) {
 		t.Fatalf("DecodeTemplateID(invalid) error = %v, want %s", err, failure.CodeBioTemplateIDInvalid)
 	}
@@ -109,6 +111,7 @@ func TestMinPINLengthDecreaseFailureKeepsApprovedParams(t *testing.T) {
 	if snapshot.Phase != failure.PhaseValidation {
 		t.Fatalf("failure phase = %q, want %q", snapshot.Phase, failure.PhaseValidation)
 	}
+
 	if snapshot.Params["requested"] != "4" || snapshot.Params["current"] != "8" {
 		t.Fatalf("failure params = %#v, want requested/current", snapshot.Params)
 	}
@@ -144,6 +147,7 @@ func TestMinPINLengthPreviewUsesZeroValuesAsAbsent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildMinPINLengthPreview: %v", err)
 	}
+
 	if len(preview.MinPINLengthRPIDs) != 1 || !preview.ForceChangePIN || !preview.PINComplexityPolicy {
 		t.Fatalf("preview = %#v", preview)
 	}
@@ -170,6 +174,7 @@ func TestEnableLongTouchForResetPreviewValidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildEnableLongTouchForResetPreview: %v", err)
 	}
+
 	if preview.CurrentLongTouch == nil || *preview.CurrentLongTouch ||
 		!preview.RequestedLongTouch {
 		t.Fatalf("preview = %#v", preview)

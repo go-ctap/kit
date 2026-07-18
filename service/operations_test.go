@@ -26,6 +26,7 @@ func TestCTAP23ServiceRequestsMapPresenceAndNewOperations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetMinPINLength: %v", err)
 	}
+
 	setMin := runtime.operation.(model.SetMinPINLengthOperation)
 	if setMin.NewMinPINLength != nil || len(setMin.MinPINLengthRPIDs) != 1 ||
 		!setMin.ForceChangePIN || !setMin.PINComplexityPolicy {
@@ -36,6 +37,7 @@ func TestCTAP23ServiceRequestsMapPresenceAndNewOperations(t *testing.T) {
 	if _, err := service.CredentialStoreState(context.Background(), OperationRequest{SelectionID: "selection-1"}); err != nil {
 		t.Fatalf("CredentialStoreState: %v", err)
 	}
+
 	if _, ok := runtime.operation.(model.CredentialStoreStateOperation); !ok {
 		t.Fatalf("store-state operation = %T", runtime.operation)
 	}
@@ -47,6 +49,7 @@ func TestCTAP23ServiceRequestsMapPresenceAndNewOperations(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("EnableLongTouchForReset: %v", err)
 	}
+
 	longTouch := runtime.operation.(model.EnableLongTouchForResetOperation)
 	if !longTouch.Confirmed {
 		t.Fatalf("long-touch operation = %#v", longTouch)
@@ -62,15 +65,19 @@ func TestListCredentialsInvalidSelectionReturnsTypedErrorEnvelope(t *testing.T) 
 	if err != nil {
 		t.Fatalf("ListCredentials error = %v, want nil because the failure is in the envelope", err)
 	}
+
 	if envelope.SelectionID != "missing-selection" {
 		t.Fatalf("envelope selection ID = %q, want missing-selection", envelope.SelectionID)
 	}
+
 	if envelope.Kind != model.OperationListCredentials {
 		t.Fatalf("envelope kind = %q, want %q", envelope.Kind, model.OperationListCredentials)
 	}
+
 	if envelope.Error == nil || envelope.Error.Code != failure.CodeSelectionInvalid {
 		t.Fatalf("envelope error = %#v, want %s", envelope.Error, failure.CodeSelectionInvalid)
 	}
+
 	if envelope.Error.Category != failure.CategoryInvalidSelection || envelope.Error.Phase != failure.PhaseSelection {
 		t.Fatalf("envelope error = %#v, want invalid-selection/selection", envelope.Error)
 	}
@@ -93,18 +100,23 @@ func TestListCredentialsOperationFailureUsesOnlyTheTypedEnvelopeError(t *testing
 	if err != nil {
 		t.Fatalf("ListCredentials error = %v, want nil because the failure is in the envelope", err)
 	}
+
 	if envelope.Error == nil || envelope.Error.Code != failure.CodeOperationCanceled {
 		t.Fatalf("envelope error = %#v, want %s", envelope.Error, failure.CodeOperationCanceled)
 	}
+
 	if envelope.Error.Category != failure.CategoryCanceled {
 		t.Fatalf("envelope error category = %q, want %q", envelope.Error.Category, failure.CategoryCanceled)
 	}
+
 	if envelope.Result != nil {
 		t.Fatalf("envelope result = %#v, want nil on operation failure", envelope.Result)
 	}
+
 	if envelope.AuthenticatorClosed {
 		t.Fatal("envelope authenticatorClosed = true, want false")
 	}
+
 	if _, ok := service.selectionFor("selection-1"); !ok {
 		t.Fatal("selected selection was retired")
 	}
@@ -128,9 +140,11 @@ func TestOperationEnvelopeReportsAndRetiresClosedSelection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListCredentials: %v", err)
 	}
+
 	if !envelope.AuthenticatorClosed {
 		t.Fatal("envelope authenticatorClosed = false, want true")
 	}
+
 	if envelope.Error == nil || envelope.Error.Code != failure.CodeOperationCanceled {
 		t.Fatalf("envelope error = %#v, want %s", envelope.Error, failure.CodeOperationCanceled)
 	}
@@ -145,6 +159,7 @@ func TestPINRequestsRoundTripSecrets(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"selectionId":"selection-1","newPIN":"123456","confirmed":true}`), &setPIN); err != nil {
 		t.Fatalf("unmarshal set PIN request: %v", err)
 	}
+
 	if setPIN.SelectionID != "selection-1" || setPIN.NewPIN != "123456" || !setPIN.Confirmed {
 		t.Fatalf("unexpected set PIN request: %#v", setPIN)
 	}
@@ -153,10 +168,12 @@ func TestPINRequestsRoundTripSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal set PIN request: %v", err)
 	}
+
 	var setPINRoundTrip PINSetRequest
 	if err := json.Unmarshal(raw, &setPINRoundTrip); err != nil {
 		t.Fatalf("unmarshal marshaled set PIN request: %v", err)
 	}
+
 	if setPINRoundTrip != setPIN {
 		t.Fatalf("set PIN request round trip = %#v, want %#v", setPINRoundTrip, setPIN)
 	}
@@ -165,6 +182,7 @@ func TestPINRequestsRoundTripSecrets(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"selectionId":"selection-1","currentPIN":"123456","newPIN":"654321","dryRun":true}`), &changePIN); err != nil {
 		t.Fatalf("unmarshal change PIN request: %v", err)
 	}
+
 	if changePIN.SelectionID != "selection-1" || changePIN.CurrentPIN != "123456" || changePIN.NewPIN != "654321" || !changePIN.DryRun {
 		t.Fatalf("unexpected change PIN request: %#v", changePIN)
 	}
@@ -173,10 +191,12 @@ func TestPINRequestsRoundTripSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal change PIN request: %v", err)
 	}
+
 	var changePINRoundTrip PINChangeRequest
 	if err := json.Unmarshal(raw, &changePINRoundTrip); err != nil {
 		t.Fatalf("unmarshal marshaled change PIN request: %v", err)
 	}
+
 	if changePINRoundTrip != changePIN {
 		t.Fatalf("change PIN request round trip = %#v, want %#v", changePINRoundTrip, changePIN)
 	}
@@ -196,6 +216,7 @@ func (s *recordingAuthenticator) Run(
 	_ ...ctapkit.OperationOption,
 ) (model.OperationResult, error) {
 	s.operation = operation
+
 	if s.result != nil || s.runErr != nil {
 		return s.result, s.runErr
 	}

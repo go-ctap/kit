@@ -78,6 +78,7 @@ func TestBuildStatusReportLabelsUVModality(t *testing.T) {
 	if statusReport.Bio.UVModality == nil || *statusReport.Bio.UVModality != uint(protocol.UserVerifyFingerprintInternal) {
 		t.Fatalf("uv modality = %#v, want numeric fingerprint flag", statusReport.Bio.UVModality)
 	}
+
 	if statusReport.Bio.UVModalityLabel != "fingerprint_internal" {
 		t.Fatalf("uv modality label = %q, want fingerprint_internal", statusReport.Bio.UVModalityLabel)
 	}
@@ -127,12 +128,15 @@ func TestBuildStatusReportAppliesEffectiveLimitsAndPreservesNullableZeros(t *tes
 	if statusReport.PIN.MinPINLength != 4 {
 		t.Fatalf("pin minPINLength = %#v, want effective 4", statusReport.PIN.MinPINLength)
 	}
+
 	if statusReport.PIN.MaxPINLength != 63 {
 		t.Fatalf("pin maxPINLength = %#v, want effective 63", statusReport.PIN.MaxPINLength)
 	}
+
 	if statusReport.PIN.PinComplexityPolicy == nil || *statusReport.PIN.PinComplexityPolicy {
 		t.Fatalf("pinComplexityPolicy = %#v, want explicit false", statusReport.PIN.PinComplexityPolicy)
 	}
+
 	if statusReport.Limits.MaxRPIDsForSetMinPINLength == nil || *statusReport.Limits.MaxRPIDsForSetMinPINLength != 0 {
 		t.Fatalf("max RPIDs = %#v, want explicit 0", statusReport.Limits.MaxRPIDsForSetMinPINLength)
 	}
@@ -154,6 +158,7 @@ func TestBuildStatusReportAppliesEffectiveLimitsAndPreservesNullableZeros(t *tes
 			t.Fatalf("JSON missing %s: %s", want, text)
 		}
 	}
+
 	for _, reject := range []string{"forcePINChange", "pinComplexityPolicyURL", "preferredPlatformUvAttempts"} {
 		if strings.Contains(text, reject) {
 			t.Fatalf("JSON included zero-value %s: %s", reject, text)
@@ -182,9 +187,11 @@ func TestBuildStatusReportUsesEffectivePINLimitsAndOmitsOtherAbsentNullableLimit
 			t.Fatalf("JSON included absent %s: %s", reject, text)
 		}
 	}
+
 	if !strings.Contains(text, `"maxPINLength":63`) {
 		t.Fatalf("JSON omitted effective max PIN length: %s", text)
 	}
+
 	if !strings.Contains(text, `"minPINLength":4`) {
 		t.Fatalf("JSON omitted effective minimum PIN length: %s", text)
 	}

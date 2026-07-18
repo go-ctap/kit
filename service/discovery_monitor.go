@@ -22,6 +22,7 @@ func (s *Service) StartDiscoveryMonitoring(ctx context.Context) error {
 		s.mu.Unlock()
 		return closedServiceError(failure.PhaseDiscovery)
 	}
+
 	if s.monitorCancel != nil {
 		s.mu.Unlock()
 		return nil
@@ -40,6 +41,7 @@ func (s *Service) StartDiscoveryMonitoring(ctx context.Context) error {
 
 		return normalizeServicePhaseError(err, failure.PhaseDiscovery)
 	}
+
 	if err := ctx.Err(); err != nil {
 		monitorCancel()
 
@@ -54,6 +56,7 @@ func (s *Service) StartDiscoveryMonitoring(ctx context.Context) error {
 
 		return closedServiceError(failure.PhaseDiscovery)
 	}
+
 	if s.monitorCancel != nil {
 		s.mu.Unlock()
 		monitorCancel()
@@ -108,6 +111,7 @@ func (s *Service) runDiscoveryMonitor(
 		if timer == nil {
 			return
 		}
+
 		if !timer.Stop() {
 			select {
 			case <-timer.C:
@@ -134,6 +138,7 @@ func (s *Service) runDiscoveryMonitor(
 			if !ok {
 				return
 			}
+
 			if event.Err != nil {
 				s.emitDiscoveryMonitorFailure(event.Err)
 

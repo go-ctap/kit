@@ -57,9 +57,11 @@ func TestTransportErrors(t *testing.T) {
 			if !failure.IsCode(err, tt.code) {
 				t.Fatalf("code = %q, want %q", failure.Snapshot(err).Code, tt.code)
 			}
+
 			if phase := failure.Snapshot(err).Phase; phase != failure.PhaseDiscovery {
 				t.Fatalf("phase = %q, want %q", phase, failure.PhaseDiscovery)
 			}
+
 			if !errors.Is(err, tt.err) {
 				t.Fatalf("error %v does not preserve cause %v", err, tt.err)
 			}

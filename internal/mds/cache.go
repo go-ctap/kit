@@ -2,8 +2,7 @@ package mds
 
 import "sync"
 
-// Cache stores verified MDS blobs in process memory.
-// Implementations should treat Blob values as immutable snapshots.
+// Cache stores and shares verified MDS blobs in process memory.
 type Cache interface {
 	Get(source string) (*Blob, bool)
 	Set(source string, blob *Blob)

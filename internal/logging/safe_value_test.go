@@ -31,14 +31,17 @@ func TestSafeValueKeepsDiagnosticsAndRedactsKnownSecrets(t *testing.T) {
 	if payload == nil || !strings.Contains(payload.JSON, public) {
 		t.Fatalf("safe payload lost public field: %#v", payload)
 	}
+
 	for _, secret := range []string{pin, confirmation} {
 		if strings.Contains(payload.JSON, secret) || strings.Contains(payload.JSON, base64.StdEncoding.EncodeToString([]byte(secret))) {
 			t.Fatalf("safe payload contains %q: %s", secret, payload.JSON)
 		}
 	}
+
 	if !strings.Contains(payload.JSON, Redacted) {
 		t.Fatalf("safe payload has no redaction marker: %s", payload.JSON)
 	}
+
 	if strings.Join(safe.RedactedFields, ",") != "pin,confirmationMessage,confirmed" {
 		t.Fatalf("redacted fields = %v", safe.RedactedFields)
 	}
@@ -54,9 +57,11 @@ func TestSafeValueRedactsSecretMapKeysBeforeJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
+
 	if strings.Contains(string(raw), secret) || strings.Contains(string(raw), base64.StdEncoding.EncodeToString([]byte(secret))) {
 		t.Fatalf("safe map contains secret: %s", raw)
 	}
+
 	if len(safe.RedactedFields) != 1 || safe.RedactedFields[0] != "hmac-secret" {
 		t.Fatalf("redacted fields = %v", safe.RedactedFields)
 	}
@@ -98,9 +103,11 @@ func TestSafeValueRedactsCTAP23LargeBlobPaymentAndStoreState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
+
 	if strings.Contains(string(raw), secret) || strings.Contains(string(raw), base64.StdEncoding.EncodeToString([]byte(secret))) {
 		t.Fatalf("safe CTAP 2.3 payload contains secret: %s", raw)
 	}
+
 	for _, field := range []string{
 		"largeBlob.write",
 		"largeBlob.blobHex",

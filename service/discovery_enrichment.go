@@ -14,12 +14,12 @@ type discoveryEnrichment struct {
 	running bool
 	cancel  context.CancelFunc
 	done    chan struct{}
-	cache   map[string]report.DeviceMetadata
+	cache   map[string]*report.DeviceMetadata
 }
 
 func newDiscoveryEnrichment() discoveryEnrichment {
 	return discoveryEnrichment{
-		cache: make(map[string]report.DeviceMetadata),
+		cache: make(map[string]*report.DeviceMetadata),
 	}
 }
 
@@ -30,6 +30,7 @@ func (s *Service) startEnrichment() {
 
 		return
 	}
+
 	if s.enrichment.running {
 		s.mu.Unlock()
 
@@ -56,8 +57,9 @@ func (s *Service) runEnrichment(ctx context.Context) {
 		probeCtx, cancel := context.WithTimeout(ctx, enrichmentProbeTimeout)
 		metadata, err := vendorinfo.Probe(probeCtx, device)
 		cancel()
+
 		if err == nil && metadata != nil {
-			s.applyEnrichment(device, *metadata)
+			s.applyEnrichment(device, metadata)
 		}
 	}
 }
@@ -91,7 +93,7 @@ func (s *Service) nextEnrichmentCandidate(
 
 func takeEnrichmentCandidate(
 	devices []report.DeviceReport,
-	cache map[string]report.DeviceMetadata,
+	cache map[string]*report.DeviceMetadata,
 	attempted map[string]struct{},
 ) (report.DeviceReport, bool) {
 	for _, device := range devices {
@@ -99,10 +101,11 @@ func takeEnrichmentCandidate(
 			continue
 		}
 
-		key := enrichmentKey(device)
+		key := device.Fingerprint
 		if _, ok := cache[key]; ok {
 			continue
 		}
+
 		if _, ok := attempted[key]; ok {
 			continue
 		}
@@ -126,8 +129,8 @@ func (s *Service) finishEnrichmentLocked() {
 	s.enrichment.done = nil
 }
 
-func (s *Service) applyEnrichment(device report.DeviceReport, metadata report.DeviceMetadata) {
-	s.persistDeviceMetadata(device.Fingerprint, metadata)
+func (s *Service) applyEnrichment(device report.DeviceReport, metadata *report.DeviceMetadata) {
+	s.persistDeviceMetadata(device.Fingerprint, *metadata)
 
 	s.mu.Lock()
 	if s.closed || !deviceReportPresent(deviceReports(s.devices), device) {
@@ -136,7 +139,7 @@ func (s *Service) applyEnrichment(device report.DeviceReport, metadata report.De
 		return
 	}
 
-	s.enrichment.cache[enrichmentKey(device)] = cloneDeviceMetadata(metadata)
+	s.enrichment.cache[device.Fingerprint] = metadata
 	snapshot := DiscoverySnapshot{Devices: s.deviceReportsWithMetadataLocked(s.devices)}
 	s.mu.Unlock()
 

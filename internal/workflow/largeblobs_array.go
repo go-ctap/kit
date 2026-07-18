@@ -61,24 +61,7 @@ func (r Runner) readLargeBlobArray(ctx context.Context) ([]protocol.LargeBlob, e
 		))
 	}
 
-	return cloneLargeBlobs(blobs), nil
-}
-
-func cloneLargeBlobs(blobs []protocol.LargeBlob) []protocol.LargeBlob {
-	if len(blobs) == 0 {
-		return nil
-	}
-
-	cloned := make([]protocol.LargeBlob, 0, len(blobs))
-	for _, blob := range blobs {
-		cloned = append(cloned, protocol.LargeBlob{
-			Ciphertext: slices.Clone(blob.Ciphertext),
-			Nonce:      slices.Clone(blob.Nonce),
-			OrigSize:   blob.OrigSize,
-		})
-	}
-
-	return cloned
+	return blobs, nil
 }
 
 func replaceBlob(
@@ -87,7 +70,8 @@ func replaceBlob(
 	blob protocol.LargeBlob,
 	operation applargeblobs.MutationOperation,
 ) []protocol.LargeBlob {
-	out := cloneLargeBlobs(blobs)
+	out := slices.Clone(blobs)
+
 	if operation == applargeblobs.MutationReplace && index >= 0 {
 		out[index] = blob
 
@@ -99,7 +83,7 @@ func replaceBlob(
 
 func removeBlobAt(blobs []protocol.LargeBlob, index int) []protocol.LargeBlob {
 	if index < 0 || index >= len(blobs) {
-		return cloneLargeBlobs(blobs)
+		return blobs
 	}
 
 	out := make([]protocol.LargeBlob, 0, len(blobs)-1)
@@ -108,11 +92,7 @@ func removeBlobAt(blobs []protocol.LargeBlob, index int) []protocol.LargeBlob {
 			continue
 		}
 
-		out = append(out, protocol.LargeBlob{
-			Ciphertext: slices.Clone(blob.Ciphertext),
-			Nonce:      slices.Clone(blob.Nonce),
-			OrigSize:   blob.OrigSize,
-		})
+		out = append(out, blob)
 	}
 
 	return out

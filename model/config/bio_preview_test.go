@@ -21,6 +21,7 @@ func TestBioEnrollPreviewAllowsSupportedAuthenticatorWithNoEnrollments(t *testin
 	if err != nil {
 		t.Fatalf("BuildBioEnrollPreview: %v", err)
 	}
+
 	if preview.PreviewOnly {
 		t.Fatalf("unexpected preview: %#v", preview)
 	}
@@ -36,6 +37,7 @@ func TestBioMutationPreviewRejectsKnownEmptyEnrollmentSet(t *testing.T) {
 	if _, err := BuildBioRenamePreview(status, "01", "left thumb", safety.PreviewModeDryRun); !failure.IsCode(err, failure.CodeBioNoEnrollments) {
 		t.Fatalf("BuildBioRenamePreview error = %v, want %s", err, failure.CodeBioNoEnrollments)
 	}
+
 	if _, err := BuildBioRemovePreview(status, "01", safety.PreviewModeDryRun); !failure.IsCode(err, failure.CodeBioNoEnrollments) {
 		t.Fatalf("BuildBioRemovePreview error = %v, want %s", err, failure.CodeBioNoEnrollments)
 	}
@@ -63,6 +65,7 @@ func TestBioEnrollJSONPreservesExplicitZeroRemainingSamples(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Marshal absent: %v", err)
 	}
+
 	if strings.Contains(string(raw), "remainingSamples") {
 		t.Fatalf("JSON = %s, want absent remainingSamples omitted", raw)
 	}

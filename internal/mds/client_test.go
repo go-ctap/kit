@@ -43,10 +43,11 @@ func TestLookupRevalidationMarksDiskCacheFresh(t *testing.T) {
 		CacheDir:   t.TempDir(),
 		Now:        func() time.Time { return now },
 	}
+
 	aaguid := uuid.New()
 	client.Cache.Set(client.cacheKey(source), &Blob{
 		Number:   1,
-		Entries:  map[uuid.UUID]appmds.PayloadEntry{},
+		Entries:  map[uuid.UUID]*appmds.PayloadEntry{},
 		CachedAt: old,
 	})
 
@@ -54,9 +55,11 @@ func TestLookupRevalidationMarksDiskCacheFresh(t *testing.T) {
 	if err != nil {
 		t.Fatalf("disk cache path: %v", err)
 	}
+
 	if err := os.WriteFile(path, []byte("cached"), 0o600); err != nil {
 		t.Fatalf("write disk cache: %v", err)
 	}
+
 	if err := os.Chtimes(path, old, old); err != nil {
 		t.Fatalf("age disk cache: %v", err)
 	}
@@ -69,6 +72,7 @@ func TestLookupRevalidationMarksDiskCacheFresh(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat disk cache: %v", err)
 	}
+
 	if got := info.ModTime(); !got.Equal(now) {
 		t.Fatalf("disk cache modtime = %v, want %v", got, now)
 	}
@@ -84,10 +88,11 @@ func TestLookupAllowsVerifiedStaleCacheOnRateLimit(t *testing.T) {
 		Cache:      NewCache(),
 		Now:        func() time.Time { return now },
 	}
+
 	aaguid := uuid.New()
 	client.Cache.Set(client.cacheKey(source), &Blob{
 		Number:   1,
-		Entries:  map[uuid.UUID]appmds.PayloadEntry{},
+		Entries:  map[uuid.UUID]*appmds.PayloadEntry{},
 		CachedAt: now.Add(-48 * time.Hour),
 	})
 
@@ -97,8 +102,47 @@ func TestLookupAllowsVerifiedStaleCacheOnRateLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("lookup: %v", err)
 	}
+
 	if !result.Cached {
 		t.Fatal("lookup did not report the stale verified cache")
+	}
+}
+
+func TestLookupSharesCachedEntry(t *testing.T) {
+	const source = "https://mds.example.test/shared-entry"
+
+	aaguid := uuid.New()
+	entry := &appmds.PayloadEntry{
+		AAGUID: aaguid,
+		MetadataStatement: appmds.MetadataStatement{
+			FriendlyNames: map[string]string{"en": "Original"},
+		},
+	}
+
+	client := &Client{
+		Source:          source,
+		Cache:           NewCache(),
+		RefreshInterval: -1,
+	}
+
+	client.Cache.Set(client.cacheKey(source), &Blob{
+		Number:   1,
+		Entries:  map[uuid.UUID]*appmds.PayloadEntry{aaguid: entry},
+		CachedAt: time.Now(),
+	})
+
+	result, err := client.Lookup(context.Background(), aaguid, LookupOptions{})
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+
+	if result.Entry != entry {
+		t.Fatalf("entry pointer = %p, want cached pointer %p", result.Entry, entry)
+	}
+
+	result.Entry.MetadataStatement.FriendlyNames["en"] = "Updated"
+	if entry.MetadataStatement.FriendlyNames["en"] != "Updated" {
+		t.Fatalf("cached entry = %#v, want shared update", entry)
 	}
 }
 
@@ -111,10 +155,12 @@ func TestLookupKeepsDiskCacheWhenVerificationFails(t *testing.T) {
 		Cache:      NewCache(),
 		CacheDir:   t.TempDir(),
 	}
+
 	path, err := client.diskCachePath(source)
 	if err != nil {
 		t.Fatalf("disk cache path: %v", err)
 	}
+
 	cached := []byte("cached blob awaiting successful revalidation")
 	if err := os.WriteFile(path, cached, 0o600); err != nil {
 		t.Fatalf("write disk cache: %v", err)
@@ -131,6 +177,7 @@ func TestLookupKeepsDiskCacheWhenVerificationFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read retained disk cache: %v", err)
 	}
+
 	if !bytes.Equal(retained, cached) {
 		t.Fatalf("retained disk cache = %q, want %q", retained, cached)
 	}

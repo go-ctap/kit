@@ -105,19 +105,23 @@ func normalizeYubico(device report.DeviceReport, info yubico.DeviceInfo) *report
 			Enabled:   capabilities(info.EnabledUSBCapabilities),
 		}},
 	}
+
 	if info.FirmwareVersion != (yubico.FirmwareVersion{}) {
 		metadata.Firmware = strconv.Itoa(int(info.FirmwareVersion.Major)) + "." +
 			strconv.Itoa(int(info.FirmwareVersion.Minor)) + "." +
 			strconv.Itoa(int(info.FirmwareVersion.Build))
 	}
+
 	if info.Serial != nil {
 		metadata.Serial = strconv.FormatUint(uint64(*info.Serial), 10)
 	}
+
 	if hasYubicoNFC(info) {
 		var supported, enabled yubico.Capability
 		if info.SupportedNFCCapabilities != nil {
 			supported = *info.SupportedNFCCapabilities
 		}
+
 		if info.EnabledNFCCapabilities != nil {
 			enabled = *info.EnabledNFCCapabilities
 		}
@@ -135,6 +139,7 @@ func yubicoModelName(fallback string, info yubico.DeviceInfo) string {
 	if isYubicoPreview(info.FirmwareVersion) {
 		return "YubiKey Preview"
 	}
+
 	if !supportsYubicoDynamicName(info.FirmwareVersion) || info.FormFactor == yubico.FormFactorUnknown {
 		return fallback
 	}
@@ -201,6 +206,7 @@ func isYubicoPreview(version yubico.FirmwareVersion) bool {
 		{{Major: 5, Minor: 2}, {Major: 5, Minor: 2, Build: 3}},
 		{{Major: 5, Minor: 5}, {Major: 5, Minor: 5, Build: 2}},
 	}
+
 	for _, firmwareRange := range ranges {
 		if firmwareAtLeast(version, firmwareRange[0]) && !firmwareAtLeast(version, firmwareRange[1]) {
 			return true
@@ -231,9 +237,11 @@ func firmwareAtLeast(got, want yubico.FirmwareVersion) bool {
 	if got.Major != want.Major {
 		return got.Major > want.Major
 	}
+
 	if got.Minor != want.Minor {
 		return got.Minor > want.Minor
 	}
+
 	return got.Build >= want.Build
 }
 

@@ -32,6 +32,7 @@ func (r Runner) enrollBio(ctx context.Context, req model.BioEnrollOperation) (mo
 	}
 
 	output.Preview = preview
+
 	if req.DryRun {
 		return output, nil
 	}
@@ -75,6 +76,7 @@ func (r Runner) bioEnrollmentProgress() appconfig.BioEnrollProgress {
 			Completed:    new(completed),
 			SampleStatus: sample.Status,
 		}
+
 		if sample.RemainingSamples != nil {
 			total := completed + uint64(*sample.RemainingSamples)
 			event.Total = new(total)
@@ -126,6 +128,7 @@ func (r Runner) runBioEnrollment(
 		}
 
 		result.Samples = append(result.Samples, sample)
+
 		if progress != nil {
 			return progress(sample)
 		}

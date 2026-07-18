@@ -24,9 +24,11 @@ func (statement *MetadataStatement) UnmarshalJSON(data []byte) error {
 	}{
 		metadataStatement: &decoded,
 	}
+
 	if err := json.Unmarshal(data, &wire); err != nil {
 		return err
 	}
+
 	if len(wire.AuthenticatorGetInfo) != 0 && string(wire.AuthenticatorGetInfo) != "null" {
 		info, err := unmarshalAuthenticatorGetInfo(wire.AuthenticatorGetInfo)
 		if err != nil {
@@ -56,10 +58,12 @@ func unmarshalAuthenticatorGetInfo(data []byte) (protocol.AuthenticatorGetInfoRe
 		if err := json.Unmarshal(raw, &encoded); err != nil {
 			return protocol.AuthenticatorGetInfoResponse{}, fmt.Errorf("decode authenticatorGetInfo.%s: %w", name, err)
 		}
+
 		value, err := hex.DecodeString(encoded)
 		if err != nil {
 			return protocol.AuthenticatorGetInfoResponse{}, fmt.Errorf("decode authenticatorGetInfo.%s: %w", name, err)
 		}
+
 		fields[name], err = json.Marshal(value)
 		if err != nil {
 			return protocol.AuthenticatorGetInfoResponse{}, err

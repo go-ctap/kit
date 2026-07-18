@@ -38,6 +38,7 @@ func pinRules() []getInfoRule {
 				if !setMinSupportExpected(context) || optionPresent(context.info, protocol.OptionClientPIN) {
 					return nil
 				}
+
 				if !optionPresent(context.info, protocol.OptionUserVerification) {
 					return finding(
 						[]FieldPath{"options.clientPin", "options.uv"},
@@ -47,6 +48,7 @@ func pinRules() []getInfoRule {
 						observedOption(context.info, protocol.OptionUserVerification),
 					)
 				}
+
 				if context.info.UvModality != nil && (*context.info.UvModality&protocol.UserVerifyPasscodeInternal) != 0 {
 					return nil
 				}
@@ -56,6 +58,7 @@ func pinRules() []getInfoRule {
 					observedOption(context.info, protocol.OptionClientPIN),
 					observedOption(context.info, protocol.OptionUserVerification),
 				}
+
 				if context.info.UvModality == nil {
 					evidence = append(evidence, observed("uvModality", EvidenceAbsent))
 				} else {
@@ -100,10 +103,12 @@ func pinRules() []getInfoRule {
 					expectations = append(expectations, expectedFor([]FieldPath{"extensions"}, ExpectationContains, "minPinLength"))
 					references = append(references, featureReference)
 				}
+
 				if context.info.MaxRPIDsForSetMinPINLength == nil {
 					expectations = append(expectations, expectedFor([]FieldPath{"maxRPIDsForSetMinPINLength"}, ExpectationRequired))
 					references = append(references, maxRPIDsReference)
 				}
+
 				if len(expectations) == 0 {
 					return nil
 				}
@@ -112,6 +117,7 @@ func pinRules() []getInfoRule {
 					observedOption(context.info, protocol.OptionSetMinPINLength),
 					observedStrings("extensions", context.info.Extensions != nil, extensionValues(context.info)),
 				}
+
 				if context.info.MaxRPIDsForSetMinPINLength == nil {
 					evidence = append(evidence, observed("maxRPIDsForSetMinPINLength", EvidenceAbsent))
 				} else {
@@ -155,32 +161,40 @@ func pinRules() []getInfoRule {
 				if optionTrue(context.info, protocol.OptionSetMinPINLength) {
 					references = append(references, optionReference)
 				}
+
 				if slices.Contains(context.info.AuthenticatorConfigCommands, protocol.ConfigSubCommandSetMinPINLength) {
 					references = append(references, commandsReference)
 				}
+
 				if slices.Contains(context.info.Extensions, extension.ExtensionIdentifierMinPinLength) {
 					references = append(references, minimumExtensionReference)
 				}
+
 				if context.info.PinComplexityPolicy != nil && slices.Contains(context.info.Extensions, extension.ExtensionIdentifierPinComplexityPolicy) {
 					references = append(references, complexityReference)
 				}
+
 				if !optionTrue(context.info, protocol.OptionSetMinPINLength) {
 					expectations = append(expectations, expectedFor([]FieldPath{"options.setMinPINLength"}, ExpectationTrue))
 					references = append(references, optionReference)
 				}
+
 				if !slices.Contains(context.info.Extensions, extension.ExtensionIdentifierMinPinLength) {
 					expectations = append(expectations, expectedFor([]FieldPath{"extensions"}, ExpectationContains, "minPinLength"))
 					references = append(references, featureReference)
 				}
+
 				commandMissing := !slices.Contains(context.info.AuthenticatorConfigCommands, protocol.ConfigSubCommandSetMinPINLength)
 				if commandMissing {
 					expectations = append(expectations, expectedFor([]FieldPath{"authenticatorConfigCommands"}, ExpectationContains, "0x03"))
 					references = append(references, inventoryReference)
 				}
+
 				if context.info.MaxRPIDsForSetMinPINLength == nil {
 					expectations = append(expectations, expectedFor([]FieldPath{"maxRPIDsForSetMinPINLength"}, ExpectationRequired))
 					references = append(references, maxRPIDsReference)
 				}
+
 				if len(expectations) == 0 {
 					return nil
 				}
@@ -190,11 +204,13 @@ func pinRules() []getInfoRule {
 					observedStrings("extensions", context.info.Extensions != nil, extensionValues(context.info)),
 					observedStrings("authenticatorConfigCommands", context.commandsKnown, unsignedValues(context.info.AuthenticatorConfigCommands)),
 				}
+
 				if context.info.MaxRPIDsForSetMinPINLength == nil {
 					evidence = append(evidence, observed("maxRPIDsForSetMinPINLength", EvidenceAbsent))
 				} else {
 					evidence = append(evidence, observedUnsigned("maxRPIDsForSetMinPINLength", *context.info.MaxRPIDsForSetMinPINLength))
 				}
+
 				if context.info.PinComplexityPolicy != nil {
 					state := EvidenceFalse
 					if *context.info.PinComplexityPolicy {
@@ -202,6 +218,7 @@ func pinRules() []getInfoRule {
 					}
 					evidence = append(evidence, observed("pinComplexityPolicy", state))
 				}
+
 				return findingWithExpectations(expectations, evidence, references...)
 			},
 		},
@@ -329,12 +346,15 @@ func setMinSupportExpected(context *getInfoContext) bool {
 	if optionTrue(context.info, protocol.OptionSetMinPINLength) {
 		return true
 	}
+
 	if context.target.Specification != SpecificationCTAP23 {
 		return false
 	}
+
 	if slices.Contains(context.info.AuthenticatorConfigCommands, protocol.ConfigSubCommandSetMinPINLength) {
 		return true
 	}
+
 	if context.target.Profile == ProfileFIDO23 && slices.Contains(context.info.Extensions, extension.ExtensionIdentifierMinPinLength) {
 		return true
 	}

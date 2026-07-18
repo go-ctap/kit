@@ -71,6 +71,7 @@ func token2PCSCCandidates(ctx context.Context, productID uint16) []token2Candida
 
 		candidate, ok := token2PCSCCandidate(ctx, device)
 		_ = device.Close()
+
 		if !ok {
 			continue
 		}
@@ -106,6 +107,7 @@ func token2CTAPHIDSerialSuffix(ctx context.Context, path string) string {
 
 	info, infoErr := device.ATRInfo(ctx)
 	_ = device.Close()
+
 	if infoErr != nil {
 		return ""
 	}
@@ -129,6 +131,7 @@ func token2FeatureHIDMetadata(
 		if err != nil || ctx.Err() != nil {
 			break
 		}
+
 		if info.Path == selected.Path || info.UsagePage == fidoUsagePage && info.Usage == fidoUsage {
 			continue
 		}
@@ -139,6 +142,7 @@ func token2FeatureHIDMetadata(
 		}
 		serialNumber, serialErr := device.SerialNumber(ctx)
 		_ = device.Close()
+
 		if serialErr != nil {
 			continue
 		}
@@ -179,9 +183,11 @@ func addToken2Config(metadata *report.DeviceMetadata, config token2.Config) {
 	if config.HOTPSupported() || config.TOTPSupported() {
 		supported = append(supported, report.CapabilityOTP)
 	}
+
 	if config.CCIDSupported() {
 		supported = append(supported, report.CapabilityCCID)
 	}
+
 	if config.FIDO21Supported() {
 		supported = append(supported, report.CapabilityCTAP2)
 	}
@@ -210,9 +216,11 @@ func selectToken2Candidate(
 
 		return report.DeviceMetadata{}, false
 	}
+
 	if len(candidates) == 1 {
 		return candidates[0].metadata, true
 	}
+
 	if serialSuffix != "" {
 		matched := slices.DeleteFunc(slices.Clone(candidates), func(candidate token2Candidate) bool {
 			return !strings.HasSuffix(candidate.metadata.Serial, serialSuffix)

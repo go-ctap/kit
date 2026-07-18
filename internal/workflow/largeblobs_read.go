@@ -3,7 +3,6 @@ package workflow
 import (
 	"context"
 	"encoding/hex"
-	"slices"
 
 	"github.com/go-ctap/ctap/crypto"
 	"github.com/go-ctap/ctap/protocol"
@@ -70,7 +69,7 @@ func (r Runner) readLargeBlobFromInventory(
 		return result, nil
 	}
 
-	key := slices.Clone(target.Record.LargeBlobKey)
+	key := target.Record.LargeBlobKey
 	defer secret.Zero(key)
 
 	blobs, err := r.readLargeBlobArray(ctx)
@@ -89,10 +88,8 @@ func (r Runner) readLargeBlobFromInventory(
 		if err != nil {
 			continue
 		}
-		// it's fine to call defer in this for like that
-		defer secret.Zero(raw)
 
-		result.RawBytes = slices.Clone(raw)
+		result.RawBytes = raw
 		result.RawHex = hex.EncodeToString(raw)
 		result.RawByteCount = len(raw)
 		result.BlobPresent = true

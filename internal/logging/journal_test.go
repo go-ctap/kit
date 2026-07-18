@@ -64,6 +64,7 @@ func TestJournalCoalescesChangeNotifications(t *testing.T) {
 	default:
 		t.Fatal("change notification is missing")
 	}
+
 	select {
 	case <-journal.Changes():
 		t.Fatal("change notifications were not coalesced")

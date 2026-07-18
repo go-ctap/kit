@@ -39,6 +39,7 @@ func TestOperationEventIncludesStateStages(t *testing.T) {
 	stages := []model.OperationStage{
 		model.OperationStageCapturingBioSample,
 	}
+
 	for _, stage := range stages {
 		if stage == "" {
 			t.Fatal("stage must not be empty")
@@ -766,6 +767,7 @@ func TestDeviceReportVendorMetadataJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
+
 	text := string(encoded)
 	for _, want := range []string{
 		`"fingerprint":"attachment-1"`,
@@ -783,6 +785,7 @@ func TestDeviceReportVendorMetadataJSON(t *testing.T) {
 			t.Fatalf("JSON %s does not contain %s", text, want)
 		}
 	}
+
 	for _, obsolete := range []string{`"deviceId"`, `"deviceFingerprint"`, `"stableId"`, `"location"`} {
 		if strings.Contains(text, obsolete) {
 			t.Fatalf("JSON retained obsolete field %s: %s", obsolete, text)
@@ -794,10 +797,12 @@ func TestCTAP23JSONPresenceContracts(t *testing.T) {
 	operation := model.SetMinPINLengthOperation{
 		NewMinPINLength: new(uint(0)),
 	}
+
 	raw, err := json.Marshal(operation)
 	if err != nil {
 		t.Fatalf("Marshal operation: %v", err)
 	}
+
 	if string(raw) != `{"newMinPINLength":0}` {
 		t.Fatalf("operation JSON = %s", raw)
 	}
@@ -806,6 +811,7 @@ func TestCTAP23JSONPresenceContracts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Marshal absent operation: %v", err)
 	}
+
 	if string(absent) != "{}" {
 		t.Fatalf("absent operation JSON = %s, want {}", absent)
 	}
@@ -821,10 +827,12 @@ func TestCTAP23JSONPresenceContracts(t *testing.T) {
 			ThirdPartyPayment: &thirdPartyPayment,
 		},
 	}
+
 	raw, err = json.Marshal(extensions)
 	if err != nil {
 		t.Fatalf("Marshal extensions: %v", err)
 	}
+
 	for _, want := range []string{`"blobHex":""`, `"written":false`, `"thirdPartyPayment":false`} {
 		if !strings.Contains(string(raw), want) {
 			t.Fatalf("extensions JSON = %s, want %s", raw, want)
@@ -838,6 +846,7 @@ func TestCTAP23JSONPresenceContracts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Marshal store state: %v", err)
 	}
+
 	if !strings.Contains(string(storeState), `"authenticatorIdentifierHex":"00"`) ||
 		!strings.Contains(string(storeState), `"credentialStoreStateHex":"11"`) {
 		t.Fatalf("store state JSON = %s", storeState)

@@ -22,6 +22,7 @@ func TestToken2PCSCCandidatePropagatesContext(t *testing.T) {
 	if !ok || candidate.metadata.Serial != device.serial {
 		t.Fatalf("candidate = %#v, ok = %v", candidate, ok)
 	}
+
 	for name, recorded := range map[string]context.Context{
 		"SerialNumber": device.serialCtx,
 		"Config":       device.configCtx,
@@ -99,13 +100,16 @@ func TestSelectToken2Candidate(t *testing.T) {
 	if !ok || metadata.Model != "second" {
 		t.Fatalf("exact selection = %#v, ok = %v", metadata, ok)
 	}
+
 	metadata, ok = selectToken2Candidate(candidates, "", "54095303")
 	if !ok || metadata.Model != "first" {
 		t.Fatalf("suffix selection = %#v, ok = %v", metadata, ok)
 	}
+
 	if _, ok := selectToken2Candidate(candidates, "", ""); ok {
 		t.Fatal("ambiguous candidates were selected")
 	}
+
 	if _, ok := selectToken2Candidate(candidates[:1], "different", ""); ok {
 		t.Fatal("candidate with a different reported serial was selected")
 	}
@@ -133,6 +137,7 @@ func TestAddToken2ConfigNormalizesReportedCapabilities(t *testing.T) {
 	if usb.Interface != report.InterfaceUSB || !slices.Equal(usb.Supported, want) {
 		t.Fatalf("USB interface = %#v", usb)
 	}
+
 	if metadata.Interfaces[1].Interface != report.InterfaceNFC {
 		t.Fatalf("NFC interface = %#v", metadata.Interfaces[1])
 	}

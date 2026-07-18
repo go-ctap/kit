@@ -2,6 +2,7 @@ package logging
 
 import (
 	"encoding/json"
+	"slices"
 	"sync"
 
 	"github.com/go-ctap/kit/model"
@@ -60,6 +61,7 @@ func (j *Journal) Read(after uint64) model.LogJournalBatch {
 		Cursor:    j.sequence,
 		Truncated: after < j.evictedThrough,
 	}
+
 	for _, stored := range j.records[j.head:] {
 		if stored.record.Sequence > after {
 			batch.Entries = append(batch.Entries, stored.record)
@@ -101,11 +103,12 @@ func (j *Journal) trimLocked() {
 		j.records[j.head] = journalRecord{}
 		j.head++
 	}
+
 	if j.head == len(j.records) {
 		j.records = nil
 		j.head = 0
 	} else if j.head > len(j.records)/2 {
-		j.records = append([]journalRecord(nil), j.records[j.head:]...)
+		j.records = slices.Clone(j.records[j.head:])
 		j.head = 0
 	}
 }

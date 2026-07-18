@@ -2,7 +2,6 @@ package conformance_test
 
 import (
 	"encoding/json"
-	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -88,7 +87,8 @@ func TestEvaluateGetInfoResolvesProfilesIndependentlyOfVersionOrder(t *testing.T
 		conformance.ProfileFIDO21,
 		conformance.ProfileFIDO23,
 	}
-	if !reflect.DeepEqual(report.AdvertisedProfiles, wantAdvertised) {
+
+	if !slices.Equal(report.AdvertisedProfiles, wantAdvertised) {
 		t.Fatalf("advertised profiles = %#v, want %#v", report.AdvertisedProfiles, wantAdvertised)
 	}
 	assertNoAssessments(t, report)
@@ -115,13 +115,15 @@ func TestEvaluateGetInfoUsesStableTargetsAndLeavesOtherProfilesUnresolved(t *tes
 		{name: "U2F only", versions: protocol.Versions{protocol.U2F_V2}, advertised: []conformance.Profile{conformance.ProfileU2FV2}},
 		{name: "unknown only", versions: protocol.Versions{protocol.Version("future")}, advertised: []conformance.Profile{}},
 	}
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			report := conformance.EvaluateGetInfo(protocol.AuthenticatorGetInfoResponse{Versions: test.versions})
 			if report.Target != nil {
 				t.Fatalf("target = %#v, want unresolved", report.Target)
 			}
-			if !reflect.DeepEqual(report.AdvertisedProfiles, test.advertised) {
+
+			if !slices.Equal(report.AdvertisedProfiles, test.advertised) {
 				t.Fatalf("advertised profiles = %#v, want %#v", report.AdvertisedProfiles, test.advertised)
 			}
 			assertNoAssessments(t, report)
@@ -411,6 +413,7 @@ func TestEvaluateGetInfoRequiresObservableBuiltInUVForAlwaysUVWithU2F(t *testing
 			}) {
 				t.Fatalf("references = %#v, want %s", finding.References, test.specification)
 			}
+
 			if !strings.HasSuffix(finding.References[0].URL, "#sctn-feature-descriptions-alwaysUv") {
 				t.Fatalf("reference URL = %q", finding.References[0].URL)
 			}
@@ -544,7 +547,8 @@ func TestEvaluateGetInfoSetMinPINReferencesFollowActualTriggers(t *testing.T) {
 			for _, reference := range finding.References {
 				got = append(got, reference.ID)
 			}
-			if !reflect.DeepEqual(got, test.want) {
+
+			if !slices.Equal(got, test.want) {
 				t.Fatalf("reference IDs = %#v, want %#v", got, test.want)
 			}
 		})
@@ -569,6 +573,7 @@ func TestEvaluateGetInfoReportsAllMissingRequiredCommandsDeterministically(t *te
 		{conformance.RuleConfigCommandRequired, "0x01"},
 		{conformance.RuleConfigCommandRequired, "0xFF"},
 	}
+
 	for index, expected := range want {
 		finding := report.Findings[index]
 		if finding.RuleID != expected.rule || !findingHasExpectedValue(finding, expected.value) {
@@ -580,10 +585,12 @@ func TestEvaluateGetInfoReportsAllMissingRequiredCommandsDeterministically(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	second, err := json.Marshal(conformance.EvaluateGetInfo(info))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if !slices.Equal(first, second) {
 		t.Fatalf("evaluation is not deterministic:\n%s\n%s", first, second)
 	}
@@ -611,9 +618,11 @@ func TestEvaluateGetInfoAgainstRejectsNonCanonicalTargets(t *testing.T) {
 		if !failure.IsCode(err, failure.CodeConformanceTargetInvalid) {
 			t.Fatalf("target %#v: error = %v, want %s", target, err, failure.CodeConformanceTargetInvalid)
 		}
+
 		if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
 			t.Fatalf("target %#v: phase = %q, want %q", target, got, failure.PhaseValidation)
 		}
+
 		params := failure.Snapshot(err).Params
 		if params["specification"] != string(target.Specification) || params["profile"] != string(target.Profile) {
 			t.Fatalf("target %#v: params = %#v, want specification/profile", target, params)
@@ -716,6 +725,7 @@ func TestEvaluateGetInfoReferencesMatchResolvedTarget(t *testing.T) {
 		if report.Target == nil {
 			t.Fatal("resolved fixture returned a nil target")
 		}
+
 		for _, finding := range report.Findings {
 			for _, reference := range finding.References {
 				if reference.Specification != report.Target.Specification {
@@ -723,6 +733,7 @@ func TestEvaluateGetInfoReferencesMatchResolvedTarget(t *testing.T) {
 				}
 			}
 		}
+
 		for _, inconclusive := range report.Inconclusive {
 			for _, reference := range inconclusive.References {
 				if reference.Specification != report.Target.Specification {
@@ -810,12 +821,14 @@ func TestEvaluateGetInfoJSONContractIsTypedAndDeterministic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	text := string(raw)
 	for _, want := range []string{`"advertisedProfiles":["FIDO_2_3"]`, `"findings":[]`, `"inconclusive":[]`} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("JSON %s does not contain %s", text, want)
 		}
 	}
+
 	for _, legacy := range []string{`"args"`, `"conformanceFindings"`, `"expectation"`} {
 		if strings.Contains(text, legacy) {
 			t.Fatalf("legacy field %s leaked into %s", legacy, text)
@@ -825,6 +838,7 @@ func TestEvaluateGetInfoJSONContractIsTypedAndDeterministic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	for _, want := range []string{`"target":null`, `"advertisedProfiles":[]`, `"findings":[]`, `"inconclusive":[]`} {
 		if !strings.Contains(string(unresolved), want) {
 			t.Fatalf("unresolved JSON %s does not contain %s", unresolved, want)
@@ -838,23 +852,28 @@ func TestEvaluateGetInfoJSONContractIsTypedAndDeterministic(t *testing.T) {
 		if len(finding.References) == 0 {
 			t.Fatalf("finding has no normative references: %#v", finding)
 		}
+
 		for _, reference := range finding.References {
 			if reference.Section == "9.7" || reference.Section == "9.8" {
 				t.Fatalf("mandatory item encoded as a fake subsection: %#v", reference)
 			}
 		}
 	}
+
 	first, err := json.Marshal(invalid)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	second, err := json.Marshal(conformance.EvaluateGetInfo(info))
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if !slices.Equal(first, second) {
 		t.Fatalf("JSON is not deterministic:\n%s\n%s", first, second)
 	}
+
 	if !strings.Contains(string(first), `"values":[]`) {
 		t.Fatalf("empty typed values serialized as null: %s", first)
 	}
@@ -913,12 +932,13 @@ func expectation(subjects []conformance.FieldPath, quantifier conformance.Expect
 		Subjects:   subjects,
 		Quantifier: quantifier,
 		Kind:       kind,
-		Values:     append([]string{}, values...),
+		Values:     values,
 	}
 }
 
 func assertNoAssessments(t *testing.T, report conformance.Report) {
 	t.Helper()
+
 	if len(report.Findings) != 0 || len(report.Inconclusive) != 0 {
 		t.Fatalf("report = %#v, want no assessments", report)
 	}
@@ -926,9 +946,11 @@ func assertNoAssessments(t *testing.T, report conformance.Report) {
 
 func requireOnlyFinding(t *testing.T, report conformance.Report, rule conformance.RuleID) conformance.Finding {
 	t.Helper()
+
 	if len(report.Findings) != 1 || len(report.Inconclusive) != 0 {
 		t.Fatalf("report = %#v, want exactly one finding", report)
 	}
+
 	if report.Findings[0].RuleID != rule {
 		t.Fatalf("rule = %s, want %s; finding = %#v", report.Findings[0].RuleID, rule, report.Findings[0])
 	}
@@ -938,9 +960,11 @@ func requireOnlyFinding(t *testing.T, report conformance.Report, rule conformanc
 
 func requireOnlyInconclusive(t *testing.T, report conformance.Report, rule conformance.RuleID) conformance.Inconclusive {
 	t.Helper()
+
 	if len(report.Findings) != 0 || len(report.Inconclusive) != 1 {
 		t.Fatalf("report = %#v, want exactly one inconclusive assessment", report)
 	}
+
 	if report.Inconclusive[0].RuleID != rule {
 		t.Fatalf("rule = %s, want %s; result = %#v", report.Inconclusive[0].RuleID, rule, report.Inconclusive[0])
 	}
@@ -950,7 +974,13 @@ func requireOnlyInconclusive(t *testing.T, report conformance.Report, rule confo
 
 func assertExpectations(t *testing.T, got, want []conformance.Expectation) {
 	t.Helper()
-	if !reflect.DeepEqual(got, want) {
+
+	if !slices.EqualFunc(got, want, func(left, right conformance.Expectation) bool {
+		return slices.Equal(left.Subjects, right.Subjects) &&
+			left.Quantifier == right.Quantifier &&
+			left.Kind == right.Kind &&
+			slices.Equal(left.Values, right.Values)
+	}) {
 		t.Fatalf("expectations = %#v, want %#v", got, want)
 	}
 }

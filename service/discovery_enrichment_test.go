@@ -24,6 +24,7 @@ func TestDeviceMetadataCacheRoundTrip(t *testing.T) {
 	if err := writeDeviceMetadata(cacheDir, "fingerprint-1", metadata); err != nil {
 		t.Fatalf("write metadata: %v", err)
 	}
+
 	path := filepath.Join(cacheDir, "fingerprint-1", "info.json")
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("stat %s: %v", path, err)
@@ -58,18 +59,39 @@ func TestRestoredDeviceMetadataSkipsProbe(t *testing.T) {
 	}
 }
 
+func TestReportWithMetadataSharesCachedMetadata(t *testing.T) {
+	service := New()
+	device := report.DeviceReport{
+		Fingerprint: "fingerprint-1",
+		Transport:   transport.ModeHID,
+	}
+	metadata := &report.DeviceMetadata{Model: "YubiKey 5"}
+	service.enrichment.cache[device.Fingerprint] = metadata
+
+	got := service.reportWithMetadata(device)
+	if got.Metadata != metadata {
+		t.Fatalf("metadata pointer = %p, want cached pointer %p", got.Metadata, metadata)
+	}
+
+	got.Metadata.Model = "updated"
+	if metadata.Model != "updated" {
+		t.Fatalf("cached metadata = %#v, want shared update", metadata)
+	}
+}
+
 func TestDeviceMetadataCacheRejectsUnsafeFingerprint(t *testing.T) {
 	cacheDir := t.TempDir()
 	if err := writeDeviceMetadata(cacheDir, "../outside", report.DeviceMetadata{Model: "unsafe"}); err != nil {
 		t.Fatalf("write unsafe fingerprint: %v", err)
 	}
+
 	if _, err := os.Stat(filepath.Join(cacheDir, "outside", "info.json")); !os.IsNotExist(err) {
 		t.Fatalf("unsafe cache path exists or stat failed unexpectedly: %v", err)
 	}
 }
 
 func TestTakeEnrichmentCandidateAttemptsAvailableKnownVendors(t *testing.T) {
-	cache := make(map[string]report.DeviceMetadata)
+	cache := make(map[string]*report.DeviceMetadata)
 	attempted := make(map[string]struct{})
 	devices := []report.DeviceReport{
 		{Fingerprint: "unknown", Vendor: report.VendorUnknown},
@@ -82,53 +104,30 @@ func TestTakeEnrichmentCandidateAttemptsAvailableKnownVendors(t *testing.T) {
 	if !ok || first.Fingerprint != "token2" {
 		t.Fatalf("first candidate = %#v, ok = %v", first, ok)
 	}
+
 	second, ok := takeEnrichmentCandidate(devices, cache, attempted)
 	if !ok || second.Fingerprint != "busy" {
 		t.Fatalf("second candidate = %#v, ok = %v", second, ok)
 	}
-	if _, ok := attempted[enrichmentKey(first)]; !ok {
+
+	if _, ok := attempted[first.Fingerprint]; !ok {
 		t.Fatal("first candidate was not marked attempted")
 	}
-	if _, ok := attempted[enrichmentKey(second)]; !ok {
+
+	if _, ok := attempted[second.Fingerprint]; !ok {
 		t.Fatal("second candidate was not marked attempted")
 	}
 
 	if third, ok := takeEnrichmentCandidate(devices, cache, attempted); !ok || third.Fingerprint != "ready" {
 		t.Fatalf("third candidate = %#v, ok = %v", third, ok)
 	}
+
 	if _, ok := takeEnrichmentCandidate(devices, cache, attempted); ok {
 		t.Fatal("already attempted device was selected again")
 	}
+
 	if got, ok := takeEnrichmentCandidate(devices, cache, make(map[string]struct{})); !ok || got.Fingerprint != "token2" {
 		t.Fatalf("new pass candidate = %#v, ok = %v", got, ok)
-	}
-}
-
-func TestCloneDeviceMetadataCopiesCapabilitySlices(t *testing.T) {
-	original := report.DeviceMetadata{
-		Model: "YubiKey",
-		Interfaces: []report.InterfaceReport{{
-			Interface: report.InterfaceUSB,
-			Supported: []report.Capability{report.CapabilityU2F},
-			Enabled:   []report.Capability{report.CapabilityCTAP2},
-		}},
-	}
-
-	clone := cloneDeviceMetadata(original)
-	clone.Interfaces[0].Supported[0] = report.CapabilityOTP
-	clone.Interfaces[0].Enabled[0] = report.CapabilityCCID
-
-	if original.Interfaces[0].Supported[0] != report.CapabilityU2F ||
-		original.Interfaces[0].Enabled[0] != report.CapabilityCTAP2 {
-		t.Fatalf("clone mutated original: %#v", original)
-	}
-}
-
-func TestEnrichmentKeyIncludesTransport(t *testing.T) {
-	hid := enrichmentKey(report.DeviceReport{Fingerprint: "fingerprint", Transport: transport.ModeHID})
-	proxy := enrichmentKey(report.DeviceReport{Fingerprint: "fingerprint", Transport: transport.ModeWindowsProxy})
-	if hid == proxy {
-		t.Fatalf("keys collide: %q", hid)
 	}
 }
 
@@ -157,6 +156,7 @@ func TestDeviceReportsEqualComparesMetadataValues(t *testing.T) {
 	if !deviceReportsEqual(first, second) {
 		t.Fatal("equal reports were treated as changed")
 	}
+
 	second[0].Metadata.Interfaces[0].Enabled[0] = report.CapabilityU2F
 	if deviceReportsEqual(first, second) {
 		t.Fatal("different metadata was treated as equal")

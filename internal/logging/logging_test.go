@@ -29,6 +29,7 @@ func TestPayloadUsesStableIndentedJSON(t *testing.T) {
 	if payload.JSON != want {
 		t.Fatalf("payload JSON = %q, want %q", payload.JSON, want)
 	}
+
 	if payload.OriginalBytes != len(want) || payload.StoredBytes != len(want) || payload.Truncated {
 		t.Fatalf("payload metadata = %#v", payload)
 	}
@@ -39,12 +40,15 @@ func TestPayloadTruncationIsValidAndBounded(t *testing.T) {
 	if payload == nil {
 		t.Fatal("Payload returned nil")
 	}
+
 	if !payload.Truncated {
 		t.Fatal("payload was not truncated")
 	}
+
 	if payload.OriginalBytes <= MaxPayloadBytes {
 		t.Fatalf("original bytes = %d, want greater than %d", payload.OriginalBytes, MaxPayloadBytes)
 	}
+
 	if payload.StoredBytes > MaxPayloadBytes || payload.StoredBytes != len(payload.JSON) {
 		t.Fatalf("stored bytes = %d, JSON bytes = %d", payload.StoredBytes, len(payload.JSON))
 	}
@@ -54,9 +58,11 @@ func TestPayloadTruncationIsValidAndBounded(t *testing.T) {
 		OriginalBytes int    `json:"originalBytes"`
 		Preview       string `json:"preview"`
 	}
+
 	if err := json.Unmarshal([]byte(payload.JSON), &stored); err != nil {
 		t.Fatalf("truncated JSON is invalid: %v", err)
 	}
+
 	if !stored.Truncated || stored.OriginalBytes != payload.OriginalBytes || stored.Preview == "" {
 		t.Fatalf("truncated JSON = %#v", stored)
 	}

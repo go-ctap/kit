@@ -284,6 +284,7 @@ func (a *largeBlobWriteEventAuthenticator) GetInfo() protocol.AuthenticatorGetIn
 		protocol.OptionPinUvAuthToken:       true,
 		protocol.OptionUserVerification:     true,
 	}
+
 	if a.credentialManagementReadOnly {
 		options[protocol.OptionCredentialManagementReadOnly] = true
 	}
@@ -353,38 +354,23 @@ func (a *largeBlobWriteEventAuthenticator) EnumerateCredentials(context.Context,
 
 func (a *largeBlobWriteEventAuthenticator) GetLargeBlobs(context.Context) ([]protocol.LargeBlob, error) {
 	a.largeBlobReads.Add(1)
+
 	if a.cancelLargeBlobRead != nil {
 		a.cancelLargeBlobRead()
 	}
+
 	if a.largeBlobReadErr != nil {
 		return nil, a.largeBlobReadErr
 	}
 
-	return cloneTestLargeBlobs(a.largeBlobs), nil
+	return a.largeBlobs, nil
 }
 
 func (a *largeBlobWriteEventAuthenticator) SetLargeBlobs(_ context.Context, _ []byte, blobs []protocol.LargeBlob) error {
 	a.largeBlobWrites.Add(1)
-	a.lastSetLargeBlobs = cloneTestLargeBlobs(blobs)
+	a.lastSetLargeBlobs = blobs
 
 	return a.setErr
-}
-
-func cloneTestLargeBlobs(blobs []protocol.LargeBlob) []protocol.LargeBlob {
-	if blobs == nil {
-		return nil
-	}
-
-	cloned := make([]protocol.LargeBlob, 0, len(blobs))
-	for _, blob := range blobs {
-		cloned = append(cloned, protocol.LargeBlob{
-			Ciphertext: append([]byte(nil), blob.Ciphertext...),
-			Nonce:      append([]byte(nil), blob.Nonce...),
-			OrigSize:   blob.OrigSize,
-		})
-	}
-
-	return cloned
 }
 
 type pinOnlyLargeBlobWriteEventAuthenticator struct {

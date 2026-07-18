@@ -29,6 +29,7 @@ func FindCredentialByHexID(report InventoryReport, credentialIDHex string) (Cred
 	if credentialIDHex == "" {
 		return CredentialTarget{}, failure.New(failure.CodeCredentialIDRequired, failure.WithPhase(failure.PhaseValidation))
 	}
+
 	for _, group := range report.Groups {
 		for _, record := range group.Credentials {
 			if record.CredentialIDHex != credentialIDHex {

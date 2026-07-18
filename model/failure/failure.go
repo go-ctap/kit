@@ -113,7 +113,7 @@ func IsCode(err error, code Code) bool {
 	return ok && actual == code
 }
 
-// Snapshot returns a detached, transport-safe representation of err. Nil
+// Snapshot returns the normalized, transport-safe failure stored by err. Nil
 // errors have no snapshot; unknown errors become CodeInternalError.
 func Snapshot(err error) *Failure {
 	if err == nil {
@@ -121,8 +121,7 @@ func Snapshot(err error) *Failure {
 	}
 
 	if typed, ok := errors.AsType[*Error](err); ok {
-		snapshot := canonicalFailure(typed.Failure)
-		return &snapshot
+		return &typed.Failure
 	}
 
 	snapshot := canonicalFailure(Failure{Code: CodeInternalError})
@@ -176,22 +175,10 @@ func allowedParams(params map[string]string, allowlist map[string]paramValueRule
 			filtered[name] = value
 		}
 	}
+
 	if len(filtered) == 0 {
 		return nil
 	}
 
 	return filtered
-}
-
-func cloneCTAP(detail *CTAPDetail) *CTAPDetail {
-	if detail == nil {
-		return nil
-	}
-
-	copied := *detail
-	if detail.SubCommandCode != nil {
-		copied.SubCommandCode = new(*detail.SubCommandCode)
-	}
-
-	return &copied
 }

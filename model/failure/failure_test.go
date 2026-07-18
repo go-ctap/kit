@@ -18,18 +18,21 @@ func TestNewConstructsSemanticErrorWithoutCause(t *testing.T) {
 	if cause := errors.Unwrap(err); cause != nil {
 		t.Fatalf("Unwrap(New(...)) = %v, want nil", cause)
 	}
+
 	if err.Code != CodePINRequired || err.Category != CategoryInvalidOperation {
 		t.Fatalf("failure = %#v, want PIN_REQUIRED/invalid-operation", err.Failure)
 	}
+
 	if len(err.Params) != 1 || err.Params["field"] != "currentPIN" {
-		t.Fatalf("Params = %#v, want detached allowlisted parameter", err.Params)
+		t.Fatalf("Params = %#v, want allowlisted parameter", err.Params)
 	}
+
 	if err.Phase != PhaseInteraction {
 		t.Fatalf("Phase = %q, want %q", err.Phase, PhaseInteraction)
 	}
 }
 
-func TestWrapBuildsDetachedCodedErrorAndRetainsCause(t *testing.T) {
+func TestWrapBuildsCodedErrorAndRetainsCause(t *testing.T) {
 	cause := errors.New("device response")
 	subCommandCode := uint64(9)
 	detail := &CTAPDetail{
@@ -61,30 +64,37 @@ func TestWrapBuildsDetachedCodedErrorAndRetainsCause(t *testing.T) {
 	if got := err.Error(); got != "PIN_REQUIRED" {
 		t.Fatalf("Error() = %q, want PIN_REQUIRED", got)
 	}
+
 	if !errors.Is(err, cause) {
 		t.Fatal("coded error does not unwrap to its cause")
 	}
+
 	if got, ok := CodeOf(err); !ok || got != CodePINRequired {
 		t.Fatalf("CodeOf() = %q, %v, want %q, true", got, ok, CodePINRequired)
 	}
+
 	if !IsCode(err, CodePINRequired) {
 		t.Fatal("IsCode() = false for the error's code")
 	}
+
 	if IsCode(err, CodePINInvalid) {
 		t.Fatal("IsCode() = true for a different code")
 	}
+
 	if len(err.Params) != 1 || err.Params["field"] != "currentPIN" {
-		t.Fatalf("Params = %#v, want only allowlisted detached parameter", err.Params)
+		t.Fatalf("Params = %#v, want only allowlisted parameter", err.Params)
 	}
-	if err.CTAP == nil || err.CTAP.Status != "CTAP2_ERR_PIN_INVALID" {
-		t.Fatalf("CTAP = %#v, want detached CTAP detail", err.CTAP)
+
+	if err.CTAP != detail || err.CTAP.Status != "changed" {
+		t.Fatalf("CTAP = %#v, want aliased CTAP detail", err.CTAP)
 	}
-	if err.CTAP.SubCommandCode == nil || *err.CTAP.SubCommandCode != 9 {
-		t.Fatalf("SubCommandCode = %#v, want 9", err.CTAP.SubCommandCode)
+
+	if err.CTAP.SubCommandCode == nil || *err.CTAP.SubCommandCode != 1 {
+		t.Fatalf("SubCommandCode = %#v, want aliased value 1", err.CTAP.SubCommandCode)
 	}
 }
 
-func TestSnapshotIsDetached(t *testing.T) {
+func TestSnapshotAliasesStoredFailure(t *testing.T) {
 	subCommandCode := uint64(1)
 	err := Wrap(
 		CodeLargeBlobArrayTooLarge,
@@ -98,11 +108,12 @@ func TestSnapshotIsDetached(t *testing.T) {
 	*first.CTAP.SubCommandCode = 2
 
 	second := Snapshot(err)
-	if second.Params["requested"] != "100" {
-		t.Fatalf("snapshot params aliased: %#v", second.Params)
+	if second != first || second.Params["requested"] != "1" {
+		t.Fatalf("snapshot did not alias stored params: %#v", second.Params)
 	}
-	if *second.CTAP.SubCommandCode != 1 {
-		t.Fatalf("snapshot CTAP detail aliased: %#v", second.CTAP)
+
+	if *second.CTAP.SubCommandCode != 2 {
+		t.Fatalf("snapshot did not alias CTAP detail: %#v", second.CTAP)
 	}
 }
 
@@ -145,15 +156,19 @@ func TestUnknownCodeBecomesInternalError(t *testing.T) {
 	if err.Code != CodeInternalError || err.Category != CategoryInternal {
 		t.Fatalf("failure = %#v, want internal error", err.Failure)
 	}
+
 	if err.Params != nil {
 		t.Fatalf("Params = %#v, want nil", err.Params)
 	}
+
 	if err.Phase != "" {
 		t.Fatalf("Phase = %q, want empty", err.Phase)
 	}
+
 	if !IsCode(err, CodeInternalError) {
 		t.Fatal("unknown code does not resolve to INTERNAL_ERROR")
 	}
+
 	if IsCode(err, Code("NOT_REGISTERED")) {
 		t.Fatal("IsCode accepted an unknown target code")
 	}
@@ -163,9 +178,11 @@ func TestNilHelpers(t *testing.T) {
 	if snapshot := Snapshot(nil); snapshot != nil {
 		t.Fatalf("Snapshot(nil) = %#v, want nil", snapshot)
 	}
+
 	if code, ok := CodeOf(nil); ok || code != "" {
 		t.Fatalf("CodeOf(nil) = %q, %v, want empty, false", code, ok)
 	}
+
 	if IsCode(nil, CodeInternalError) {
 		t.Fatal("IsCode(nil) = true")
 	}

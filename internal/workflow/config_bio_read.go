@@ -63,9 +63,11 @@ func (r Runner) bioSensorReport(ctx context.Context) (appconfig.BioSensorReport,
 	}
 	report.Modality = bioModality(modality.Modality)
 	report.FingerprintKind = fingerprintKind(sensor.FingerprintKind)
+
 	if sensor.MaxCaptureSamplesRequiredForEnroll != nil {
 		report.MaxCaptureSamplesRequiredForEnroll = sensor.MaxCaptureSamplesRequiredForEnroll
 	}
+
 	if sensor.MaxTemplateFriendlyName != nil {
 		report.MaxTemplateFriendlyName = sensor.MaxTemplateFriendlyName
 	}

@@ -23,6 +23,7 @@ func TestJSONNeverIncludesCauseOrRejectedParams(t *testing.T) {
 	if marshalErr != nil {
 		t.Fatalf("Marshal: %v", marshalErr)
 	}
+
 	text := string(raw)
 	for _, forbidden := range []string{
 		"123456",
@@ -36,9 +37,11 @@ func TestJSONNeverIncludesCauseOrRejectedParams(t *testing.T) {
 			t.Fatalf("Marshal leaked %q: %s", forbidden, text)
 		}
 	}
+
 	if !strings.Contains(text, `"field":"currentPIN"`) {
 		t.Fatalf("Marshal omitted allowlisted parameter: %s", text)
 	}
+
 	if !strings.Contains(text, `"category":"invalid-operation"`) {
 		t.Fatalf("Marshal omitted the registered category: %s", text)
 	}
@@ -66,10 +69,12 @@ func TestConstructionCanonicalizesOperationAndCTAPSymbols(t *testing.T) {
 	if marshalErr != nil {
 		t.Fatalf("Marshal: %v", marshalErr)
 	}
+
 	text := string(raw)
 	if strings.Contains(text, canary) {
 		t.Fatalf("Marshal leaked unregistered metadata: %s", text)
 	}
+
 	for _, expected := range []string{
 		`"command":"authenticatorClientPIN"`,
 		`"subCommandFamily":"clientPIN"`,

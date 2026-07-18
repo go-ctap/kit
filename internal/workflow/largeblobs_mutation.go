@@ -27,10 +27,9 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 	if err != nil {
 		return output, err
 	}
+	defer zeroCredentialInventoryReport(&inventory)
 
 	state, err := r.loadTargetBlobState(ctx, inventory, req.CredentialIDHex)
-	zeroCredentialInventoryReport(&inventory)
-
 	if err != nil {
 		return output, err
 	}
@@ -39,6 +38,7 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 
 	preview, err := buildWritePreviewFromState(state, req.Payload)
 	output.Preview = preview
+
 	if err != nil {
 		return output, err
 	}
@@ -61,6 +61,7 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 	if err != nil && failure.IsCode(err, failure.CodeLargeBlobArrayTooLarge) && result.CredentialIDHex != "" {
 		output.Result = &result
 	}
+
 	if err != nil {
 		return output, err
 	}
@@ -101,10 +102,9 @@ func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOp
 	if err != nil {
 		return output, err
 	}
+	defer zeroCredentialInventoryReport(&inventory)
 
 	state, err := r.loadTargetBlobState(ctx, inventory, req.CredentialIDHex)
-	zeroCredentialInventoryReport(&inventory)
-
 	if err != nil {
 		return output, err
 	}
@@ -117,6 +117,7 @@ func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOp
 	}
 
 	output.Preview = preview
+
 	if req.DryRun {
 		return output, nil
 	}

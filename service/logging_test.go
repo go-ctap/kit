@@ -30,17 +30,21 @@ func TestInvalidSelectionOperationAppendsCompletedEntry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListCredentials: %v", err)
 	}
+
 	logs := serviceLogs(t, service)
 	if len(logs) != 1 {
 		t.Fatalf("log count = %d, want 1", len(logs))
 	}
+
 	entry := logs[0].Entry
 	if entry.Outcome != model.LogOutcomeFailed || entry.Error == nil || entry.Error.Code != failure.CodeSelectionInvalid {
 		t.Fatalf("completed entry = %#v", logs[0])
 	}
+
 	if entry.OperationID != string(envelope.OperationID) || entry.SelectionID != "missing-selection" {
 		t.Fatalf("log correlation = %#v, envelope operation ID = %q", entry, envelope.OperationID)
 	}
+
 	if entry.Response == nil || !json.Valid([]byte(entry.Response.JSON)) {
 		t.Fatalf("response payload = %#v", entry.Response)
 	}
@@ -67,16 +71,19 @@ func TestOperationLoggingRedactsPINAndConfirmation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ChangePIN: %v", err)
 	}
+
 	raw, err := json.Marshal(serviceLogs(t, service))
 	if err != nil {
 		t.Fatalf("Marshal logs: %v", err)
 	}
+
 	serialized := string(raw)
 	for _, secret := range []string{currentPIN, newPIN, confirmation} {
 		if strings.Contains(serialized, secret) || strings.Contains(serialized, base64.StdEncoding.EncodeToString([]byte(secret))) {
 			t.Fatalf("logs contain %q: %s", secret, serialized)
 		}
 	}
+
 	for _, field := range []string{"request.input.currentPIN", "request.input.newPIN", "request.input.confirmed", "request.input.confirmationMessage"} {
 		if !strings.Contains(serialized, field) {
 			t.Fatalf("logs do not record redacted field %q: %s", field, serialized)
@@ -98,9 +105,11 @@ func TestOperationLoggingDoesNotRequireEventEmitter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListCredentials: %v", err)
 	}
+
 	if envelope.Error != nil || envelope.Result == nil {
 		t.Fatalf("envelope = %#v", envelope)
 	}
+
 	if logs := serviceLogs(t, service); len(logs) == 0 {
 		t.Fatal("operation journal is empty")
 	}
@@ -127,6 +136,7 @@ func TestOperationLoggingRetainsTransportDiagnostic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListCredentials: %v", err)
 	}
+
 	if envelope.Error == nil || envelope.Error.Code != failure.CodeTransportFailure {
 		t.Fatalf("envelope error = %#v", envelope.Error)
 	}
@@ -135,6 +145,7 @@ func TestOperationLoggingRetainsTransportDiagnostic(t *testing.T) {
 	if len(logs) != 1 {
 		t.Fatalf("operation logs = %#v", logs)
 	}
+
 	if logs[0].Entry.ErrorMessage != "transport read: io: read/write on closed pipe" {
 		t.Fatalf("error message = %q", logs[0].Entry.ErrorMessage)
 	}
@@ -160,13 +171,16 @@ func TestSelectionLifecycleLoggingAppendsCompletedEntries(t *testing.T) {
 	if _, err := service.SetSelection(context.Background(), SelectionRequest{}); err != nil {
 		t.Fatalf("clear selection: %v", err)
 	}
+
 	logs := serviceLogs(t, service)
 	if len(logs) != 2 {
 		t.Fatalf("selection lifecycle log count = %d, want 2: %#v", len(logs), logs)
 	}
+
 	if logs[0].Entry.Code != model.LogCodeSelectionOpen || logs[0].Entry.Outcome != model.LogOutcomeFailed {
 		t.Fatalf("open selection entry = %#v", logs[0])
 	}
+
 	if logs[1].Entry.Code != model.LogCodeSelectionClose || logs[1].Entry.Outcome != model.LogOutcomeSucceeded {
 		t.Fatalf("close selection entry = %#v", logs[1])
 	}
@@ -271,16 +285,19 @@ func TestOperationLogEncoderNeverSerializesPrivateWebAuthnOrLargeBlobData(t *tes
 			RedactedFields: slices.Concat(largeBlobRequest.RedactedFields, largeBlobResponse.RedactedFields),
 		},
 	}
+
 	raw, err := json.Marshal(entries)
 	if err != nil {
 		t.Fatalf("Marshal envelopes: %v", err)
 	}
+
 	serialized := string(raw)
 	for _, secret := range secrets {
 		if strings.Contains(serialized, secret) || strings.Contains(serialized, base64.StdEncoding.EncodeToString([]byte(secret))) {
 			t.Fatalf("log envelopes contain private value %q: %s", secret, serialized)
 		}
 	}
+
 	for _, field := range []string{
 		"request.input.extensions.credBlob",
 		"request.input.extensions.hmacGetSecret",
@@ -320,10 +337,12 @@ func TestProgressLoggingDoesNotDuplicateOperationEvent(t *testing.T) {
 	if got := emitter.count(EventOperationEvent); got != 1 {
 		t.Fatalf("operation event count = %d, want 1", got)
 	}
+
 	logs := serviceLogs(t, service)
 	if len(logs) != 1 || logs[0].Entry.Code != model.LogCodeOperationProgress {
 		t.Fatalf("progress logs = %#v", logs)
 	}
+
 	if logs[0].Entry.SelectionID != "selection-1" || logs[0].Entry.OperationID != "operation-1" {
 		t.Fatalf("progress correlation = %#v", logs[0])
 	}
@@ -375,44 +394,54 @@ func TestInteractionLoggingAppendsCompletedEntriesWithoutDuplicatePrompt(t *test
 	if err != nil || !resolved {
 		t.Fatalf("ResolveInteraction = %v, %v", resolved, err)
 	}
+
 	if err := <-result; err != nil {
 		t.Fatalf("RequestInteraction: %v", err)
 	}
+
 	if got := emitter.count(EventInteractionRequested); got != 1 {
 		t.Fatalf("interaction event count = %d, want 1", got)
 	}
+
 	logs := serviceLogs(t, service)
 	if len(logs) != 2 {
 		t.Fatalf("interaction log count = %d, want 2: %#v", len(logs), logs)
 	}
+
 	for _, record := range logs {
 		if record.Entry.SelectionID != "selection-1" || record.Entry.OperationID != "operation-1" {
 			t.Fatalf("interaction correlation = %#v", record.Entry)
 		}
 	}
+
 	requestEntry := logs[0].Entry
 	if requestEntry.Code != model.LogCodeInteractionRequest ||
 		requestEntry.Level != model.LogLevelInfo ||
 		requestEntry.Outcome != model.LogOutcomeSucceeded {
 		t.Fatalf("interaction request log = %#v", requestEntry)
 	}
+
 	if requestEntry.Request == nil {
 		t.Fatal("retry interaction request = nil")
 	}
+
 	var loggedRequest model.InteractionRequest
 	if err := json.Unmarshal([]byte(requestEntry.Request.JSON), &loggedRequest); err != nil {
 		t.Fatalf("decode retry interaction request: %v", err)
 	}
+
 	if loggedRequest.PINState == nil ||
 		loggedRequest.PINState.Failure == nil || loggedRequest.PINState.Failure.Code != failure.CodePINInvalid ||
 		loggedRequest.PINState.RetriesRemaining == nil || *loggedRequest.PINState.RetriesRemaining != 6 ||
 		loggedRequest.PINState.PowerCycleState == nil || *loggedRequest.PINState.PowerCycleState {
 		t.Fatalf("retry interaction request = %#v", loggedRequest)
 	}
+
 	raw, err := json.Marshal(logs)
 	if err != nil {
 		t.Fatalf("Marshal logs: %v", err)
 	}
+
 	if strings.Contains(string(raw), sentinelPIN) || strings.Contains(string(raw), base64.StdEncoding.EncodeToString([]byte(sentinelPIN))) {
 		t.Fatalf("interaction logs contain PIN: %s", raw)
 	}
@@ -433,18 +462,22 @@ func TestInteractionLogEncoderKeepsPreviewAndRedactsMessage(t *testing.T) {
 	if payload == nil {
 		t.Fatal("payload is nil")
 	}
+
 	if strings.Contains(payload.JSON, secretMessage) {
 		t.Fatalf("payload contains interaction message: %s", payload.JSON)
 	}
 	var decoded struct {
 		Preview map[string]any `json:"preview"`
 	}
+
 	if err := json.Unmarshal([]byte(payload.JSON), &decoded); err != nil {
 		t.Fatalf("decode payload: %v", err)
 	}
+
 	if decoded.Preview["publicDiagnostic"] != "kept" {
 		t.Fatalf("payload omitted preview: %s", payload.JSON)
 	}
+
 	if !slices.Contains(value.RedactedFields, "request.message") {
 		t.Fatalf("redacted fields = %v", value.RedactedFields)
 	}
@@ -478,10 +511,12 @@ func (e *countingLogEmitter) count(name string) int {
 			count++
 		}
 	}
+
 	return count
 }
 
 func serviceLogs(t *testing.T, service *Service) []model.LogJournalRecord {
 	t.Helper()
+
 	return service.ReadLogs(ReadLogsRequest{}).Entries
 }

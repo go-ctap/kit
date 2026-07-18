@@ -19,15 +19,19 @@ func TestMetadataStatementDecodesAuthenticatorGetInfoByteStringsFromHex(t *testi
 	if err != nil {
 		t.Fatalf("Unmarshal: %v", err)
 	}
+
 	if statement.Description != "Authenticator" {
 		t.Fatalf("Description = %q", statement.Description)
 	}
+
 	if !bytes.Equal(statement.AuthenticatorGetInfo.EncIdentifier, []byte{0x00, 0xff}) {
 		t.Fatalf("EncIdentifier = %x", statement.AuthenticatorGetInfo.EncIdentifier)
 	}
+
 	if got := string(statement.AuthenticatorGetInfo.PinComplexityPolicyURL); got != "https://yubi.co/pin" {
 		t.Fatalf("PinComplexityPolicyURL = %q", got)
 	}
+
 	if !bytes.Equal(statement.AuthenticatorGetInfo.EncCredStoreState, []byte{0x01, 0x02, 0x03}) {
 		t.Fatalf("EncCredStoreState = %x", statement.AuthenticatorGetInfo.EncCredStoreState)
 	}

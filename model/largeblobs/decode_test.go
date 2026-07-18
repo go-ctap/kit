@@ -54,6 +54,7 @@ func TestDecodeLargeBlob(t *testing.T) {
 			} else if status.Failure.Phase != failure.PhaseDecode {
 				t.Fatalf("Failure phase = %q, want %q", status.Failure.Phase, failure.PhaseDecode)
 			}
+
 			if tt.wantRequest && status.Label == "" {
 				t.Fatal("Label empty for requested decode")
 			}

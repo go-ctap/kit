@@ -44,6 +44,7 @@ func TestLoggingTransportRedactsClientPINSecrets(t *testing.T) {
 	if len(entries) != 1 {
 		t.Fatalf("entries = %#v, want one completed entry", entries)
 	}
+
 	completed := entries[0]
 	if completed.SelectionID != "session-1" || completed.OperationID != "operation-1" ||
 		completed.SubCommandCode == nil || *completed.SubCommandCode != uint64(request.SubCommand) {
@@ -82,6 +83,7 @@ func TestLoggingTransportUsesActualIteratorSubcommands(t *testing.T) {
 		{SubCommand: protocol.CredentialManagementSubCommandEnumerateRPsBegin},
 		{SubCommand: protocol.CredentialManagementSubCommandEnumerateRPsGetNextRP},
 	}
+
 	for _, request := range requests {
 		if _, err := transport.CBOR(t.Context(), commandBytes(t, protocol.AuthenticatorCredentialManagement, request)); err != nil {
 			t.Fatalf("CBOR(%s): %v", request.SubCommand, err)
@@ -92,6 +94,7 @@ func TestLoggingTransportUsesActualIteratorSubcommands(t *testing.T) {
 	if len(completed) != 2 {
 		t.Fatalf("completed entries = %d, want 2", len(completed))
 	}
+
 	for index, entry := range completed {
 		if entry.SubCommandCode == nil || *entry.SubCommandCode != uint64(requests[index].SubCommand) {
 			t.Fatalf("entry %d subcommand = %#v", index, entry.SubCommandCode)
@@ -105,6 +108,7 @@ func TestLoggingTransportDistinguishesGetNextAssertion(t *testing.T) {
 	if _, err := transport.CBOR(t.Context(), commandBytes(t, protocol.AuthenticatorGetAssertion, protocol.AuthenticatorGetAssertionRequest{RPID: "example.com"})); err != nil {
 		t.Fatalf("GetAssertion: %v", err)
 	}
+
 	if _, err := transport.CBOR(t.Context(), []byte{byte(protocol.AuthenticatorGetNextAssertion)}); err != nil {
 		t.Fatalf("GetNextAssertion: %v", err)
 	}
@@ -135,6 +139,7 @@ func TestLoggingTransportPreservesCTAPHIDCapabilities(t *testing.T) {
 	base := &fakeCTAPTransport{
 		vendorResponse: ctaphid.VendorResponse{Data: []byte{1, 2, 3}},
 	}
+
 	transport := newLoggingTransport(base, nil, testDecoder(t))
 	if transport != base {
 		t.Fatalf("transport = %T, want original transport without recorder", transport)
@@ -144,10 +149,12 @@ func TestLoggingTransportPreservesCTAPHIDCapabilities(t *testing.T) {
 	if !ok {
 		t.Fatalf("logging transport %T does not preserve VendorTransport", transport)
 	}
+
 	response, err := vendor.Vendor(t.Context(), yubico.CommandGetDeviceInfo, nil)
 	if err != nil {
 		t.Fatalf("Vendor: %v", err)
 	}
+
 	if !slices.Equal(response.Data, base.vendorResponse.Data) || base.vendorCalls != 1 {
 		t.Fatalf("vendor response = %#v, calls = %d", response, base.vendorCalls)
 	}
@@ -155,6 +162,7 @@ func TestLoggingTransportPreservesCTAPHIDCapabilities(t *testing.T) {
 	if err := transport.Cancel(t.Context()); err != nil {
 		t.Fatalf("Cancel: %v", err)
 	}
+
 	if base.cancelCalls != 1 {
 		t.Fatalf("cancel calls = %d, want 1", base.cancelCalls)
 	}
@@ -162,25 +170,30 @@ func TestLoggingTransportPreservesCTAPHIDCapabilities(t *testing.T) {
 
 func newTestLoggingTransport(t *testing.T, recorder kitlog.Recorder, responses ...[]byte) ctapTransport {
 	t.Helper()
+
 	return newLoggingTransport(&fakeCTAPTransport{responses: responses}, recorder, testDecoder(t))
 }
 
 func newTestLoggingTransportWithErrors(t *testing.T, recorder kitlog.Recorder, errors []error) ctapTransport {
 	t.Helper()
+
 	return newLoggingTransport(&fakeCTAPTransport{errors: errors}, recorder, testDecoder(t))
 }
 
 func commandBytes(t *testing.T, command protocol.Command, request any) []byte {
 	t.Helper()
+
 	return slices.Concat([]byte{byte(command)}, encodeCBOR(t, request))
 }
 
 func encodeCBOR(t *testing.T, value any) []byte {
 	t.Helper()
+
 	encoder, err := cbor.CTAP2EncOptions().EncMode()
 	if err != nil {
 		t.Fatalf("EncMode: %v", err)
 	}
+
 	encoded, err := encoder.Marshal(value)
 	if err != nil {
 		t.Fatalf("Marshal(%T): %v", value, err)
@@ -191,6 +204,7 @@ func encodeCBOR(t *testing.T, value any) []byte {
 
 func testDecoder(t *testing.T) cbor.DecMode {
 	t.Helper()
+
 	decoder, err := cbor.DecOptions{UTF8: cbor.UTF8DecodeInvalid}.DecMode()
 	if err != nil {
 		t.Fatalf("DecMode: %v", err)
@@ -201,10 +215,12 @@ func testDecoder(t *testing.T) cbor.DecMode {
 
 func assertLogHasNoSecrets(t *testing.T, entries []model.LogEntry, secrets ...string) {
 	t.Helper()
+
 	raw, err := json.Marshal(entries)
 	if err != nil {
 		t.Fatalf("Marshal entries: %v", err)
 	}
+
 	for _, secret := range secrets {
 		for _, encoded := range []string{secret, base64.StdEncoding.EncodeToString([]byte(secret))} {
 			if len(encoded) > 0 && strings.Contains(string(raw), encoded) {
@@ -216,6 +232,7 @@ func assertLogHasNoSecrets(t *testing.T, entries []model.LogEntry, secrets ...st
 
 func assertRedactedFields(t *testing.T, entry model.LogEntry, fields ...string) {
 	t.Helper()
+
 	for _, expected := range fields {
 		found := false
 		for _, field := range entry.RedactedFields {
@@ -224,6 +241,7 @@ func assertRedactedFields(t *testing.T, entry model.LogEntry, fields ...string) 
 				break
 			}
 		}
+
 		if !found {
 			t.Fatalf("redactedFields = %v, missing %q", entry.RedactedFields, expected)
 		}
@@ -242,12 +260,15 @@ type fakeCTAPTransport struct {
 func (t *fakeCTAPTransport) CBOR(context.Context, []byte) (ctaptransport.CBORResponse, error) {
 	index := t.calls
 	t.calls++
+
 	if index < len(t.errors) && t.errors[index] != nil {
 		return ctaptransport.CBORResponse{}, t.errors[index]
 	}
+
 	if index < len(t.responses) {
 		return ctaptransport.CBORResponse{Data: t.responses[index]}, nil
 	}
+
 	return ctaptransport.CBORResponse{}, nil
 }
 

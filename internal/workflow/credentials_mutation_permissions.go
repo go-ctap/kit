@@ -16,6 +16,7 @@ func (r Runner) inventoryMutationPermissions(
 	if err != nil {
 		return protocol.PermissionNone, protocol.PermissionNone, err
 	}
+
 	if required&protocol.PermissionCredentialManagement != 0 {
 		return required, required, nil
 	}

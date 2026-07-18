@@ -51,10 +51,12 @@ func TestOpenAuthenticatorMakesJournalAvailableWhileOpeningAuthenticator(t *test
 
 		return &contractAuthenticator{}, nil
 	}
+
 	opened := openContractAuthenticatorWithOptions(t, nil, open, WithLogJournal(journal))
 	if err := opened.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
+
 	batch := journal.Read(0)
 	if len(batch.Entries) != 1 || batch.Entries[0].Entry.Code != "open-command" {
 		t.Fatalf("open log entries = %#v", batch.Entries)
@@ -72,6 +74,7 @@ func openContractAuthenticatorWithOptions(
 	opts ...AuthenticatorOption,
 ) *Authenticator {
 	t.Helper()
+
 	if open == nil {
 		open = func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 			return &contractAuthenticator{}, nil

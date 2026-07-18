@@ -79,12 +79,15 @@ func operationEventLogEntry(state *operationState, event model.OperationEvent) m
 	if event.Kind != "" {
 		params["interactionKind"] = string(event.Kind)
 	}
+
 	if event.Completed != nil {
 		params["completed"] = strconv.FormatUint(*event.Completed, 10)
 	}
+
 	if event.Total != nil {
 		params["total"] = strconv.FormatUint(*event.Total, 10)
 	}
+
 	if event.SampleStatus != "" {
 		params["sampleStatus"] = event.SampleStatus
 	}

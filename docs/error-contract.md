@@ -24,8 +24,8 @@ if err != nil {
 - `failure.IsCode` matches a stable semantic code.
 - `failure.CodeOf` returns `("", false)` for nil and `INTERNAL_ERROR` for an
   unknown non-nil Go error.
-- `failure.Snapshot` returns a detached, transport-safe DTO, or nil for a nil
-  error.
+- `failure.Snapshot` returns the normalized, transport-safe failure stored by
+  the error, or nil for a nil error.
 - `failure.Error.Error()` returns only the code string, never diagnostic prose.
 
 Use `failure.IsCode`, not `errors.Is`, for semantic conditions. `errors.Is` and
@@ -66,7 +66,7 @@ Only `code` and `category` are always present.
 `failure.Failure` is an ordinary typed struct. It does not implement custom
 JSON marshaling, so Wails can generate a typed binding. Runtime code constructs
 errors through `New` or `Wrap` and service DTOs use `Snapshot`; those boundaries
-apply the registry and copy mutable maps and CTAP details.
+apply the registry without cloning the stored failure.
 
 ## Stable Registry
 
@@ -175,8 +175,8 @@ interaction request with the previous failure:
 `powerCycleState` preserves the authenticator's optional boolean, including an
 explicit `false`; it is omitted when the authenticator does not return it. A
 failure to read retry state completes the operation before requesting the PIN.
-The embedded previous failure is a detached, secret-free snapshot and omits
-runtime correlation identifiers.
+The embedded previous failure is secret-free and omits runtime correlation
+identifiers.
 
 Every retry requires a new interaction response. The runtime never resubmits a
 previous PIN. Blocked states, cancellation, other token failures, and a failure

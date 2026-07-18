@@ -21,13 +21,13 @@ func defaultDeviceMetadataCacheDir() string {
 }
 
 func (s *Service) restoreDeviceMetadata(devices []report.DeviceReport) {
-	restored := make(map[string]report.DeviceMetadata)
+	restored := make(map[string]*report.DeviceMetadata)
 
 	s.deviceMetadataCacheMu.Lock()
 	for _, device := range devices {
 		metadata, ok := readDeviceMetadata(s.deviceMetadataCacheDir, device.Fingerprint)
 		if ok {
-			restored[enrichmentKey(device)] = metadata
+			restored[device.Fingerprint] = &metadata
 		}
 	}
 	s.deviceMetadataCacheMu.Unlock()
@@ -81,6 +81,7 @@ func writeDeviceMetadata(cacheDir, fingerprint string, metadata report.DeviceMet
 	if err != nil {
 		return err
 	}
+
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}

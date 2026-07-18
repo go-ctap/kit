@@ -29,6 +29,7 @@ func sanitizeValue(value reflect.Value, path []string, redacted *[]string) any {
 	if !value.IsValid() {
 		return nil
 	}
+
 	for value.Kind() == reflect.Interface || value.Kind() == reflect.Pointer {
 		if value.IsNil() {
 			return nil
@@ -39,6 +40,7 @@ func sanitizeValue(value reflect.Value, path []string, redacted *[]string) any {
 	if value.CanAddr() && value.Addr().Type().Implements(jsonMarshalerType) {
 		return value.Addr().Interface()
 	}
+
 	if value.CanInterface() && value.Type().Implements(jsonMarshalerType) {
 		return value.Interface()
 	}
@@ -51,12 +53,15 @@ func sanitizeValue(value reflect.Value, path []string, redacted *[]string) any {
 			if value.CanInterface() {
 				return value.Interface()
 			}
+
 			return nil
 		}
+
 		items := make([]any, value.Len())
 		for index := range value.Len() {
 			items[index] = sanitizeValue(value.Index(index), appendPath(path, fmt.Sprint(index)), redacted)
 		}
+
 		return items
 	case reflect.Map:
 		if value.IsNil() {
@@ -75,11 +80,13 @@ func sanitizeValue(value reflect.Value, path []string, redacted *[]string) any {
 			}
 			result[key] = sanitizeValue(mapValue, fieldPath, redacted)
 		}
+
 		return result
 	default:
 		if value.CanInterface() {
 			return value.Interface()
 		}
+
 		return nil
 	}
 }
@@ -103,9 +110,11 @@ func sanitizeStruct(value reflect.Value, path []string, redacted *[]string) any 
 			}
 			continue
 		}
+
 		if ignored || omitEmpty && isZero(fieldValue) {
 			continue
 		}
+
 		if fieldInfo.Anonymous && fieldInfo.Tag.Get("json") == "" {
 			inline, ok := sanitizeValue(fieldValue, path, redacted).(map[string]any)
 			if ok {
@@ -125,6 +134,7 @@ func sensitiveLogField(path []string) bool {
 	if len(path) == 0 {
 		return false
 	}
+
 	name := canonicalLogName(path[len(path)-1])
 	switch name {
 	case "pin", "currentpin", "newpin", "confirmed",
@@ -143,6 +153,7 @@ func sensitiveLogField(path []string) bool {
 			if normalized == "credentialblob" || normalized == "getcredblob" || normalized == "credblob" {
 				return true
 			}
+
 			if normalized == "largeblob" || normalized == "largeblobinputs" || normalized == "largebloboutputs" {
 				return true
 			}
@@ -157,6 +168,7 @@ func canonicalLogName(value string) string {
 		if unicode.IsLetter(character) || unicode.IsDigit(character) {
 			return unicode.ToLower(character)
 		}
+
 		return -1
 	}, value)
 }
@@ -167,10 +179,12 @@ func logFieldName(field reflect.StructField) (name string, omitEmpty bool, ignor
 	if parts[0] == "-" {
 		return lowerFirst(field.Name), false, true
 	}
+
 	name = parts[0]
 	if name == "" {
 		name = lowerFirst(field.Name)
 	}
+
 	for _, option := range parts[1:] {
 		if option == "omitempty" || option == "omitzero" {
 			omitEmpty = true

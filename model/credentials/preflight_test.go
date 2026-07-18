@@ -57,6 +57,7 @@ func TestBuildDeletePreviewMissingCredential(t *testing.T) {
 	if !failure.IsCode(err, failure.CodeCredentialIDRequired) {
 		t.Fatalf("BuildDeletePreview(empty) error = %v, want %s", err, failure.CodeCredentialIDRequired)
 	}
+
 	if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
 		t.Fatalf("BuildDeletePreview(empty) phase = %q, want %q", got, failure.PhaseValidation)
 	}
@@ -72,6 +73,7 @@ func TestBuildUpdateUserPreviewRejectsInvalidUserIDHex(t *testing.T) {
 		if !failure.IsCode(err, failure.CodeUserIDHexInvalid) {
 			t.Fatalf("BuildUpdateUserPreview(%q) error = %v, want %s", userIDHex, err, failure.CodeUserIDHexInvalid)
 		}
+
 		if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
 			t.Fatalf("BuildUpdateUserPreview(%q) phase = %q, want %q", userIDHex, got, failure.PhaseValidation)
 		}
