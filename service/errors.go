@@ -5,8 +5,8 @@ import (
 	"github.com/go-ctap/kit/model/failure"
 )
 
-func invalidSessionError() error {
-	return failure.New(failure.CodeSessionInvalid, failure.WithPhase(failure.PhaseSession))
+func invalidSelectionError() error {
+	return failure.New(failure.CodeSelectionInvalid, failure.WithPhase(failure.PhaseSelection))
 }
 
 func normalizeServicePhaseError(err error, phase failure.Phase) error {

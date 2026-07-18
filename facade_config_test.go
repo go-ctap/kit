@@ -42,7 +42,7 @@ func TestBioSensorInfoReportsSpecNamedEnums(t *testing.T) {
 				modality:        protocol.BioModalityFingerprint,
 				fingerprintKind: tt.kind,
 			}
-			session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+			session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 				return a, nil
 			})
 			defer func() { _ = session.Close() }()
@@ -100,7 +100,7 @@ func TestBioSensorInfoOmitsUnknownSpecValues(t *testing.T) {
 				modality:        tt.modality,
 				fingerprintKind: tt.fingerprintKind,
 			}
-			session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+			session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 				return a, nil
 			})
 			defer func() { _ = session.Close() }()
@@ -136,7 +136,7 @@ func TestBioSensorInfoOmitsUnknownSpecValues(t *testing.T) {
 func TestResetDeclinedConfirmDoesNotEmitTouchOrReset(t *testing.T) {
 	a := &resetCountingAuthenticator{}
 	events := &recordingEventSink{}
-	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -169,7 +169,7 @@ func TestResetDeclinedConfirmDoesNotEmitTouchOrReset(t *testing.T) {
 func TestResetRequestsTouchInteractionBeforeReset(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &resetCountingAuthenticator{events: events}
-	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -252,7 +252,7 @@ func TestRunContextReachesTokenAndAuthenticatorCommand(t *testing.T) {
 	type contextKey struct{}
 
 	a := &contextRecordingConfigAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -282,7 +282,7 @@ func TestBioEnrollmentCleanupUsesBoundedIndependentContext(t *testing.T) {
 		captureErr:      operationErr,
 		cleanupErr:      cleanupErr,
 	}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -317,7 +317,7 @@ func TestBioEnrollmentCleanupUsesBoundedIndependentContext(t *testing.T) {
 func TestBioEnrollmentSuccessfulCleanupIsReported(t *testing.T) {
 	operationErr := errors.New("capture failed")
 	a := &bioCleanupAuthenticator{captureErr: operationErr}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -343,7 +343,7 @@ func runConfirmedResetWithErrorAndEvents(t *testing.T, events *recordingEventSin
 	t.Helper()
 
 	a := &resetCountingAuthenticator{events: events, resetErr: resetErr}
-	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -495,7 +495,7 @@ func TestPINMutationsRejectEmptyPINAtSessionRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := &pinMutationCountingAuthenticator{configured: tt.configured}
-			session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+			session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 				return a, nil
 			})
 			defer func() { _ = session.Close() }()
@@ -521,7 +521,7 @@ func TestPINMutationsRejectEmptyPINAtSessionRun(t *testing.T) {
 func TestUVTokenAcquisitionRequestsUserVerificationInteraction(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &uvTokenAuthenticator{events: events}
-	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()

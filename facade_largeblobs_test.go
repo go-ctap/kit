@@ -18,7 +18,7 @@ import (
 )
 
 func TestCredentialInventoryDoesNotMarshalLargeBlobKey(t *testing.T) {
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return &largeBlobWriteEventAuthenticator{}, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -51,7 +51,7 @@ func TestCredentialInventoryDoesNotMarshalLargeBlobKey(t *testing.T) {
 func TestLargeBlobWriteEventsFollowInteractionAndInventoryOrder(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &largeBlobWriteEventAuthenticator{}
-	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -73,7 +73,6 @@ func TestLargeBlobWriteEventsFollowInteractionAndInventoryOrder(t *testing.T) {
 		model.OperationStageInteractionRequired,
 		model.OperationStageEnumeratingRPs,
 		model.OperationStageEnumeratingCredentials,
-		model.OperationStageInteractionRequired,
 	}
 
 	got := eventStages(events.Events())
@@ -96,44 +95,37 @@ func TestLargeBlobWriteEventsFollowInteractionAndInventoryOrder(t *testing.T) {
 	}
 }
 
-func TestLargeBlobWritePreparesOneCompositeGrantForInventoryRefresh(t *testing.T) {
+func TestLargeBlobWriteUsesSeparateGrantForReadOnlyInventory(t *testing.T) {
 	a := &largeBlobWriteEventAuthenticator{credentialManagementReadOnly: true}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
 
 	_, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
-		CredentialIDHex:         "c05e",
-		Payload:                 []byte("test"),
-		PrepareInventoryRefresh: true,
-		Confirmed:               true,
+		CredentialIDHex: "c05e",
+		Payload:         []byte("test"),
+		Confirmed:       true,
 	}, userVerificationHandler(t))
 	if err != nil {
 		t.Fatalf("WriteLargeBlob: %v", err)
 	}
 
-	if _, err := session.Run(
-		context.Background(),
-		model.ListLargeBlobsOperation{Refresh: true},
-		userVerificationHandler(t),
-	); err != nil {
-		t.Fatalf("ListLargeBlobs refresh: %v", err)
+	if got := a.tokenCalls.Load(); got != 2 {
+		t.Fatalf("token calls = %d, want 2", got)
 	}
-
-	wantPermission := protocol.PermissionLargeBlobWrite |
-		protocol.PermissionCredentialManagement
-	if got := a.tokenCalls.Load(); got != 1 {
-		t.Fatalf("token calls = %d, want 1", got)
+	wantPermissions := []protocol.Permission{
+		protocol.PermissionPersistentCredentialManagementReadOnly,
+		protocol.PermissionLargeBlobWrite,
 	}
-	if !slices.Equal(a.tokenPermissions, []protocol.Permission{wantPermission}) {
-		t.Fatalf("token permissions = %#v, want [%#v]", a.tokenPermissions, wantPermission)
+	if !slices.Equal(a.tokenPermissions, wantPermissions) {
+		t.Fatalf("token permissions = %#v, want %#v", a.tokenPermissions, wantPermissions)
 	}
 }
 
 func TestLargeBlobWriteCapacityErrorKeepsPreview(t *testing.T) {
 	a := &largeBlobWriteEventAuthenticator{maxSerializedLargeBlobArray: 16}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -162,7 +154,7 @@ func TestLargeBlobWriteCapacityErrorKeepsPreview(t *testing.T) {
 
 func TestLargeBlobWriteZeroCapacityMeansUnknownLimit(t *testing.T) {
 	a := &largeBlobWriteEventAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -185,9 +177,9 @@ func TestLargeBlobWriteZeroCapacityMeansUnknownLimit(t *testing.T) {
 	}
 }
 
-func TestLargeBlobReadAndPreviewReuseCredentialInventoryButReadFreshArray(t *testing.T) {
+func TestLargeBlobReadAndPreviewReadFreshAuthenticatorState(t *testing.T) {
 	a := &largeBlobWriteEventAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -206,20 +198,20 @@ func TestLargeBlobReadAndPreviewReuseCredentialInventoryButReadFreshArray(t *tes
 		t.Fatalf("preview write large blob: %v", err)
 	}
 
-	if got := a.rpEnumerations.Load(); got != 1 {
-		t.Fatalf("RP enumerations = %d, want 1", got)
+	if got := a.rpEnumerations.Load(); got != 2 {
+		t.Fatalf("RP enumerations = %d, want 2", got)
 	}
-	if got := a.credentialEnumerations.Load(); got != 1 {
-		t.Fatalf("credential enumerations = %d, want 1", got)
+	if got := a.credentialEnumerations.Load(); got != 2 {
+		t.Fatalf("credential enumerations = %d, want 2", got)
 	}
 	if got := a.largeBlobReads.Load(); got != 2 {
 		t.Fatalf("large blob reads = %d, want 2", got)
 	}
 }
 
-func TestLargeBlobListUsesCachedReport(t *testing.T) {
+func TestLargeBlobListReadsFreshReport(t *testing.T) {
 	a := &largeBlobWriteEventAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -232,20 +224,20 @@ func TestLargeBlobListUsesCachedReport(t *testing.T) {
 		t.Fatalf("list large blobs again: %v", err)
 	}
 
-	if got := a.rpEnumerations.Load(); got != 1 {
-		t.Fatalf("RP enumerations = %d, want 1", got)
+	if got := a.rpEnumerations.Load(); got != 2 {
+		t.Fatalf("RP enumerations = %d, want 2", got)
 	}
-	if got := a.credentialEnumerations.Load(); got != 1 {
-		t.Fatalf("credential enumerations = %d, want 1", got)
+	if got := a.credentialEnumerations.Load(); got != 2 {
+		t.Fatalf("credential enumerations = %d, want 2", got)
 	}
-	if got := a.largeBlobReads.Load(); got != 1 {
-		t.Fatalf("large blob reads = %d, want 1", got)
+	if got := a.largeBlobReads.Load(); got != 2 {
+		t.Fatalf("large blob reads = %d, want 2", got)
 	}
 }
 
-func TestLargeBlobListRefreshBypassesCredentialAndBlobCaches(t *testing.T) {
+func TestLargeBlobListAlwaysObservesCurrentAuthenticatorState(t *testing.T) {
 	a := &largeBlobWriteEventAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -260,7 +252,7 @@ func TestLargeBlobListRefreshBypassesCredentialAndBlobCaches(t *testing.T) {
 	}
 	a.largeBlobs = []protocol.LargeBlob{added}
 
-	result, err := session.Run(context.Background(), model.ListLargeBlobsOperation{Refresh: true}, userVerificationHandler(t))
+	result, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t))
 	if err != nil {
 		t.Fatalf("refreshed ListLargeBlobs: %v", err)
 	}
@@ -278,120 +270,17 @@ func TestLargeBlobListRefreshBypassesCredentialAndBlobCaches(t *testing.T) {
 		t.Fatalf("cached large blob output = %#v, want refreshed report", cached)
 	}
 
-	if got := a.rpEnumerations.Load(); got != 2 {
-		t.Fatalf("RP enumerations = %d, want 2", got)
+	if got := a.rpEnumerations.Load(); got != 3 {
+		t.Fatalf("RP enumerations = %d, want 3", got)
 	}
-	if got := a.credentialEnumerations.Load(); got != 2 {
-		t.Fatalf("credential enumerations = %d, want 2", got)
+	if got := a.credentialEnumerations.Load(); got != 3 {
+		t.Fatalf("credential enumerations = %d, want 3", got)
 	}
 	if got := a.tokenCalls.Load(); got != 1 {
 		t.Fatalf("token calls = %d, want 1", got)
 	}
-	if got := a.largeBlobReads.Load(); got != 2 {
-		t.Fatalf("large blob reads = %d, want 2", got)
-	}
-}
-
-func TestLargeBlobListRefreshFailurePreservesLastSuccessfulCaches(t *testing.T) {
-	tests := []struct {
-		name               string
-		fail               func(*largeBlobWriteEventAuthenticator)
-		clear              func(*largeBlobWriteEventAuthenticator)
-		wantRPs            int32
-		wantCredentials    int32
-		wantLargeBlobReads int32
-	}{
-		{
-			name:    "credential enumeration",
-			fail:    func(a *largeBlobWriteEventAuthenticator) { a.rpErr = context.Canceled },
-			clear:   func(a *largeBlobWriteEventAuthenticator) { a.rpErr = nil },
-			wantRPs: 2, wantCredentials: 1, wantLargeBlobReads: 1,
-		},
-		{
-			name:    "large blob array read",
-			fail:    func(a *largeBlobWriteEventAuthenticator) { a.largeBlobReadErr = context.Canceled },
-			clear:   func(a *largeBlobWriteEventAuthenticator) { a.largeBlobReadErr = nil },
-			wantRPs: 2, wantCredentials: 2, wantLargeBlobReads: 2,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			a := &largeBlobWriteEventAuthenticator{}
-			session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-				return a, nil
-			})
-			defer func() { _ = session.Close() }()
-
-			if _, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t)); err != nil {
-				t.Fatalf("prime ListLargeBlobs: %v", err)
-			}
-
-			tt.fail(a)
-			_, err := session.Run(context.Background(), model.ListLargeBlobsOperation{Refresh: true}, userVerificationHandler(t))
-			requireFailureCode(t, err, failure.CodeOperationCanceled)
-			tt.clear(a)
-
-			if _, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t)); err != nil {
-				t.Fatalf("cached ListLargeBlobs after failed refresh: %v", err)
-			}
-
-			if got := a.rpEnumerations.Load(); got != tt.wantRPs {
-				t.Fatalf("RP enumerations = %d, want %d", got, tt.wantRPs)
-			}
-			if got := a.credentialEnumerations.Load(); got != tt.wantCredentials {
-				t.Fatalf("credential enumerations = %d, want %d", got, tt.wantCredentials)
-			}
-			if got := a.largeBlobReads.Load(); got != tt.wantLargeBlobReads {
-				t.Fatalf("large blob reads = %d, want %d", got, tt.wantLargeBlobReads)
-			}
-		})
-	}
-}
-
-func TestLargeBlobListCanceledContextAfterFreshArrayReadPreservesLastSuccessfulCaches(t *testing.T) {
-	a := &largeBlobWriteEventAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
-	defer func() { _ = session.Close() }()
-
-	initial, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t))
-	if err != nil {
-		t.Fatalf("prime ListLargeBlobs: %v", err)
-	}
-	initialOutput := initial.(model.LargeBlobListOutput)
-	if initialOutput.Report.Credentials[0].BlobPresent {
-		t.Fatal("initial cached blob present = true, want false")
-	}
-
-	added, err := crypto.EncryptLargeBlob(bytes.Repeat([]byte{0x01}, 32), []byte("not-committed"))
-	if err != nil {
-		t.Fatalf("encrypt added blob: %v", err)
-	}
-	a.largeBlobs = []protocol.LargeBlob{added}
-	ctx, cancel := context.WithCancel(context.Background())
-	a.cancelLargeBlobRead = cancel
-	_, err = session.Run(ctx, model.ListLargeBlobsOperation{Refresh: true}, userVerificationHandler(t))
-	requireFailureCode(t, err, failure.CodeOperationCanceled)
-	a.cancelLargeBlobRead = nil
-
-	cached, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t))
-	if err != nil {
-		t.Fatalf("cached ListLargeBlobs after canceled refresh: %v", err)
-	}
-	cachedOutput := cached.(model.LargeBlobListOutput)
-	if cachedOutput.Report.Credentials[0].BlobPresent {
-		t.Fatal("cached blob present after canceled refresh = true, want last-known-good false")
-	}
-	if got := a.rpEnumerations.Load(); got != 2 {
-		t.Fatalf("RP enumerations = %d, want 2", got)
-	}
-	if got := a.credentialEnumerations.Load(); got != 2 {
-		t.Fatalf("credential enumerations = %d, want 2", got)
-	}
-	if got := a.largeBlobReads.Load(); got != 2 {
-		t.Fatalf("large blob reads = %d, want 2", got)
+	if got := a.largeBlobReads.Load(); got != 3 {
+		t.Fatalf("large blob reads = %d, want 3", got)
 	}
 }
 
@@ -404,7 +293,7 @@ func TestLargeBlobDeleteLastBlobWritesEmptyArray(t *testing.T) {
 	a := &largeBlobWriteEventAuthenticator{
 		largeBlobs: []protocol.LargeBlob{current},
 	}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -462,7 +351,7 @@ func TestLargeBlobGarbageCollectNoopDoesNotWrite(t *testing.T) {
 	a := &largeBlobWriteEventAuthenticator{
 		largeBlobs: []protocol.LargeBlob{matched},
 	}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -507,7 +396,7 @@ func TestLargeBlobGarbageCollectSkipsNonConformingEntries(t *testing.T) {
 	a := &largeBlobWriteEventAuthenticator{
 		largeBlobs: []protocol.LargeBlob{nonConforming},
 	}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -553,7 +442,7 @@ func TestLargeBlobGarbageCollectRemovesOnlyUnmatchedEntries(t *testing.T) {
 	a := &largeBlobWriteEventAuthenticator{
 		largeBlobs: []protocol.LargeBlob{matched, unmatched},
 	}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -604,7 +493,7 @@ func TestLargeBlobGarbageCollectAllUnmatchedWritesEmptyArray(t *testing.T) {
 	a := &largeBlobWriteEventAuthenticator{
 		largeBlobs: []protocol.LargeBlob{unmatched},
 	}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -648,7 +537,7 @@ func TestLargeBlobWritePINOnlyFlowDoesNotRequestUserVerification(t *testing.T) {
 	a := &pinOnlyLargeBlobWriteEventAuthenticator{
 		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
 	}
-	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -672,8 +561,8 @@ func TestLargeBlobWritePINOnlyFlowDoesNotRequestUserVerification(t *testing.T) {
 		t.Fatal("result = nil, want output")
 	}
 
-	if got := a.pinCalls.Load(); got != 2 {
-		t.Fatalf("PIN token calls = %d, want 2", got)
+	if got := a.pinCalls.Load(); got != 1 {
+		t.Fatalf("PIN token calls = %d, want 1", got)
 	}
 
 	if got := a.uvCalls.Load(); got != 0 {
@@ -684,7 +573,6 @@ func TestLargeBlobWritePINOnlyFlowDoesNotRequestUserVerification(t *testing.T) {
 		model.OperationStageInteractionRequired,
 		model.OperationStageEnumeratingRPs,
 		model.OperationStageEnumeratingCredentials,
-		model.OperationStageInteractionRequired,
 	}
 
 	got := eventStages(events.Events())
@@ -712,7 +600,7 @@ func TestLargeBlobWritePreparedRefreshRequestsPINOnce(t *testing.T) {
 	a := &pinOnlyLargeBlobWriteEventAuthenticator{
 		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
 	}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -725,17 +613,16 @@ func TestLargeBlobWritePreparedRefreshRequestsPINOnce(t *testing.T) {
 	})
 
 	_, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
-		CredentialIDHex:         "c05e",
-		Payload:                 []byte("test"),
-		PrepareInventoryRefresh: true,
-		Confirmed:               true,
+		CredentialIDHex: "c05e",
+		Payload:         []byte("test"),
+		Confirmed:       true,
 	}, handler)
 	if err != nil {
 		t.Fatalf("WriteLargeBlob: %v", err)
 	}
 	if _, err := session.Run(
 		context.Background(),
-		model.ListLargeBlobsOperation{Refresh: true},
+		model.ListLargeBlobsOperation{},
 		handler,
 	); err != nil {
 		t.Fatalf("ListLargeBlobs refresh: %v", err)
@@ -757,7 +644,7 @@ func TestLargeBlobWritePINVerificationFlowSkipsUVForUVCapableAuthenticator(t *te
 	a := &pinPreferredLargeBlobWriteEventAuthenticator{
 		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
 	}
-	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -788,8 +675,8 @@ func TestLargeBlobWritePINVerificationFlowSkipsUVForUVCapableAuthenticator(t *te
 		t.Fatal("result = nil, want output")
 	}
 
-	if got := a.pinCalls.Load(); got != 2 {
-		t.Fatalf("PIN token calls = %d, want 2", got)
+	if got := a.pinCalls.Load(); got != 1 {
+		t.Fatalf("PIN token calls = %d, want 1", got)
 	}
 
 	if got := a.uvCalls.Load(); got != 0 {

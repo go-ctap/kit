@@ -9,37 +9,30 @@ import (
 	"github.com/go-ctap/kit/model/failure"
 )
 
-func (r Runner) mutationPermission(
+func (r Runner) inventoryMutationPermissions(
 	required protocol.Permission,
-	prepareInventoryRefresh bool,
-) (protocol.Permission, error) {
-	if !prepareInventoryRefresh {
-		return required, nil
+) (protocol.Permission, protocol.Permission, error) {
+	inventory, err := inventoryPermission(r.infoProvider().GetInfo())
+	if err != nil {
+		return protocol.PermissionNone, protocol.PermissionNone, err
+	}
+	if required&protocol.PermissionCredentialManagement != 0 {
+		return required, required, nil
 	}
 
-	if _, err := inventoryPermission(r.infoProvider().GetInfo()); err != nil {
-		return protocol.PermissionNone, err
+	if inventory == protocol.PermissionPersistentCredentialManagementReadOnly {
+		return inventory, required, nil
 	}
 
-	return required | protocol.PermissionCredentialManagement, nil
-}
+	grant := required | protocol.PermissionCredentialManagement
 
-func inventoryGrantPermission(
-	permission protocol.Permission,
-	prepareInventoryRefresh bool,
-) protocol.Permission {
-	if !prepareInventoryRefresh {
-		return protocol.PermissionNone
-	}
-
-	return permission
+	return grant, grant, nil
 }
 
 func (r Runner) credentialMutationRPID(
 	target appcredentials.CredentialTarget,
-	prepareInventoryRefresh bool,
 ) string {
-	if prepareInventoryRefresh || !r.env.StrictPermissions {
+	if !r.env.StrictPermissions {
 		return ""
 	}
 

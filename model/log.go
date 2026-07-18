@@ -19,7 +19,7 @@ type LogLayer string
 
 const (
 	LogLayerService     LogLayer = "service"
-	LogLayerSession     LogLayer = "session"
+	LogLayerSelection   LogLayer = "selection"
 	LogLayerOperation   LogLayer = "operation"
 	LogLayerInteraction LogLayer = "interaction"
 	LogLayerCTAP        LogLayer = "ctap"
@@ -40,8 +40,8 @@ const (
 	LogCodeDiscoveryRun       LogCode = "discovery.run"
 	LogCodeDiscoveryChanged   LogCode = "discovery.changed"
 	LogCodeMDSLookup          LogCode = "mds.lookup"
-	LogCodeSessionOpen        LogCode = "session.open"
-	LogCodeSessionClose       LogCode = "session.close"
+	LogCodeSelectionOpen      LogCode = "selection.open"
+	LogCodeSelectionClose     LogCode = "selection.close"
 	LogCodeOperationRun       LogCode = "operation.run"
 	LogCodeOperationProgress  LogCode = "operation.progress"
 	LogCodeInteractionRequest LogCode = "interaction.request"
@@ -75,7 +75,7 @@ type LogEntry struct {
 	Error                *failure.Failure  `json:"error,omitempty"`
 	ErrorMessage         string            `json:"errorMessage,omitempty"`
 	RedactedFields       []string          `json:"redactedFields,omitempty"`
-	SessionID            string            `json:"sessionId,omitempty"`
+	SelectionID          string            `json:"selectionId,omitempty"`
 	OperationID          string            `json:"operationId,omitempty"`
 }
 

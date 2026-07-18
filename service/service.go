@@ -32,52 +32,55 @@ type Service struct {
 	monitorDone       chan struct{}
 	scanDevices       func(context.Context, transport.Mode) ([]ctapkit.Device, error)
 	openMonitor       func(context.Context, transport.Mode) (<-chan ctapdiscover.Event, error)
+	resolveDevice     func([]ctapkit.Device, string) (selectedDevice, error)
+	openAuthenticator openAuthenticatorFunc
 	enrichment        discoveryEnrichment
+	selectionGate     chan struct{}
 
 	devices      []ctapkit.Device
-	sessions     map[SessionID]*managedSession
-	operations   map[OperationID]*operationState
+	selected     *selection
 	interactions map[InteractionID]*pendingInteraction
 	logs         *ctapkit.LogJournal
 }
 
-type managedSession struct {
-	id        SessionID
-	session   sessionRuntime
-	device    report.DeviceReport
-	openedAt  time.Time
-	updatedAt time.Time
-}
-
-type sessionRuntime interface {
-	Run(context.Context, model.Operation, model.InteractionHandler, ...ctapkit.RunOption) (model.OperationResult, error)
-	Close() error
-	Info() model.SessionInfo
-}
-
 type operationState struct {
-	id        OperationID
-	sessionID SessionID
-	kind      model.OperationKind
-	cancel    context.CancelFunc
-	done      chan struct{}
+	id          OperationID
+	selectionID SelectionID
+	kind        model.OperationKind
+	cancel      context.CancelFunc
+	done        chan struct{}
 }
 
 type pendingInteraction struct {
 	prompt   InteractionPrompt
 	response chan model.InteractionResponse
+	done     <-chan struct{}
 }
 
 func New(opts ...Option) *Service {
 	service := &Service{
-		sessions:         make(map[SessionID]*managedSession),
-		operations:       make(map[OperationID]*operationState),
 		interactions:     make(map[InteractionID]*pendingInteraction),
 		lastDiscoverMode: transport.ModeAuto,
 		scanDevices:      ctapkit.DiscoverDevices,
 		openMonitor:      transport.Events,
-		enrichment:       newDiscoveryEnrichment(),
-		logs:             ctapkit.NewLogJournal(),
+		resolveDevice: func(devices []ctapkit.Device, selector string) (selectedDevice, error) {
+			device, err := ctapkit.SelectDevice(devices, selector)
+			if err != nil {
+				return selectedDevice{}, err
+			}
+
+			return selectedDevice{handle: device, report: device.Report()}, nil
+		},
+		openAuthenticator: func(
+			ctx context.Context,
+			device ctapkit.Device,
+			opts ...ctapkit.AuthenticatorOption,
+		) (authenticatorRuntime, error) {
+			return ctapkit.OpenAuthenticator(ctx, device, opts...)
+		},
+		enrichment:    newDiscoveryEnrichment(),
+		selectionGate: make(chan struct{}, 1),
+		logs:          ctapkit.NewLogJournal(),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -99,59 +102,6 @@ func WithEventEmitter(emitter EventEmitter) Option {
 	}
 }
 
-func (s *Service) Close() error {
-	s.mu.Lock()
-	if s.closed {
-		s.mu.Unlock()
-
-		return nil
-	}
-	s.closed = true
-	monitorCancel := s.monitorCancel
-	monitorDone := s.monitorDone
-	enrichmentCancel := s.enrichment.cancel
-	enrichmentDone := s.enrichment.done
-	s.monitorCancel = nil
-	s.monitorDone = nil
-
-	sessions := make([]*managedSession, 0, len(s.sessions))
-	for id, session := range s.sessions {
-		sessions = append(sessions, session)
-		delete(s.sessions, id)
-	}
-	operations := make([]*operationState, 0, len(s.operations))
-	for _, operation := range s.operations {
-		operations = append(operations, operation)
-	}
-	s.mu.Unlock()
-
-	if enrichmentCancel != nil {
-		enrichmentCancel()
-	}
-	for _, operation := range operations {
-		operation.cancel()
-	}
-
-	var cleanupErr error
-	if monitorCancel != nil {
-		monitorCancel()
-	}
-	if monitorDone != nil {
-		<-monitorDone
-	}
-	if enrichmentDone != nil {
-		<-enrichmentDone
-	}
-	for _, session := range sessions {
-		if err := session.session.Close(); err != nil && cleanupErr == nil {
-			cleanupErr = err
-		}
-		s.waitForSessionOperations(session.id)
-	}
-
-	return cleanupErr
-}
-
 func (s *Service) Discover(ctx context.Context, req DiscoverRequest) (DiscoverySnapshot, error) {
 	started := time.Now()
 	snapshot, err := s.discoverSnapshot(ctx, req)
@@ -164,174 +114,6 @@ func (s *Service) Discover(ctx context.Context, req DiscoverRequest) (DiscoveryS
 	}, started, err))
 
 	return snapshot, err
-}
-
-func (s *Service) OpenSession(ctx context.Context, req OpenSessionRequest) (snapshot SessionSnapshot, returnErr error) {
-	sessionID := newSessionID()
-	started := time.Now()
-	defer func() {
-		s.logs.Append(kitlog.Finish(model.LogEntry{
-			Timestamp: started.UTC(),
-			Layer:     model.LogLayerSession,
-			Code:      model.LogCodeSessionOpen,
-			Request:   kitlog.Payload(kitlog.SafeValue(req)),
-			Response:  kitlog.Payload(kitlog.SafeValue(snapshot)),
-			SessionID: string(sessionID),
-		}, started, returnErr))
-	}()
-
-	if s.isClosed() {
-		return SessionSnapshot{}, closedServiceError(failure.PhaseSession)
-	}
-	device, err := s.selectDevice(req.Selector)
-	if err != nil {
-		return SessionSnapshot{}, err
-	}
-	releaseDevice, err := s.claimDeviceForSession(ctx, device.Report())
-	if err != nil {
-		return SessionSnapshot{}, err
-	}
-	defer releaseDevice()
-	opts := []ctapkit.OpenSessionOption{
-		ctapkit.WithEventSink(sessionEventSink{service: s, sessionID: sessionID}),
-		ctapkit.WithLogJournal(s.logs),
-	}
-	if s.strictPermissions {
-		opts = append(opts, ctapkit.WithStrictPermissions())
-	}
-
-	openCtx := kitlog.WithCorrelation(ctx, string(sessionID), "", "")
-	session, err := ctapkit.OpenSession(openCtx, device, opts...)
-	if err != nil {
-		return SessionSnapshot{}, err
-	}
-
-	now := time.Now().UTC()
-	managed := &managedSession{
-		id:        sessionID,
-		session:   session,
-		device:    s.reportWithMetadata(device.Report()),
-		openedAt:  now,
-		updatedAt: now,
-	}
-
-	s.mu.Lock()
-	if s.closed {
-		s.mu.Unlock()
-		_ = session.Close()
-
-		return SessionSnapshot{}, closedServiceError(failure.PhaseSession)
-	}
-	if !deviceReportPresent(deviceReports(s.devices), managed.device) {
-		s.mu.Unlock()
-		_ = session.Close()
-
-		return SessionSnapshot{}, invalidSessionError()
-	}
-	s.sessions[managed.id] = managed
-	snapshot = managed.snapshot(false)
-	s.mu.Unlock()
-
-	return snapshot, nil
-}
-
-func (s *Service) Sessions() []SessionSnapshot {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	snapshots := make([]SessionSnapshot, 0, len(s.sessions))
-	for _, session := range s.sessions {
-		snapshots = append(snapshots, session.snapshot(s.sessionOperationLocked(session.id) != nil))
-	}
-
-	return snapshots
-}
-
-func (s *Service) Session(id SessionID) (SessionSnapshot, error) {
-	s.mu.Lock()
-	session, ok := s.sessions[id]
-	if !ok {
-		s.mu.Unlock()
-		return SessionSnapshot{}, invalidSessionError()
-	}
-	snapshot := session.snapshot(s.sessionOperationLocked(id) != nil)
-	s.mu.Unlock()
-
-	return snapshot, nil
-}
-
-func (s *Service) CloseSession(id SessionID) (snapshot SessionSnapshot, returnErr error) {
-	started := time.Now()
-	defer func() {
-		s.logs.Append(kitlog.Finish(model.LogEntry{
-			Timestamp: started.UTC(),
-			Layer:     model.LogLayerSession,
-			Code:      model.LogCodeSessionClose,
-			Request:   kitlog.Payload(kitlog.SafeValue(map[string]any{"sessionId": id})),
-			Response:  kitlog.Payload(kitlog.SafeValue(snapshot)),
-			SessionID: string(id),
-		}, started, returnErr))
-	}()
-
-	s.mu.Lock()
-	session, ok := s.sessions[id]
-	if ok {
-		delete(s.sessions, id)
-	}
-	s.mu.Unlock()
-
-	if !ok {
-		return SessionSnapshot{}, invalidSessionError()
-	}
-
-	s.cancelSessionOperations(session.id)
-	err := session.session.Close()
-	s.waitForSessionOperations(session.id)
-	session.updatedAt = time.Now().UTC()
-	s.startEnrichment()
-
-	snapshot = session.snapshot(false)
-
-	return snapshot, err
-}
-
-func (s *Service) CloseAllSessions() (snapshots []SessionSnapshot, returnErr error) {
-	started := time.Now()
-	defer func() {
-		s.logs.Append(kitlog.Finish(model.LogEntry{
-			Timestamp: started.UTC(),
-			Layer:     model.LogLayerSession,
-			Code:      model.LogCodeSessionClose,
-			Params:    map[string]string{"scope": "all"},
-			Request:   kitlog.Payload(kitlog.SafeValue(map[string]any{"all": true})),
-			Response:  kitlog.Payload(kitlog.SafeValue(snapshots)),
-		}, started, returnErr))
-	}()
-
-	s.mu.Lock()
-	sessions := make([]*managedSession, 0, len(s.sessions))
-	for id, session := range s.sessions {
-		sessions = append(sessions, session)
-		delete(s.sessions, id)
-	}
-	s.mu.Unlock()
-
-	snapshots = make([]SessionSnapshot, 0, len(sessions))
-	var closeErr error
-	for _, session := range sessions {
-		s.cancelSessionOperations(session.id)
-		if err := session.session.Close(); err != nil && closeErr == nil {
-			closeErr = err
-		}
-		s.waitForSessionOperations(session.id)
-		session.updatedAt = time.Now().UTC()
-
-		snapshot := session.snapshot(false)
-		snapshots = append(snapshots, snapshot)
-	}
-	s.startEnrichment()
-
-	return snapshots, closeErr
 }
 
 func (s *Service) runOperation(ctx context.Context, req OperationRequest, operation model.Operation) (envelope operationEnvelope, returnErr error) {
@@ -349,14 +131,14 @@ func (s *Service) runOperation(ctx context.Context, req OperationRequest, operat
 			Response:       kitlog.Payload(response),
 			RedactedFields: slices.Concat(request.RedactedFields, response.RedactedFields),
 			OperationKind:  operation.Kind(),
-			SessionID:      string(req.SessionID),
+			SelectionID:    string(req.SelectionID),
 			OperationID:    string(operationID),
 		}, started, operationErr))
 	}()
 
-	session, ok := s.session(req.SessionID)
+	selected, ok := s.selectionFor(req.SelectionID)
 	if !ok {
-		err := invalidSessionError()
+		err := invalidSelectionError()
 		operationErr = err
 		envelope = failedOperationEnvelope(operationID, req, operation, err)
 
@@ -365,46 +147,48 @@ func (s *Service) runOperation(ctx context.Context, req OperationRequest, operat
 
 	ctx, cancel := context.WithCancel(ctx)
 	state := &operationState{
-		id:        operationID,
-		sessionID: req.SessionID,
-		kind:      operation.Kind(),
-		cancel:    cancel,
-		done:      make(chan struct{}),
+		id:          operationID,
+		selectionID: req.SelectionID,
+		kind:        operation.Kind(),
+		cancel:      cancel,
+		done:        make(chan struct{}),
 	}
 
-	if !s.registerSessionOperation(session, state) {
+	if !s.registerOperation(selected, state) {
 		cancel()
 
-		err := invalidSessionError()
+		err := invalidSelectionError()
 		operationErr = err
 		envelope = failedOperationEnvelope(operationID, req, operation, err)
 
 		return envelope, nil
 	}
 	defer cancel()
-	defer s.unregisterOperation(operationID)
+	defer s.unregisterOperation(selected, operationID)
 
 	opts := runOptions(req.VerificationFlow)
-	ctx = kitlog.WithCorrelation(ctx, string(req.SessionID), string(operationID), operation.Kind())
-	result, err := session.session.Run(ctx, operation, interactionHandler{
+	ctx = kitlog.WithCorrelation(ctx, string(req.SelectionID), string(operationID), operation.Kind())
+	result, err := selected.runtime.Run(ctx, operation, interactionHandler{
 		service:     s,
-		sessionID:   req.SessionID,
+		ctx:         ctx,
+		done:        state.done,
+		selectionID: req.SelectionID,
 		operationID: operationID,
 		kind:        operation.Kind(),
 	}, opts...)
 	operationErr = err
-	sessionClosed := session.session.Info().Closed
-	if sessionClosed {
-		s.retireSession(session)
+	authenticatorClosed := selected.runtime.Closed()
+	if authenticatorClosed {
+		s.retireSelection(selected)
 	}
 
 	envelope = operationEnvelope{
-		OperationID:   operationID,
-		SessionID:     req.SessionID,
-		Kind:          operation.Kind(),
-		SessionClosed: sessionClosed,
-		Result:        result,
-		Error:         failure.Snapshot(err),
+		OperationID:         operationID,
+		SelectionID:         req.SelectionID,
+		Kind:                operation.Kind(),
+		AuthenticatorClosed: authenticatorClosed,
+		Result:              result,
+		Error:               failure.Snapshot(err),
 	}
 
 	return envelope, nil
@@ -418,7 +202,7 @@ func failedOperationEnvelope(operationID OperationID, req OperationRequest, oper
 
 	return operationEnvelope{
 		OperationID: operationID,
-		SessionID:   req.SessionID,
+		SelectionID: req.SelectionID,
 		Kind:        kind,
 		Error:       failure.Snapshot(err),
 	}
@@ -430,33 +214,20 @@ func (s *Service) CancelOperation(req CancelOperationRequest) bool {
 
 func (s *Service) cancelOperation(id OperationID) bool {
 	s.mu.Lock()
-	operation, ok := s.operations[id]
+	selected := s.selected
+	var operation *operationState
+	if selected != nil {
+		operation = selected.operations[id]
+	}
 	s.mu.Unlock()
 
-	if !ok {
+	if operation == nil {
 		return false
 	}
 
 	operation.cancel()
 
 	return true
-}
-
-func (s *Service) cancelSessionOperations(id SessionID) bool {
-	s.mu.Lock()
-	operations := make([]*operationState, 0, 1)
-	for _, operation := range s.operations {
-		if operation.sessionID == id {
-			operations = append(operations, operation)
-		}
-	}
-	s.mu.Unlock()
-
-	for _, operation := range operations {
-		operation.cancel()
-	}
-
-	return len(operations) > 0
 }
 
 func (s *Service) ResolveInteraction(ctx context.Context, answer InteractionAnswer) (bool, error) {
@@ -476,12 +247,10 @@ func (s *Service) ResolveInteraction(ctx context.Context, answer InteractionAnsw
 		Confirmed: answer.Confirmed,
 		Canceled:  answer.Canceled,
 	}
-	done := s.operationDone(pending.prompt.OperationID)
-
 	select {
 	case pending.response <- response:
 		return true, nil
-	case <-done:
+	case <-pending.done:
 		clear(response.PIN)
 
 		return false, nil
@@ -534,84 +303,59 @@ func (s *Service) LookupMDS(ctx context.Context, req MDSLookupRequest) (envelope
 	return envelope, nil
 }
 
-func (s *Service) session(id SessionID) (*managedSession, bool) {
+func (s *Service) selectionFor(id SelectionID) (*selection, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	session, ok := s.sessions[id]
+	selected := s.selected
+	ok := selected != nil && selected.id == id
 
-	return session, ok
+	return selected, ok
 }
 
-func (s *Service) retireSession(session *managedSession) {
+func (s *Service) retireSelection(selected *selection) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if current := s.sessions[session.id]; current == session {
-		delete(s.sessions, session.id)
+	if s.selected == selected {
+		s.selected = nil
 	}
 }
 
-func (s *Service) selectDevice(selector string) (ctapkit.Device, error) {
-	s.mu.Lock()
-	devices := append([]ctapkit.Device(nil), s.devices...)
-	s.mu.Unlock()
-
-	return ctapkit.SelectDevice(devices, selector)
-}
-
-func (s *Service) registerSessionOperation(session *managedSession, operation *operationState) bool {
+func (s *Service) registerOperation(selected *selection, operation *operationState) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	current, ok := s.sessions[operation.sessionID]
-	if s.closed {
+	if s.closed || s.selected != selected || selected.id != operation.selectionID {
 		return false
 	}
-	if !ok || current != session {
-		return false
-	}
-	s.operations[operation.id] = operation
-	session.updatedAt = time.Now().UTC()
+	selected.operations[operation.id] = operation
 
 	return true
 }
 
-func (s *Service) unregisterOperation(id OperationID) {
+func (s *Service) unregisterOperation(selected *selection, id OperationID) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if operation, ok := s.operations[id]; ok {
+	if operation, ok := selected.operations[id]; ok {
 		close(operation.done)
-		if session := s.sessions[operation.sessionID]; session != nil {
-			session.updatedAt = time.Now().UTC()
-		}
 	}
-	delete(s.operations, id)
+	delete(selected.operations, id)
 }
 
-func (s *Service) operationDone(id OperationID) <-chan struct{} {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	operation, ok := s.operations[id]
-	if !ok {
-		closed := make(chan struct{})
-		close(closed)
-
-		return closed
-	}
-
-	return operation.done
-}
-
-func (s *Service) registerInteraction(prompt InteractionPrompt, response chan model.InteractionResponse) {
+func (s *Service) registerInteraction(
+	prompt InteractionPrompt,
+	response chan model.InteractionResponse,
+	done <-chan struct{},
+) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.interactions[prompt.InteractionID] = &pendingInteraction{
 		prompt:   prompt,
 		response: response,
+		done:     done,
 	}
 }
 
@@ -635,46 +379,25 @@ func (s *Service) emit(name string, payload any) {
 	emitter.Emit(name, payload)
 }
 
-func (m *managedSession) snapshot(running bool) SessionSnapshot {
-	info := m.session.Info()
-	info.Device = m.device
-
-	return SessionSnapshot{
-		ID:        m.id,
-		Info:      info,
-		Running:   running,
-		OpenedAt:  m.openedAt,
-		UpdatedAt: m.updatedAt,
-	}
+type selectionEventSink struct {
+	service     *Service
+	selectionID SelectionID
 }
 
-func (s *Service) sessionOperationLocked(id SessionID) *operationState {
-	for _, operation := range s.operations {
-		if operation.sessionID == id {
-			return operation
+func (s selectionEventSink) Emit(event model.OperationEvent) {
+	s.service.emitOperationEvent(s.selectionID, event)
+}
+
+func (s *Service) emitOperationEvent(selectionID SelectionID, event model.OperationEvent) {
+	s.mu.Lock()
+	selected := s.selected
+	ok := selected != nil && selected.id == selectionID
+	var operation *operationState
+	if ok {
+		for _, operation = range selected.operations {
+			break
 		}
 	}
-
-	return nil
-}
-
-type sessionEventSink struct {
-	service   *Service
-	sessionID SessionID
-}
-
-func (s sessionEventSink) Emit(event model.OperationEvent) {
-	if s.service == nil {
-		return
-	}
-
-	s.service.emitOperationEvent(s.sessionID, event)
-}
-
-func (s *Service) emitOperationEvent(sessionID SessionID, event model.OperationEvent) {
-	s.mu.Lock()
-	_, ok := s.sessions[sessionID]
-	operation := s.sessionOperationLocked(sessionID)
 	s.mu.Unlock()
 	if !ok {
 		return
@@ -687,35 +410,31 @@ func (s *Service) emitOperationEvent(sessionID SessionID, event model.OperationE
 
 	s.emit(EventOperationEvent, OperationEventEnvelope{
 		OperationID: operationID,
-		SessionID:   sessionID,
+		SelectionID: selectionID,
 		Event:       event,
 	})
 }
 
 type interactionHandler struct {
 	service     *Service
-	sessionID   SessionID
+	ctx         context.Context
+	done        <-chan struct{}
+	selectionID SelectionID
 	operationID OperationID
 	kind        model.OperationKind
 }
 
 func (h interactionHandler) RequestInteraction(req model.InteractionRequest) (answer model.InteractionResponse, returnErr error) {
-	if h.service == nil {
-		return model.InteractionResponse{}, failure.New(failure.CodeInteractionHandlerRequired,
-			failure.WithPhase(failure.PhaseInteraction),
-		)
-	}
-
 	request := interactionRequestLogValue(req)
 	requestStarted := time.Now()
 	prompt := InteractionPrompt{
 		InteractionID: newInteractionID(),
 		OperationID:   h.operationID,
-		SessionID:     h.sessionID,
+		SelectionID:   h.selectionID,
 		Request:       req,
 	}
 	response := make(chan model.InteractionResponse)
-	h.service.registerInteraction(prompt, response)
+	h.service.registerInteraction(prompt, response, h.done)
 	h.service.emit(EventInteractionRequested, prompt)
 	h.service.logs.Append(kitlog.Finish(model.LogEntry{
 		Timestamp:      requestStarted.UTC(),
@@ -725,7 +444,7 @@ func (h interactionHandler) RequestInteraction(req model.InteractionRequest) (an
 		Response:       kitlog.Payload(kitlog.SafeValue(map[string]any{"interactionId": prompt.InteractionID})),
 		RedactedFields: request.RedactedFields,
 		OperationKind:  h.kind,
-		SessionID:      string(h.sessionID),
+		SelectionID:    string(h.selectionID),
 		OperationID:    string(h.operationID),
 	}, requestStarted, nil))
 	defer h.service.unregisterInteraction(prompt.InteractionID)
@@ -755,7 +474,7 @@ func (h interactionHandler) RequestInteraction(req model.InteractionRequest) (an
 			Response:       kitlog.Payload(kitlog.SafeValue(result)),
 			RedactedFields: resolveRedacted,
 			OperationKind:  h.kind,
-			SessionID:      string(h.sessionID),
+			SelectionID:    string(h.selectionID),
 			OperationID:    string(h.operationID),
 		}, resolveStarted, returnErr))
 	}()
@@ -763,21 +482,21 @@ func (h interactionHandler) RequestInteraction(req model.InteractionRequest) (an
 	select {
 	case answer = <-response:
 		return answer, nil
-	case <-h.service.operationDone(h.operationID):
-		err := failure.New(failure.CodeInteractionCanceled,
-			failure.WithPhase(failure.PhaseInteraction),
-		)
-
-		return model.InteractionResponse{}, err
+	case <-h.ctx.Done():
+	case <-h.done:
 	}
+
+	return model.InteractionResponse{}, failure.New(failure.CodeInteractionCanceled,
+		failure.WithPhase(failure.PhaseInteraction),
+	)
 }
 
-func runOptions(verificationFlow model.VerificationFlow) []ctapkit.RunOption {
+func runOptions(verificationFlow model.VerificationFlow) []ctapkit.OperationOption {
 	if verificationFlow == model.VerificationFlowDefault {
 		return nil
 	}
 
-	return []ctapkit.RunOption{ctapkit.WithVerificationFlow(verificationFlow)}
+	return []ctapkit.OperationOption{ctapkit.WithVerificationFlow(verificationFlow)}
 }
 
 func deviceReports(devices []ctapkit.Device) []report.DeviceReport {
@@ -789,8 +508,8 @@ func deviceReports(devices []ctapkit.Device) []report.DeviceReport {
 	return reports
 }
 
-func newSessionID() SessionID {
-	return SessionID(uuid.NewString())
+func newSelectionID() SelectionID {
+	return SelectionID(uuid.NewString())
 }
 
 func newOperationID() OperationID {

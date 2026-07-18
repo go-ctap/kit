@@ -622,6 +622,27 @@ func (c *testTokenCache) InvalidateToken() {
 	c.secret = nil
 }
 
+func (c *testTokenCache) InvalidateTokenUnlessPermission(permission protocol.Permission) {
+	if c.secret == nil {
+		return
+	}
+	if permission == protocol.PermissionPersistentCredentialManagementReadOnly &&
+		c.key.Permission != permission {
+		c.InvalidateToken()
+
+		return
+	}
+
+	remaining := c.key.Permission & permission
+	if remaining == protocol.PermissionNone {
+		c.InvalidateToken()
+
+		return
+	}
+
+	c.key.Permission = remaining
+}
+
 type recordingTokenDevice struct {
 	info             protocol.AuthenticatorGetInfoResponse
 	uvErr            error

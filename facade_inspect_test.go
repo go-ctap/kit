@@ -14,7 +14,7 @@ import (
 
 func TestInspectEmitsNoEventsWithoutProgressOrStateChanges(t *testing.T) {
 	events := &recordingEventSink{}
-	session := openContractSession(t, events, nil)
+	session := openContractAuthenticator(t, events, nil)
 	defer func() { _ = session.Close() }()
 
 	output, err := session.Run(context.Background(), model.InspectOperation{}, nil)
@@ -42,7 +42,7 @@ func TestInspectNormalizesYubicoMetadata(t *testing.T) {
 		EnabledUSBCapabilities:   yubico.CapabilityCTAP2,
 		SupportedNFCCapabilities: &supportedNFC,
 	}}
-	session := openYubicoContractSession(t, auth)
+	session := openYubicoContractAuthenticator(t, auth)
 	defer func() { _ = session.Close() }()
 
 	result, err := session.Run(context.Background(), model.InspectOperation{}, nil)
@@ -57,7 +57,7 @@ func TestInspectNormalizesYubicoMetadata(t *testing.T) {
 
 func TestInspectKeepsBaseResultWhenYubicoMetadataFails(t *testing.T) {
 	auth := &yubicoContractAuthenticator{err: errors.New("vendor command failed")}
-	session := openYubicoContractSession(t, auth)
+	session := openYubicoContractAuthenticator(t, auth)
 	defer func() { _ = session.Close() }()
 
 	result, err := session.Run(context.Background(), model.InspectOperation{}, nil)
@@ -80,7 +80,7 @@ func (a *yubicoContractAuthenticator) GetYubiKeyDeviceInfo(context.Context) (yub
 	return a.info, a.err
 }
 
-func openYubicoContractSession(t *testing.T, auth authenticator.Device) *Session {
+func openYubicoContractAuthenticator(t *testing.T, auth authenticator.Device) *Authenticator {
 	t.Helper()
 
 	device := newDevice(0, transport.ModeHID, transport.Descriptor{
@@ -89,7 +89,7 @@ func openYubicoContractSession(t *testing.T, auth authenticator.Device) *Session
 		VendorID:  0x1050,
 		ProductID: 0x0407,
 	})
-	session, err := openSession(
+	session, err := openAuthenticatorHandle(
 		context.Background(),
 		device,
 		func(context.Context, transport.Mode, string) (authenticator.Device, error) {
@@ -97,7 +97,7 @@ func openYubicoContractSession(t *testing.T, auth authenticator.Device) *Session
 		},
 	)
 	if err != nil {
-		t.Fatalf("OpenSession: %v", err)
+		t.Fatalf("OpenAuthenticator: %v", err)
 	}
 
 	return session

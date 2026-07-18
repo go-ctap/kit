@@ -171,8 +171,8 @@ func TestSelectDeviceUsesDiscoverySnapshot(t *testing.T) {
 	}
 }
 
-func TestOpenSessionRejectsZeroDevice(t *testing.T) {
-	session, err := OpenSession(context.Background(), Device{})
+func TestOpenAuthenticatorRejectsZeroDevice(t *testing.T) {
+	session, err := OpenAuthenticator(context.Background(), Device{})
 	requireFailureCode(t, err, failure.CodeDeviceHandleInvalid)
 
 	if session != nil {

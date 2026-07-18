@@ -12,9 +12,7 @@ import (
 )
 
 func (r Runner) credentialStoreState(ctx context.Context) (appcredentials.StoreStateResult, error) {
-	if r.env.Cache != nil {
-		r.env.Cache.InvalidateTokenUnlessPermission(protocol.PermissionPersistentCredentialManagementReadOnly)
-	}
+	r.env.Tokens.InvalidateUnlessPermission(protocol.PermissionPersistentCredentialManagementReadOnly)
 
 	var state ctapauthenticator.PersistentCredentialStoreState
 	err := r.env.Tokens.Use(

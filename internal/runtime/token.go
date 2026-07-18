@@ -36,6 +36,15 @@ type TokenCache interface {
 	GetToken(TokenKey) ([]byte, bool, error)
 	SetToken(TokenKey, *secret.Handle)
 	InvalidateToken()
+	InvalidateTokenUnlessPermission(protocol.Permission)
+}
+
+func (s *TokenService) Invalidate() {
+	s.cache.InvalidateToken()
+}
+
+func (s *TokenService) InvalidateUnlessPermission(permission protocol.Permission) {
+	s.cache.InvalidateTokenUnlessPermission(permission)
 }
 
 type TokenService struct {

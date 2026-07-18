@@ -7,7 +7,7 @@ their `error` or `failure` field.
 ## Go API
 
 ```go
-result, err := session.Run(ctx, operation, handler)
+result, err := authenticator.Run(ctx, operation, handler)
 if err != nil {
 	if failure.IsCode(err, failure.CodeCredentialNotFound) {
 		// Choose recovery or localized UI by the stable code.
@@ -199,7 +199,7 @@ not decide which token errors invalidate the cache. The first rejection is
 therefore not returned as the final `credentials.list` error.
 
 Persistent credential-store state uses the ordinary replay-safe token path.
-Before acquisition, the session cache retains only an already-standalone
+Before acquisition, the authenticator token store retains only an already-standalone
 `persistentCredentialManagementReadOnly` grant; credential-management and
 composite grants are discarded.
 

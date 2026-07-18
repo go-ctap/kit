@@ -39,7 +39,7 @@ func (s *Service) reportWithMetadata(device report.DeviceReport) report.DeviceRe
 	return device
 }
 
-func (s *Service) mergeInspectMetadata(sessionID SessionID, result *model.InspectOutput) *DiscoverySnapshot {
+func (s *Service) mergeInspectMetadata(selectionID SelectionID, result *model.InspectOutput) *DiscoverySnapshot {
 	if result == nil {
 		return nil
 	}
@@ -47,12 +47,12 @@ func (s *Service) mergeInspectMetadata(sessionID SessionID, result *model.Inspec
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	session := s.sessions[sessionID]
-	if session == nil {
+	selected := s.selected
+	if selected == nil || selected.id != selectionID {
 		return nil
 	}
 
-	key := enrichmentKey(session.device)
+	key := enrichmentKey(selected.device)
 	cached, cachedOK := s.enrichment.cache[key]
 	if result.Result.Device.Metadata == nil {
 		if cachedOK {
@@ -67,8 +67,8 @@ func (s *Service) mergeInspectMetadata(sessionID SessionID, result *model.Inspec
 	changed := !cachedOK || !deviceMetadataEqual(cached, metadata)
 	s.enrichment.cache[key] = metadata
 
-	sessionMetadata := cloneDeviceMetadata(metadata)
-	session.device.Metadata = &sessionMetadata
+	selectionMetadata := cloneDeviceMetadata(metadata)
+	selected.device.Metadata = &selectionMetadata
 	resultMetadata := cloneDeviceMetadata(metadata)
 	result.Result.Device.Metadata = &resultMetadata
 	if !changed {

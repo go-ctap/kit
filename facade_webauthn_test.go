@@ -28,7 +28,7 @@ import (
 
 func TestMakeCredentialDryRunDoesNotConfirmAcquireTokenOrMutate(t *testing.T) {
 	a := &webauthnTestAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -55,7 +55,7 @@ func TestMakeCredentialDryRunDoesNotConfirmAcquireTokenOrMutate(t *testing.T) {
 
 func TestGetAssertionDryRunDoesNotAcquireTokenOrCallAuthenticator(t *testing.T) {
 	a := &webauthnTestAuthenticator{alwaysUV: true}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -88,7 +88,7 @@ func TestGetAssertionDryRunDoesNotAcquireTokenOrCallAuthenticator(t *testing.T) 
 
 func TestGetAssertionLargeBlobWriteRequiresConfirmationIncludingEmptyBlob(t *testing.T) {
 	a := &webauthnTestAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -129,7 +129,7 @@ func TestGetAssertionLargeBlobWriteRequiresConfirmationIncludingEmptyBlob(t *tes
 
 func TestMakeCredentialMapsRequestAndUsesRawClientDataJSON(t *testing.T) {
 	a := &webauthnTestAuthenticator{makeCredentialUvNotRequired: true}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -194,7 +194,7 @@ func TestMakeCredentialMapsRequestAndUsesRawClientDataJSON(t *testing.T) {
 
 func TestMakeCredentialAcquiresScopedTokenWhenCTAPRequiresIt(t *testing.T) {
 	a := &webauthnTestAuthenticator{makeCredentialRequiresToken: true}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -223,7 +223,7 @@ func TestMakeCredentialKeepsPartialResultAndInvalidatesInventoryOnRefreshFailure
 		makeCredentialErr:                   refreshErr,
 		returnMakeCredentialResponseOnError: true,
 	}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -259,7 +259,7 @@ func TestMakeCredentialKeepsPartialResultAndInvalidatesInventoryOnRefreshFailure
 
 func TestMakeCredentialSkipsTokenWhenAuthenticatorDoesNotRequireIt(t *testing.T) {
 	a := &webauthnTestAuthenticator{makeCredentialUvNotRequired: true}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -278,9 +278,9 @@ func TestMakeCredentialSkipsTokenWhenAuthenticatorDoesNotRequireIt(t *testing.T)
 	}
 }
 
-func TestMakeCredentialInvalidatesCredentialCaches(t *testing.T) {
+func TestCredentialInventoryAlwaysReadsFreshStateAroundMakeCredential(t *testing.T) {
 	a := &webauthnTestAuthenticator{makeCredentialUvNotRequired: true}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -291,8 +291,8 @@ func TestMakeCredentialInvalidatesCredentialCaches(t *testing.T) {
 	if _, err := session.Run(context.Background(), model.ListCredentialsOperation{}, userVerificationHandler(t)); err != nil {
 		t.Fatalf("cached ListCredentials: %v", err)
 	}
-	if got := a.metadataCalls; got != 1 {
-		t.Fatalf("metadata calls before mutation = %d, want 1", got)
+	if got := a.metadataCalls; got != 2 {
+		t.Fatalf("metadata calls before mutation = %d, want 2", got)
 	}
 
 	op := sampleMakeCredentialOperation(false)
@@ -303,14 +303,14 @@ func TestMakeCredentialInvalidatesCredentialCaches(t *testing.T) {
 	if _, err := session.Run(context.Background(), model.ListCredentialsOperation{}, userVerificationHandler(t)); err != nil {
 		t.Fatalf("post-mutation ListCredentials: %v", err)
 	}
-	if got := a.metadataCalls; got != 2 {
-		t.Fatalf("metadata calls after mutation = %d, want 2", got)
+	if got := a.metadataCalls; got != 3 {
+		t.Fatalf("metadata calls after mutation = %d, want 3", got)
 	}
 }
 
 func TestGetAssertionReturnsAllAssertionsInOrder(t *testing.T) {
 	a := &webauthnTestAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -356,7 +356,7 @@ func TestGetAssertionReturnsAllAssertionsInOrder(t *testing.T) {
 
 func TestGetAssertionUsesBuiltInUVWhenRequested(t *testing.T) {
 	a := &webauthnTestAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -388,7 +388,7 @@ func TestGetAssertionUsesBuiltInUVWhenRequested(t *testing.T) {
 
 func TestGetAssertionAcquiresScopedTokenWhenCTAPRequiresIt(t *testing.T) {
 	a := &webauthnTestAuthenticator{getAssertionRequiresToken: true}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -416,7 +416,7 @@ func TestGetAssertionAcquiresScopedTokenWhenCTAPRequiresIt(t *testing.T) {
 
 func TestGetAssertionAcquiresScopedTokenWhenCTAPRequiresBuiltInUV(t *testing.T) {
 	a := &webauthnTestAuthenticator{getAssertionRequiresBuiltInUV: true}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -441,7 +441,7 @@ func TestGetAssertionAcquiresScopedTokenWhenCTAPRequiresBuiltInUV(t *testing.T) 
 
 func TestWebAuthnDelegatesPRFRoutingToCTAP(t *testing.T) {
 	a := &webauthnTestAuthenticator{makeCredentialUvNotRequired: true}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -522,7 +522,7 @@ func TestWebAuthnCTAPStatusMapsCodes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			a := &webauthnTestAuthenticator{makeCredentialUvNotRequired: true}
 			tt.setupErr(a)
-			session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+			session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 				return a, nil
 			})
 			defer func() { _ = session.Close() }()

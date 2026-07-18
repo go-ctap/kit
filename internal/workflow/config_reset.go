@@ -45,9 +45,7 @@ func (r Runner) resetFactory(ctx context.Context, req model.ResetFactoryOperatio
 	}
 
 	err := r.configManager().Reset(ctx)
-	if r.env.Cache != nil {
-		r.env.Cache.InvalidateAll()
-	}
+	r.env.Tokens.Invalidate()
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,

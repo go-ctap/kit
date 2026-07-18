@@ -6,9 +6,6 @@ import (
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
-	appconfig "github.com/go-ctap/kit/model/config"
-	appcredentials "github.com/go-ctap/kit/model/credentials"
-	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/report"
 )
 
@@ -17,7 +14,6 @@ type Environment struct {
 	Authenticator     authenticator.Device
 	Events            EventEmitter
 	Interactions      InteractionRequester
-	Cache             CacheStore
 	Tokens            TokenService
 	StrictPermissions bool
 }
@@ -39,19 +35,6 @@ type TokenService interface {
 		string,
 		func([]byte) error,
 	) error
-}
-
-type CacheStore interface {
-	Credential() (appcredentials.InventoryReport, bool)
-	SetCredential(appcredentials.InventoryReport)
-	LargeBlobList() (applargeblobs.ListReport, bool)
-	SetLargeBlobList(applargeblobs.ListReport)
-	Config() (appconfig.StatusReport, bool)
-	SetConfig(appconfig.StatusReport)
-	InvalidateAll()
-	InvalidateCredentials()
-	InvalidateLargeBlobs()
-	InvalidateConfig()
-	InvalidateToken()
-	InvalidateTokenUnlessPermission(protocol.Permission)
+	Invalidate()
+	InvalidateUnlessPermission(protocol.Permission)
 }

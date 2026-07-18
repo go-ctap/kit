@@ -21,19 +21,19 @@ type correlationKey struct{}
 type recorderKey struct{}
 
 type correlation struct {
-	sessionID     string
+	selectionID   string
 	operationID   string
 	operationKind model.OperationKind
 }
 
 func WithCorrelation(
 	ctx context.Context,
-	sessionID string,
+	selectionID string,
 	operationID string,
 	operationKind model.OperationKind,
 ) context.Context {
 	return context.WithValue(ctx, correlationKey{}, correlation{
-		sessionID:     sessionID,
+		selectionID:   selectionID,
 		operationID:   operationID,
 		operationKind: operationKind,
 	})
@@ -42,7 +42,7 @@ func WithCorrelation(
 func Correlation(ctx context.Context) (string, string, model.OperationKind) {
 	value, _ := ctx.Value(correlationKey{}).(correlation)
 
-	return value.sessionID, value.operationID, value.operationKind
+	return value.selectionID, value.operationID, value.operationKind
 }
 
 type Recorder interface {

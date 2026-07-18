@@ -16,21 +16,7 @@ import (
 )
 
 func (r Runner) listLargeBlobs(ctx context.Context, req model.ListLargeBlobsOperation) (applargeblobs.ListReport, error) {
-	if !req.Refresh {
-		if rep, ok := r.env.Cache.LargeBlobList(); ok {
-			return rep, nil
-		}
-	}
-
-	var (
-		inventory appcredentials.InventoryReport
-		err       error
-	)
-	if req.Refresh {
-		inventory, err = r.freshCredentialInventoryReport(ctx, protocol.PermissionNone)
-	} else {
-		inventory, err = r.readCredentialInventoryReport(ctx)
-	}
+	inventory, err := r.freshCredentialInventoryReport(ctx, protocol.PermissionNone)
 	if err != nil {
 		return applargeblobs.ListReport{}, err
 	}
@@ -46,13 +32,6 @@ func (r Runner) listLargeBlobs(ctx context.Context, req model.ListLargeBlobsOper
 			errornorm.WithPhase(failure.PhaseDiscovery),
 		)
 	}
-
-	if req.Refresh {
-		r.env.Cache.SetCredential(inventory)
-		r.env.Cache.SetLargeBlobList(rep)
-		return rep, nil
-	}
-	r.env.Cache.SetLargeBlobList(rep)
 
 	return rep, nil
 }

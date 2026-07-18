@@ -3,7 +3,6 @@ package ctapkit
 import (
 	"bytes"
 	"context"
-	"errors"
 	"iter"
 	"slices"
 	"sync/atomic"
@@ -19,10 +18,10 @@ import (
 	"github.com/samber/lo"
 )
 
-func TestCredentialInventoryRefreshBypassesCacheAndReusesToken(t *testing.T) {
+func TestCredentialInventoryReadsFreshStateAndReusesToken(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &refreshCredentialAuthenticator{revision: 1}
-	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -37,12 +36,12 @@ func TestCredentialInventoryRefreshBypassesCacheAndReusesToken(t *testing.T) {
 	}
 
 	a.revision = 2
-	refreshed := runCredentialList(t, session, model.ListCredentialsOperation{Refresh: true})
+	refreshed := runCredentialList(t, session, model.ListCredentialsOperation{})
 	if got := credentialIDFromInventory(t, refreshed); got != "02" {
 		t.Fatalf("refreshed credential ID = %q, want 02", got)
 	}
-	if got := a.metadataCalls.Load(); got != 2 {
-		t.Fatalf("metadata calls = %d, want 2", got)
+	if got := a.metadataCalls.Load(); got != 3 {
+		t.Fatalf("metadata calls = %d, want 3", got)
 	}
 	if got := a.tokenCalls.Load(); got != 1 {
 		t.Fatalf("token calls = %d, want 1", got)
@@ -51,8 +50,10 @@ func TestCredentialInventoryRefreshBypassesCacheAndReusesToken(t *testing.T) {
 	assertProgressEvents(t, events.Events(), model.OperationStageEnumeratingRPs, [][2]uint64{
 		{1, 1},
 		{1, 1},
+		{1, 1},
 	})
 	assertProgressEvents(t, events.Events(), model.OperationStageEnumeratingCredentials, [][2]uint64{
+		{1, 1},
 		{1, 1},
 		{1, 1},
 	})
@@ -60,7 +61,7 @@ func TestCredentialInventoryRefreshBypassesCacheAndReusesToken(t *testing.T) {
 
 func TestCredentialInventoryReturnsEmptyReportWithoutEnumeratingRPs(t *testing.T) {
 	a := &emptyCredentialAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -79,7 +80,7 @@ func TestCredentialInventoryReturnsEmptyReportWithoutEnumeratingRPs(t *testing.T
 
 func TestCredentialInventoryReacquiresRejectedTokenOnce(t *testing.T) {
 	a := &rejectedCredentialTokenAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -101,7 +102,7 @@ func TestCredentialInventoryReacquiresRejectedTokenOnce(t *testing.T) {
 
 func TestCredentialInventoryStopsAfterSecondRejectedToken(t *testing.T) {
 	a := &rejectedCredentialTokenAuthenticator{rejectEveryToken: true}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -122,97 +123,16 @@ func TestCredentialInventoryStopsAfterSecondRejectedToken(t *testing.T) {
 	}
 }
 
-func TestCredentialInventoryFailedRefreshPreservesLastKnownGoodCache(t *testing.T) {
-	tests := []struct {
-		name       string
-		refreshErr error
-	}{
-		{name: "device failure", refreshErr: errors.New("refresh failed")},
-		{name: "cancellation", refreshErr: context.Canceled},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			a := &refreshCredentialAuthenticator{revision: 1}
-			session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-				return a, nil
-			})
-			defer func() { _ = session.Close() }()
-
-			initial := runCredentialList(t, session, model.ListCredentialsOperation{})
-			if got := credentialIDFromInventory(t, initial); got != "01" {
-				t.Fatalf("initial credential ID = %q, want 01", got)
-			}
-
-			a.revision = 2
-			a.metadataErr = tt.refreshErr
-			if _, err := session.Run(
-				context.Background(),
-				model.ListCredentialsOperation{Refresh: true},
-				userVerificationHandler(t),
-			); err == nil {
-				t.Fatal("refresh error = nil")
-			}
-
-			cached := runCredentialList(t, session, model.ListCredentialsOperation{})
-			if got := credentialIDFromInventory(t, cached); got != "01" {
-				t.Fatalf("credential ID after failed refresh = %q, want cached 01", got)
-			}
-			if got := a.metadataCalls.Load(); got != 2 {
-				t.Fatalf("metadata calls = %d, want 2", got)
-			}
-			if got := a.tokenCalls.Load(); got != 1 {
-				t.Fatalf("token calls = %d, want 1", got)
-			}
-		})
-	}
-}
-
-func TestCredentialInventoryCanceledContextDuringRefreshPreservesLastKnownGoodCache(t *testing.T) {
-	a := &refreshCredentialAuthenticator{revision: 1}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
-	defer func() { _ = session.Close() }()
-
-	initial := runCredentialList(t, session, model.ListCredentialsOperation{})
-	if got := credentialIDFromInventory(t, initial); got != "01" {
-		t.Fatalf("initial credential ID = %q, want 01", got)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	a.revision = 2
-	a.cancelEnumeration = cancel
-	if _, err := session.Run(
-		ctx,
-		model.ListCredentialsOperation{Refresh: true},
-		userVerificationHandler(t),
-	); err != nil {
-		requireFailureCode(t, err, failure.CodeOperationCanceled)
-	} else {
-		t.Fatal("refresh error = nil, want OPERATION_CANCELED")
-	}
-	a.cancelEnumeration = nil
-
-	cached := runCredentialList(t, session, model.ListCredentialsOperation{})
-	if got := credentialIDFromInventory(t, cached); got != "01" {
-		t.Fatalf("credential ID after canceled refresh = %q, want cached 01", got)
-	}
-	if got := a.metadataCalls.Load(); got != 2 {
-		t.Fatalf("metadata calls = %d, want 2", got)
-	}
-}
-
 func TestCredentialMutationUsesInventoryFromSuccessfulRefresh(t *testing.T) {
 	a := &refreshCredentialAuthenticator{revision: 1}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
 
 	_ = runCredentialList(t, session, model.ListCredentialsOperation{})
 	a.revision = 2
-	refreshed := runCredentialList(t, session, model.ListCredentialsOperation{Refresh: true})
+	refreshed := runCredentialList(t, session, model.ListCredentialsOperation{})
 	if got := credentialIDFromInventory(t, refreshed); got != "02" {
 		t.Fatalf("refreshed credential ID = %q, want 02", got)
 	}
@@ -228,41 +148,9 @@ func TestCredentialMutationUsesInventoryFromSuccessfulRefresh(t *testing.T) {
 	}
 }
 
-func TestCredentialInventoryRefreshInvalidatesLargeBlobListCache(t *testing.T) {
-	a := &largeBlobWriteEventAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
-	defer func() { _ = session.Close() }()
-
-	if _, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t)); err != nil {
-		t.Fatalf("first ListLargeBlobs: %v", err)
-	}
-	if _, err := session.Run(
-		context.Background(),
-		model.ListCredentialsOperation{Refresh: true},
-		userVerificationHandler(t),
-	); err != nil {
-		t.Fatalf("refresh ListCredentials: %v", err)
-	}
-	if _, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t)); err != nil {
-		t.Fatalf("second ListLargeBlobs: %v", err)
-	}
-
-	if got := a.rpEnumerations.Load(); got != 2 {
-		t.Fatalf("RP enumerations = %d, want 2", got)
-	}
-	if got := a.credentialEnumerations.Load(); got != 2 {
-		t.Fatalf("credential enumerations = %d, want 2", got)
-	}
-	if got := a.largeBlobReads.Load(); got != 2 {
-		t.Fatalf("large blob reads = %d, want 2", got)
-	}
-}
-
 func TestCredentialInventoryProgressEventsIncludeCounts(t *testing.T) {
 	events := &recordingEventSink{}
-	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return &progressCredentialAuthenticator{}, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -288,7 +176,7 @@ func TestCredentialInventoryProgressEventsIncludeCounts(t *testing.T) {
 
 func TestCredentialDeleteUsesUnscopedMutationPermissionsByDefault(t *testing.T) {
 	a := &credentialMutationTokenAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -306,7 +194,7 @@ func TestCredentialDeleteUsesUnscopedMutationPermissionsByDefault(t *testing.T) 
 
 func TestCredentialDeleteUsesScopedMutationPermissionsWhenStrict(t *testing.T) {
 	a := &credentialMutationTokenAuthenticator{}
-	session := openContractSessionWithOptions(
+	session := openContractAuthenticatorWithOptions(
 		t,
 		nil,
 		func(context.Context, transport.Mode, string) (authenticator.Device, error) {
@@ -333,45 +221,9 @@ func TestCredentialDeleteUsesScopedMutationPermissionsWhenStrict(t *testing.T) {
 	)
 }
 
-func TestCredentialDeletePreparesOneUnscopedGrantForInventoryRefreshWhenStrict(t *testing.T) {
-	a := &credentialMutationTokenAuthenticator{credentialManagementReadOnly: true}
-	session := openContractSessionWithOptions(
-		t,
-		nil,
-		func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-			return a, nil
-		},
-		WithStrictPermissions(),
-	)
-	defer func() { _ = session.Close() }()
-
-	_, err := session.Run(context.Background(), model.DeleteCredentialOperation{
-		CredentialIDHex:         "c05e",
-		PrepareInventoryRefresh: true,
-		Confirmed:               true,
-	}, userVerificationHandler(t))
-	if err != nil {
-		t.Fatalf("DeleteCredential: %v", err)
-	}
-
-	if _, err := session.Run(
-		context.Background(),
-		model.ListCredentialsOperation{Refresh: true},
-		userVerificationHandler(t),
-	); err != nil {
-		t.Fatalf("ListCredentials refresh: %v", err)
-	}
-
-	wantPermission := protocol.PermissionCredentialManagement
-	if !slices.Equal(a.tokenPermissions, []protocol.Permission{wantPermission}) {
-		t.Fatalf("token permissions = %#v, want [%#v]", a.tokenPermissions, wantPermission)
-	}
-	assertCredentialMutationToken(t, a.tokenRPIDs, []string{""}, a.deleteTokens, "token:")
-}
-
 func TestCredentialUpdateUserUsesUnscopedMutationPermissionsByDefault(t *testing.T) {
 	a := &credentialMutationTokenAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -391,7 +243,7 @@ func TestCredentialUpdateUserUsesUnscopedMutationPermissionsByDefault(t *testing
 
 func TestCredentialUpdateUserUsesScopedMutationPermissionsWhenStrict(t *testing.T) {
 	a := &credentialMutationTokenAuthenticator{}
-	session := openContractSessionWithOptions(
+	session := openContractAuthenticatorWithOptions(
 		t,
 		nil,
 		func(context.Context, transport.Mode, string) (authenticator.Device, error) {
@@ -586,7 +438,7 @@ func (a *refreshCredentialAuthenticator) EnumerateCredentials(
 	}
 }
 
-func runCredentialList(t *testing.T, session *Session, operation model.ListCredentialsOperation) model.CredentialsOutput {
+func runCredentialList(t *testing.T, session *Authenticator, operation model.ListCredentialsOperation) model.CredentialsOutput {
 	t.Helper()
 
 	result, err := session.Run(context.Background(), operation, userVerificationHandler(t))

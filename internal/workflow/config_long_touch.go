@@ -37,12 +37,8 @@ func (r Runner) enableLongTouchForReset(ctx context.Context, req model.EnableLon
 		return output, err
 	}
 
-	err = r.runMutationWithOptionalToken(ctx, protocol.PermissionAuthenticatorConfiguration, "", func(token []byte) error {
+	err = r.runWithOptionalToken(ctx, protocol.PermissionAuthenticatorConfiguration, "", func(token []byte) error {
 		return r.configManager().EnableLongTouchForReset(ctx, token)
-	}, func() {
-		if r.env.Cache != nil {
-			r.env.Cache.InvalidateConfig()
-		}
 	})
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithConfigSubCommand(

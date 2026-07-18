@@ -14,9 +14,8 @@ import (
 func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredentialOperation) (model.OperationResult, error) {
 	var output model.CredentialDeleteOutput
 
-	permission, err := r.mutationPermission(
+	inventoryPermission, mutationPermission, err := r.inventoryMutationPermissions(
 		protocol.PermissionCredentialManagement,
-		req.PrepareInventoryRefresh,
 	)
 	if err != nil {
 		return output, err
@@ -24,7 +23,7 @@ func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredential
 
 	report, err := r.readCredentialInventoryReportWithGrant(
 		ctx,
-		inventoryGrantPermission(permission, req.PrepareInventoryRefresh),
+		inventoryPermission,
 	)
 	if err != nil {
 		return output, err
@@ -64,8 +63,8 @@ func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredential
 	token, err := r.env.Tokens.Acquire(
 		ctx,
 		r.tokenProvider(),
-		permission,
-		r.credentialMutationRPID(publicTarget, req.PrepareInventoryRefresh),
+		mutationPermission,
+		r.credentialMutationRPID(publicTarget),
 	)
 	if err != nil {
 		return output, err
@@ -73,9 +72,6 @@ func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredential
 	defer secret.Zero(token)
 
 	err = r.credentialManager().DeleteCredential(ctx, token, descriptor)
-	if r.env.Cache != nil {
-		r.env.Cache.InvalidateCredentials()
-	}
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 			failure.PhaseAuthenticatorCommand,

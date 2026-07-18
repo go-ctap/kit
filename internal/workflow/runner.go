@@ -53,27 +53,7 @@ func Run(
 }
 
 func (r Runner) runOperation(ctx context.Context, operation model.Operation) (model.OperationResult, error) {
-	result, err := r.runOperationBody(ctx, operation)
-	if err == nil || hasCommittedPartialResult(result.Output) {
-		result.Effects.Apply(r.env.Cache)
-	}
-
-	return result.Output, err
-}
-
-func hasCommittedPartialResult(output model.OperationResult) bool {
-	result, ok := output.(model.MakeCredentialOutput)
-
-	return ok && result.Result != nil
-}
-
-type operationResult struct {
-	Output  model.OperationResult
-	Effects Effects
-}
-
-func outputOnly(output model.OperationResult) operationResult {
-	return operationResult{Output: output}
+	return r.runOperationBody(ctx, operation)
 }
 
 func (r Runner) runWithOptionalToken(
@@ -99,133 +79,106 @@ func (r Runner) runWithOptionalToken(
 	return run(token)
 }
 
-func (r Runner) runMutationWithOptionalToken(
-	ctx context.Context,
-	permission protocol.Permission,
-	rpID string,
-	run func([]byte) error,
-	commandFinished func(),
-) error {
-	err := run(nil)
-	if !errors.Is(err, ctapdevice.ErrPinUvAuthTokenRequired) &&
-		!errors.Is(err, ctapdevice.ErrBuiltInUVRequired) {
-		commandFinished()
-
-		return err
-	}
-
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), permission, rpID)
-	if err != nil {
-		return err
-	}
-	defer secret.Zero(token)
-
-	err = run(token)
-	commandFinished()
-
-	return err
-}
-
-func (r Runner) runOperationBody(ctx context.Context, operation model.Operation) (operationResult, error) {
+func (r Runner) runOperationBody(ctx context.Context, operation model.Operation) (model.OperationResult, error) {
 	switch req := operation.(type) {
 	case model.InspectOperation:
 		result, err := r.inspect(ctx)
 
-		return outputOnly(model.InspectOutput{Result: result}), err
+		return model.InspectOutput{Result: result}, err
 	case model.ListCredentialsOperation:
 		result, err := r.listCredentials(ctx, req)
 
-		return outputOnly(model.CredentialsOutput{Report: result}), err
+		return model.CredentialsOutput{Report: result}, err
 	case model.CredentialStoreStateOperation:
 		result, err := r.credentialStoreState(ctx)
 
-		return outputOnly(model.CredentialStoreStateOutput{Result: result}), err
+		return model.CredentialStoreStateOutput{Result: result}, err
 	case model.ReadLargeBlobOperation:
 		result, err := r.readLargeBlob(ctx, req)
 
-		return outputOnly(model.LargeBlobReadOutput{Report: result}), err
+		return model.LargeBlobReadOutput{Report: result}, err
 	case model.ListLargeBlobsOperation:
 		result, err := r.listLargeBlobs(ctx, req)
 
-		return outputOnly(model.LargeBlobListOutput{Report: result}), err
+		return model.LargeBlobListOutput{Report: result}, err
 	case model.ConfigStatusOperation:
 		result, err := r.configStatus(ctx)
 
-		return outputOnly(model.ConfigStatusOutput{Report: result}), err
+		return model.ConfigStatusOutput{Report: result}, err
 	case model.BioSensorInfoOperation:
 		result, err := r.bioSensorInfo(ctx)
 
-		return outputOnly(model.BioSensorOutput{Report: result}), err
+		return model.BioSensorOutput{Report: result}, err
 	case model.BioListOperation:
 		result, err := r.bioList(ctx)
 
-		return outputOnly(model.BioListOutput{Report: result}), err
+		return model.BioListOutput{Report: result}, err
 	case model.DeleteCredentialOperation:
 		result, err := r.deleteCredential(ctx, req)
 
-		return operationResult{Output: result, Effects: credentialMutationEffects(req)}, err
+		return result, err
 	case model.UpdateCredentialUserOperation:
 		result, err := r.updateCredentialUser(ctx, req)
 
-		return operationResult{Output: result, Effects: credentialMutationEffects(req)}, err
+		return result, err
 	case model.MakeCredentialOperation:
 		result, err := r.makeCredential(ctx, req)
 
-		return operationResult{Output: result, Effects: makeCredentialEffects(req, result)}, err
+		return result, err
 	case model.GetAssertionOperation:
 		result, err := r.getAssertion(ctx, req)
 
-		return operationResult{Output: result, Effects: getAssertionEffects(req, result)}, err
+		return result, err
 	case model.WriteLargeBlobOperation:
 		result, err := r.writeLargeBlob(ctx, req)
 
-		return operationResult{Output: result, Effects: largeBlobMutationResultEffects(req, result)}, err
+		return result, err
 	case model.DeleteLargeBlobOperation:
 		result, err := r.deleteLargeBlob(ctx, req)
 
-		return operationResult{Output: result, Effects: largeBlobMutationResultEffects(req, result)}, err
+		return result, err
 	case model.GarbageCollectLargeBlobsOperation:
 		result, err := r.garbageCollectLargeBlobs(ctx, req)
 
-		return operationResult{Output: result, Effects: largeBlobMutationResultEffects(req, result)}, err
+		return result, err
 	case model.ResetFactoryOperation:
 		result, err := r.resetFactory(ctx, req)
 
-		return operationResult{Output: result, Effects: resetEffects(req)}, err
+		return result, err
 	case model.SetPINOperation:
 		result, err := r.setPIN(ctx, req)
 
-		return operationResult{Output: result, Effects: pinMutationEffects(req)}, err
+		return result, err
 	case model.ChangePINOperation:
 		result, err := r.changePIN(ctx, req)
 
-		return operationResult{Output: result, Effects: pinMutationEffects(req)}, err
+		return result, err
 	case model.BioEnrollOperation:
 		result, err := r.enrollBio(ctx, req)
 
-		return operationResult{Output: result, Effects: bioMutationEffects(req)}, err
+		return result, err
 	case model.BioRenameOperation:
 		result, err := r.renameBio(ctx, req)
 
-		return operationResult{Output: result, Effects: Effects{}}, err
+		return result, err
 	case model.BioRemoveOperation:
 		result, err := r.removeBio(ctx, req)
 
-		return operationResult{Output: result, Effects: bioMutationEffects(req)}, err
+		return result, err
 	case model.SetAlwaysUVOperation:
 		result, err := r.setAlwaysUV(ctx, req)
 
-		return operationResult{Output: result, Effects: authenticatorConfigEffects(req)}, err
+		return result, err
 	case model.SetMinPINLengthOperation:
 		result, err := r.setMinPINLength(ctx, req)
 
-		return operationResult{Output: result, Effects: authenticatorConfigEffects(req)}, err
+		return result, err
 	case model.EnableLongTouchForResetOperation:
 		result, err := r.enableLongTouchForReset(ctx, req)
 
-		return operationResult{Output: result, Effects: authenticatorConfigEffects(req)}, err
+		return result, err
 	default:
-		return operationResult{}, failure.New(failure.CodeOperationUnsupported,
+		return nil, failure.New(failure.CodeOperationUnsupported,
 			failure.WithPhase(failure.PhaseValidation),
 		)
 	}

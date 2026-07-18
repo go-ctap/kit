@@ -104,9 +104,8 @@ func newCodeRegistry() map[Code]codeSpec {
 		CodeUserActionPending,
 		CodeAuthenticatorOperationPending,
 	)
-	register(CategoryInvalidSession,
-		CodeSessionInvalid,
-		CodeSessionClosed,
+	register(CategoryInvalidSelection,
+		CodeSelectionInvalid,
 	)
 	register(CategoryCanceled,
 		CodeOperationCanceled,
@@ -147,6 +146,7 @@ func newCodeRegistry() map[Code]codeSpec {
 		CodeCTAPRequestTooLarge,
 	)
 	register(CategoryInvalidState,
+		CodeAuthenticatorClosed,
 		CodeServiceClosed,
 		CodeDeviceNotFound,
 		CodeDeviceUnavailable,

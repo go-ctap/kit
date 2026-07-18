@@ -19,7 +19,7 @@ import (
 
 func TestCredentialStoreStateUsesStandalonePCMRToken(t *testing.T) {
 	a := &storeStateAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -52,7 +52,7 @@ func TestCredentialStoreStateUsesStandalonePCMRToken(t *testing.T) {
 
 func TestCredentialInventoryRejectsMissingMandatoryMetadataTotals(t *testing.T) {
 	a := &missingTotalsAuthenticator{stage: "metadata"}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -66,7 +66,7 @@ func TestCredentialInventoryRejectsMissingMandatoryMetadataTotals(t *testing.T) 
 func TestEnableLongTouchForResetDryRunAndRefreshFailureCacheEffects(t *testing.T) {
 	refreshErr := errors.New("refresh failed after config command")
 	a := &longTouchAuthenticator{enableErr: refreshErr}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -104,7 +104,7 @@ func TestEnableLongTouchForResetDryRunAndRefreshFailureCacheEffects(t *testing.T
 
 func TestEnableLongTouchForResetSuccess(t *testing.T) {
 	a := &longTouchAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -121,7 +121,7 @@ func TestEnableLongTouchForResetSuccess(t *testing.T) {
 
 func TestSetMinPINLengthPassesParametersWithoutDefaults(t *testing.T) {
 	a := &setMinPINLengthAuthenticator{}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()

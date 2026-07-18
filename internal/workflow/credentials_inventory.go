@@ -19,52 +19,20 @@ import (
 
 func (r Runner) listCredentials(
 	ctx context.Context,
-	req model.ListCredentialsOperation,
+	_ model.ListCredentialsOperation,
 ) (appcredentials.InventoryReport, error) {
-	if !req.Refresh {
-		if report, ok := r.env.Cache.Credential(); ok {
-			return report, nil
-		}
-	}
-
-	return r.fetchCredentialInventoryReport(ctx)
+	return r.freshCredentialInventoryReport(ctx, protocol.PermissionNone)
 }
 
 func (r Runner) readCredentialInventoryReport(ctx context.Context) (appcredentials.InventoryReport, error) {
-	if report, ok := r.env.Cache.Credential(); ok {
-		return report, nil
-	}
-
-	return r.fetchCredentialInventoryReport(ctx)
-}
-
-func (r Runner) fetchCredentialInventoryReport(ctx context.Context) (appcredentials.InventoryReport, error) {
-	report, err := r.freshCredentialInventoryReport(ctx, protocol.PermissionNone)
-	if err != nil {
-		return appcredentials.InventoryReport{}, err
-	}
-
-	r.env.Cache.SetCredential(report)
-
-	return report, nil
+	return r.freshCredentialInventoryReport(ctx, protocol.PermissionNone)
 }
 
 func (r Runner) readCredentialInventoryReportWithGrant(
 	ctx context.Context,
 	grantPermission protocol.Permission,
 ) (appcredentials.InventoryReport, error) {
-	if report, ok := r.env.Cache.Credential(); ok {
-		return report, nil
-	}
-
-	report, err := r.freshCredentialInventoryReport(ctx, grantPermission)
-	if err != nil {
-		return appcredentials.InventoryReport{}, err
-	}
-
-	r.env.Cache.SetCredential(report)
-
-	return report, nil
+	return r.freshCredentialInventoryReport(ctx, grantPermission)
 }
 
 func (r Runner) freshCredentialInventoryReport(

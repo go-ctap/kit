@@ -43,20 +43,17 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 	}
 
 	var response protocol.AuthenticatorMakeCredentialResponse
-	err = r.runMutationWithOptionalToken(ctx, protocol.PermissionMakeCredential, input.RP.ID, func(token []byte) error {
+	err = r.runWithOptionalToken(ctx, protocol.PermissionMakeCredential, input.RP.ID, func(token []byte) error {
 		var err error
 		response, err = r.callMakeCredential(ctx, token, input)
 
 		return err
-	}, func() {
-		if r.env.Cache != nil {
-			r.env.Cache.InvalidateCredentials()
-		}
 	})
 	if err != nil {
 		if response.AuthData != nil && response.AuthData.AttestedCredentialData != nil {
 			if result, resultErr := makeCredentialResult(r.env.Selected.Fingerprint, input.RP.ID, input.Extensions, response); resultErr == nil {
 				output.Result = &result
+				r.afterUserPresence(result.UserPresent)
 			}
 		}
 
@@ -67,6 +64,7 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 		return output, err
 	}
 	output.Result = &result
+	r.afterUserPresence(result.UserPresent)
 
 	return output, nil
 }
@@ -125,23 +123,26 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 
 		return nil
 	}
-	run := r.runWithOptionalToken
-	if hasLargeBlobWrite(input.Extensions) {
-		run = func(ctx context.Context, permission protocol.Permission, rpID string, use func([]byte) error) error {
-			return r.runMutationWithOptionalToken(ctx, permission, rpID, use, func() {
-				if r.env.Cache != nil {
-					r.env.Cache.InvalidateLargeBlobs()
-				}
-			})
-		}
-	}
-	if err := run(ctx, protocol.PermissionGetAssertion, input.RPID, readAssertions); err != nil {
+	if err := r.runWithOptionalToken(ctx, protocol.PermissionGetAssertion, input.RPID, readAssertions); err != nil {
 		return output, err
 	}
 
 	output.Result = &result
+	for _, assertion := range result.Assertions {
+		if assertion.UserPresent {
+			r.afterUserPresence(true)
+
+			break
+		}
+	}
 
 	return output, nil
+}
+
+func (r Runner) afterUserPresence(present bool) {
+	if present {
+		r.env.Tokens.InvalidateUnlessPermission(protocol.PermissionLargeBlobWrite)
+	}
 }
 
 func (r Runner) callMakeCredential(

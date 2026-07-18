@@ -5,6 +5,11 @@
 - The root `ctapkit` package is the public runtime facade; this repository is not a CLI.
 - Do not add terminal UX, renderers, prompts, spinners, command trees, or product-specific output.
 
+## ACTIVE DEVELOPMENT AND PROTOTYPING
+- THIS RUNTIME IS NOT A STABLE PUBLIC API. IT IS IN ACTIVE DEVELOPMENT AND PROTOTYPING.
+- LARGE-SCALE REFACTORINGS AND BREAKING API CHANGES ARE EXPLICITLY ALLOWED AND PREFERRED OVER COMPATIBILITY LAYERS WHEN THEY PRODUCE A SIMPLER DESIGN.
+- DO NOT PRESERVE OBSOLETE API SHAPES WITH ALIASES, WRAPPERS, RE-EXPORTS, OR SHIMS.
+
 ## Boundaries
 - Public runtime API belongs in `ctapkit`; DTOs in `model`; device/transport abstractions in `device` and `transport`.
 - Sessions, operations, workflows, authenticator handles, caches, tokens, and secrets stay private under `internal/`.

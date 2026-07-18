@@ -11,18 +11,7 @@ import (
 )
 
 func (r Runner) configStatus(ctx context.Context) (appconfig.StatusReport, error) {
-	if rep, ok := r.env.Cache.Config(); ok {
-		return rep, nil
-	}
-
-	rep, err := r.statusWithRetries(ctx)
-	if err != nil {
-		return appconfig.StatusReport{}, err
-	}
-
-	r.env.Cache.SetConfig(rep)
-
-	return rep, nil
+	return r.statusWithRetries(ctx)
 }
 
 func (r Runner) statusReport() appconfig.StatusReport {

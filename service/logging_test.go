@@ -12,18 +12,20 @@ import (
 
 	ctaptransport "github.com/go-ctap/ctap/transport"
 	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
+	ctapkit "github.com/go-ctap/kit"
 	kitlog "github.com/go-ctap/kit/internal/logging"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/largeblobs"
+	"github.com/go-ctap/kit/model/report"
 	appwebauthn "github.com/go-ctap/kit/model/webauthn"
 )
 
-func TestInvalidSessionOperationAppendsCompletedEntry(t *testing.T) {
+func TestInvalidSelectionOperationAppendsCompletedEntry(t *testing.T) {
 	service := New()
 
 	envelope, err := service.ListCredentials(context.Background(), CredentialListRequest{
-		OperationRequest: OperationRequest{SessionID: "missing-session"},
+		OperationRequest: OperationRequest{SelectionID: "missing-selection"},
 	})
 	if err != nil {
 		t.Fatalf("ListCredentials: %v", err)
@@ -33,10 +35,10 @@ func TestInvalidSessionOperationAppendsCompletedEntry(t *testing.T) {
 		t.Fatalf("log count = %d, want 1", len(logs))
 	}
 	entry := logs[0].Entry
-	if entry.Outcome != model.LogOutcomeFailed || entry.Error == nil || entry.Error.Code != failure.CodeSessionInvalid {
+	if entry.Outcome != model.LogOutcomeFailed || entry.Error == nil || entry.Error.Code != failure.CodeSelectionInvalid {
 		t.Fatalf("completed entry = %#v", logs[0])
 	}
-	if entry.OperationID != string(envelope.OperationID) || entry.SessionID != "missing-session" {
+	if entry.OperationID != string(envelope.OperationID) || entry.SelectionID != "missing-selection" {
 		t.Fatalf("log correlation = %#v, envelope operation ID = %q", entry, envelope.OperationID)
 	}
 	if entry.Response == nil || !json.Valid([]byte(entry.Response.JSON)) {
@@ -51,15 +53,12 @@ func TestOperationLoggingRedactsPINAndConfirmation(t *testing.T) {
 		confirmation = "sentinel-reset-confirmation-5512"
 	)
 	service := New()
-	service.sessions["session-1"] = &managedSession{
-		id: "session-1",
-		session: &recordingOperationSession{
-			result: model.PINOutput{},
-		},
-	}
+	service.selected = newSelection("selection-1", report.DeviceReport{}, &recordingAuthenticator{
+		result: model.PINOutput{},
+	})
 
 	_, err := service.ChangePIN(context.Background(), PINChangeRequest{
-		OperationRequest:    OperationRequest{SessionID: "session-1"},
+		OperationRequest:    OperationRequest{SelectionID: "selection-1"},
 		CurrentPIN:          currentPIN,
 		NewPIN:              newPIN,
 		Confirmed:           true,
@@ -87,13 +86,14 @@ func TestOperationLoggingRedactsPINAndConfirmation(t *testing.T) {
 
 func TestOperationLoggingDoesNotRequireEventEmitter(t *testing.T) {
 	service := New()
-	service.sessions["session-1"] = &managedSession{
-		id:      "session-1",
-		session: &recordingOperationSession{result: model.CredentialsOutput{}},
-	}
+	service.selected = newSelection(
+		"selection-1",
+		report.DeviceReport{},
+		&recordingAuthenticator{result: model.CredentialsOutput{}},
+	)
 
 	envelope, err := service.ListCredentials(context.Background(), CredentialListRequest{
-		OperationRequest: OperationRequest{SessionID: "session-1"},
+		OperationRequest: OperationRequest{SelectionID: "selection-1"},
 	})
 	if err != nil {
 		t.Fatalf("ListCredentials: %v", err)
@@ -107,7 +107,7 @@ func TestOperationLoggingDoesNotRequireEventEmitter(t *testing.T) {
 }
 
 func TestOperationLoggingRetainsTransportDiagnostic(t *testing.T) {
-	runtime := &recordingOperationSession{
+	runtime := &recordingAuthenticator{
 		runErr: failure.Wrap(
 			failure.CodeTransportFailure,
 			&ctaptransport.IOError{
@@ -119,13 +119,10 @@ func TestOperationLoggingRetainsTransportDiagnostic(t *testing.T) {
 		),
 	}
 	service := New()
-	service.sessions["session-1"] = &managedSession{
-		id:      "session-1",
-		session: runtime,
-	}
+	service.selected = newSelection("selection-1", report.DeviceReport{}, runtime)
 
 	envelope, err := service.ListCredentials(context.Background(), CredentialListRequest{
-		OperationRequest: OperationRequest{SessionID: "session-1"},
+		OperationRequest: OperationRequest{SelectionID: "selection-1"},
 	})
 	if err != nil {
 		t.Fatalf("ListCredentials: %v", err)
@@ -143,28 +140,35 @@ func TestOperationLoggingRetainsTransportDiagnostic(t *testing.T) {
 	}
 }
 
-func TestSessionLifecycleLoggingAppendsCompletedEntries(t *testing.T) {
+func TestSelectionLifecycleLoggingAppendsCompletedEntries(t *testing.T) {
 	service := New()
+	service.resolveDevice = func([]ctapkit.Device, string) (selectedDevice, error) {
+		return selectedDevice{report: testDevice("hid://one", "fingerprint-1")}, nil
+	}
+	service.openAuthenticator = func(
+		context.Context,
+		ctapkit.Device,
+		...ctapkit.AuthenticatorOption,
+	) (authenticatorRuntime, error) {
+		return nil, io.ErrClosedPipe
+	}
 
-	if _, err := service.OpenSession(context.Background(), OpenSessionRequest{Selector: "missing-device"}); err == nil {
-		t.Fatal("OpenSession error = nil, want missing device failure")
+	if _, err := service.SetSelection(context.Background(), SelectionRequest{Selector: "fingerprint-1"}); err == nil {
+		t.Fatal("SetSelection error = nil, want open failure")
 	}
-	service.sessions["session-1"] = &managedSession{
-		id:      "session-1",
-		session: &recordingOperationSession{},
-	}
-	if _, err := service.CloseSession("session-1"); err != nil {
-		t.Fatalf("CloseSession: %v", err)
+	service.selected = newSelection("selection-1", report.DeviceReport{}, &recordingAuthenticator{})
+	if _, err := service.SetSelection(context.Background(), SelectionRequest{}); err != nil {
+		t.Fatalf("clear selection: %v", err)
 	}
 	logs := serviceLogs(t, service)
 	if len(logs) != 2 {
-		t.Fatalf("session lifecycle log count = %d, want 2: %#v", len(logs), logs)
+		t.Fatalf("selection lifecycle log count = %d, want 2: %#v", len(logs), logs)
 	}
-	if logs[0].Entry.Code != model.LogCodeSessionOpen || logs[0].Entry.Outcome != model.LogOutcomeFailed {
-		t.Fatalf("open session entry = %#v", logs[0])
+	if logs[0].Entry.Code != model.LogCodeSelectionOpen || logs[0].Entry.Outcome != model.LogOutcomeFailed {
+		t.Fatalf("open selection entry = %#v", logs[0])
 	}
-	if logs[1].Entry.Code != model.LogCodeSessionClose || logs[1].Entry.Outcome != model.LogOutcomeSucceeded {
-		t.Fatalf("close session entry = %#v", logs[1])
+	if logs[1].Entry.Code != model.LogCodeSelectionClose || logs[1].Entry.Outcome != model.LogOutcomeSucceeded {
+		t.Fatalf("close selection entry = %#v", logs[1])
 	}
 }
 
@@ -189,7 +193,7 @@ func TestOperationLogEncoderNeverSerializesPrivateWebAuthnOrLargeBlobData(t *tes
 		}},
 		CreateHMACSecretInputs: &ctapwebauthn.CreateHMACSecretInputs{HMACCreateSecret: true},
 	}}
-	request := operationRequestLogValue(OperationRequest{SessionID: "session-1"}, model.MakeCredentialOperation{
+	request := operationRequestLogValue(OperationRequest{SelectionID: "selection-1"}, model.MakeCredentialOperation{
 		MakeCredentialInput: makeInput,
 	})
 	makeOutput := model.MakeCredentialOutput{
@@ -216,7 +220,7 @@ func TestOperationLogEncoderNeverSerializesPrivateWebAuthnOrLargeBlobData(t *tes
 			Eval: ctapwebauthn.AuthenticationExtensionsPRFValues{First: []byte(secrets[2])},
 		}},
 	}}
-	getRequest := operationRequestLogValue(OperationRequest{SessionID: "session-1"}, model.GetAssertionOperation{
+	getRequest := operationRequestLogValue(OperationRequest{SelectionID: "selection-1"}, model.GetAssertionOperation{
 		GetAssertionInput: getInput,
 	})
 	getResponse := operationEnvelopeLogValue(operationEnvelope{Result: model.GetAssertionOutput{
@@ -235,7 +239,7 @@ func TestOperationLogEncoderNeverSerializesPrivateWebAuthnOrLargeBlobData(t *tes
 		}},
 		}}})
 
-	largeBlobRequest := operationRequestLogValue(OperationRequest{SessionID: "session-1"}, model.WriteLargeBlobOperation{
+	largeBlobRequest := operationRequestLogValue(OperationRequest{SelectionID: "selection-1"}, model.WriteLargeBlobOperation{
 		Payload: []byte(secrets[5]),
 	})
 	largeBlobResponse := operationEnvelopeLogValue(operationEnvelope{Result: model.LargeBlobReadOutput{
@@ -303,14 +307,14 @@ func boolPointer(value bool) *bool { return &value }
 func TestProgressLoggingDoesNotDuplicateOperationEvent(t *testing.T) {
 	emitter := newCountingLogEmitter()
 	service := New(WithEventEmitter(emitter))
-	service.sessions["session-1"] = &managedSession{id: "session-1"}
-	service.operations["operation-1"] = &operationState{
-		id:        "operation-1",
-		sessionID: "session-1",
-		kind:      model.OperationListCredentials,
+	service.selected = newSelection("selection-1", report.DeviceReport{}, nil)
+	service.selected.operations["operation-1"] = &operationState{
+		id:          "operation-1",
+		selectionID: "selection-1",
+		kind:        model.OperationListCredentials,
 	}
 
-	sessionEventSink{service: service, sessionID: "session-1"}.Emit(model.OperationEvent{
+	selectionEventSink{service: service, selectionID: "selection-1"}.Emit(model.OperationEvent{
 		Stage: model.OperationStageEnumeratingCredentials,
 	})
 	if got := emitter.count(EventOperationEvent); got != 1 {
@@ -320,7 +324,7 @@ func TestProgressLoggingDoesNotDuplicateOperationEvent(t *testing.T) {
 	if len(logs) != 1 || logs[0].Entry.Code != model.LogCodeOperationProgress {
 		t.Fatalf("progress logs = %#v", logs)
 	}
-	if logs[0].Entry.SessionID != "session-1" || logs[0].Entry.OperationID != "operation-1" {
+	if logs[0].Entry.SelectionID != "selection-1" || logs[0].Entry.OperationID != "operation-1" {
 		t.Fatalf("progress correlation = %#v", logs[0])
 	}
 }
@@ -331,15 +335,19 @@ func TestInteractionLoggingAppendsCompletedEntriesWithoutDuplicatePrompt(t *test
 	powerCycleState := false
 	emitter := newCountingLogEmitter()
 	service := New(WithEventEmitter(emitter))
-	service.operations["operation-1"] = &operationState{
-		id:        "operation-1",
-		sessionID: "session-1",
-		kind:      model.OperationListCredentials,
-		done:      make(chan struct{}),
+	done := make(chan struct{})
+	service.selected = newSelection("selection-1", report.DeviceReport{}, nil)
+	service.selected.operations["operation-1"] = &operationState{
+		id:          "operation-1",
+		selectionID: "selection-1",
+		kind:        model.OperationListCredentials,
+		done:        done,
 	}
 	handler := interactionHandler{
 		service:     service,
-		sessionID:   "session-1",
+		ctx:         t.Context(),
+		done:        done,
+		selectionID: "selection-1",
 		operationID: "operation-1",
 		kind:        model.OperationListCredentials,
 	}
@@ -378,7 +386,7 @@ func TestInteractionLoggingAppendsCompletedEntriesWithoutDuplicatePrompt(t *test
 		t.Fatalf("interaction log count = %d, want 2: %#v", len(logs), logs)
 	}
 	for _, record := range logs {
-		if record.Entry.SessionID != "session-1" || record.Entry.OperationID != "operation-1" {
+		if record.Entry.SelectionID != "selection-1" || record.Entry.OperationID != "operation-1" {
 			t.Fatalf("interaction correlation = %#v", record.Entry)
 		}
 	}

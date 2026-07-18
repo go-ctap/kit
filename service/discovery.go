@@ -113,6 +113,11 @@ func (s *Service) updateDiscovery(
 	if authoritative {
 		nextReports = s.deviceReportsWithMetadata(devices)
 	}
+	releaseSelection, err := s.lockSelection(ctx)
+	if err != nil {
+		return result, err
+	}
+	defer releaseSelection()
 
 	s.mu.Lock()
 	if s.closed {
@@ -120,16 +125,19 @@ func (s *Service) updateDiscovery(
 
 		return result, closedServiceError(failure.PhaseDiscovery)
 	}
-	var affected []*managedSession
+	var affected *selection
 	if authoritative {
 		s.pruneEnrichmentCacheLocked(devices)
 		s.devices = devices
 		s.lastDiscoverMode = normalizedDiscoverMode(req.Mode)
-		affected = s.detachMissingSessionsLocked(nextReports)
+		affected = s.detachMissingSelectionLocked(nextReports)
 	}
 	s.mu.Unlock()
 
-	closeErr := s.closeManagedSessions(affected)
+	var closeErr error
+	if affected != nil {
+		closeErr = s.closeSelection(affected)
+	}
 	result.err = scanErr
 	if result.err == nil {
 		result.err = closeErr
@@ -143,53 +151,14 @@ func (s *Service) updateDiscovery(
 	return result, nil
 }
 
-func (s *Service) detachMissingSessionsLocked(devices []report.DeviceReport) []*managedSession {
-	affected := make([]*managedSession, 0)
-	for id, session := range s.sessions {
-		if deviceReportPresent(devices, session.device) {
-			continue
-		}
-
-		affected = append(affected, session)
-		delete(s.sessions, id)
+func (s *Service) detachMissingSelectionLocked(devices []report.DeviceReport) *selection {
+	selected := s.selected
+	if selected == nil || deviceReportPresent(devices, selected.device) {
+		return nil
 	}
+	s.selected = nil
 
-	return affected
-}
-
-func (s *Service) closeManagedSessions(sessions []*managedSession) error {
-	var closeErr error
-	for _, session := range sessions {
-		s.cancelSessionOperations(session.id)
-		if err := session.session.Close(); err != nil && closeErr == nil {
-			closeErr = err
-		}
-		session.updatedAt = time.Now().UTC()
-		s.waitForSessionOperations(session.id)
-	}
-
-	return closeErr
-}
-
-func (s *Service) waitForSessionOperations(id SessionID) {
-	for {
-		s.mu.Lock()
-		operations := make([]*operationState, 0, 1)
-		for _, operation := range s.operations {
-			if operation.sessionID == id {
-				operations = append(operations, operation)
-			}
-		}
-		s.mu.Unlock()
-
-		if len(operations) == 0 {
-			return
-		}
-		for _, operation := range operations {
-			operation.cancel()
-			<-operation.done
-		}
-	}
+	return selected
 }
 
 func (s *Service) currentDiscoverRequest() DiscoverRequest {

@@ -33,7 +33,7 @@ func TestPINInteractionRejectsEmptyPINAtSessionRun(t *testing.T) {
 	a := &pinOnlyLargeBlobWriteEventAuthenticator{
 		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
 	}
-	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -59,7 +59,7 @@ func TestPINInteractionWithoutHandlerReturnsInvalidState(t *testing.T) {
 	a := &pinOnlyLargeBlobWriteEventAuthenticator{
 		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
 	}
-	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -85,7 +85,7 @@ func TestCanceledContextDuringInteractionReturnsCanceledFailure(t *testing.T) {
 	a := &pinOnlyLargeBlobWriteEventAuthenticator{
 		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
 	}
-	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -112,7 +112,7 @@ func TestCanceledContextDuringInteractionReturnsCanceledFailure(t *testing.T) {
 func TestConfirmInteractionCanceledReturnsCanceledFailure(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &pinMutationCountingAuthenticator{}
-	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -139,7 +139,7 @@ func TestConfirmInteractionCanceledReturnsCanceledFailure(t *testing.T) {
 func TestResetConfirmInteractionCanceledReturnsCanceledFailure(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &resetCountingAuthenticator{}
-	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -175,7 +175,7 @@ func TestPINInteractionHandlerReceivesRequestAndValidPINContinues(t *testing.T) 
 	a := &pinOnlyLargeBlobWriteEventAuthenticator{
 		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
 	}
-	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
@@ -208,8 +208,8 @@ func TestPINInteractionHandlerReceivesRequestAndValidPINContinues(t *testing.T) 
 		t.Fatalf("result = %#v, want large blob mutation output", result)
 	}
 
-	if len(requests) != 2 {
-		t.Fatalf("PIN requests = %d, want 2", len(requests))
+	if len(requests) != 1 {
+		t.Fatalf("PIN requests = %d, want 1", len(requests))
 	}
 
 	for _, pin := range returnedPINs {
@@ -224,7 +224,7 @@ func TestPINInteractionHandlerReceivesRequestAndValidPINContinues(t *testing.T) 
 		}
 	}
 
-	if got := a.pinCalls.Load(); got != 2 {
-		t.Fatalf("PIN token calls = %d, want 2", got)
+	if got := a.pinCalls.Load(); got != 1 {
+		t.Fatalf("PIN token calls = %d, want 1", got)
 	}
 }

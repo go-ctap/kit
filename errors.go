@@ -8,7 +8,7 @@ import (
 func normalizeRunError(err error, operation string) error {
 	return errornorm.Normalize(errornorm.Annotate(
 		err,
-		errornorm.WithPhase(failure.PhaseSession),
+		errornorm.WithPhase(failure.PhaseAuthenticator),
 	), operation)
 }
 

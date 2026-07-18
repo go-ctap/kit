@@ -23,14 +23,14 @@ import "github.com/go-ctap/kit/transport"
 
 ## What This Is
 
-`ctapkit` provides the shared runtime boundary for applications that need to discover, inspect, and safely control local FIDO2 authenticators. It is designed for CLI, GUI, and TUI consumers that want the same device/session/operation semantics without duplicating CTAP safety logic.
+`ctapkit` provides the shared runtime boundary for applications that need to discover, inspect, and safely control local FIDO2 authenticators. It is designed for CLI, GUI, and TUI consumers that want the same device/authenticator/operation semantics without duplicating CTAP safety logic.
 
 This repository does not own terminal UX, command parsing, output rendering, MDS presentation, release packaging, or product-specific workflows. Those live in consumer applications.
 
 ## Package Layout
 
 - `ctapkit`: public runtime facade.
-- `model`: public operation, event, interaction, and session DTOs.
+- `model`: public operation, event, and interaction DTOs.
 - `model/failure`: stable machine-readable failure codes and transport-safe snapshots.
 - `model/config`: authenticator config DTOs and reports.
 - `model/credentials`: credential DTOs, previews, and reports.
@@ -40,31 +40,32 @@ This repository does not own terminal UX, command parsing, output rendering, MDS
 - `transport`: HID and Windows proxy transport boundary.
 - `internal/device`: runtime attachment fingerprints derived from transport descriptors.
 - `internal/runtime`: event, interaction, and token policies.
-- `internal/session`: opened-session core, lifecycle, serialization, and cache boundary.
 - `internal/workflow`: operation dispatch and domain workflow bodies over an explicit execution environment.
 
-## Session Flow
+## Authenticator Flow
 
 A consumer should generally do this:
 
 1. Convert UI or CLI input into a typed `model.Operation`.
 2. Discover devices with `ctapkit.DiscoverDevices`.
-3. Pick one returned `ctapkit.Device` handle and open it with `ctapkit.OpenSession`.
-4. Run one typed operation synchronously with `Session.Run`.
-5. Clean up with `Session.Close`.
+3. Pick one returned `ctapkit.Device` handle and open it with `ctapkit.OpenAuthenticator`.
+4. Run typed operations synchronously with `Authenticator.Run`.
+5. Close the authenticator when the selected device changes or the application exits.
 
-`Session.Run` returns the typed `model.OperationResult` directly. Consumers that need non-blocking UI can call it from their own goroutine or task. Progress and UI updates are delivered through the `model.EventSink` attached with `ctapkit.WithEventSink`; PIN, user-verification, touch, and confirm participation is delivered through `model.InteractionHandler`.
-Interaction requests and operation events contain only their prompt or event payload; consumers should correlate session-specific work through the `*ctapkit.Session` handle and their own event sink ownership.
+`Authenticator` is the single long-lived runtime entity for an opened transport channel. It owns close/cancel behavior, whole-operation serialization, and one reusable `pinUvAuthToken`. It does not cache credential inventories, configuration reports, or large-blob reports; those values are read from the authenticator for every operation because device state can be changed by another channel between commands.
+
+`Authenticator.Run` returns the typed `model.OperationResult` directly. Consumers that need non-blocking UI can call it from their own goroutine or task. Progress and UI updates are delivered through the `model.EventSink` attached with `ctapkit.WithEventSink`; PIN, user-verification, touch, and confirm participation is delivered through `model.InteractionHandler`.
+Interaction requests and operation events contain only their prompt or event payload; consumers should correlate work through the `*ctapkit.Authenticator` handle and their own event sink ownership.
 
 Public failures use stable codes, optional safe interpolation parameters, and
 exact CTAP provenance. See the [machine-readable error
 contract](docs/error-contract.md).
 
-Verification defaults to UV when the authenticator supports it, with PIN fallback when CTAP reports a fallback condition. A consumer that wants to offer "use PIN" before starting work can pass `ctapkit.WithVerificationFlow(model.VerificationFlowPIN)` to `Session.Run`. User-verification interactions are pre-command prompt and cancel points; the authenticator remains authoritative for whether UV actually succeeds.
+Verification defaults to UV when the authenticator supports it, with PIN fallback when CTAP reports a fallback condition. A consumer that wants to offer "use PIN" before starting work can pass `ctapkit.WithVerificationFlow(model.VerificationFlowPIN)` to `Authenticator.Run`. User-verification interactions are pre-command prompt and cancel points; the authenticator remains authoritative for whether UV actually succeeds.
 
 Core operations are intentionally UI-neutral. PIN prompts, user verification messages, spinners, progress bars, tables, JSON/YAML formatting, and GUI/TUI event presentation belong to the consumer.
 
-MDS lookup is exposed as a root facade helper rather than a session operation:
+MDS lookup is exposed as a root facade helper rather than an authenticator operation:
 
 ```go
 metadata, err := ctapkit.LookupMDS(ctx, inspect.Result.Info.AAGUID)
@@ -99,7 +100,7 @@ verified is retained for a later retry but is never returned as verified data.
 
 ## Safety Model
 
-- Per-session workflow serialization prevents multi-step flows on the same opened authenticator from interleaving.
+- Per-authenticator workflow serialization prevents multi-step flows on the same opened channel from interleaving.
 - CTAPHID channel isolation and per-command serialization allow independent clients to share an authenticator; external state changes remain possible between commands and must be handled as normal runtime errors.
 - `pinUvAuthToken` values and other runtime-owned secrets are never exposed through public results. Root `model` PIN operations omit PINs when marshaled; the Wails-oriented `service` request DTOs keep typed PIN fields in JSON, so adapters and clients must redact them and must not log or persist serialized requests.
 - Mutating operations preserve dry-run and confirmation semantics.
@@ -115,7 +116,7 @@ go test ./... -count=1
 go vet ./...
 ```
 
-For lifecycle, session, interaction, or synchronization changes, also run:
+For authenticator lifecycle, interaction, or synchronization changes, also run:
 
 ```powershell
 go test -race ./... -count=1

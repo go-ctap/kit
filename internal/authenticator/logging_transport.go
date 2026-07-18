@@ -207,7 +207,7 @@ func (t *loggingTransport) appendCommand(
 		return
 	}
 
-	sessionID, operationID, operationKind := kitlog.Correlation(ctx)
+	selectionID, operationID, operationKind := kitlog.Correlation(ctx)
 	commandName, _ := decoded.spec.command.Name()
 	entry := model.LogEntry{
 		Timestamp:        started.UTC(),
@@ -221,7 +221,7 @@ func (t *loggingTransport) appendCommand(
 		SubCommandCode:   decoded.spec.subCommandCode,
 		Request:          kitlog.Payload(decoded.value),
 		RedactedFields:   prefixFields(decoded.value.RedactedFields, "request"),
-		SessionID:        sessionID,
+		SelectionID:      selectionID,
 		OperationID:      operationID,
 	}
 	entry.Response = kitlog.Payload(response)

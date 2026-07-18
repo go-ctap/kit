@@ -3,77 +3,22 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"testing"
 
 	ctapkit "github.com/go-ctap/kit"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
+	"github.com/go-ctap/kit/model/report"
 )
 
-func TestCredentialListRequestRefreshJSONContract(t *testing.T) {
-	var legacy CredentialListRequest
-	if err := json.Unmarshal([]byte(`{"sessionId":"session-1"}`), &legacy); err != nil {
-		t.Fatalf("unmarshal legacy credential list request: %v", err)
-	}
-	if legacy.SessionID != "session-1" || legacy.Refresh {
-		t.Fatalf("legacy credential list request = %#v", legacy)
-	}
-
-	raw, err := json.Marshal(legacy)
-	if err != nil {
-		t.Fatalf("marshal legacy credential list request: %v", err)
-	}
-	if strings.Contains(string(raw), "refresh") {
-		t.Fatalf("legacy credential list request included refresh: %s", raw)
-	}
-
-	refreshed := CredentialListRequest{
-		OperationRequest: OperationRequest{SessionID: "session-1"},
-		Refresh:          true,
-	}
-	raw, err = json.Marshal(refreshed)
-	if err != nil {
-		t.Fatalf("marshal refreshed credential list request: %v", err)
-	}
-	if !strings.Contains(string(raw), `"refresh":true`) {
-		t.Fatalf("refreshed credential list request omitted refresh: %s", raw)
-	}
-}
-
-func TestListCredentialsMapsRefreshToRuntimeOperation(t *testing.T) {
-	runtime := &recordingOperationSession{}
-	service := New()
-	service.sessions["session-1"] = &managedSession{
-		id:      "session-1",
-		session: runtime,
-	}
-
-	_, err := service.ListCredentials(context.Background(), CredentialListRequest{
-		OperationRequest: OperationRequest{SessionID: "session-1"},
-		Refresh:          true,
-	})
-	if err != nil {
-		t.Fatalf("ListCredentials: %v", err)
-	}
-
-	operation, ok := runtime.operation.(model.ListCredentialsOperation)
-	if !ok {
-		t.Fatalf("runtime operation = %T, want ListCredentialsOperation", runtime.operation)
-	}
-	if !operation.Refresh {
-		t.Fatal("runtime list credentials operation refresh = false, want true")
-	}
-}
-
 func TestCTAP23ServiceRequestsMapPresenceAndNewOperations(t *testing.T) {
-	runtime := &recordingOperationSession{}
+	runtime := &recordingAuthenticator{}
 	service := New()
-	service.sessions["session-1"] = &managedSession{id: "session-1", session: runtime}
+	service.selected = newSelection("selection-1", report.DeviceReport{}, runtime)
 	runtime.result = model.AuthenticatorConfigOutput{}
 
 	_, err := service.SetMinPINLength(context.Background(), MinPINLengthRequest{
-		OperationRequest:    OperationRequest{SessionID: "session-1"},
+		OperationRequest:    OperationRequest{SelectionID: "selection-1"},
 		MinPINLengthRPIDs:   []string{"example.com"},
 		ForceChangePIN:      true,
 		PINComplexityPolicy: true,
@@ -88,7 +33,7 @@ func TestCTAP23ServiceRequestsMapPresenceAndNewOperations(t *testing.T) {
 	}
 
 	runtime.result = model.CredentialStoreStateOutput{}
-	if _, err := service.CredentialStoreState(context.Background(), OperationRequest{SessionID: "session-1"}); err != nil {
+	if _, err := service.CredentialStoreState(context.Background(), OperationRequest{SelectionID: "selection-1"}); err != nil {
 		t.Fatalf("CredentialStoreState: %v", err)
 	}
 	if _, ok := runtime.operation.(model.CredentialStoreStateOperation); !ok {
@@ -97,7 +42,7 @@ func TestCTAP23ServiceRequestsMapPresenceAndNewOperations(t *testing.T) {
 
 	runtime.result = model.AuthenticatorConfigOutput{}
 	if _, err := service.EnableLongTouchForReset(context.Background(), EnableLongTouchForResetRequest{
-		OperationRequest: OperationRequest{SessionID: "session-1"},
+		OperationRequest: OperationRequest{SelectionID: "selection-1"},
 		Confirmed:        true,
 	}); err != nil {
 		t.Fatalf("EnableLongTouchForReset: %v", err)
@@ -108,86 +53,31 @@ func TestCTAP23ServiceRequestsMapPresenceAndNewOperations(t *testing.T) {
 	}
 }
 
-func TestLargeBlobListRequestRefreshJSONContract(t *testing.T) {
-	var legacy LargeBlobListRequest
-	if err := json.Unmarshal([]byte(`{"sessionId":"session-1"}`), &legacy); err != nil {
-		t.Fatalf("unmarshal legacy large blob list request: %v", err)
-	}
-	if legacy.SessionID != "session-1" || legacy.Refresh {
-		t.Fatalf("legacy large blob list request = %#v", legacy)
-	}
-
-	raw, err := json.Marshal(legacy)
-	if err != nil {
-		t.Fatalf("marshal legacy large blob list request: %v", err)
-	}
-	if strings.Contains(string(raw), "refresh") {
-		t.Fatalf("legacy large blob list request included refresh: %s", raw)
-	}
-
-	refreshed := LargeBlobListRequest{
-		OperationRequest: OperationRequest{SessionID: "session-1"},
-		Refresh:          true,
-	}
-	raw, err = json.Marshal(refreshed)
-	if err != nil {
-		t.Fatalf("marshal refreshed large blob list request: %v", err)
-	}
-	if !strings.Contains(string(raw), `"refresh":true`) {
-		t.Fatalf("refreshed large blob list request omitted refresh: %s", raw)
-	}
-}
-
-func TestListLargeBlobsMapsRefreshToRuntimeOperation(t *testing.T) {
-	runtime := &recordingOperationSession{result: model.LargeBlobListOutput{}}
-	service := New()
-	service.sessions["session-1"] = &managedSession{
-		id:      "session-1",
-		session: runtime,
-	}
-
-	_, err := service.ListLargeBlobs(context.Background(), LargeBlobListRequest{
-		OperationRequest: OperationRequest{SessionID: "session-1"},
-		Refresh:          true,
-	})
-	if err != nil {
-		t.Fatalf("ListLargeBlobs: %v", err)
-	}
-
-	operation, ok := runtime.operation.(model.ListLargeBlobsOperation)
-	if !ok {
-		t.Fatalf("runtime operation = %T, want ListLargeBlobsOperation", runtime.operation)
-	}
-	if !operation.Refresh {
-		t.Fatal("runtime list large blobs operation refresh = false, want true")
-	}
-}
-
-func TestListCredentialsInvalidSessionReturnsTypedErrorEnvelope(t *testing.T) {
+func TestListCredentialsInvalidSelectionReturnsTypedErrorEnvelope(t *testing.T) {
 	service := New()
 
 	envelope, err := service.ListCredentials(context.Background(), CredentialListRequest{
-		OperationRequest: OperationRequest{SessionID: "missing-session"},
+		OperationRequest: OperationRequest{SelectionID: "missing-selection"},
 	})
 	if err != nil {
 		t.Fatalf("ListCredentials error = %v, want nil because the failure is in the envelope", err)
 	}
-	if envelope.SessionID != "missing-session" {
-		t.Fatalf("envelope session ID = %q, want missing-session", envelope.SessionID)
+	if envelope.SelectionID != "missing-selection" {
+		t.Fatalf("envelope selection ID = %q, want missing-selection", envelope.SelectionID)
 	}
 	if envelope.Kind != model.OperationListCredentials {
 		t.Fatalf("envelope kind = %q, want %q", envelope.Kind, model.OperationListCredentials)
 	}
-	if envelope.Error == nil || envelope.Error.Code != failure.CodeSessionInvalid {
-		t.Fatalf("envelope error = %#v, want %s", envelope.Error, failure.CodeSessionInvalid)
+	if envelope.Error == nil || envelope.Error.Code != failure.CodeSelectionInvalid {
+		t.Fatalf("envelope error = %#v, want %s", envelope.Error, failure.CodeSelectionInvalid)
 	}
-	if envelope.Error.Category != failure.CategoryInvalidSession || envelope.Error.Phase != failure.PhaseSession {
-		t.Fatalf("envelope error = %#v, want invalid-session/session", envelope.Error)
+	if envelope.Error.Category != failure.CategoryInvalidSelection || envelope.Error.Phase != failure.PhaseSelection {
+		t.Fatalf("envelope error = %#v, want invalid-selection/selection", envelope.Error)
 	}
 }
 
 func TestListCredentialsOperationFailureUsesOnlyTheTypedEnvelopeError(t *testing.T) {
-	runtime := &recordingOperationSession{
+	runtime := &recordingAuthenticator{
 		runErr: failure.Wrap(
 			failure.CodeOperationCanceled,
 			context.Canceled,
@@ -195,13 +85,10 @@ func TestListCredentialsOperationFailureUsesOnlyTheTypedEnvelopeError(t *testing
 		),
 	}
 	service := New()
-	service.sessions["session-1"] = &managedSession{
-		id:      "session-1",
-		session: runtime,
-	}
+	service.selected = newSelection("selection-1", report.DeviceReport{}, runtime)
 
 	envelope, err := service.ListCredentials(context.Background(), CredentialListRequest{
-		OperationRequest: OperationRequest{SessionID: "session-1"},
+		OperationRequest: OperationRequest{SelectionID: "selection-1"},
 	})
 	if err != nil {
 		t.Fatalf("ListCredentials error = %v, want nil because the failure is in the envelope", err)
@@ -215,17 +102,17 @@ func TestListCredentialsOperationFailureUsesOnlyTheTypedEnvelopeError(t *testing
 	if envelope.Result != nil {
 		t.Fatalf("envelope result = %#v, want nil on operation failure", envelope.Result)
 	}
-	if envelope.SessionClosed {
-		t.Fatal("envelope sessionClosed = true, want false")
+	if envelope.AuthenticatorClosed {
+		t.Fatal("envelope authenticatorClosed = true, want false")
 	}
-	if _, err := service.Session("session-1"); err != nil {
-		t.Fatalf("Session: %v", err)
+	if _, ok := service.selectionFor("selection-1"); !ok {
+		t.Fatal("selected selection was retired")
 	}
 }
 
-func TestOperationEnvelopeReportsAndRetiresClosedSession(t *testing.T) {
-	runtime := &recordingOperationSession{
-		info: model.SessionInfo{Closed: true},
+func TestOperationEnvelopeReportsAndRetiresClosedSelection(t *testing.T) {
+	runtime := &recordingAuthenticator{
+		closed: true,
 		runErr: failure.Wrap(
 			failure.CodeOperationCanceled,
 			context.Canceled,
@@ -233,35 +120,32 @@ func TestOperationEnvelopeReportsAndRetiresClosedSession(t *testing.T) {
 		),
 	}
 	service := New()
-	service.sessions["session-1"] = &managedSession{
-		id:      "session-1",
-		session: runtime,
-	}
+	service.selected = newSelection("selection-1", report.DeviceReport{}, runtime)
 
 	envelope, err := service.ListCredentials(context.Background(), CredentialListRequest{
-		OperationRequest: OperationRequest{SessionID: "session-1"},
+		OperationRequest: OperationRequest{SelectionID: "selection-1"},
 	})
 	if err != nil {
 		t.Fatalf("ListCredentials: %v", err)
 	}
-	if !envelope.SessionClosed {
-		t.Fatal("envelope sessionClosed = false, want true")
+	if !envelope.AuthenticatorClosed {
+		t.Fatal("envelope authenticatorClosed = false, want true")
 	}
 	if envelope.Error == nil || envelope.Error.Code != failure.CodeOperationCanceled {
 		t.Fatalf("envelope error = %#v, want %s", envelope.Error, failure.CodeOperationCanceled)
 	}
 
-	if _, err := service.Session("session-1"); !failure.IsCode(err, failure.CodeSessionInvalid) {
-		t.Fatalf("Session error = %v, want %s", err, failure.CodeSessionInvalid)
+	if _, ok := service.selectionFor("selection-1"); ok {
+		t.Fatal("closed selected selection was retained")
 	}
 }
 
 func TestPINRequestsRoundTripSecrets(t *testing.T) {
 	var setPIN PINSetRequest
-	if err := json.Unmarshal([]byte(`{"sessionId":"session-1","newPIN":"123456","confirmed":true}`), &setPIN); err != nil {
+	if err := json.Unmarshal([]byte(`{"selectionId":"selection-1","newPIN":"123456","confirmed":true}`), &setPIN); err != nil {
 		t.Fatalf("unmarshal set PIN request: %v", err)
 	}
-	if setPIN.SessionID != "session-1" || setPIN.NewPIN != "123456" || !setPIN.Confirmed {
+	if setPIN.SelectionID != "selection-1" || setPIN.NewPIN != "123456" || !setPIN.Confirmed {
 		t.Fatalf("unexpected set PIN request: %#v", setPIN)
 	}
 
@@ -278,10 +162,10 @@ func TestPINRequestsRoundTripSecrets(t *testing.T) {
 	}
 
 	var changePIN PINChangeRequest
-	if err := json.Unmarshal([]byte(`{"sessionId":"session-1","currentPIN":"123456","newPIN":"654321","dryRun":true}`), &changePIN); err != nil {
+	if err := json.Unmarshal([]byte(`{"selectionId":"selection-1","currentPIN":"123456","newPIN":"654321","dryRun":true}`), &changePIN); err != nil {
 		t.Fatalf("unmarshal change PIN request: %v", err)
 	}
-	if changePIN.SessionID != "session-1" || changePIN.CurrentPIN != "123456" || changePIN.NewPIN != "654321" || !changePIN.DryRun {
+	if changePIN.SelectionID != "selection-1" || changePIN.CurrentPIN != "123456" || changePIN.NewPIN != "654321" || !changePIN.DryRun {
 		t.Fatalf("unexpected change PIN request: %#v", changePIN)
 	}
 
@@ -298,18 +182,18 @@ func TestPINRequestsRoundTripSecrets(t *testing.T) {
 	}
 }
 
-type recordingOperationSession struct {
+type recordingAuthenticator struct {
 	operation model.Operation
 	result    model.OperationResult
 	runErr    error
-	info      model.SessionInfo
+	closed    bool
 }
 
-func (s *recordingOperationSession) Run(
+func (s *recordingAuthenticator) Run(
 	_ context.Context,
 	operation model.Operation,
 	_ model.InteractionHandler,
-	_ ...ctapkit.RunOption,
+	_ ...ctapkit.OperationOption,
 ) (model.OperationResult, error) {
 	s.operation = operation
 	if s.result != nil || s.runErr != nil {
@@ -319,6 +203,6 @@ func (s *recordingOperationSession) Run(
 	return model.CredentialsOutput{}, nil
 }
 
-func (s *recordingOperationSession) Close() error { return nil }
+func (s *recordingAuthenticator) Close() error { return nil }
 
-func (s *recordingOperationSession) Info() model.SessionInfo { return s.info }
+func (s *recordingAuthenticator) Closed() bool { return s.closed }

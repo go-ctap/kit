@@ -16,9 +16,8 @@ import (
 func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCredentialUserOperation) (model.OperationResult, error) {
 	var output model.CredentialUpdateOutput
 
-	permission, err := r.mutationPermission(
+	inventoryPermission, mutationPermission, err := r.inventoryMutationPermissions(
 		protocol.PermissionCredentialManagement,
-		req.PrepareInventoryRefresh,
 	)
 	if err != nil {
 		return output, err
@@ -26,7 +25,7 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 
 	report, err := r.readCredentialInventoryReportWithGrant(
 		ctx,
-		inventoryGrantPermission(permission, req.PrepareInventoryRefresh),
+		inventoryPermission,
 	)
 	if err != nil {
 		return output, err
@@ -95,8 +94,8 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 	token, err := r.env.Tokens.Acquire(
 		ctx,
 		r.tokenProvider(),
-		permission,
-		r.credentialMutationRPID(publicTarget, req.PrepareInventoryRefresh),
+		mutationPermission,
+		r.credentialMutationRPID(publicTarget),
 	)
 	if err != nil {
 		return output, err
@@ -104,9 +103,6 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 	defer secret.Zero(token)
 
 	err = r.credentialManager().UpdateUserInformation(ctx, token, descriptor, updatedUser)
-	if r.env.Cache != nil {
-		r.env.Cache.InvalidateCredentials()
-	}
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 			failure.PhaseAuthenticatorCommand,

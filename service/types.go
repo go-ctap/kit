@@ -3,8 +3,6 @@
 package service
 
 import (
-	"time"
-
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
 	appmds "github.com/go-ctap/kit/model/mds"
@@ -12,7 +10,7 @@ import (
 	"github.com/go-ctap/kit/transport"
 )
 
-type SessionID string
+type SelectionID string
 
 type OperationID string
 
@@ -56,33 +54,33 @@ type DiscoveryChangedEnvelope struct {
 	Error    *failure.Failure   `json:"error,omitempty"`
 }
 
-type OpenSessionRequest struct {
+type SelectionRequest struct {
 	Selector string `json:"selector,omitempty"`
 }
 
-type SessionSnapshot struct {
-	ID        SessionID         `json:"id"`
-	Info      model.SessionInfo `json:"info"`
-	Running   bool              `json:"running,omitempty"`
-	OpenedAt  time.Time         `json:"openedAt"`
-	UpdatedAt time.Time         `json:"updatedAt"`
+type SelectionSnapshot struct {
+	Selection *ActiveSelection `json:"selection,omitempty"`
+}
+
+type ActiveSelection struct {
+	ID SelectionID `json:"id"`
 }
 
 type operationEnvelope struct {
-	OperationID   OperationID           `json:"operationId"`
-	SessionID     SessionID             `json:"sessionId"`
-	Kind          model.OperationKind   `json:"kind"`
-	SessionClosed bool                  `json:"sessionClosed"`
-	Result        model.OperationResult `json:"result,omitempty"`
-	Error         *failure.Failure      `json:"error,omitempty"`
+	OperationID         OperationID           `json:"operationId"`
+	SelectionID         SelectionID           `json:"selectionId"`
+	Kind                model.OperationKind   `json:"kind"`
+	AuthenticatorClosed bool                  `json:"authenticatorClosed"`
+	Result              model.OperationResult `json:"result,omitempty"`
+	Error               *failure.Failure      `json:"error,omitempty"`
 }
 
 type OperationEnvelopeMeta struct {
-	OperationID   OperationID         `json:"operationId"`
-	SessionID     SessionID           `json:"sessionId"`
-	Kind          model.OperationKind `json:"kind"`
-	SessionClosed bool                `json:"sessionClosed"`
-	Error         *failure.Failure    `json:"error,omitempty"`
+	OperationID         OperationID         `json:"operationId"`
+	SelectionID         SelectionID         `json:"selectionId"`
+	Kind                model.OperationKind `json:"kind"`
+	AuthenticatorClosed bool                `json:"authenticatorClosed"`
+	Error               *failure.Failure    `json:"error,omitempty"`
 }
 
 type InspectEnvelope struct {
@@ -182,7 +180,7 @@ type CancelOperationRequest struct {
 type InteractionPrompt struct {
 	InteractionID InteractionID            `json:"interactionId"`
 	OperationID   OperationID              `json:"operationId"`
-	SessionID     SessionID                `json:"sessionId"`
+	SelectionID   SelectionID              `json:"selectionId"`
 	Request       model.InteractionRequest `json:"request"`
 }
 
@@ -195,7 +193,7 @@ type InteractionAnswer struct {
 
 type OperationEventEnvelope struct {
 	OperationID OperationID          `json:"operationId,omitempty"`
-	SessionID   SessionID            `json:"sessionId"`
+	SelectionID SelectionID          `json:"selectionId"`
 	Event       model.OperationEvent `json:"event"`
 }
 

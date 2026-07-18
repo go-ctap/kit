@@ -23,7 +23,7 @@ func Open(ctx context.Context, mode transport.Mode, path string) (Device, error)
 		opts = append(opts, options.WithUseNamedPipes())
 	default:
 		return nil, failure.New(failure.CodeTransportModeUnsupported,
-			failure.WithPhase(failure.PhaseSession),
+			failure.WithPhase(failure.PhaseAuthenticator),
 		)
 	}
 
@@ -53,34 +53,34 @@ func Open(ctx context.Context, mode transport.Mode, path string) (Device, error)
 			return nil, failure.Wrap(
 				failure.CodeOperationCanceled,
 				err,
-				failure.WithPhase(failure.PhaseSession),
+				failure.WithPhase(failure.PhaseAuthenticator),
 			)
 		case errors.Is(err, context.DeadlineExceeded):
 			return nil, failure.Wrap(
 				failure.CodeOperationTimeout,
 				err,
-				failure.WithPhase(failure.PhaseSession),
+				failure.WithPhase(failure.PhaseAuthenticator),
 			)
 		case errors.Is(err, fs.ErrPermission):
 			return nil, failure.Wrap(
 				failure.CodeTransportPermissionDenied,
 				err,
-				failure.WithPhase(failure.PhaseSession),
+				failure.WithPhase(failure.PhaseAuthenticator),
 			)
 		case mode == transport.ModeWindowsProxy:
 			return nil, failure.Wrap(
 				failure.CodeTransportProxyUnavailable,
 				err,
-				failure.WithPhase(failure.PhaseSession),
+				failure.WithPhase(failure.PhaseAuthenticator),
 			)
 		default:
 			return nil, failure.Wrap(
 				failure.CodeTransportFailure,
 				err,
-				failure.WithPhase(failure.PhaseSession),
+				failure.WithPhase(failure.PhaseAuthenticator),
 			)
 		}
 	}
 
-	return nil, failure.New(failure.CodeTransportFailure, failure.WithPhase(failure.PhaseSession))
+	return nil, failure.New(failure.CodeTransportFailure, failure.WithPhase(failure.PhaseAuthenticator))
 }

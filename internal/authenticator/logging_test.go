@@ -45,7 +45,7 @@ func TestLoggingTransportRedactsClientPINSecrets(t *testing.T) {
 		t.Fatalf("entries = %#v, want one completed entry", entries)
 	}
 	completed := entries[0]
-	if completed.SessionID != "session-1" || completed.OperationID != "operation-1" ||
+	if completed.SelectionID != "session-1" || completed.OperationID != "operation-1" ||
 		completed.SubCommandCode == nil || *completed.SubCommandCode != uint64(request.SubCommand) {
 		t.Fatalf("completed correlation = %#v", completed)
 	}

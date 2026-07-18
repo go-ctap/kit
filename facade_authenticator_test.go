@@ -16,11 +16,11 @@ import (
 	"github.com/go-ctap/kit/transport"
 )
 
-func TestSessionTypedOperationContract(t *testing.T) {
-	session := openContractSession(t, nil, nil)
-	defer func() { _ = session.Close() }()
+func TestAuthenticatorTypedOperationContract(t *testing.T) {
+	opened := openContractAuthenticator(t, nil, nil)
+	defer func() { _ = opened.Close() }()
 
-	output, err := session.Run(context.Background(), model.ConfigStatusOperation{}, nil)
+	output, err := opened.Run(context.Background(), model.ConfigStatusOperation{}, nil)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -31,7 +31,7 @@ func TestSessionTypedOperationContract(t *testing.T) {
 	}
 }
 
-func TestSessionPreCompletedContextHasSessionPhase(t *testing.T) {
+func TestAuthenticatorPreCompletedContextHasAuthenticatorPhase(t *testing.T) {
 	canceled, cancel := context.WithCancel(t.Context())
 	cancel()
 
@@ -47,46 +47,46 @@ func TestSessionPreCompletedContextHasSessionPhase(t *testing.T) {
 		{name: "deadline", ctx: deadline, code: failure.CodeOperationTimeout},
 	}
 
-	session := openContractSession(t, nil, nil)
-	defer func() { _ = session.Close() }()
+	opened := openContractAuthenticator(t, nil, nil)
+	defer func() { _ = opened.Close() }()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := session.Run(tt.ctx, model.ConfigStatusOperation{}, nil)
+			_, err := opened.Run(tt.ctx, model.ConfigStatusOperation{}, nil)
 			requireFailureCode(t, err, tt.code)
 
 			snapshot := failure.Snapshot(err)
 			if snapshot.Operation != string(model.OperationConfigStatus) {
 				t.Fatalf("operation = %q, want %q", snapshot.Operation, model.OperationConfigStatus)
 			}
-			if snapshot.Phase != failure.PhaseSession {
-				t.Fatalf("phase = %q, want %q", snapshot.Phase, failure.PhaseSession)
+			if snapshot.Phase != failure.PhaseAuthenticator {
+				t.Fatalf("phase = %q, want %q", snapshot.Phase, failure.PhaseAuthenticator)
 			}
 		})
 	}
 }
 
-func TestSessionCloseClosesAuthenticatorOnce(t *testing.T) {
+func TestAuthenticatorCloseClosesAuthenticatorOnce(t *testing.T) {
 	a := &closeCountingAuthenticator{
 		closeStarted: make(chan struct{}),
 		releaseClose: make(chan struct{}),
 	}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	opened := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
-	defer func() { _ = session.Close() }()
+	defer func() { _ = opened.Close() }()
 
 	firstErr := make(chan error, 1)
 	secondErr := make(chan error, 1)
 
 	go func() {
-		firstErr <- session.Close()
+		firstErr <- opened.Close()
 	}()
 
 	<-a.closeStarted
 
 	go func() {
-		secondErr <- session.Close()
+		secondErr <- opened.Close()
 	}()
 
 	close(a.releaseClose)
@@ -102,7 +102,7 @@ func TestSessionCloseClosesAuthenticatorOnce(t *testing.T) {
 	}
 }
 
-func TestSessionCloseCancelsActiveRunAndClosesAuthenticatorOnce(t *testing.T) {
+func TestAuthenticatorCloseCancelsActiveRunAndClosesAuthenticatorOnce(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &cancelablePINAuthenticator{
 		pinOnlyLargeBlobWriteEventAuthenticator: pinOnlyLargeBlobWriteEventAuthenticator{
@@ -110,7 +110,7 @@ func TestSessionCloseCancelsActiveRunAndClosesAuthenticatorOnce(t *testing.T) {
 		},
 		closeStarted: make(chan struct{}),
 	}
-	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	opened := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 
@@ -123,7 +123,7 @@ func TestSessionCloseCancelsActiveRunAndClosesAuthenticatorOnce(t *testing.T) {
 	})
 
 	go func() {
-		_, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
+		_, err := opened.Run(context.Background(), model.WriteLargeBlobOperation{
 			CredentialIDHex: "c05e",
 			Payload:         []byte("test"),
 			Confirmed:       true,
@@ -139,24 +139,24 @@ func TestSessionCloseCancelsActiveRunAndClosesAuthenticatorOnce(t *testing.T) {
 
 	closeDone := make(chan error, 2)
 
-	go func() { closeDone <- session.Close() }()
+	go func() { closeDone <- opened.Close() }()
 
 	select {
 	case <-a.closeStarted:
 	case <-time.After(time.Second):
-		t.Fatal("Session.Close did not close authenticator")
+		t.Fatal("Authenticator.Close did not close authenticator")
 	}
 
-	go func() { closeDone <- session.Close() }()
+	go func() { closeDone <- opened.Close() }()
 
 	for i := 0; i < 2; i++ {
 		select {
 		case err := <-closeDone:
 			if err != nil {
-				t.Fatalf("Session.Close: %v", err)
+				t.Fatalf("Authenticator.Close: %v", err)
 			}
 		case <-time.After(time.Second):
-			t.Fatal("Session.Close did not return")
+			t.Fatal("Authenticator.Close did not return")
 		}
 	}
 
@@ -164,7 +164,7 @@ func TestSessionCloseCancelsActiveRunAndClosesAuthenticatorOnce(t *testing.T) {
 	case err := <-runDone:
 		requireFailureCode(t, err, failure.CodeOperationCanceled)
 	case <-time.After(time.Second):
-		t.Fatal("Run was not canceled by Session.Close")
+		t.Fatal("Run was not canceled by Authenticator.Close")
 	}
 
 	if got := a.closeCount.Load(); got != 1 {
@@ -172,7 +172,7 @@ func TestSessionCloseCancelsActiveRunAndClosesAuthenticatorOnce(t *testing.T) {
 	}
 }
 
-func TestSessionCloseDoesNotWaitForStuckInteractionHandler(t *testing.T) {
+func TestAuthenticatorCloseDoesNotWaitForStuckInteractionHandler(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &cancelablePINAuthenticator{
 		pinOnlyLargeBlobWriteEventAuthenticator: pinOnlyLargeBlobWriteEventAuthenticator{
@@ -180,7 +180,7 @@ func TestSessionCloseDoesNotWaitForStuckInteractionHandler(t *testing.T) {
 		},
 		closeStarted: make(chan struct{}),
 	}
-	session := openContractSession(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	opened := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 
@@ -197,7 +197,7 @@ func TestSessionCloseDoesNotWaitForStuckInteractionHandler(t *testing.T) {
 	})
 
 	go func() {
-		_, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
+		_, err := opened.Run(context.Background(), model.WriteLargeBlobOperation{
 			CredentialIDHex: "c05e",
 			Payload:         []byte("test"),
 			Confirmed:       true,
@@ -213,22 +213,22 @@ func TestSessionCloseDoesNotWaitForStuckInteractionHandler(t *testing.T) {
 
 	closeDone := make(chan error, 1)
 
-	go func() { closeDone <- session.Close() }()
+	go func() { closeDone <- opened.Close() }()
 
 	select {
 	case err := <-closeDone:
 		if err != nil {
-			t.Fatalf("Session.Close: %v", err)
+			t.Fatalf("Authenticator.Close: %v", err)
 		}
 	case <-time.After(time.Second):
-		t.Fatal("Session.Close waited for stuck interaction handler")
+		t.Fatal("Authenticator.Close waited for stuck interaction handler")
 	}
 
 	select {
 	case err := <-runDone:
 		requireFailureCode(t, err, failure.CodeOperationCanceled)
 	case <-time.After(time.Second):
-		t.Fatal("Run was not canceled by Session.Close")
+		t.Fatal("Run was not canceled by Authenticator.Close")
 	}
 
 	if got := a.closeCount.Load(); got != 1 {
@@ -238,16 +238,16 @@ func TestSessionCloseDoesNotWaitForStuckInteractionHandler(t *testing.T) {
 	close(unblockHandler)
 }
 
-func TestSessionCloseCancelsBlockedAuthenticatorCommand(t *testing.T) {
+func TestAuthenticatorCloseCancelsBlockedAuthenticatorCommand(t *testing.T) {
 	a := &blockingConfigAuthenticator{commandEntered: make(chan struct{})}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	opened := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
-	defer func() { _ = session.Close() }()
+	defer func() { _ = opened.Close() }()
 
 	runDone := make(chan error, 1)
 	go func() {
-		_, err := session.Run(
+		_, err := opened.Run(
 			context.Background(),
 			model.SetAlwaysUVOperation{Target: appconfig.AlwaysUVTargetEnable, Confirmed: true},
 			userVerificationHandler(t),
@@ -261,8 +261,8 @@ func TestSessionCloseCancelsBlockedAuthenticatorCommand(t *testing.T) {
 		t.Fatal("Run did not reach authenticator command")
 	}
 
-	if err := session.Close(); err != nil {
-		t.Fatalf("Session.Close: %v", err)
+	if err := opened.Close(); err != nil {
+		t.Fatalf("Authenticator.Close: %v", err)
 	}
 
 	select {
@@ -273,22 +273,22 @@ func TestSessionCloseCancelsBlockedAuthenticatorCommand(t *testing.T) {
 	}
 }
 
-func TestRunAfterSessionCloseIsRejected(t *testing.T) {
-	session := openContractSession(t, nil, nil)
+func TestRunAfterAuthenticatorCloseIsRejected(t *testing.T) {
+	opened := openContractAuthenticator(t, nil, nil)
 
-	if err := session.Close(); err != nil {
+	if err := opened.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
 
-	result, err := session.Run(context.Background(), model.ConfigStatusOperation{}, nil)
-	requireFailureCode(t, err, failure.CodeSessionClosed)
+	result, err := opened.Run(context.Background(), model.ConfigStatusOperation{}, nil)
+	requireFailureCode(t, err, failure.CodeAuthenticatorClosed)
 
 	if result != nil {
 		t.Fatalf("result = %#v, want nil", result)
 	}
 }
 
-func TestTransportConnectionFailureClosesSession(t *testing.T) {
+func TestTransportConnectionFailureClosesAuthenticator(t *testing.T) {
 	tests := []ctaptransport.IOOperation{
 		ctaptransport.IORead,
 		ctaptransport.IOWrite,
@@ -301,27 +301,27 @@ func TestTransportConnectionFailureClosesSession(t *testing.T) {
 				operation:   operation,
 				invalidated: true,
 			}
-			session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+			opened := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 				return a, nil
 			})
 
-			_, err := session.Run(context.Background(), model.SetPINOperation{
+			_, err := opened.Run(context.Background(), model.SetPINOperation{
 				NewPIN:    "1234",
 				Confirmed: true,
 			}, nil)
 			requireFailureCode(t, err, failure.CodeTransportFailure)
 
-			if !session.Info().Closed {
-				t.Fatal("session remained open after transport connection failure")
+			if !opened.Closed() {
+				t.Fatal("opened remained open after transport connection failure")
 			}
 			if got := a.closeCount.Load(); got != 1 {
 				t.Fatalf("authenticator close count = %d, want 1", got)
 			}
 
-			_, err = session.Run(context.Background(), model.ConfigStatusOperation{}, nil)
-			requireFailureCode(t, err, failure.CodeSessionClosed)
+			_, err = opened.Run(context.Background(), model.ConfigStatusOperation{}, nil)
+			requireFailureCode(t, err, failure.CodeAuthenticatorClosed)
 
-			if err := session.Close(); err != nil {
+			if err := opened.Close(); err != nil {
 				t.Fatalf("Close: %v", err)
 			}
 			if got := a.closeCount.Load(); got != 1 {
@@ -331,7 +331,7 @@ func TestTransportConnectionFailureClosesSession(t *testing.T) {
 	}
 }
 
-func TestTransportFailureWithoutDeviceInvalidationKeepsSessionOpen(t *testing.T) {
+func TestTransportFailureWithoutDeviceInvalidationKeepsAuthenticatorOpen(t *testing.T) {
 	tests := []ctaptransport.IOOperation{
 		ctaptransport.IORead,
 		ctaptransport.IOWrite,
@@ -341,24 +341,24 @@ func TestTransportFailureWithoutDeviceInvalidationKeepsSessionOpen(t *testing.T)
 	for _, operation := range tests {
 		t.Run(string(operation), func(t *testing.T) {
 			a := &transportFailureAuthenticator{operation: operation}
-			session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+			opened := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 				return a, nil
 			})
 
-			_, err := session.Run(context.Background(), model.SetPINOperation{
+			_, err := opened.Run(context.Background(), model.SetPINOperation{
 				NewPIN:    "1234",
 				Confirmed: true,
 			}, nil)
 			requireFailureCode(t, err, failure.CodeTransportFailure)
 
-			if session.Info().Closed {
-				t.Fatal("session closed without device invalidation")
+			if opened.Closed() {
+				t.Fatal("opened closed without device invalidation")
 			}
 			if got := a.closeCount.Load(); got != 0 {
 				t.Fatalf("authenticator close count = %d, want 0", got)
 			}
 
-			if err := session.Close(); err != nil {
+			if err := opened.Close(); err != nil {
 				t.Fatalf("Close: %v", err)
 			}
 			if got := a.closeCount.Load(); got != 1 {
@@ -368,24 +368,24 @@ func TestTransportFailureWithoutDeviceInvalidationKeepsSessionOpen(t *testing.T)
 	}
 }
 
-func TestCanceledTransmitWithoutDeviceInvalidationKeepsSessionOpen(t *testing.T) {
+func TestCanceledTransmitWithoutDeviceInvalidationKeepsAuthenticatorOpen(t *testing.T) {
 	a := &transportFailureAuthenticator{
 		operation: ctaptransport.IOTransmit,
 		cause:     context.Canceled,
 	}
-	session := openContractSession(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	opened := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
-	defer func() { _ = session.Close() }()
+	defer func() { _ = opened.Close() }()
 
-	_, err := session.Run(context.Background(), model.SetPINOperation{
+	_, err := opened.Run(context.Background(), model.SetPINOperation{
 		NewPIN:    "1234",
 		Confirmed: true,
 	}, nil)
 	requireFailureCode(t, err, failure.CodeOperationCanceled)
 
-	if session.Info().Closed {
-		t.Fatal("session closed after a canceled transmit without device invalidation")
+	if opened.Closed() {
+		t.Fatal("opened closed after a canceled transmit without device invalidation")
 	}
 	if got := a.closeCount.Load(); got != 0 {
 		t.Fatalf("authenticator close count = %d, want 0", got)
@@ -430,11 +430,11 @@ func (a *transportFailureAuthenticator) Close() error {
 	return nil
 }
 
-func TestSessionEventSinksAreScopedToOpenedSession(t *testing.T) {
+func TestAuthenticatorEventSinksAreScopedToOpenedAuthenticator(t *testing.T) {
 	firstEvents := &recordingEventSink{}
 	secondEvents := &recordingEventSink{}
 
-	first := openContractSession(t, firstEvents, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	first := openContractAuthenticator(t, firstEvents, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return &progressCredentialAuthenticator{}, nil
 	})
 	if _, err := first.Run(context.Background(), model.ListCredentialsOperation{}, userVerificationHandler(t)); err != nil {
@@ -446,13 +446,13 @@ func TestSessionEventSinksAreScopedToOpenedSession(t *testing.T) {
 
 	firstEventCount := len(firstEvents.Events())
 	if firstEventCount == 0 {
-		t.Fatal("first session emitted no events")
+		t.Fatal("first opened emitted no events")
 	}
 	if got := len(secondEvents.Events()); got != 0 {
-		t.Fatalf("second sink events before second session = %d, want 0", got)
+		t.Fatalf("second sink events before second opened = %d, want 0", got)
 	}
 
-	second := openContractSession(t, secondEvents, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	second := openContractAuthenticator(t, secondEvents, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return &progressCredentialAuthenticator{}, nil
 	})
 	if _, err := second.Run(context.Background(), model.ListCredentialsOperation{}, userVerificationHandler(t)); err != nil {
@@ -463,9 +463,9 @@ func TestSessionEventSinksAreScopedToOpenedSession(t *testing.T) {
 	}
 
 	if got := len(firstEvents.Events()); got != firstEventCount {
-		t.Fatalf("first sink events after second session = %d, want %d", got, firstEventCount)
+		t.Fatalf("first sink events after second opened = %d, want %d", got, firstEventCount)
 	}
 	if got := len(secondEvents.Events()); got == 0 {
-		t.Fatal("second session emitted no events")
+		t.Fatal("second opened emitted no events")
 	}
 }

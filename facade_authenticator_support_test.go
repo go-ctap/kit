@@ -10,7 +10,7 @@ import (
 	"github.com/go-ctap/kit/transport"
 )
 
-func TestOpenSessionAllowsIndependentChannelsForSameDevice(t *testing.T) {
+func TestOpenAuthenticatorAllowsIndependentChannelsForSameDevice(t *testing.T) {
 	opens := 0
 	open := func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		opens++
@@ -19,23 +19,23 @@ func TestOpenSessionAllowsIndependentChannelsForSameDevice(t *testing.T) {
 	}
 	device := newContractDevice()
 
-	first, err := openSession(t.Context(), device, open)
+	first, err := openAuthenticatorHandle(t.Context(), device, open)
 	if err != nil {
-		t.Fatalf("open first session: %v", err)
+		t.Fatalf("open first opened: %v", err)
 	}
 	defer func() {
 		if err := first.Close(); err != nil {
-			t.Errorf("close first session: %v", err)
+			t.Errorf("close first opened: %v", err)
 		}
 	}()
 
-	second, err := openSession(t.Context(), device, open)
+	second, err := openAuthenticatorHandle(t.Context(), device, open)
 	if err != nil {
-		t.Fatalf("open second session: %v", err)
+		t.Fatalf("open second opened: %v", err)
 	}
 	defer func() {
 		if err := second.Close(); err != nil {
-			t.Errorf("close second session: %v", err)
+			t.Errorf("close second opened: %v", err)
 		}
 	}()
 
@@ -44,15 +44,15 @@ func TestOpenSessionAllowsIndependentChannelsForSameDevice(t *testing.T) {
 	}
 }
 
-func TestOpenSessionMakesJournalAvailableWhileOpeningAuthenticator(t *testing.T) {
+func TestOpenAuthenticatorMakesJournalAvailableWhileOpeningAuthenticator(t *testing.T) {
 	journal := NewLogJournal()
 	open := func(ctx context.Context, _ transport.Mode, _ string) (authenticator.Device, error) {
 		kitlog.RecorderFrom(ctx).Append(model.LogEntry{Code: "open-command"})
 
 		return &contractAuthenticator{}, nil
 	}
-	session := openContractSessionWithOptions(t, nil, open, WithLogJournal(journal))
-	if err := session.Close(); err != nil {
+	opened := openContractAuthenticatorWithOptions(t, nil, open, WithLogJournal(journal))
+	if err := opened.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
 	batch := journal.Read(0)
@@ -61,16 +61,16 @@ func TestOpenSessionMakesJournalAvailableWhileOpeningAuthenticator(t *testing.T)
 	}
 }
 
-func openContractSession(t *testing.T, events model.EventSink, open authenticatorOpenFunc) *Session {
-	return openContractSessionWithOptions(t, events, open)
+func openContractAuthenticator(t *testing.T, events model.EventSink, open authenticatorOpenFunc) *Authenticator {
+	return openContractAuthenticatorWithOptions(t, events, open)
 }
 
-func openContractSessionWithOptions(
+func openContractAuthenticatorWithOptions(
 	t *testing.T,
 	events model.EventSink,
 	open authenticatorOpenFunc,
-	opts ...OpenSessionOption,
-) *Session {
+	opts ...AuthenticatorOption,
+) *Authenticator {
 	t.Helper()
 	if open == nil {
 		open = func(context.Context, transport.Mode, string) (authenticator.Device, error) {
@@ -78,23 +78,23 @@ func openContractSessionWithOptions(
 		}
 	}
 
-	sessionOpts := []OpenSessionOption(nil)
+	sessionOpts := []AuthenticatorOption(nil)
 	if events != nil {
 		sessionOpts = append(sessionOpts, WithEventSink(events))
 	}
 	sessionOpts = append(sessionOpts, opts...)
 
-	session, err := openSession(
+	opened, err := openAuthenticatorHandle(
 		context.Background(),
 		newContractDevice(),
 		open,
 		sessionOpts...,
 	)
 	if err != nil {
-		t.Fatalf("OpenSession: %v", err)
+		t.Fatalf("OpenAuthenticator: %v", err)
 	}
 
-	return session
+	return opened
 }
 
 func newContractDevice() Device {

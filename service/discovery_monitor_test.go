@@ -16,36 +16,34 @@ import (
 	"github.com/go-ctap/kit/transport"
 )
 
-func TestTopologyReconciliationClosesOnlyMissingSession(t *testing.T) {
+func TestTopologyReconciliationClosesMissingSelection(t *testing.T) {
 	firstDevice := testDevice("hid://one", "serial-1")
 	secondDevice := testDevice("hid://two", "serial-2")
-	firstRuntime := &fakeSessionRuntime{info: model.SessionInfo{Device: firstDevice}}
-	secondRuntime := &fakeSessionRuntime{info: model.SessionInfo{Device: secondDevice}}
+	firstRuntime := &fakeAuthenticatorRuntime{}
 	service := New()
-	service.sessions["session-1"] = managedTestSession("session-1", firstDevice, firstRuntime)
-	service.sessions["session-2"] = managedTestSession("session-2", secondDevice, secondRuntime)
+	service.selected = testSelection("selection-1", firstDevice, firstRuntime)
 
 	service.mu.Lock()
-	affected := service.detachMissingSessionsLocked([]report.DeviceReport{secondDevice})
+	affected := service.detachMissingSelectionLocked([]report.DeviceReport{secondDevice})
 	service.mu.Unlock()
-	err := service.closeManagedSessions(affected)
+	err := service.closeSelection(affected)
 	if err != nil {
-		t.Fatalf("close sessions: %v", err)
+		t.Fatalf("close selection: %v", err)
 	}
 
-	if !firstRuntime.closed.Load() || secondRuntime.closed.Load() {
-		t.Fatalf("runtime close state = (%v, %v)", firstRuntime.closed.Load(), secondRuntime.closed.Load())
+	if !firstRuntime.closed.Load() {
+		t.Fatal("missing selection runtime was not closed")
 	}
-	if _, ok := service.sessions["session-2"]; !ok {
-		t.Fatal("surviving session was removed")
+	if service.selected != nil {
+		t.Fatal("missing selection was retained")
 	}
 }
 
-func TestDiscoverUsesReconcilerForExistingSessions(t *testing.T) {
+func TestDiscoverKeepsCurrentSelection(t *testing.T) {
 	device := testDevice("hid://one", "serial-1")
-	runtime := &fakeSessionRuntime{info: model.SessionInfo{Device: device}}
+	runtime := &fakeAuthenticatorRuntime{}
 	service := New()
-	service.sessions["session-1"] = managedTestSession("session-1", device, runtime)
+	service.selected = testSelection("selection-1", device, runtime)
 	service.scanDevices = func(context.Context, transport.Mode) ([]ctapkit.Device, error) {
 		return nil, nil
 	}
@@ -99,24 +97,25 @@ func TestDiscoveryEventFollowsOperationCancellation(t *testing.T) {
 			observed <- canceled.Load()
 		}
 	})))
-	service.sessions["session-1"] = managedTestSession(
-		"session-1",
+	selected := testSelection(
+		"selection-1",
 		device,
-		&fakeSessionRuntime{info: model.SessionInfo{Device: device}},
+		&fakeAuthenticatorRuntime{},
 	)
+	service.selected = selected
 	operation := &operationState{
-		id:        operationID,
-		sessionID: "session-1",
-		done:      make(chan struct{}),
+		id:          operationID,
+		selectionID: "selection-1",
+		done:        make(chan struct{}),
 	}
 	var cancelOnce sync.Once
 	operation.cancel = func() {
 		cancelOnce.Do(func() {
 			canceled.Store(true)
-			service.unregisterOperation(operationID)
+			service.unregisterOperation(selected, operationID)
 		})
 	}
-	service.operations[operationID] = operation
+	selected.operations[operationID] = operation
 	service.scanDevices = func(context.Context, transport.Mode) ([]ctapkit.Device, error) {
 		return nil, nil
 	}
@@ -293,8 +292,8 @@ func testDevice(path string, fingerprint string) report.DeviceReport {
 	}
 }
 
-func managedTestSession(id SessionID, device report.DeviceReport, runtime sessionRuntime) *managedSession {
-	return &managedSession{id: id, device: device, session: runtime}
+func testSelection(id SelectionID, device report.DeviceReport, runtime authenticatorRuntime) *selection {
+	return newSelection(id, device, runtime)
 }
 
 func waitForScan(t *testing.T, scans <-chan struct{}) {
@@ -346,26 +345,23 @@ func (m *fakeDiscoveryMonitor) isCanceled() bool {
 	return m.ctx != nil && m.ctx.Err() != nil
 }
 
-type fakeSessionRuntime struct {
-	info     model.SessionInfo
+type fakeAuthenticatorRuntime struct {
 	closed   atomic.Bool
 	closeErr error
 }
 
-func (s *fakeSessionRuntime) Run(
+func (s *fakeAuthenticatorRuntime) Run(
 	context.Context,
 	model.Operation,
 	model.InteractionHandler,
-	...ctapkit.RunOption,
+	...ctapkit.OperationOption,
 ) (model.OperationResult, error) {
 	return nil, nil
 }
 
-func (s *fakeSessionRuntime) Close() error {
+func (s *fakeAuthenticatorRuntime) Close() error {
 	s.closed.Store(true)
 	return s.closeErr
 }
 
-func (s *fakeSessionRuntime) Info() model.SessionInfo {
-	return s.info
-}
+func (s *fakeAuthenticatorRuntime) Closed() bool { return s.closed.Load() }

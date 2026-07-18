@@ -28,9 +28,8 @@ type garbageCollectState struct {
 func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageCollectLargeBlobsOperation) (model.OperationResult, error) {
 	var output model.LargeBlobMutationOutput
 
-	permission, err := r.mutationPermission(
+	inventoryPermission, mutationPermission, err := r.inventoryMutationPermissions(
 		protocol.PermissionLargeBlobWrite,
-		req.PrepareInventoryRefresh,
 	)
 	if err != nil {
 		return output, err
@@ -38,7 +37,7 @@ func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageC
 
 	state, err := r.loadGarbageCollectState(
 		ctx,
-		inventoryGrantPermission(permission, req.PrepareInventoryRefresh),
+		inventoryPermission,
 	)
 	if err != nil {
 		return output, err
@@ -67,16 +66,13 @@ func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageC
 		return output, nil
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), permission, "")
+	token, err := r.env.Tokens.Acquire(ctx, r.tokenProvider(), mutationPermission, "")
 	if err != nil {
 		return output, err
 	}
 	defer secret.Zero(token)
 
 	err = r.largeBlobManager().SetLargeBlobs(ctx, token, state.replacement)
-	if r.env.Cache != nil {
-		r.env.Cache.InvalidateLargeBlobs()
-	}
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,

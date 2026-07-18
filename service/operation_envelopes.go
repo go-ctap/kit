@@ -9,11 +9,11 @@ import (
 
 func operationEnvelopeMeta(envelope operationEnvelope) OperationEnvelopeMeta {
 	return OperationEnvelopeMeta{
-		OperationID:   envelope.OperationID,
-		SessionID:     envelope.SessionID,
-		Kind:          envelope.Kind,
-		SessionClosed: envelope.SessionClosed,
-		Error:         envelope.Error,
+		OperationID:         envelope.OperationID,
+		SelectionID:         envelope.SelectionID,
+		Kind:                envelope.Kind,
+		AuthenticatorClosed: envelope.AuthenticatorClosed,
+		Error:               envelope.Error,
 	}
 }
 

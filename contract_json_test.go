@@ -56,63 +56,6 @@ func TestWebAuthnOperationKindStrings(t *testing.T) {
 	}
 }
 
-func TestListCredentialsOperationRefreshJSONContract(t *testing.T) {
-	legacy, err := json.Marshal(model.ListCredentialsOperation{})
-	if err != nil {
-		t.Fatalf("marshal legacy list credentials operation: %v", err)
-	}
-	if string(legacy) != `{}` {
-		t.Fatalf("legacy list credentials operation JSON = %s, want {}", legacy)
-	}
-
-	refreshed, err := json.Marshal(model.ListCredentialsOperation{Refresh: true})
-	if err != nil {
-		t.Fatalf("marshal refreshed list credentials operation: %v", err)
-	}
-	if string(refreshed) != `{"refresh":true}` {
-		t.Fatalf("refreshed list credentials operation JSON = %s", refreshed)
-	}
-}
-
-func TestListLargeBlobsOperationRefreshJSONContract(t *testing.T) {
-	legacy, err := json.Marshal(model.ListLargeBlobsOperation{})
-	if err != nil {
-		t.Fatalf("marshal legacy list large blobs operation: %v", err)
-	}
-	if string(legacy) != `{}` {
-		t.Fatalf("legacy list large blobs operation JSON = %s, want {}", legacy)
-	}
-
-	refreshed, err := json.Marshal(model.ListLargeBlobsOperation{Refresh: true})
-	if err != nil {
-		t.Fatalf("marshal refreshed list large blobs operation: %v", err)
-	}
-	if string(refreshed) != `{"refresh":true}` {
-		t.Fatalf("refreshed list large blobs operation JSON = %s", refreshed)
-	}
-}
-
-func TestMutationInventoryRefreshJSONContract(t *testing.T) {
-	legacy, err := json.Marshal(model.DeleteCredentialOperation{CredentialIDHex: "c05e"})
-	if err != nil {
-		t.Fatalf("marshal legacy delete credential operation: %v", err)
-	}
-	if strings.Contains(string(legacy), "prepareInventoryRefresh") {
-		t.Fatalf("legacy delete credential operation included refresh plan: %s", legacy)
-	}
-
-	prepared, err := json.Marshal(model.DeleteCredentialOperation{
-		CredentialIDHex:         "c05e",
-		PrepareInventoryRefresh: true,
-	})
-	if err != nil {
-		t.Fatalf("marshal prepared delete credential operation: %v", err)
-	}
-	if !strings.Contains(string(prepared), `"prepareInventoryRefresh":true`) {
-		t.Fatalf("prepared delete credential operation omitted refresh plan: %s", prepared)
-	}
-}
-
 func TestUserVerificationInteractionJSON(t *testing.T) {
 	raw, err := json.Marshal(model.InteractionRequest{
 		Kind:       model.InteractionKindUserVerification,
@@ -139,8 +82,8 @@ func TestUserVerificationInteractionJSON(t *testing.T) {
 		t.Fatalf("operationId leaked into interaction request JSON: %s", raw)
 	}
 
-	if strings.Contains(string(raw), "sessionId") {
-		t.Fatalf("sessionId leaked into interaction request JSON: %s", raw)
+	if strings.Contains(string(raw), "selectionId") {
+		t.Fatalf("selectionId leaked into interaction request JSON: %s", raw)
 	}
 
 	if strings.Contains(string(raw), "interactionId") {
@@ -216,7 +159,7 @@ func TestTouchInteractionJSON(t *testing.T) {
 		t.Fatalf("operationId leaked into interaction request JSON: %s", raw)
 	}
 
-	if strings.Contains(string(raw), "sessionId") || strings.Contains(string(raw), "interactionId") {
+	if strings.Contains(string(raw), "selectionId") || strings.Contains(string(raw), "interactionId") {
 		t.Fatalf("runtime correlation fields leaked into interaction request JSON: %s", raw)
 	}
 }
@@ -254,7 +197,7 @@ func TestInteractionRequestJSONIncludesPreviewAndResponseOmitsPIN(t *testing.T) 
 		t.Fatalf("operationId leaked into interaction request JSON: %s", text)
 	}
 
-	if strings.Contains(text, "sessionId") || strings.Contains(text, "interactionId") {
+	if strings.Contains(text, "selectionId") || strings.Contains(text, "interactionId") {
 		t.Fatalf("runtime correlation fields leaked into interaction request JSON: %s", text)
 	}
 

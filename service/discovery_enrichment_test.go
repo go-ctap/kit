@@ -1,60 +1,28 @@
 package service
 
 import (
-	"context"
 	"testing"
 
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 )
 
-func TestSessionClaimsArePerDevice(t *testing.T) {
-	service := New()
-	claimedDevice := report.DeviceReport{Fingerprint: "claimed", Transport: transport.ModeHID}
-	otherDevice := report.DeviceReport{Fingerprint: "other", Transport: transport.ModeHID}
-	service.enrichment.claims[enrichmentKey(claimedDevice)] = make(chan struct{})
-
-	release, err := service.claimDeviceForSession(t.Context(), otherDevice)
-	if err != nil {
-		t.Fatalf("claim other device: %v", err)
-	}
-	release()
-
-	canceled, cancel := context.WithCancel(t.Context())
-	cancel()
-	if release, err := service.claimDeviceForSession(canceled, claimedDevice); err == nil {
-		release()
-		t.Fatal("claimed device was acquired")
-	}
-
-	service.releaseDeviceClaim(claimedDevice)
-	release, err = service.claimDeviceForSession(t.Context(), claimedDevice)
-	if err != nil {
-		t.Fatalf("claim released device: %v", err)
-	}
-	release()
-}
-
 func TestTakeEnrichmentCandidateAttemptsAvailableKnownVendors(t *testing.T) {
 	cache := make(map[string]report.DeviceMetadata)
 	attempted := make(map[string]struct{})
-	busyFingerprint := "busy"
 	devices := []report.DeviceReport{
 		{Fingerprint: "unknown", Vendor: report.VendorUnknown},
 		{Fingerprint: "token2", Vendor: report.VendorToken2},
-		{Fingerprint: busyFingerprint, Vendor: report.VendorYubico},
+		{Fingerprint: "busy", Vendor: report.VendorYubico},
 		{Fingerprint: "ready", Vendor: report.VendorYubico},
 	}
 
-	busy := func(device report.DeviceReport) bool {
-		return device.Fingerprint == busyFingerprint
-	}
-	first, ok := takeEnrichmentCandidate(devices, cache, attempted, busy)
+	first, ok := takeEnrichmentCandidate(devices, cache, attempted)
 	if !ok || first.Fingerprint != "token2" {
 		t.Fatalf("first candidate = %#v, ok = %v", first, ok)
 	}
-	second, ok := takeEnrichmentCandidate(devices, cache, attempted, busy)
-	if !ok || second.Fingerprint != "ready" {
+	second, ok := takeEnrichmentCandidate(devices, cache, attempted)
+	if !ok || second.Fingerprint != "busy" {
 		t.Fatalf("second candidate = %#v, ok = %v", second, ok)
 	}
 	if _, ok := attempted[enrichmentKey(first)]; !ok {
@@ -64,10 +32,13 @@ func TestTakeEnrichmentCandidateAttemptsAvailableKnownVendors(t *testing.T) {
 		t.Fatal("second candidate was not marked attempted")
 	}
 
-	if _, ok := takeEnrichmentCandidate(devices, cache, attempted, busy); ok {
+	if third, ok := takeEnrichmentCandidate(devices, cache, attempted); !ok || third.Fingerprint != "ready" {
+		t.Fatalf("third candidate = %#v, ok = %v", third, ok)
+	}
+	if _, ok := takeEnrichmentCandidate(devices, cache, attempted); ok {
 		t.Fatal("already attempted device was selected again")
 	}
-	if got, ok := takeEnrichmentCandidate(devices, cache, make(map[string]struct{}), busy); !ok || got.Fingerprint != "token2" {
+	if got, ok := takeEnrichmentCandidate(devices, cache, make(map[string]struct{})); !ok || got.Fingerprint != "token2" {
 		t.Fatalf("new pass candidate = %#v, ok = %v", got, ok)
 	}
 }
