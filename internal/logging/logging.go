@@ -7,6 +7,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/go-ctap/ctap/diagnostic"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
 )
@@ -93,6 +94,25 @@ func Payload(value SafeJSONValue) *model.LogPayload {
 	}
 }
 
+func CBORDiagnosticPayload(message diagnostic.Message) *model.LogPayload {
+	stored := message.Notation
+	truncated := len(stored) > MaxPayloadBytes
+	if truncated {
+		stored = safePreview([]byte(stored), previewBytes)
+	}
+	if message.Bytes < 0 {
+		message.Bytes = 0
+	}
+
+	return &model.LogPayload{
+		CBORDiagnostic:  stored,
+		DiagnosticError: safePreview([]byte(message.Error), previewBytes),
+		OriginalBytes:   message.Bytes,
+		StoredBytes:     len(stored),
+		Truncated:       truncated,
+	}
+}
+
 func safePreview(raw []byte, limit int) string {
 	if len(raw) <= limit {
 		return string(raw)
@@ -107,9 +127,14 @@ func safePreview(raw []byte, limit int) string {
 }
 
 func Finish(entry model.LogEntry, started time.Time, err error) model.LogEntry {
-	entry.ErrorMessage = TransportErrorMessage(err)
+	return FinishElapsed(entry, time.Since(started), err)
+}
 
-	return FinishFailure(entry, started, failure.Snapshot(err))
+func FinishElapsed(entry model.LogEntry, duration time.Duration, err error) model.LogEntry {
+	entry.ErrorMessage = TransportErrorMessage(err)
+	entry.DurationMilliseconds = duration.Milliseconds()
+
+	return finishFailure(entry, failure.Snapshot(err))
 }
 
 func TransportErrorMessage(err error) string {
@@ -130,6 +155,11 @@ func TransportErrorMessage(err error) string {
 
 func FinishFailure(entry model.LogEntry, started time.Time, snapshot *failure.Failure) model.LogEntry {
 	entry.DurationMilliseconds = time.Since(started).Milliseconds()
+
+	return finishFailure(entry, snapshot)
+}
+
+func finishFailure(entry model.LogEntry, snapshot *failure.Failure) model.LogEntry {
 	entry.Error = snapshot
 	if entry.Error == nil {
 		entry.Outcome = model.LogOutcomeSucceeded

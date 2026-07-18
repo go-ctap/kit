@@ -50,10 +50,12 @@ const (
 )
 
 type LogPayload struct {
-	JSON          string `json:"json"`
-	OriginalBytes int    `json:"originalBytes"`
-	StoredBytes   int    `json:"storedBytes"`
-	Truncated     bool   `json:"truncated"`
+	JSON            string `json:"json,omitempty"`
+	CBORDiagnostic  string `json:"cborDiagnostic,omitempty"`
+	DiagnosticError string `json:"diagnosticError,omitempty"`
+	OriginalBytes   int    `json:"originalBytes"`
+	StoredBytes     int    `json:"storedBytes"`
+	Truncated       bool   `json:"truncated"`
 }
 
 type LogEntry struct {
@@ -67,7 +69,6 @@ type LogEntry struct {
 	OperationKind        OperationKind     `json:"operationKind,omitempty"`
 	Command              string            `json:"command,omitempty"`
 	CommandCode          uint8             `json:"commandCode,omitempty"`
-	SubCommandFamily     string            `json:"subCommandFamily,omitempty"`
 	SubCommand           string            `json:"subCommand,omitempty"`
 	SubCommandCode       *uint64           `json:"subCommandCode,omitempty"`
 	Request              *LogPayload       `json:"request,omitempty"`

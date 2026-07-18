@@ -211,6 +211,13 @@ retry.
 
 ## Engineering Log Diagnostics
 
+`ctap.command` journal entries retain bounded, redacted request and response
+CBOR diagnostic notation in `request.cborDiagnostic` and
+`response.cborDiagnostic`. This is produced from the known typed CTAP schema:
+unknown CBOR fields are omitted and map ordering may be normalized. It is an
+engineering view of the exchange, not a byte-exact capture. The raw bytes and
+secret-bearing typed fields never enter the journal.
+
 Completed journal entries include the bounded retained cause of transport
 failures as a log-only `errorMessage`:
 

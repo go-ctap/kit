@@ -4,7 +4,7 @@
 
 Reusable CTAP/FIDO2 runtime core for the `go-ctap` application family.
 
-The runtime currently targets `github.com/go-ctap/ctap` v0.30.0 and exposes the
+The runtime currently targets `github.com/go-ctap/ctap` v0.31.0 and exposes the
 CTAP 2.3 operation model without legacy API aliases.
 
 The current Go module is:
@@ -106,6 +106,21 @@ verified is retained for a later retry but is never returned as verified data.
 - Mutating operations preserve dry-run and confirmation semantics.
 - Destructive flows such as reset, credential deletion, and large-blob deletion require explicit confirmation.
 - Factory reset must be executed shortly after authenticator power-up on many authenticators; consumers should collect any strong UI confirmation before reconnecting and then run a confirmed reset promptly.
+
+## Engineering Journal
+
+Passing `ctapkit.WithLogJournal` when opening an authenticator records CTAP
+exchanges without changing any operation method. Each `ctap.command` entry
+contains command metadata and bounded request/response CBOR diagnostic notation
+in `cborDiagnostic`; fields marked for redaction by `go-ctap` are replaced
+before the event reaches the journal. Internally, kit installs go-ctap's typed
+`diagnostic.Sink`; application code does not need to receive or forward these
+events.
+
+The diagnostic payload is a normalized view of fields known to the installed
+`go-ctap` protocol structures. Unknown CBOR fields are omitted, so it must not
+be treated as a byte-exact wire capture. `originalBytes` reports the size of the
+CBOR body; the command byte is reported separately as `commandCode`.
 
 ## Verification
 
