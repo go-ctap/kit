@@ -1,2 +1,2 @@
-// Package transport defines authenticator transport discovery providers.
+// Package transport discovers authenticators over the supported CTAP transports.
 package transport

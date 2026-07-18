@@ -9,40 +9,27 @@ import (
 	"github.com/go-ctap/kit/transport"
 )
 
-type fakeDiscoveryProvider struct {
-	list []transport.Descriptor
-	err  error
-}
-
-func (p *fakeDiscoveryProvider) Check(context.Context) error {
-	return nil
-}
-
-func (p *fakeDiscoveryProvider) List(context.Context) ([]transport.Descriptor, error) {
-	if p.err != nil {
-		return nil, p.err
-	}
-
-	return p.list, nil
-}
-
-type fakeDiscoveryResolver struct {
-	resolved  transport.ResolvedProvider
+type fakeTransportDiscovery struct {
+	mode      transport.Mode
+	list      []transport.Descriptor
 	err       error
 	requested transport.Mode
 }
 
-func (r *fakeDiscoveryResolver) Resolve(_ context.Context, requested transport.Mode) (transport.ResolvedProvider, error) {
-	r.requested = requested
-	if r.err != nil {
-		return transport.ResolvedProvider{}, r.err
+func (d *fakeTransportDiscovery) discover(
+	_ context.Context,
+	requested transport.Mode,
+) (transport.Mode, []transport.Descriptor, error) {
+	d.requested = requested
+	if d.err != nil {
+		return "", nil, d.err
 	}
 
-	return r.resolved, nil
+	return d.mode, d.list, nil
 }
 
 func TestDiscoverDevicesReturnsOpaqueDevicesWithReports(t *testing.T) {
-	resolver := newFakeDiscoveryResolver([]transport.Descriptor{{
+	discovery := newFakeTransportDiscovery([]transport.Descriptor{{
 		Path:         "hid://one",
 		Manufacturer: "Yubico",
 		Product:      "YubiKey 5C NFC",
@@ -51,13 +38,13 @@ func TestDiscoverDevicesReturnsOpaqueDevicesWithReports(t *testing.T) {
 		ProductID:    0x0407,
 	}})
 
-	devices, err := discoverDevices(context.Background(), resolver)
+	devices, err := discoverDevices(context.Background(), discovery.discover, transport.ModeAuto)
 	if err != nil {
 		t.Fatalf("DiscoverDevices: %v", err)
 	}
 
-	if resolver.requested != transport.ModeAuto {
-		t.Fatalf("requested mode = %q, want %q", resolver.requested, transport.ModeAuto)
+	if discovery.requested != transport.ModeAuto {
+		t.Fatalf("requested mode = %q, want %q", discovery.requested, transport.ModeAuto)
 	}
 
 	if len(devices) != 1 {
@@ -89,7 +76,7 @@ func TestDiscoverDevicesFingerprintTracksTransportAttachment(t *testing.T) {
 		},
 	}
 
-	devices, err := discoverDevices(context.Background(), newFakeDiscoveryResolver(descriptors))
+	devices, err := discoverDevices(context.Background(), newFakeTransportDiscovery(descriptors).discover, transport.ModeAuto)
 	if err != nil {
 		t.Fatalf("DiscoverDevices: %v", err)
 	}
@@ -98,7 +85,7 @@ func TestDiscoverDevicesFingerprintTracksTransportAttachment(t *testing.T) {
 	}
 
 	descriptors[0].Path = "hid://renumbered"
-	repeated, err := discoverDevices(context.Background(), newFakeDiscoveryResolver(descriptors[:1]))
+	repeated, err := discoverDevices(context.Background(), newFakeTransportDiscovery(descriptors[:1]).discover, transport.ModeAuto)
 	if err != nil {
 		t.Fatalf("DiscoverDevices after path change: %v", err)
 	}
@@ -108,23 +95,23 @@ func TestDiscoverDevicesFingerprintTracksTransportAttachment(t *testing.T) {
 }
 
 func TestDiscoverDevicesWithTransportPassesRequestedMode(t *testing.T) {
-	resolver := newFakeDiscoveryResolver([]transport.Descriptor{{
+	discovery := newFakeTransportDiscovery([]transport.Descriptor{{
 		Path:      "hid://one",
 		VendorID:  0x1050,
 		ProductID: 0x0407,
 	}})
 
-	if _, err := discoverDevices(context.Background(), resolver, WithTransport(transport.ModeHID)); err != nil {
+	if _, err := discoverDevices(context.Background(), discovery.discover, transport.ModeHID); err != nil {
 		t.Fatalf("DiscoverDevices: %v", err)
 	}
 
-	if resolver.requested != transport.ModeHID {
-		t.Fatalf("requested mode = %q, want %q", resolver.requested, transport.ModeHID)
+	if discovery.requested != transport.ModeHID {
+		t.Fatalf("requested mode = %q, want %q", discovery.requested, transport.ModeHID)
 	}
 }
 
 func TestSelectDeviceUsesDiscoverySnapshot(t *testing.T) {
-	devices, err := discoverDevices(context.Background(), newFakeDiscoveryResolver([]transport.Descriptor{
+	devices, err := discoverDevices(context.Background(), newFakeTransportDiscovery([]transport.Descriptor{
 		{
 			Path:      "hid://one",
 			Serial:    "12345678",
@@ -136,7 +123,7 @@ func TestSelectDeviceUsesDiscoverySnapshot(t *testing.T) {
 			VendorID:  0x1050,
 			ProductID: 0x0408,
 		},
-	}))
+	}).discover, transport.ModeAuto)
 	if err != nil {
 		t.Fatalf("DiscoverDevices: %v", err)
 	}
@@ -193,11 +180,9 @@ func TestOpenSessionRejectsZeroDevice(t *testing.T) {
 	}
 }
 
-func newFakeDiscoveryResolver(descriptors []transport.Descriptor) *fakeDiscoveryResolver {
-	return &fakeDiscoveryResolver{
-		resolved: transport.ResolvedProvider{
-			Mode:     transport.ModeHID,
-			Provider: &fakeDiscoveryProvider{list: descriptors},
-		},
+func newFakeTransportDiscovery(descriptors []transport.Descriptor) *fakeTransportDiscovery {
+	return &fakeTransportDiscovery{
+		mode: transport.ModeHID,
+		list: descriptors,
 	}
 }

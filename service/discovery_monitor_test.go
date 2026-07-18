@@ -8,64 +8,13 @@ import (
 	"testing"
 	"time"
 
-	ghid "github.com/go-ctap/hid"
+	ctapdiscover "github.com/go-ctap/ctap/discover"
 	ctapkit "github.com/go-ctap/kit"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 )
-
-func TestDiscoveryEventFromHID(t *testing.T) {
-	tests := []struct {
-		name  string
-		event ghid.DeviceEvent
-		want  bool
-	}{
-		{
-			name: "fido",
-			event: ghid.DeviceEvent{
-				Type:       ghid.DeviceEventConnected,
-				DeviceInfo: &ghid.DeviceInfo{UsagePage: fidoUsagePage, Usage: fidoUsage},
-			},
-			want: true,
-		},
-		{
-			name: "non fido",
-			event: ghid.DeviceEvent{
-				Type:       ghid.DeviceEventConnected,
-				DeviceInfo: &ghid.DeviceInfo{UsagePage: 1, Usage: 2},
-			},
-		},
-		{
-			name: "partial metadata",
-			event: ghid.DeviceEvent{
-				Type:       ghid.DeviceEventDisconnected,
-				DeviceInfo: &ghid.DeviceInfo{Path: "hid://one"},
-				Err:        errors.New("metadata unavailable"),
-			},
-			want: true,
-		},
-		{
-			name:  "missing metadata",
-			event: ghid.DeviceEvent{Type: ghid.DeviceEventDisconnected},
-			want:  true,
-		},
-		{
-			name:  "unknown event",
-			event: ghid.DeviceEvent{Type: "changed"},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			got := isFIDOEvent(test.event)
-			if got != test.want {
-				t.Fatalf("accepted = %v, want %v", got, test.want)
-			}
-		})
-	}
-}
 
 func TestTopologyReconciliationClosesOnlyMissingSession(t *testing.T) {
 	firstDevice := testDevice("hid://one", "serial-1")
@@ -97,7 +46,7 @@ func TestDiscoverUsesReconcilerForExistingSessions(t *testing.T) {
 	runtime := &fakeSessionRuntime{info: model.SessionInfo{Device: device}}
 	service := New()
 	service.sessions["session-1"] = managedTestSession("session-1", device, runtime)
-	service.scanDevices = func(context.Context, ...ctapkit.DiscoverOption) ([]ctapkit.Device, error) {
+	service.scanDevices = func(context.Context, transport.Mode) ([]ctapkit.Device, error) {
 		return nil, nil
 	}
 
@@ -114,7 +63,7 @@ func TestRefreshDiscoveryPublishesFailureAndRetainsMode(t *testing.T) {
 	emitter := &recordingEmitter{events: make(chan DiscoveryChangedEnvelope, 1)}
 	service := New(WithEventEmitter(emitter))
 	service.lastDiscoverMode = transport.ModeHID
-	service.scanDevices = func(context.Context, ...ctapkit.DiscoverOption) ([]ctapkit.Device, error) {
+	service.scanDevices = func(context.Context, transport.Mode) ([]ctapkit.Device, error) {
 		return nil, failure.New(
 			failure.CodeTransportFailure,
 			failure.WithPhase(failure.PhaseDiscovery),
@@ -168,7 +117,7 @@ func TestDiscoveryEventFollowsOperationCancellation(t *testing.T) {
 		})
 	}
 	service.operations[operationID] = operation
-	service.scanDevices = func(context.Context, ...ctapkit.DiscoverOption) ([]ctapkit.Device, error) {
+	service.scanDevices = func(context.Context, transport.Mode) ([]ctapkit.Device, error) {
 		return nil, nil
 	}
 
@@ -192,16 +141,16 @@ func TestDiscoveryEventFollowsOperationCancellation(t *testing.T) {
 	}
 }
 
-func TestDiscoveryMonitorCoalescesHIDBurst(t *testing.T) {
-	receiver := &fakeDiscoveryReceiver{events: make(chan ghid.DeviceEvent, 8)}
+func TestDiscoveryMonitorCoalescesEventBurst(t *testing.T) {
+	monitor := newFakeDiscoveryMonitor()
 	service := New()
 	var opens atomic.Int32
-	service.openMonitor = func() (ghid.EventReceiver, error) {
+	service.openMonitor = func(ctx context.Context, _ transport.Mode) (<-chan ctapdiscover.Event, error) {
 		opens.Add(1)
-		return receiver, nil
+		return monitor.open(ctx), nil
 	}
 	scans := make(chan struct{}, 8)
-	service.scanDevices = func(context.Context, ...ctapkit.DiscoverOption) ([]ctapkit.Device, error) {
+	service.scanDevices = func(context.Context, transport.Mode) ([]ctapkit.Device, error) {
 		scans <- struct{}{}
 		return nil, nil
 	}
@@ -217,22 +166,83 @@ func TestDiscoveryMonitorCoalescesHIDBurst(t *testing.T) {
 	}
 	waitForScan(t, scans)
 
-	info := &ghid.DeviceInfo{Path: "hid://one", UsagePage: fidoUsagePage, Usage: fidoUsage}
-	receiver.events <- ghid.DeviceEvent{Type: ghid.DeviceEventConnected, DeviceInfo: info}
-	receiver.events <- ghid.DeviceEvent{Type: ghid.DeviceEventDisconnected, DeviceInfo: info}
-	receiver.events <- ghid.DeviceEvent{Type: ghid.DeviceEventConnected, DeviceInfo: info}
+	monitor.events <- ctapdiscover.Event{}
+	monitor.events <- ctapdiscover.Event{}
+	monitor.events <- ctapdiscover.Event{}
 	waitForScan(t, scans)
 	select {
 	case <-scans:
-		t.Fatal("HID burst caused more than one rescan")
+		t.Fatal("discovery burst caused more than one rescan")
 	case <-time.After(2 * discoveryEventSettleTime):
 	}
 
 	if err := service.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
-	if !receiver.isClosed() {
-		t.Fatal("HID receiver was not closed")
+	if !monitor.isCanceled() {
+		t.Fatal("discovery monitor context was not canceled")
+	}
+}
+
+func TestDiscoveryMonitorOutlivesStartContext(t *testing.T) {
+	monitor := newFakeDiscoveryMonitor()
+	service := New()
+	service.openMonitor = func(ctx context.Context, _ transport.Mode) (<-chan ctapdiscover.Event, error) {
+		return monitor.open(ctx), nil
+	}
+	scans := make(chan struct{}, 2)
+	service.scanDevices = func(context.Context, transport.Mode) ([]ctapkit.Device, error) {
+		scans <- struct{}{}
+		return nil, nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	if err := service.StartDiscoveryMonitoring(ctx); err != nil {
+		t.Fatalf("StartDiscoveryMonitoring: %v", err)
+	}
+	waitForScan(t, scans)
+	cancel()
+
+	monitor.events <- ctapdiscover.Event{}
+	waitForScan(t, scans)
+	if monitor.isCanceled() {
+		t.Fatal("caller context stopped the persistent discovery monitor")
+	}
+
+	if err := service.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+}
+
+func TestDiscoveryMonitorPublishesSourceFailure(t *testing.T) {
+	monitor := newFakeDiscoveryMonitor()
+	emitter := &recordingEmitter{events: make(chan DiscoveryChangedEnvelope, 1)}
+	service := New(WithEventEmitter(emitter))
+	service.openMonitor = func(ctx context.Context, _ transport.Mode) (<-chan ctapdiscover.Event, error) {
+		return monitor.open(ctx), nil
+	}
+	service.scanDevices = func(context.Context, transport.Mode) ([]ctapkit.Device, error) {
+		return nil, nil
+	}
+
+	if err := service.StartDiscoveryMonitoring(context.Background()); err != nil {
+		t.Fatalf("StartDiscoveryMonitoring: %v", err)
+	}
+	monitor.events <- ctapdiscover.Event{Err: errors.New("monitor unavailable")}
+
+	select {
+	case emitted := <-emitter.events:
+		if emitted.Trigger != DiscoveryTriggerHotplug || emitted.Snapshot != nil ||
+			emitted.Error == nil || emitted.Error.Code != failure.CodeTransportFailure ||
+			emitted.Error.Phase != failure.PhaseDiscovery {
+			t.Fatalf("monitor failure envelope = %#v", emitted)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("monitor failure event was not emitted")
+	}
+
+	if err := service.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
 	}
 }
 
@@ -315,26 +325,25 @@ func (f eventEmitterFunc) Emit(name string, payload any) {
 	f(name, payload)
 }
 
-type fakeDiscoveryReceiver struct {
-	events chan ghid.DeviceEvent
-	once   sync.Once
-	closed atomic.Bool
+type fakeDiscoveryMonitor struct {
+	ctx    context.Context
+	events chan ctapdiscover.Event
 }
 
-func (r *fakeDiscoveryReceiver) Listen() <-chan ghid.DeviceEvent {
-	return r.events
+func newFakeDiscoveryMonitor() *fakeDiscoveryMonitor {
+	return &fakeDiscoveryMonitor{
+		events: make(chan ctapdiscover.Event, 8),
+	}
 }
 
-func (r *fakeDiscoveryReceiver) Close() error {
-	r.once.Do(func() {
-		r.closed.Store(true)
-		close(r.events)
-	})
-	return nil
+func (m *fakeDiscoveryMonitor) open(ctx context.Context) <-chan ctapdiscover.Event {
+	m.ctx = ctx
+
+	return m.events
 }
 
-func (r *fakeDiscoveryReceiver) isClosed() bool {
-	return r.closed.Load()
+func (m *fakeDiscoveryMonitor) isCanceled() bool {
+	return m.ctx != nil && m.ctx.Err() != nil
 }
 
 type fakeSessionRuntime struct {

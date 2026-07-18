@@ -19,23 +19,9 @@ type Device struct {
 	valid  bool
 }
 
-// DiscoverOption configures device discovery.
-type DiscoverOption func(*discoverConfig)
-
-type discoverConfig struct {
-	mode transport.Mode
-}
-
-// WithTransport overrides the default automatic transport policy for discovery.
-func WithTransport(mode transport.Mode) DiscoverOption {
-	return func(config *discoverConfig) {
-		config.mode = mode
-	}
-}
-
 // DiscoverDevices returns authenticators reachable through the configured transport policy.
-func DiscoverDevices(ctx context.Context, opts ...DiscoverOption) ([]Device, error) {
-	return discoverDevices(ctx, transport.NewDefaultResolver(), opts...)
+func DiscoverDevices(ctx context.Context, mode transport.Mode) ([]Device, error) {
+	return discoverDevices(ctx, transport.Discover, mode)
 }
 
 // SelectDevice resolves a user-facing selector against one discovery snapshot.
@@ -77,28 +63,20 @@ func (d Device) Report() report.DeviceReport {
 	return d.report
 }
 
-func discoverDevices(ctx context.Context, resolver transport.ProviderResolver, opts ...DiscoverOption) ([]Device, error) {
-	config := &discoverConfig{
-		mode: transport.ModeAuto,
-	}
-	for _, opt := range opts {
-		if opt != nil {
-			opt(config)
-		}
+type discoverTransportFunc func(context.Context, transport.Mode) (transport.Mode, []transport.Descriptor, error)
+
+func discoverDevices(ctx context.Context, discover discoverTransportFunc, mode transport.Mode) ([]Device, error) {
+	if mode == "" {
+		mode = transport.ModeAuto
 	}
 
-	resolved, err := resolver.Resolve(ctx, config.mode)
-	if err != nil {
-		return nil, err
-	}
-
-	descriptors, err := resolved.Provider.List(ctx)
+	mode, descriptors, err := discover(ctx, mode)
 	if err != nil {
 		return nil, err
 	}
 
 	return lo.Map(descriptors, func(descriptor transport.Descriptor, index int) Device {
-		return newDevice(index, resolved.Mode, descriptor)
+		return newDevice(index, mode, descriptor)
 	}), nil
 }
 

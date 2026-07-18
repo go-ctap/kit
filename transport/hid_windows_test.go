@@ -3,87 +3,42 @@
 package transport
 
 import (
-	"context"
-	"errors"
 	"testing"
 
 	"github.com/go-ctap/kit/model/failure"
 )
 
-type fakeProvider struct {
-	checkErr   error
-	list       []Descriptor
-	listErr    error
-	checkCount int
-}
-
-func (f *fakeProvider) Check(context.Context) error {
-	f.checkCount++
-
-	return f.checkErr
-}
-
-func (f *fakeProvider) List(context.Context) ([]Descriptor, error) {
-	return f.list, f.listErr
-}
-
-func TestTransportPolicyAutoElevated(t *testing.T) {
-	hid := &fakeProvider{}
-	proxy := &fakeProvider{}
-	resolver := windowsPolicy{hid: hid, proxy: proxy, isElevated: func() bool { return true }}
-
-	resolved, err := resolver.Resolve(context.Background(), ModeAuto)
-	if err != nil {
-		t.Fatalf("Resolve(auto,elevated): %v", err)
+func TestResolveWindowsMode(t *testing.T) {
+	tests := []struct {
+		name      string
+		requested Mode
+		elevated  bool
+		want      Mode
+		wantErr   bool
+	}{
+		{name: "auto elevated", requested: ModeAuto, elevated: true, want: ModeHID},
+		{name: "auto unelevated", requested: ModeAuto, want: ModeWindowsProxy},
+		{name: "explicit HID", requested: ModeHID, want: ModeHID},
+		{name: "explicit proxy", requested: ModeWindowsProxy, want: ModeWindowsProxy},
+		{name: "unsupported", requested: "nfc", wantErr: true},
 	}
 
-	if resolved.Mode != ModeHID {
-		t.Fatalf("resolved mode = %q, want %q", resolved.Mode, ModeHID)
-	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := resolveWindowsMode(test.requested, test.elevated)
+			if test.wantErr {
+				if !failure.IsCode(err, failure.CodeTransportModeUnsupported) {
+					t.Fatalf("resolve error = %v, want %s", err, failure.CodeTransportModeUnsupported)
+				}
 
-	if resolved.Provider != hid {
-		t.Fatalf("expected HID provider to be selected")
-	}
-
-	if proxy.checkCount != 0 {
-		t.Fatalf("proxy check count = %d, want 0", proxy.checkCount)
-	}
-}
-
-func TestTransportPolicyAutoProxyFallback(t *testing.T) {
-	hid := &fakeProvider{}
-	proxy := &fakeProvider{}
-	resolver := windowsPolicy{hid: hid, proxy: proxy, isElevated: func() bool { return false }}
-
-	resolved, err := resolver.Resolve(context.Background(), ModeAuto)
-	if err != nil {
-		t.Fatalf("Resolve(auto,unelevated): %v", err)
-	}
-
-	if resolved.Mode != ModeWindowsProxy {
-		t.Fatalf("resolved mode = %q, want %q", resolved.Mode, ModeWindowsProxy)
-	}
-
-	if resolved.Provider != proxy {
-		t.Fatalf("expected proxy provider to be selected")
-	}
-
-	if proxy.checkCount != 1 {
-		t.Fatalf("proxy check count = %d, want 1", proxy.checkCount)
-	}
-}
-
-func TestTransportPolicyProxyUnavailable(t *testing.T) {
-	hid := &fakeProvider{}
-	proxy := &fakeProvider{checkErr: errors.New("pipe unavailable")}
-	resolver := windowsPolicy{hid: hid, proxy: proxy, isElevated: func() bool { return false }}
-
-	_, err := resolver.Resolve(context.Background(), ModeAuto)
-	if err == nil {
-		t.Fatal("Resolve(auto,proxy unavailable) returned nil error")
-	}
-
-	if !failure.IsCode(err, failure.CodeTransportProxyUnavailable) {
-		t.Fatalf("Resolve error = %v, want %s", err, failure.CodeTransportProxyUnavailable)
+				return
+			}
+			if err != nil {
+				t.Fatalf("resolve mode: %v", err)
+			}
+			if got != test.want {
+				t.Fatalf("resolved mode = %q, want %q", got, test.want)
+			}
+		})
 	}
 }

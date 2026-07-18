@@ -103,7 +103,7 @@ func (s *Service) updateDiscovery(
 	s.mu.Unlock()
 	previousReports := s.deviceReportsWithMetadata(previousDevices)
 
-	devices, scanErr := s.scanDevices(ctx, discoverOptions(req)...)
+	devices, scanErr := s.scanDevices(ctx, normalizedDiscoverMode(req.Mode))
 	if ctxErr := ctx.Err(); scanErr != nil && ctxErr != nil {
 		return result, normalizeServicePhaseError(ctxErr, failure.PhaseDiscovery)
 	}

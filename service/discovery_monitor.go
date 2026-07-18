@@ -4,7 +4,9 @@ import (
 	"context"
 	"time"
 
-	ghid "github.com/go-ctap/hid"
+	ctapdiscover "github.com/go-ctap/ctap/discover"
+	kitlog "github.com/go-ctap/kit/internal/logging"
+	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
 )
 
@@ -20,47 +22,58 @@ func (s *Service) StartDiscoveryMonitoring(ctx context.Context) error {
 		s.mu.Unlock()
 		return closedServiceError(failure.PhaseDiscovery)
 	}
-	if s.monitor != nil {
+	if s.monitorCancel != nil {
 		s.mu.Unlock()
 		return nil
 	}
 	s.mu.Unlock()
 
-	receiver, err := s.openMonitor()
+	monitorCtx, monitorCancel := context.WithCancel(context.Background())
+	stopCancelOnCallerDone := context.AfterFunc(ctx, monitorCancel)
+	events, err := s.openMonitor(monitorCtx, s.currentDiscoverRequest().Mode)
+	stopCancelOnCallerDone()
 	if err != nil {
-		return failure.Wrap(
-			failure.CodeTransportFailure,
-			err,
-			failure.WithPhase(failure.PhaseDiscovery),
-		)
+		monitorCancel()
+		if ctx.Err() != nil {
+			return normalizeServicePhaseError(ctx.Err(), failure.PhaseDiscovery)
+		}
+
+		return normalizeServicePhaseError(err, failure.PhaseDiscovery)
+	}
+	if err := ctx.Err(); err != nil {
+		monitorCancel()
+
+		return normalizeServicePhaseError(err, failure.PhaseDiscovery)
 	}
 	done := make(chan struct{})
 
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
-		_ = receiver.Close()
+		monitorCancel()
 
 		return closedServiceError(failure.PhaseDiscovery)
 	}
-	if s.monitor != nil {
+	if s.monitorCancel != nil {
 		s.mu.Unlock()
-		_ = receiver.Close()
+		monitorCancel()
 
 		return nil
 	}
-	s.monitor = receiver
+	s.monitorCancel = monitorCancel
 	s.monitorDone = done
-	go s.runDiscoveryMonitor(receiver, done)
+	go s.runDiscoveryMonitor(monitorCtx, monitorCancel, events, done)
 	s.mu.Unlock()
 
 	reconcileErr := s.reconcileTopology(ctx, s.currentDiscoverRequest(), DiscoveryTriggerMonitor, false)
 	if reconcileErr != nil {
 		s.mu.Lock()
-		s.monitor = nil
-		s.monitorDone = nil
+		if s.monitorDone == done {
+			s.monitorCancel = nil
+			s.monitorDone = nil
+		}
 		s.mu.Unlock()
-		_ = receiver.Close()
+		monitorCancel()
 		<-done
 
 		return reconcileErr
@@ -69,10 +82,24 @@ func (s *Service) StartDiscoveryMonitoring(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) runDiscoveryMonitor(receiver ghid.EventReceiver, done chan<- struct{}) {
-	defer close(done)
+func (s *Service) runDiscoveryMonitor(
+	ctx context.Context,
+	cancel context.CancelFunc,
+	events <-chan ctapdiscover.Event,
+	done chan struct{},
+) {
+	defer func() {
+		close(done)
 
-	events := receiver.Listen()
+		s.mu.Lock()
+		if s.monitorDone == done {
+			s.monitorCancel = nil
+			s.monitorDone = nil
+		}
+		s.mu.Unlock()
+	}()
+	defer cancel()
+
 	var timer *time.Timer
 	var timerC <-chan time.Time
 	pending := false
@@ -96,17 +123,21 @@ func (s *Service) runDiscoveryMonitor(receiver ghid.EventReceiver, done chan<- s
 		}
 
 		pending = false
-		_ = s.reconcileTopology(context.Background(), s.currentDiscoverRequest(), DiscoveryTriggerHotplug, false)
+		_ = s.reconcileTopology(ctx, s.currentDiscoverRequest(), DiscoveryTriggerHotplug, false)
 	}
 
 	for {
 		select {
-		case hidEvent, ok := <-events:
+		case <-ctx.Done():
+			return
+		case event, ok := <-events:
 			if !ok {
 				return
 			}
-			if !isFIDOEvent(hidEvent) {
-				continue
+			if event.Err != nil {
+				s.emitDiscoveryMonitorFailure(event.Err)
+
+				return
 			}
 
 			pending = true
@@ -124,25 +155,26 @@ func (s *Service) runDiscoveryMonitor(receiver ghid.EventReceiver, done chan<- s
 	}
 }
 
-const (
-	fidoUsagePage uint16 = 0xf1d0
-	fidoUsage     uint16 = 0x01
-)
-
-func isFIDOEvent(event ghid.DeviceEvent) bool {
-	if event.Type != ghid.DeviceEventConnected && event.Type != ghid.DeviceEventDisconnected {
-		return false
+func (s *Service) emitDiscoveryMonitorFailure(err error) {
+	monitorErr := failure.Wrap(
+		failure.CodeTransportFailure,
+		err,
+		failure.WithPhase(failure.PhaseDiscovery),
+	)
+	envelope := DiscoveryChangedEnvelope{
+		Trigger: DiscoveryTriggerHotplug,
+		Error:   failure.Snapshot(monitorErr),
 	}
+	s.emit(EventDiscoveryChanged, envelope)
 
-	if event.DeviceInfo == nil {
-		return true
-	}
-
-	info := event.DeviceInfo
-	if (info.UsagePage != 0 && info.UsagePage != fidoUsagePage) ||
-		(info.Usage != 0 && info.Usage != fidoUsage) {
-		return false
-	}
-
-	return true
+	s.logs.Append(model.LogEntry{
+		Timestamp:    time.Now().UTC(),
+		Layer:        model.LogLayerService,
+		Level:        model.LogLevelError,
+		Outcome:      model.LogOutcomeFailed,
+		Code:         model.LogCodeDiscoveryChanged,
+		Params:       map[string]string{"trigger": string(DiscoveryTriggerHotplug)},
+		Error:        envelope.Error,
+		ErrorMessage: kitlog.TransportErrorMessage(monitorErr),
+	})
 }

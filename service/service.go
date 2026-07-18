@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	ghid "github.com/go-ctap/hid"
+	ctapdiscover "github.com/go-ctap/ctap/discover"
 	ctapkit "github.com/go-ctap/kit"
 	kitlog "github.com/go-ctap/kit/internal/logging"
 	"github.com/go-ctap/kit/model"
@@ -28,10 +28,10 @@ type Service struct {
 	strictPermissions bool
 	closed            bool
 	lastDiscoverMode  transport.Mode
-	monitor           ghid.EventReceiver
+	monitorCancel     context.CancelFunc
 	monitorDone       chan struct{}
-	scanDevices       func(context.Context, ...ctapkit.DiscoverOption) ([]ctapkit.Device, error)
-	openMonitor       func() (ghid.EventReceiver, error)
+	scanDevices       func(context.Context, transport.Mode) ([]ctapkit.Device, error)
+	openMonitor       func(context.Context, transport.Mode) (<-chan ctapdiscover.Event, error)
 	enrichment        discoveryEnrichment
 
 	devices      []ctapkit.Device
@@ -75,7 +75,7 @@ func New(opts ...Option) *Service {
 		interactions:     make(map[InteractionID]*pendingInteraction),
 		lastDiscoverMode: transport.ModeAuto,
 		scanDevices:      ctapkit.DiscoverDevices,
-		openMonitor:      ghid.Events,
+		openMonitor:      transport.Events,
 		enrichment:       newDiscoveryEnrichment(),
 		logs:             ctapkit.NewLogJournal(),
 	}
@@ -107,11 +107,11 @@ func (s *Service) Close() error {
 		return nil
 	}
 	s.closed = true
-	receiver := s.monitor
+	monitorCancel := s.monitorCancel
 	monitorDone := s.monitorDone
 	enrichmentCancel := s.enrichment.cancel
 	enrichmentDone := s.enrichment.done
-	s.monitor = nil
+	s.monitorCancel = nil
 	s.monitorDone = nil
 
 	sessions := make([]*managedSession, 0, len(s.sessions))
@@ -133,14 +133,8 @@ func (s *Service) Close() error {
 	}
 
 	var cleanupErr error
-	if receiver != nil {
-		if err := receiver.Close(); err != nil {
-			cleanupErr = failure.Wrap(
-				failure.CodeTransportFailure,
-				err,
-				failure.WithPhase(failure.PhaseCleanup),
-			)
-		}
+	if monitorCancel != nil {
+		monitorCancel()
 	}
 	if monitorDone != nil {
 		<-monitorDone
@@ -776,14 +770,6 @@ func (h interactionHandler) RequestInteraction(req model.InteractionRequest) (an
 
 		return model.InteractionResponse{}, err
 	}
-}
-
-func discoverOptions(req DiscoverRequest) []ctapkit.DiscoverOption {
-	if req.Mode == "" || req.Mode == transport.ModeAuto {
-		return nil
-	}
-
-	return []ctapkit.DiscoverOption{ctapkit.WithTransport(req.Mode)}
 }
 
 func runOptions(verificationFlow model.VerificationFlow) []ctapkit.RunOption {

@@ -99,7 +99,6 @@ func openContractSessionWithOptions(
 
 func newContractDevice() Device {
 	return newDevice(0, transport.ModeHID, transport.Descriptor{
-		Transport: transport.ModeHID,
 		Path:      "contract-path",
 		VendorID:  1,
 		ProductID: 2,
