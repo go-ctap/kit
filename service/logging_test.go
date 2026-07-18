@@ -5,20 +5,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
-	"slices"
 	"strings"
 	"sync"
 	"testing"
 
 	ctaptransport "github.com/go-ctap/ctap/transport"
-	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
 	ctapkit "github.com/go-ctap/kit"
-	kitlog "github.com/go-ctap/kit/internal/logging"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
-	"github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/report"
-	appwebauthn "github.com/go-ctap/kit/model/webauthn"
 )
 
 func TestInvalidSelectionOperationAppendsCompletedEntry(t *testing.T) {
@@ -45,12 +40,12 @@ func TestInvalidSelectionOperationAppendsCompletedEntry(t *testing.T) {
 		t.Fatalf("log correlation = %#v, envelope operation ID = %q", entry, envelope.OperationID)
 	}
 
-	if entry.Response == nil || !json.Valid([]byte(entry.Response.JSON)) {
-		t.Fatalf("response payload = %#v", entry.Response)
+	if entry.Request != nil || entry.Response != nil {
+		t.Fatalf("service payloads = request %#v, response %#v", entry.Request, entry.Response)
 	}
 }
 
-func TestOperationLoggingRedactsPINAndConfirmation(t *testing.T) {
+func TestOperationLoggingOmitsPayloadsAndSecrets(t *testing.T) {
 	const (
 		currentPIN   = "sentinel-current-pin-1182"
 		newPIN       = "sentinel-new-pin-9921"
@@ -72,21 +67,23 @@ func TestOperationLoggingRedactsPINAndConfirmation(t *testing.T) {
 		t.Fatalf("ChangePIN: %v", err)
 	}
 
-	raw, err := json.Marshal(serviceLogs(t, service))
+	logs := serviceLogs(t, service)
+	if len(logs) != 1 {
+		t.Fatalf("operation logs = %#v", logs)
+	}
+	entry := logs[0].Entry
+	if entry.Request != nil || entry.Response != nil || len(entry.RedactedFields) != 0 {
+		t.Fatalf("service payload metadata = %#v", entry)
+	}
+
+	raw, err := json.Marshal(logs)
 	if err != nil {
 		t.Fatalf("Marshal logs: %v", err)
 	}
-
 	serialized := string(raw)
 	for _, secret := range []string{currentPIN, newPIN, confirmation} {
 		if strings.Contains(serialized, secret) || strings.Contains(serialized, base64.StdEncoding.EncodeToString([]byte(secret))) {
 			t.Fatalf("logs contain %q: %s", secret, serialized)
-		}
-	}
-
-	for _, field := range []string{"request.input.currentPIN", "request.input.newPIN", "request.input.confirmed", "request.input.confirmationMessage"} {
-		if !strings.Contains(serialized, field) {
-			t.Fatalf("logs do not record redacted field %q: %s", field, serialized)
 		}
 	}
 }
@@ -186,141 +183,6 @@ func TestSelectionLifecycleLoggingAppendsCompletedEntries(t *testing.T) {
 	}
 }
 
-func TestOperationLogEncoderNeverSerializesPrivateWebAuthnOrLargeBlobData(t *testing.T) {
-	secrets := []string{
-		"sentinel-credential-blob-9182",
-		"sentinel-hmac-salt-1827",
-		"sentinel-prf-input-8271",
-		"sentinel-hmac-output-7711",
-		"sentinel-prf-output-6612",
-		"sentinel-large-blob-payload-5004",
-		"sentinel-large-blob-decoded-2910",
-		"sentinel-credential-blob-output-2801",
-	}
-	makeInput := appwebauthn.MakeCredentialInput{Extensions: &ctapwebauthn.CreateAuthenticationExtensionsClientInputs{
-		CreateCredentialBlobInputs: &ctapwebauthn.CreateCredentialBlobInputs{CredBlob: []byte(secrets[0])},
-		CreateHMACSecretMCInputs: &ctapwebauthn.CreateHMACSecretMCInputs{HMACGetSecret: ctapwebauthn.HMACGetSecretInput{
-			Salt1: []byte(secrets[1]),
-		}},
-		PRFInputs: &ctapwebauthn.PRFInputs{PRF: ctapwebauthn.AuthenticationExtensionsPRFInputs{
-			Eval: ctapwebauthn.AuthenticationExtensionsPRFValues{First: []byte(secrets[2])},
-		}},
-		CreateHMACSecretInputs: &ctapwebauthn.CreateHMACSecretInputs{HMACCreateSecret: true},
-	}}
-	request := operationRequestLogValue(OperationRequest{SelectionID: "selection-1"}, model.MakeCredentialOperation{
-		MakeCredentialInput: makeInput,
-	})
-	makeOutput := model.MakeCredentialOutput{
-		Preview: appwebauthn.MakeCredentialPreview{Input: makeInput},
-		Result: &appwebauthn.MakeCredentialResult{
-			AuthenticatorDataHex:     secrets[3],
-			AttestationObjectCBORHex: secrets[4],
-			ExtensionResults: &appwebauthn.MakeCredentialExtensionResults{
-				Client: &appwebauthn.MakeCredentialClientExtensionResults{
-					HMACSecretMC: &appwebauthn.HMACSecretOutput{Output1Hex: secrets[3]},
-					PRF: &appwebauthn.MakeCredentialPRFOutput{
-						Enabled: true,
-						Results: ctapwebauthn.AuthenticationExtensionsPRFValues{First: []byte(secrets[4])},
-					},
-				},
-			}},
-	}
-	response := operationEnvelopeLogValue(operationEnvelope{Result: makeOutput})
-	getInput := appwebauthn.GetAssertionInput{Extensions: &ctapwebauthn.GetAuthenticationExtensionsClientInputs{
-		GetHMACSecretInputs: &ctapwebauthn.GetHMACSecretInputs{HMACGetSecret: ctapwebauthn.HMACGetSecretInput{
-			Salt1: []byte(secrets[1]),
-		}},
-		PRFInputs: &ctapwebauthn.PRFInputs{PRF: ctapwebauthn.AuthenticationExtensionsPRFInputs{
-			Eval: ctapwebauthn.AuthenticationExtensionsPRFValues{First: []byte(secrets[2])},
-		}},
-	}}
-	getRequest := operationRequestLogValue(OperationRequest{SelectionID: "selection-1"}, model.GetAssertionOperation{
-		GetAssertionInput: getInput,
-	})
-	getResponse := operationEnvelopeLogValue(operationEnvelope{Result: model.GetAssertionOutput{
-		Preview: appwebauthn.GetAssertionPreview{Input: getInput},
-		Result: &appwebauthn.GetAssertionResult{Assertions: []appwebauthn.Assertion{{
-			AuthenticatorDataHex: secrets[3],
-			ExtensionResults: &appwebauthn.GetAssertionExtensionResults{
-				Client: &appwebauthn.GetAssertionClientExtensionResults{
-					CredentialBlob: &appwebauthn.CredentialBlobGetOutput{ValueHex: secrets[7]},
-					HMACSecret:     &appwebauthn.HMACSecretOutput{Output1Hex: secrets[3]},
-					PRF: &appwebauthn.GetAssertionPRFOutput{
-						Results: ctapwebauthn.AuthenticationExtensionsPRFValues{First: []byte(secrets[4])},
-					},
-				},
-			},
-		}},
-		}}})
-
-	largeBlobRequest := operationRequestLogValue(OperationRequest{SelectionID: "selection-1"}, model.WriteLargeBlobOperation{
-		Payload: []byte(secrets[5]),
-	})
-	largeBlobResponse := operationEnvelopeLogValue(operationEnvelope{Result: model.LargeBlobReadOutput{
-		Report: largeblobs.ReadReport{
-			RawHex:       secrets[5],
-			RawByteCount: len(secrets[5]),
-			Decode: largeblobs.DecodeStatus{
-				Success:      true,
-				DecodedText:  secrets[6],
-				DecodedValue: map[string]string{"private": secrets[6]},
-			},
-		},
-	}})
-
-	entries := []model.LogEntry{
-		{
-			Request:        kitlog.Payload(request),
-			Response:       kitlog.Payload(response),
-			RedactedFields: slices.Concat(request.RedactedFields, response.RedactedFields),
-		},
-		{
-			Request:        kitlog.Payload(getRequest),
-			Response:       kitlog.Payload(getResponse),
-			RedactedFields: slices.Concat(getRequest.RedactedFields, getResponse.RedactedFields),
-		},
-		{
-			Request:        kitlog.Payload(largeBlobRequest),
-			Response:       kitlog.Payload(largeBlobResponse),
-			RedactedFields: slices.Concat(largeBlobRequest.RedactedFields, largeBlobResponse.RedactedFields),
-		},
-	}
-
-	raw, err := json.Marshal(entries)
-	if err != nil {
-		t.Fatalf("Marshal envelopes: %v", err)
-	}
-
-	serialized := string(raw)
-	for _, secret := range secrets {
-		if strings.Contains(serialized, secret) || strings.Contains(serialized, base64.StdEncoding.EncodeToString([]byte(secret))) {
-			t.Fatalf("log envelopes contain private value %q: %s", secret, serialized)
-		}
-	}
-
-	for _, field := range []string{
-		"request.input.extensions.credBlob",
-		"request.input.extensions.hmacGetSecret",
-		"request.input.extensions.prf",
-		"response.result.result.authenticatorDataHex",
-		"response.result.result.attestationObjectCBORHex",
-		"response.result.result.extensionResults.client.hmac-secret-mc",
-		"response.result.result.extensionResults.client.prf",
-		"response.result.result.assertions.0.authenticatorDataHex",
-		"response.result.result.assertions.0.extensionResults.client.getCredBlob.valueHex",
-		"request.input.payload",
-		"response.result.report.rawHex",
-		"response.result.report.decode.decodedText",
-		"response.result.report.decode.decodedValue",
-	} {
-		if !strings.Contains(serialized, field) {
-			t.Fatalf("log envelopes do not record redacted field %q: %s", field, serialized)
-		}
-	}
-}
-
-func boolPointer(value bool) *bool { return &value }
-
 func TestProgressLoggingDoesNotDuplicateOperationEvent(t *testing.T) {
 	emitter := newCountingLogEmitter()
 	service := New(WithEventEmitter(emitter))
@@ -348,10 +210,8 @@ func TestProgressLoggingDoesNotDuplicateOperationEvent(t *testing.T) {
 	}
 }
 
-func TestInteractionLoggingAppendsCompletedEntriesWithoutDuplicatePrompt(t *testing.T) {
+func TestInteractionLoggingAppendsMetadataOnlyEntriesWithoutDuplicatePrompt(t *testing.T) {
 	const sentinelPIN = "sentinel-interaction-pin-8301"
-	retriesRemaining := uint(6)
-	powerCycleState := false
 	emitter := newCountingLogEmitter()
 	service := New(WithEventEmitter(emitter))
 	done := make(chan struct{})
@@ -373,17 +233,7 @@ func TestInteractionLoggingAppendsCompletedEntriesWithoutDuplicatePrompt(t *test
 
 	result := make(chan error, 1)
 	go func() {
-		_, err := handler.RequestInteraction(model.InteractionRequest{
-			Kind: model.InteractionKindPIN,
-			PINState: &model.PINInteractionState{
-				Failure: failure.Snapshot(failure.New(
-					failure.CodePINInvalid,
-					failure.WithPhase(failure.PhaseTokenAcquisition),
-				)),
-				RetriesRemaining: &retriesRemaining,
-				PowerCycleState:  &powerCycleState,
-			},
-		})
+		_, err := handler.RequestInteraction(model.InteractionRequest{Kind: model.InteractionKindPIN})
 		result <- err
 	}()
 	prompt := <-emitter.prompts
@@ -412,74 +262,26 @@ func TestInteractionLoggingAppendsCompletedEntriesWithoutDuplicatePrompt(t *test
 		if record.Entry.SelectionID != "selection-1" || record.Entry.OperationID != "operation-1" {
 			t.Fatalf("interaction correlation = %#v", record.Entry)
 		}
+		if record.Entry.Request != nil || record.Entry.Response != nil || len(record.Entry.RedactedFields) != 0 {
+			t.Fatalf("interaction payload metadata = %#v", record.Entry)
+		}
 	}
 
 	requestEntry := logs[0].Entry
 	if requestEntry.Code != model.LogCodeInteractionRequest ||
 		requestEntry.Level != model.LogLevelInfo ||
-		requestEntry.Outcome != model.LogOutcomeSucceeded {
+		requestEntry.Outcome != model.LogOutcomeSucceeded ||
+		requestEntry.Params["interactionKind"] != string(model.InteractionKindPIN) ||
+		requestEntry.Params["interactionId"] != string(prompt.InteractionID) {
 		t.Fatalf("interaction request log = %#v", requestEntry)
-	}
-
-	if requestEntry.Request == nil {
-		t.Fatal("retry interaction request = nil")
-	}
-
-	var loggedRequest model.InteractionRequest
-	if err := json.Unmarshal([]byte(requestEntry.Request.JSON), &loggedRequest); err != nil {
-		t.Fatalf("decode retry interaction request: %v", err)
-	}
-
-	if loggedRequest.PINState == nil ||
-		loggedRequest.PINState.Failure == nil || loggedRequest.PINState.Failure.Code != failure.CodePINInvalid ||
-		loggedRequest.PINState.RetriesRemaining == nil || *loggedRequest.PINState.RetriesRemaining != 6 ||
-		loggedRequest.PINState.PowerCycleState == nil || *loggedRequest.PINState.PowerCycleState {
-		t.Fatalf("retry interaction request = %#v", loggedRequest)
 	}
 
 	raw, err := json.Marshal(logs)
 	if err != nil {
 		t.Fatalf("Marshal logs: %v", err)
 	}
-
 	if strings.Contains(string(raw), sentinelPIN) || strings.Contains(string(raw), base64.StdEncoding.EncodeToString([]byte(sentinelPIN))) {
 		t.Fatalf("interaction logs contain PIN: %s", raw)
-	}
-}
-
-func TestInteractionLogEncoderKeepsPreviewAndRedactsMessage(t *testing.T) {
-	const secretMessage = "reset phrase sentinel"
-	value := interactionRequestLogValue(model.InteractionRequest{
-		Kind:        model.InteractionKindConfirm,
-		Message:     secretMessage,
-		Permission:  "authenticatorConfiguration",
-		Destructive: true,
-		Preview: map[string]any{
-			"publicDiagnostic": "kept",
-		},
-	})
-	payload := kitlog.Payload(value)
-	if payload == nil {
-		t.Fatal("payload is nil")
-	}
-
-	if strings.Contains(payload.JSON, secretMessage) {
-		t.Fatalf("payload contains interaction message: %s", payload.JSON)
-	}
-	var decoded struct {
-		Preview map[string]any `json:"preview"`
-	}
-
-	if err := json.Unmarshal([]byte(payload.JSON), &decoded); err != nil {
-		t.Fatalf("decode payload: %v", err)
-	}
-
-	if decoded.Preview["publicDiagnostic"] != "kept" {
-		t.Fatalf("payload omitted preview: %s", payload.JSON)
-	}
-
-	if !slices.Contains(value.RedactedFields, "request.message") {
-		t.Fatalf("redacted fields = %v", value.RedactedFields)
 	}
 }
 

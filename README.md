@@ -1,4 +1,4 @@
-# ctapkit
+# go-ctap/kit
 
 [![Go](https://github.com/go-ctap/kit/actions/workflows/go.yml/badge.svg)](https://github.com/go-ctap/kit/actions/workflows/go.yml)
 
@@ -121,6 +121,11 @@ The diagnostic payload is a normalized view of fields known to the installed
 `go-ctap` protocol structures. Unknown CBOR fields are omitted, so it must not
 be treated as a byte-exact wire capture. `originalBytes` reports the size of the
 CBOR body; the command byte is reported separately as `commandCode`.
+
+Non-CTAP runtime entries are metadata-only: they retain event kind, outcome,
+correlation IDs, small non-secret parameters, and normalized failures, but do
+not copy service request or response DTOs into the journal. This keeps secret
+handling out of the logging layer and avoids duplicating application state.
 
 ## Verification
 

@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"slices"
 	"sync"
 	"time"
 
@@ -114,8 +113,6 @@ func (s *Service) Discover(ctx context.Context, req DiscoverRequest) (DiscoveryS
 		Timestamp: started.UTC(),
 		Layer:     model.LogLayerService,
 		Code:      model.LogCodeDiscoveryRun,
-		Request:   kitlog.Payload(kitlog.SafeValue(req)),
-		Response:  kitlog.Payload(kitlog.SafeValue(snapshot)),
 	}, started, err))
 
 	return snapshot, err
@@ -123,21 +120,16 @@ func (s *Service) Discover(ctx context.Context, req DiscoverRequest) (DiscoveryS
 
 func (s *Service) runOperation(ctx context.Context, req OperationRequest, operation model.Operation) (envelope operationEnvelope, returnErr error) {
 	operationID := OperationID(uuid.NewString())
-	request := operationRequestLogValue(req, operation)
 	started := time.Now()
 	var operationErr error
 	defer func() {
-		response := operationEnvelopeLogValue(envelope)
 		s.logs.Append(kitlog.Finish(model.LogEntry{
-			Timestamp:      started.UTC(),
-			Layer:          model.LogLayerOperation,
-			Code:           model.LogCodeOperationRun,
-			Request:        kitlog.Payload(request),
-			Response:       kitlog.Payload(response),
-			RedactedFields: slices.Concat(request.RedactedFields, response.RedactedFields),
-			OperationKind:  operation.Kind(),
-			SelectionID:    string(req.SelectionID),
-			OperationID:    string(operationID),
+			Timestamp:     started.UTC(),
+			Layer:         model.LogLayerOperation,
+			Code:          model.LogCodeOperationRun,
+			OperationKind: operation.Kind(),
+			SelectionID:   string(req.SelectionID),
+			OperationID:   string(operationID),
 		}, started, operationErr))
 	}()
 
@@ -274,8 +266,7 @@ func (s *Service) LookupMDS(ctx context.Context, req MDSLookupRequest) (envelope
 			Timestamp: started.UTC(),
 			Layer:     model.LogLayerService,
 			Code:      model.LogCodeMDSLookup,
-			Request:   kitlog.Payload(kitlog.SafeValue(req)),
-			Response:  kitlog.Payload(kitlog.SafeValue(envelope)),
+			Params:    map[string]string{"aaguid": req.AAGUID},
 		}, started, returnErr))
 	}()
 
@@ -435,7 +426,6 @@ type interactionHandler struct {
 }
 
 func (h interactionHandler) RequestInteraction(req model.InteractionRequest) (answer model.InteractionResponse, returnErr error) {
-	request := interactionRequestLogValue(req)
 	requestStarted := time.Now()
 	prompt := InteractionPrompt{
 		InteractionID: InteractionID(uuid.NewString()),
@@ -447,46 +437,29 @@ func (h interactionHandler) RequestInteraction(req model.InteractionRequest) (an
 	h.service.registerInteraction(prompt, response, h.done)
 	h.service.emit(EventInteractionRequested, prompt)
 	h.service.logs.Append(kitlog.Finish(model.LogEntry{
-		Timestamp:      requestStarted.UTC(),
-		Layer:          model.LogLayerInteraction,
-		Code:           model.LogCodeInteractionRequest,
-		Request:        kitlog.Payload(request),
-		Response:       kitlog.Payload(kitlog.SafeValue(map[string]any{"interactionId": prompt.InteractionID})),
-		RedactedFields: request.RedactedFields,
-		OperationKind:  h.kind,
-		SelectionID:    string(h.selectionID),
-		OperationID:    string(h.operationID),
+		Timestamp: requestStarted.UTC(),
+		Layer:     model.LogLayerInteraction,
+		Code:      model.LogCodeInteractionRequest,
+		Params: map[string]string{
+			"interactionId":   string(prompt.InteractionID),
+			"interactionKind": string(req.Kind),
+		},
+		OperationKind: h.kind,
+		SelectionID:   string(h.selectionID),
+		OperationID:   string(h.operationID),
 	}, requestStarted, nil))
 	defer h.service.unregisterInteraction(prompt.InteractionID)
 
 	resolveStarted := time.Now()
 	defer func() {
-		var result any
-		var resolveRedacted []string
-		if returnErr == nil {
-			response := map[string]any{"canceled": answer.Canceled}
-			if answer.Confirmed {
-				response["confirmed"] = kitlog.Redacted
-				resolveRedacted = append(resolveRedacted, "response.confirmed")
-			}
-
-			if len(answer.PIN) != 0 {
-				response["pin"] = kitlog.Redacted
-				resolveRedacted = append(resolveRedacted, "response.pin")
-			}
-			result = response
-		}
 		h.service.logs.Append(kitlog.Finish(model.LogEntry{
-			Timestamp:      resolveStarted.UTC(),
-			Layer:          model.LogLayerInteraction,
-			Code:           model.LogCodeInteractionResolve,
-			Params:         map[string]string{"interactionId": string(prompt.InteractionID)},
-			Request:        kitlog.Payload(kitlog.SafeValue(map[string]any{"interactionId": prompt.InteractionID})),
-			Response:       kitlog.Payload(kitlog.SafeValue(result)),
-			RedactedFields: resolveRedacted,
-			OperationKind:  h.kind,
-			SelectionID:    string(h.selectionID),
-			OperationID:    string(h.operationID),
+			Timestamp:     resolveStarted.UTC(),
+			Layer:         model.LogLayerInteraction,
+			Code:          model.LogCodeInteractionResolve,
+			Params:        map[string]string{"interactionId": string(prompt.InteractionID)},
+			OperationKind: h.kind,
+			SelectionID:   string(h.selectionID),
+			OperationID:   string(h.operationID),
 		}, resolveStarted, returnErr))
 	}()
 

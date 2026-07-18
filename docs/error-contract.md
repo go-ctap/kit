@@ -218,6 +218,9 @@ unknown CBOR fields are omitted and map ordering may be normalized. It is an
 engineering view of the exchange, not a byte-exact capture. The raw bytes and
 secret-bearing typed fields never enter the journal.
 
+Other runtime journal entries contain metadata and normalized failures only;
+service request and response DTOs are not serialized into log payloads.
+
 Completed journal entries include the bounded retained cause of transport
 failures as a log-only `errorMessage`:
 

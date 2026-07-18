@@ -33,8 +33,6 @@ func (s *Service) RefreshDiscovery(ctx context.Context, req DiscoverRequest) err
 		Layer:     model.LogLayerService,
 		Code:      model.LogCodeDiscoveryRun,
 		Params:    map[string]string{"trigger": string(DiscoveryTriggerManual)},
-		Request:   kitlog.Payload(kitlog.SafeValue(effective)),
-		Response:  kitlog.Payload(kitlog.SafeValue(struct{}{})),
 	}, started, err))
 
 	return err
@@ -67,7 +65,6 @@ func (s *Service) reconcileTopology(
 			Outcome:      model.LogOutcomeEvent,
 			Code:         model.LogCodeDiscoveryChanged,
 			Params:       map[string]string{"trigger": string(trigger)},
-			Response:     kitlog.Payload(kitlog.SafeValue(envelope)),
 			Error:        envelope.Error,
 			ErrorMessage: kitlog.TransportErrorMessage(result.err),
 		}

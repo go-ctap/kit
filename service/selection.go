@@ -178,12 +178,7 @@ func (s *Service) openSelection(
 			Timestamp:   started.UTC(),
 			Layer:       model.LogLayerSelection,
 			Code:        model.LogCodeSelectionOpen,
-			Request:     kitlog.Payload(kitlog.SafeValue(req)),
 			SelectionID: string(selectionID),
-		}
-
-		if selected != nil {
-			entry.Response = kitlog.Payload(kitlog.SafeValue(ActiveSelection{ID: selected.id}))
 		}
 		s.logs.Append(kitlog.Finish(entry, started, returnErr))
 	}()
@@ -216,8 +211,6 @@ func (s *Service) closeSelection(selected *selection) (returnErr error) {
 			Timestamp:   started.UTC(),
 			Layer:       model.LogLayerSelection,
 			Code:        model.LogCodeSelectionClose,
-			Request:     kitlog.Payload(kitlog.SafeValue(map[string]any{"selectionId": selected.id})),
-			Response:    kitlog.Payload(kitlog.SafeValue(ActiveSelection{ID: selected.id})),
 			SelectionID: string(selected.id),
 		}, started, returnErr))
 	}()

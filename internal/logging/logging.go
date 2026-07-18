@@ -2,7 +2,6 @@ package logging
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
 	"unicode/utf8"
@@ -15,7 +14,6 @@ import (
 const (
 	MaxPayloadBytes = 64 * 1024
 	previewBytes    = 4 * 1024
-	Redacted        = "[REDACTED]"
 )
 
 type correlationKey struct{}
@@ -58,40 +56,6 @@ func RecorderFrom(ctx context.Context) Recorder {
 	recorder, _ := ctx.Value(recorderKey{}).(Recorder)
 
 	return recorder
-}
-
-func Payload(value SafeJSONValue) *model.LogPayload {
-	raw, err := json.MarshalIndent(value.Value, "", "  ")
-	if err != nil {
-		return nil
-	}
-
-	originalBytes := len(raw)
-	stored := raw
-	truncated := false
-	if originalBytes > MaxPayloadBytes {
-		truncated = true
-		preview := safePreview(raw, previewBytes)
-		stored, err = json.MarshalIndent(struct {
-			Truncated     bool   `json:"truncated"`
-			OriginalBytes int    `json:"originalBytes"`
-			Preview       string `json:"preview"`
-		}{
-			Truncated:     true,
-			OriginalBytes: originalBytes,
-			Preview:       preview,
-		}, "", "  ")
-		if err != nil || len(stored) > MaxPayloadBytes {
-			return nil
-		}
-	}
-
-	return &model.LogPayload{
-		JSON:          string(stored),
-		OriginalBytes: originalBytes,
-		StoredBytes:   len(stored),
-		Truncated:     truncated,
-	}
 }
 
 func CBORDiagnosticPayload(message diagnostic.Message) *model.LogPayload {
