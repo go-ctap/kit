@@ -32,6 +32,7 @@ This repository does not own terminal UX, command parsing, output rendering, MDS
 - `ctapkit`: public runtime facade.
 - `model`: public operation, event, and interaction DTOs.
 - `model/failure`: stable machine-readable failure codes and transport-safe snapshots.
+- `model/operation`: canonical public operation identifiers used by failures and diagnostics.
 - `model/config`: authenticator config DTOs and reports.
 - `model/credentials`: credential DTOs, previews, and reports.
 - `model/largeblobs`: large-blob DTOs, previews, and reports.
@@ -115,23 +116,22 @@ verified is retained for a later retry but is never returned as verified data.
 ## Engineering Journal
 
 Passing `ctapkit.WithLogJournal` when opening an authenticator records CTAP
-exchanges without changing any operation method. Each `ctap.command` entry
+exchanges without changing any operation method. Each journal entry
 contains command metadata and bounded request/response CBOR diagnostic notation
 in `cborDiagnostic`; fields marked for redaction by `go-ctap` are replaced
 before the event reaches the journal. Internally, kit installs go-ctap's typed
 `diagnostic.Sink`; application code does not need to receive or forward these
 events.
 
+The runtime assigns `operationKind` while executing a typed authenticator
+operation. Exchanges emitted while opening an authenticator have no operation
+kind. The journal accepts only runtime CTAP diagnostics; application and
+product logging belong to the consuming application.
+
 The diagnostic payload is a normalized view of fields known to the installed
 `go-ctap` protocol structures. Unknown CBOR fields are omitted, so it must not
 be treated as a byte-exact wire capture. `originalBytes` reports the size of the
 CBOR body; the command byte is reported separately as `commandCode`.
-
-Non-CTAP runtime entries are metadata-only: they retain event kind, outcome,
-correlation IDs, small non-secret parameters, and normalized failures, but do
-not copy application request or response DTOs into the journal. This keeps
-secret handling out of the logging layer and avoids duplicating application
-state.
 
 ## Verification
 

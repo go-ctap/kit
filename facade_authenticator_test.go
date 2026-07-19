@@ -14,6 +14,7 @@ import (
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
+	"github.com/go-ctap/kit/model/operation"
 	"github.com/go-ctap/kit/transport"
 )
 
@@ -56,8 +57,8 @@ func TestAuthenticatorPreCompletedContextHasAuthenticatorPhase(t *testing.T) {
 			requireFailureCode(t, err, tt.code)
 
 			snapshot := failure.Snapshot(err)
-			if snapshot.Operation != string(model.OperationConfigStatus) {
-				t.Fatalf("operation = %q, want %q", snapshot.Operation, model.OperationConfigStatus)
+			if snapshot.Operation != string(operation.ConfigStatus) {
+				t.Fatalf("operation = %q, want %q", snapshot.Operation, operation.ConfigStatus)
 			}
 
 			if snapshot.Phase != failure.PhaseAuthenticator {

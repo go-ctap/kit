@@ -16,19 +16,14 @@ func NewCTAPSink(logs Recorder) diagnostic.Sink {
 	}
 
 	return func(ctx context.Context, event diagnostic.Exchange) {
-		selectionID, operationID, operationKind := Correlation(ctx)
 		command, _ := event.Command.Name()
 		entry := model.LogEntry{
 			Timestamp:     event.StartedAt,
-			Layer:         model.LogLayerCTAP,
-			Code:          model.LogCodeCTAPCommand,
-			OperationKind: operationKind,
+			OperationKind: OperationFrom(ctx),
 			Command:       command,
 			CommandCode:   uint8(event.Command),
 			Request:       CBORDiagnosticPayload(event.Request),
 			Response:      CBORDiagnosticPayload(event.Response),
-			SelectionID:   selectionID,
-			OperationID:   operationID,
 		}
 		setSubCommand(&entry, event.Command, event.SubCommand)
 		entry.RedactedFields = appendPrefixedFields(entry.RedactedFields, event.Request.RedactedFields, "request")

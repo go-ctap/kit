@@ -47,7 +47,7 @@ func TestOpenAuthenticatorAllowsIndependentChannelsForSameDevice(t *testing.T) {
 func TestOpenAuthenticatorMakesJournalAvailableWhileOpeningAuthenticator(t *testing.T) {
 	journal := NewLogJournal()
 	open := func(ctx context.Context, _ transport.Mode, _ string) (authenticator.Device, error) {
-		kitlog.RecorderFrom(ctx).Append(model.LogEntry{Code: "open-command"})
+		kitlog.RecorderFrom(ctx).Append(model.LogEntry{Command: "open-command"})
 
 		return &contractAuthenticator{}, nil
 	}
@@ -58,7 +58,7 @@ func TestOpenAuthenticatorMakesJournalAvailableWhileOpeningAuthenticator(t *test
 	}
 
 	batch := journal.Read(0)
-	if len(batch.Entries) != 1 || batch.Entries[0].Entry.Code != "open-command" {
+	if len(batch.Entries) != 1 || batch.Entries[0].Entry.Command != "open-command" {
 		t.Fatalf("open log entries = %#v", batch.Entries)
 	}
 }

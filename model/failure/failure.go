@@ -149,7 +149,6 @@ func canonicalPhase(phase Phase) Phase {
 	case "",
 		PhaseValidation,
 		PhaseDiscovery,
-		PhaseSelection,
 		PhaseAuthenticator,
 		PhaseInteraction,
 		PhaseTokenAcquisition,

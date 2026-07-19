@@ -3,38 +3,16 @@ package failure
 import (
 	"github.com/go-ctap/ctap/protocol"
 	ctaptransport "github.com/go-ctap/ctap/transport"
+	"github.com/go-ctap/kit/model/operation"
 )
 
-func canonicalOperation(operation string) string {
-	switch operation {
-	case "inspect",
-		"credentials.list",
-		"credentials.storeState",
-		"credentials.delete",
-		"credentials.updateUser",
-		"largeBlobs.read",
-		"largeBlobs.list",
-		"largeBlobs.write",
-		"largeBlobs.delete",
-		"largeBlobs.garbageCollect",
-		"config.status",
-		"config.bio.sensorInfo",
-		"config.bio.list",
-		"config.bio.enroll",
-		"config.bio.rename",
-		"config.bio.remove",
-		"config.reset.factory",
-		"config.pin.set",
-		"config.pin.change",
-		"config.alwaysUv.set",
-		"config.minPinLength.set",
-		"config.longTouchForReset.enable",
-		"webauthn.makeCredential",
-		"webauthn.getAssertion":
-		return operation
-	default:
+func canonicalOperation(value string) string {
+	kind, ok := operation.Parse(value)
+	if !ok {
 		return ""
 	}
+
+	return string(kind)
 }
 
 func canonicalCTAP(detail *CTAPDetail) *CTAPDetail {

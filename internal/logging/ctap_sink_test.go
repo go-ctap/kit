@@ -8,11 +8,12 @@ import (
 	"github.com/go-ctap/ctap/diagnostic"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/operation"
 )
 
-func TestCTAPSinkAppendsCorrelatedExchange(t *testing.T) {
+func TestCTAPSinkAppendsOperationExchange(t *testing.T) {
 	recorder := &sinkRecorder{}
-	ctx := WithCorrelation(t.Context(), "selection-1", "operation-1", model.OperationListCredentials)
+	ctx := WithOperation(t.Context(), operation.ListCredentials)
 	NewCTAPSink(recorder)(ctx, diagnostic.Exchange{
 		StartedAt:  time.Now(),
 		Duration:   10 * time.Millisecond,
@@ -30,9 +31,8 @@ func TestCTAPSinkAppendsCorrelatedExchange(t *testing.T) {
 		t.Fatalf("entries = %d, want 1", len(recorder.entries))
 	}
 	entry := recorder.entries[0]
-	if entry.SelectionID != "selection-1" || entry.OperationID != "operation-1" ||
-		entry.OperationKind != model.OperationListCredentials {
-		t.Fatalf("correlation = %#v", entry)
+	if entry.OperationKind != operation.ListCredentials {
+		t.Fatalf("operation kind = %q", entry.OperationKind)
 	}
 	if entry.CommandCode != uint8(protocol.AuthenticatorClientPIN) ||
 		entry.SubCommandCode == nil || *entry.SubCommandCode != uint64(protocol.ClientPINSubCommandGetPINRetries) {
@@ -45,8 +45,7 @@ func TestCTAPSinkAppendsCorrelatedExchange(t *testing.T) {
 	if len(entry.RedactedFields) != 1 || entry.RedactedFields[0] != "request.PinUvAuthParam" {
 		t.Fatalf("redacted fields = %v", entry.RedactedFields)
 	}
-	if entry.Outcome != model.LogOutcomeSucceeded || entry.Level != model.LogLevelInfo ||
-		entry.DurationMilliseconds != 10 {
+	if entry.Outcome != model.LogOutcomeSucceeded || entry.DurationMilliseconds != 10 {
 		t.Fatalf("completion = %#v", entry)
 	}
 }

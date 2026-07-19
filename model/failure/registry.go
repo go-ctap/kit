@@ -104,9 +104,6 @@ func newCodeRegistry() map[Code]codeSpec {
 		CodeUserActionPending,
 		CodeAuthenticatorOperationPending,
 	)
-	register(CategoryInvalidSelection,
-		CodeSelectionInvalid,
-	)
 	register(CategoryCanceled,
 		CodeOperationCanceled,
 		CodeInteractionCanceled,
@@ -114,9 +111,6 @@ func newCodeRegistry() map[Code]codeSpec {
 		CodeAuthenticatorSelectionCanceled,
 	)
 	register(CategoryInvalidOperation,
-		CodeOperationRequired,
-		CodeRequestJSONInvalid,
-		CodeConfirmationRequired,
 		CodeInteractionKindRequired,
 		CodeInteractionHandlerRequired,
 		CodeDeviceHandleInvalid,
@@ -147,7 +141,6 @@ func newCodeRegistry() map[Code]codeSpec {
 	)
 	register(CategoryInvalidState,
 		CodeAuthenticatorClosed,
-		CodeServiceClosed,
 		CodeDeviceNotFound,
 		CodeDeviceUnavailable,
 		CodeMDSVerificationFailed,

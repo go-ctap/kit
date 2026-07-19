@@ -14,6 +14,7 @@ import (
 	"github.com/go-ctap/kit/model/failure"
 	appinspect "github.com/go-ctap/kit/model/inspect"
 	"github.com/go-ctap/kit/model/largeblobs"
+	"github.com/go-ctap/kit/model/operation"
 	"github.com/go-ctap/kit/model/report"
 	webauthn2 "github.com/go-ctap/kit/model/webauthn"
 )
@@ -49,11 +50,11 @@ func TestOperationEventIncludesStateStages(t *testing.T) {
 }
 
 func TestWebAuthnOperationKindStrings(t *testing.T) {
-	if got := model.OperationMakeCredential; got != "webauthn.makeCredential" {
+	if got := operation.MakeCredential; got != "webauthn.makeCredential" {
 		t.Fatalf("MakeCredential kind = %q", got)
 	}
 
-	if got := model.OperationGetAssertion; got != "webauthn.getAssertion" {
+	if got := operation.GetAssertion; got != "webauthn.getAssertion" {
 		t.Fatalf("GetAssertion kind = %q", got)
 	}
 }

@@ -5,9 +5,10 @@ import (
 	"errors"
 
 	ctaptransport "github.com/go-ctap/ctap/transport"
+	"github.com/go-ctap/kit/internal/logging"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/internal/workflow"
-	"github.com/go-ctap/kit/model"
+	appoperation "github.com/go-ctap/kit/model/operation"
 )
 
 type workflowCall[T any] func(workflow.Runner, context.Context) (T, error)
@@ -15,7 +16,7 @@ type workflowCall[T any] func(workflow.Runner, context.Context) (T, error)
 func executeOperation[T any](
 	a *Authenticator,
 	ctx context.Context,
-	kind model.OperationKind,
+	kind appoperation.Kind,
 	call workflowCall[T],
 	opts ...OperationOption,
 ) (*T, error) {
@@ -24,7 +25,7 @@ func executeOperation[T any](
 		return nil, normalizeRunError(err, string(kind))
 	}
 
-	result, err := executeSerializedOperation(a, ctx, config, call)
+	result, err := executeSerializedOperation(a, ctx, kind, config, call)
 	if err != nil {
 		if _, invalidated := errors.AsType[*ctaptransport.DeviceInvalidatedError](err); invalidated {
 			_ = a.Close()
@@ -39,6 +40,7 @@ func executeOperation[T any](
 func executeSerializedOperation[T any](
 	a *Authenticator,
 	ctx context.Context,
+	kind appoperation.Kind,
 	config operationConfig,
 	call workflowCall[T],
 ) (*T, error) {
@@ -53,6 +55,7 @@ func executeSerializedOperation[T any](
 
 	childCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	childCtx = logging.WithOperation(childCtx, kind)
 
 	if err := a.start(cancel); err != nil {
 		return nil, err

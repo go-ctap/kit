@@ -185,11 +185,11 @@ Every retry requires a new interaction response. The runtime never resubmits a
 previous PIN. Blocked states, cancellation, other token failures, and a failure
 to read retry state complete the operation with an ordinary public failure.
 
-The journal records the authenticator rejection as a failed `ctap.command`.
-Because the interaction handler itself completed successfully, it is not logged
-as a failed interaction. The following ordinary `interaction.request` contains
-the safe `pinState` payload with the previous failure, remaining retries, and
-power-cycle state. The submitted PIN remains redacted.
+The journal records only the rejected CTAP exchange. Interaction retries are
+delivered through the operation-scoped handler or event sink and are not journal
+entries. The following `InteractionRequest` contains the safe `pinState` payload
+with the previous failure, remaining retries, and power-cycle state. The
+submitted PIN remains redacted.
 
 ## Rejected Token Recovery
 
@@ -219,15 +219,15 @@ retry.
 
 ## Engineering Log Diagnostics
 
-`ctap.command` journal entries retain bounded, redacted request and response
+Engineering journal entries retain bounded, redacted request and response
 CBOR diagnostic notation in `request.cborDiagnostic` and
 `response.cborDiagnostic`. This is produced from the known typed CTAP schema:
 unknown CBOR fields are omitted and map ordering may be normalized. It is an
 engineering view of the exchange, not a byte-exact capture. The raw bytes and
 secret-bearing typed fields never enter the journal.
 
-Other runtime journal entries contain metadata and normalized failures only;
-application request and response DTOs are not serialized into log payloads.
+The journal contains only CTAP exchanges. Application events, request state,
+and product correlation identifiers belong to the consuming application.
 
 Completed journal entries include the bounded retained cause of transport
 failures as a log-only `errorMessage`:
