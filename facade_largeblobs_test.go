@@ -168,12 +168,19 @@ func TestLargeBlobWriteZeroCapacityMeansUnknownLimit(t *testing.T) {
 	}
 }
 
-func TestLargeBlobReadAndPreviewReadFreshAuthenticatorState(t *testing.T) {
+func TestLargeBlobEditUsesOneInventoryReadBeforeRefresh(t *testing.T) {
 	a := &largeBlobWriteEventAuthenticator{}
 	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
+
+	if _, err := session.ListLargeBlobs(
+		context.Background(),
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
+	); err != nil {
+		t.Fatalf("list large blobs: %v", err)
+	}
 
 	if _, err := session.ReadLargeBlob(context.Background(), applargeblobs.ReadOperation{
 		CredentialIDHex: "c05e",
@@ -181,24 +188,61 @@ func TestLargeBlobReadAndPreviewReadFreshAuthenticatorState(t *testing.T) {
 		t.Fatalf("read large blob: %v", err)
 	}
 
-	if _, err := session.WriteLargeBlob(context.Background(), applargeblobs.WriteOperation{
+	operation := applargeblobs.WriteOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
 		DryRun:          true,
-	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...); err != nil {
+	}
+	if _, err := session.WriteLargeBlob(
+		context.Background(),
+		operation,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
+	); err != nil {
 		t.Fatalf("preview write large blob: %v", err)
 	}
 
+	operation.DryRun = false
+	if _, err := session.WriteLargeBlob(
+		context.Background(),
+		operation,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
+	); err != nil {
+		t.Fatalf("write large blob: %v", err)
+	}
+
+	if got := a.rpEnumerations.Load(); got != 1 {
+		t.Fatalf("RP enumerations before refresh = %d, want 1", got)
+	}
+
+	if got := a.credentialEnumerations.Load(); got != 1 {
+		t.Fatalf("credential enumerations before refresh = %d, want 1", got)
+	}
+
+	if got := a.largeBlobReads.Load(); got != 1 {
+		t.Fatalf("large blob reads before refresh = %d, want 1", got)
+	}
+
+	if got := a.largeBlobWrites.Load(); got != 1 {
+		t.Fatalf("large blob writes = %d, want 1", got)
+	}
+
+	if _, err := session.ListLargeBlobs(
+		context.Background(),
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
+	); err != nil {
+		t.Fatalf("refresh large blobs: %v", err)
+	}
+
 	if got := a.rpEnumerations.Load(); got != 2 {
-		t.Fatalf("RP enumerations = %d, want 2", got)
+		t.Fatalf("RP enumerations after refresh = %d, want 2", got)
 	}
 
 	if got := a.credentialEnumerations.Load(); got != 2 {
-		t.Fatalf("credential enumerations = %d, want 2", got)
+		t.Fatalf("credential enumerations after refresh = %d, want 2", got)
 	}
 
 	if got := a.largeBlobReads.Load(); got != 2 {
-		t.Fatalf("large blob reads = %d, want 2", got)
+		t.Fatalf("large blob reads after refresh = %d, want 2", got)
 	}
 }
 

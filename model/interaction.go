@@ -1,6 +1,7 @@
 package model
 
 import (
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/model/failure"
 )
 
@@ -19,6 +20,7 @@ type InteractionRequest struct {
 	Destructive bool                 `json:"destructive,omitempty"`
 	Preview     any                  `json:"preview,omitempty"`
 	PINState    *PINInteractionState `json:"pinState,omitempty"`
+	UVModality  *protocol.UserVerify `json:"uvModality,omitempty"`
 }
 
 type PINInteractionState struct {

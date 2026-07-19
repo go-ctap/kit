@@ -26,7 +26,9 @@
 - Rely on `go-ctaphid` for per-command CTAP serialization.
 - Use session workflow serialization only to prevent multi-step flows from interleaving on the same opened authenticator.
 - Do not add process-wide or cross-process device leases; CTAPHID channel isolation owns multi-client transport coordination.
-- Treat authenticator state as externally mutable between commands and handle resulting CTAP errors without assuming workflow-level atomicity.
+- Assume that the consuming application is the sole mutating user of an opened authenticator while it is selected. Concurrent state changes by other applications or processes are outside the supported usage model; users are responsible for not performing simultaneous writes through another program.
+- Do not add refresh-before-every-write behavior, optimistic concurrency, external-change detection, cross-process coordination, or other complexity solely to preserve concurrent mutations made by another program. Runtime-owned snapshots and caches may be reused across serialized workflows when that materially simplifies the design.
+- Workflow serialization does not make a sequence of CTAP commands atomic. Handle command failures and device invalidation, and keep runtime-owned state consistent with mutations performed through this runtime.
 - Public close/cancel/continue paths must release owned resources and tolerate duplicate or racing consumer calls.
 - Never log or persist `pinUvAuthToken`, PINs, reset phrases, or tokens. Do not hide Wails-bound DTO fields with custom JSON marshaling merely to enforce this policy; the client boundary is responsible for transport and presentation redaction.
 - When the runtime creates or owns secret byte buffers, wipe them at release. Do not mutate caller-owned buffers unless the API explicitly transfers ownership.

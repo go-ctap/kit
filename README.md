@@ -127,9 +127,13 @@ close and cancellation state. It runs one complete workflow at a time. This
 prevents two multi-command operations on the same channel from mixing with each
 other.
 
-The runtime does not cache credential lists, configuration reports, or
-large-blob reports. It reads them again for each operation because another
-client may change authenticator state between commands.
+Credential-list and configuration workflows read current state per operation.
+Large-blob workflows are the deliberate exception: `ListLargeBlobs` refreshes
+private in-memory inventory for the selected open authenticator, and read,
+preview, and mutation operations reuse that inventory. A successful mutation
+updates the large-blob array, and the next explicit `ListLargeBlobs` reads the
+authenticator again. The state never crosses the authenticator boundary, and
+its credential keys are cleared on refresh and close.
 
 `Authenticator.Close` is safe to call more than once or while another goroutine
 is using the authenticator. It cancels the active operation, clears owned secret

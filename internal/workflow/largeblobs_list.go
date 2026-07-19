@@ -13,14 +13,17 @@ import (
 	"github.com/go-ctap/kit/model/report"
 )
 
-func (r Runner) ListLargeBlobs(ctx context.Context, device LargeBlobDevice) (applargeblobs.ListReport, error) {
-	inventory, err := r.credentialInventoryReport(ctx, device, protocol.PermissionNone)
+func (r Runner) ListLargeBlobs(
+	ctx context.Context,
+	device LargeBlobDevice,
+	largeBlobState *LargeBlobState,
+) (applargeblobs.ListReport, error) {
+	inventory, err := r.refreshLargeBlobInventory(ctx, device, largeBlobState, protocol.PermissionNone)
 	if err != nil {
 		return applargeblobs.ListReport{}, err
 	}
-	defer zeroCredentialInventoryReport(&inventory)
 
-	rep, err := r.listLargeBlobsFromInventory(ctx, device, inventory)
+	report, err := r.listLargeBlobsFromInventory(ctx, device, inventory)
 	if err != nil {
 		return applargeblobs.ListReport{}, err
 	}
@@ -32,7 +35,7 @@ func (r Runner) ListLargeBlobs(ctx context.Context, device LargeBlobDevice) (app
 		)
 	}
 
-	return rep, nil
+	return report, nil
 }
 
 type listBuildContext struct {
@@ -45,7 +48,7 @@ type listBuildContext struct {
 func (r Runner) listLargeBlobsFromInventory(
 	ctx context.Context,
 	device LargeBlobDevice,
-	inventory appcredentials.InventoryReport,
+	inventory *largeBlobInventory,
 ) (applargeblobs.ListReport, error) {
 	if err := ctx.Err(); err != nil {
 		return applargeblobs.ListReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseDiscovery))
@@ -57,31 +60,21 @@ func (r Runner) listLargeBlobsFromInventory(
 		Support: support,
 	}
 
-	var (
-		blobs []protocol.LargeBlob
-		err   error
-	)
-
 	if support.LargeBlobs {
-		blobs, err = r.readLargeBlobArray(ctx, device)
-		if err != nil {
-			return applargeblobs.ListReport{}, err
-		}
-
 		report.Array.Read = true
-		report.Array.BlobCount = len(blobs)
+		report.Array.BlobCount = len(inventory.blobs)
 	}
 
 	matchedBlobIndexes := make(map[int]bool)
 	buildCtx := listBuildContext{
 		selected:           r.env.Selected,
 		support:            support,
-		blobs:              blobs,
+		blobs:              inventory.blobs,
 		matchedBlobIndexes: matchedBlobIndexes,
 	}
 
-	report.Credentials = make([]applargeblobs.ListCredential, 0, int(inventory.Summary.TotalCredentials))
-	for _, group := range inventory.Groups {
+	report.Credentials = make([]applargeblobs.ListCredential, 0, int(inventory.credentials.Summary.TotalCredentials))
+	for _, group := range inventory.credentials.Groups {
 		for _, record := range group.Credentials {
 			row, err := buildListCredentialRow(buildCtx, group, record)
 			if err != nil {
@@ -141,7 +134,6 @@ func buildListCredentialRow(
 	row.BlobState = applargeblobs.BlobStateMissing
 
 	key := record.LargeBlobKey
-	defer secret.Zero(key)
 
 	for index, candidate := range ctx.blobs {
 		if ctx.matchedBlobIndexes[index] {

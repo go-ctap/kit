@@ -60,9 +60,11 @@ func TestWebAuthnOperationKindStrings(t *testing.T) {
 }
 
 func TestUserVerificationInteractionJSON(t *testing.T) {
+	modality := protocol.UserVerifyFingerprintInternal
 	raw, err := json.Marshal(model.InteractionRequest{
 		Kind:       model.InteractionKindUserVerification,
 		Permission: "credentialManagement",
+		UVModality: &modality,
 	})
 	if err != nil {
 		t.Fatalf("marshal interaction request: %v", err)
@@ -70,6 +72,10 @@ func TestUserVerificationInteractionJSON(t *testing.T) {
 
 	if !strings.Contains(string(raw), `"kind":"user-verification"`) {
 		t.Fatalf("user-verification JSON contract missing: %s", raw)
+	}
+
+	if !strings.Contains(string(raw), `"uvModality":2`) {
+		t.Fatalf("user-verification modality missing: %s", raw)
 	}
 
 	flow, err := json.Marshal(VerificationFlowPIN)

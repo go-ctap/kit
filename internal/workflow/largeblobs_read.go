@@ -9,8 +9,6 @@ import (
 	rtcredentials "github.com/go-ctap/kit/internal/credentials"
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtlargeblobs "github.com/go-ctap/kit/internal/largeblobs"
-	"github.com/go-ctap/kit/internal/secret"
-	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 )
@@ -18,28 +16,28 @@ import (
 func (r Runner) ReadLargeBlob(
 	ctx context.Context,
 	device LargeBlobDevice,
+	largeBlobState *LargeBlobState,
 	req applargeblobs.ReadOperation,
 ) (applargeblobs.ReadReport, error) {
-	report, err := r.credentialInventoryReport(ctx, device, protocol.PermissionNone)
+	inventory, err := r.loadLargeBlobInventory(ctx, device, largeBlobState, protocol.PermissionNone)
 	if err != nil {
 		return applargeblobs.ReadReport{}, err
 	}
-	defer zeroCredentialInventoryReport(&report)
 
-	return r.readLargeBlobFromInventory(ctx, device, req, report)
+	return r.readLargeBlobFromInventory(ctx, device, req, inventory)
 }
 
 func (r Runner) readLargeBlobFromInventory(
 	ctx context.Context,
 	device LargeBlobDevice,
 	req applargeblobs.ReadOperation,
-	inventory appcredentials.InventoryReport,
+	inventory *largeBlobInventory,
 ) (applargeblobs.ReadReport, error) {
 	if err := ctx.Err(); err != nil {
 		return applargeblobs.ReadReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseValidation))
 	}
 
-	target, err := rtcredentials.FindByHexID(inventory, req.CredentialIDHex)
+	target, err := rtcredentials.FindByHexID(inventory.credentials, req.CredentialIDHex)
 	if err != nil {
 		return applargeblobs.ReadReport{}, err
 	}
@@ -73,20 +71,14 @@ func (r Runner) readLargeBlobFromInventory(
 	}
 
 	key := target.Record.LargeBlobKey
-	defer secret.Zero(key)
-
-	blobs, err := r.readLargeBlobArray(ctx, device)
-	if err != nil {
-		return applargeblobs.ReadReport{}, err
-	}
 
 	result.Array = applargeblobs.ArrayState{
 		Read:      true,
-		BlobCount: len(blobs),
+		BlobCount: len(inventory.blobs),
 		BlobState: applargeblobs.BlobStateMissing,
 	}
 
-	for _, candidate := range blobs {
+	for _, candidate := range inventory.blobs {
 		raw, err := crypto.DecryptLargeBlob(key, candidate)
 		if err != nil {
 			continue

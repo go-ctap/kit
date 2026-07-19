@@ -13,6 +13,7 @@ import (
 func (r Runner) WriteLargeBlob(
 	ctx context.Context,
 	device LargeBlobDevice,
+	largeBlobState *LargeBlobState,
 	req applargeblobs.WriteOperation,
 ) (applargeblobs.MutationOutput, error) {
 	var output applargeblobs.MutationOutput
@@ -25,15 +26,15 @@ func (r Runner) WriteLargeBlob(
 		return output, err
 	}
 
-	inventory, err := r.credentialInventoryReport(
+	inventory, err := r.loadLargeBlobInventory(
 		ctx,
 		device,
+		largeBlobState,
 		inventoryPermission,
 	)
 	if err != nil {
 		return output, err
 	}
-	defer zeroCredentialInventoryReport(&inventory)
 
 	state, err := r.loadTargetBlobState(ctx, device, inventory, req.CredentialIDHex)
 	if err != nil {
@@ -68,12 +69,15 @@ func (r Runner) WriteLargeBlob(
 		return device.SetLargeBlobs(ctx, token, replacement)
 	})
 	if err != nil {
+		largeBlobState.Clear()
+
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.AuthenticatorLargeBlobs,
 		))
 	}
 
+	largeBlobState.replaceBlobs(replacement)
 	output.Result = &result
 
 	return output, nil
@@ -82,6 +86,7 @@ func (r Runner) WriteLargeBlob(
 func (r Runner) DeleteLargeBlob(
 	ctx context.Context,
 	device LargeBlobDevice,
+	largeBlobState *LargeBlobState,
 	req applargeblobs.DeleteOperation,
 ) (applargeblobs.MutationOutput, error) {
 	var output applargeblobs.MutationOutput
@@ -94,15 +99,15 @@ func (r Runner) DeleteLargeBlob(
 		return output, err
 	}
 
-	inventory, err := r.credentialInventoryReport(
+	inventory, err := r.loadLargeBlobInventory(
 		ctx,
 		device,
+		largeBlobState,
 		inventoryPermission,
 	)
 	if err != nil {
 		return output, err
 	}
-	defer zeroCredentialInventoryReport(&inventory)
 
 	state, err := r.loadTargetBlobState(ctx, device, inventory, req.CredentialIDHex)
 	if err != nil {
@@ -139,12 +144,15 @@ func (r Runner) DeleteLargeBlob(
 		return device.SetLargeBlobs(ctx, token, replacement)
 	})
 	if err != nil {
+		largeBlobState.Clear()
+
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.AuthenticatorLargeBlobs,
 		))
 	}
 
+	largeBlobState.replaceBlobs(replacement)
 	output.Result = &result
 
 	return output, nil

@@ -7,6 +7,7 @@ import (
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/logging"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
+	"github.com/go-ctap/kit/internal/workflow"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
@@ -73,9 +74,10 @@ func WithVerificationFlow(flow VerificationFlow) OperationOption {
 // Authenticator is one opened authenticator channel. It owns transport
 // lifecycle, operation serialization, and runtime token state until Close.
 type Authenticator struct {
-	selected report.DeviceReport
-	device   authenticator.Device
-	tokens   *rtruntime.TokenStore
+	selected       report.DeviceReport
+	device         authenticator.Device
+	tokens         *rtruntime.TokenStore
+	largeBlobState *workflow.LargeBlobState
 
 	runMu   sync.Mutex
 	stateMu sync.Mutex
@@ -124,9 +126,10 @@ func openAuthenticatorHandle(
 	}
 
 	return &Authenticator{
-		selected: selected,
-		device:   opened,
-		tokens:   rtruntime.NewTokenStore(),
+		selected:       selected,
+		device:         opened,
+		tokens:         rtruntime.NewTokenStore(),
+		largeBlobState: workflow.NewLargeBlobState(),
 	}, nil
 }
 
@@ -144,6 +147,7 @@ func (a *Authenticator) Close() error {
 		defer a.runMu.Unlock()
 
 		a.tokens.InvalidateToken()
+		a.largeBlobState.Clear()
 
 		if a.device != nil {
 			a.closeErr = a.device.Close()

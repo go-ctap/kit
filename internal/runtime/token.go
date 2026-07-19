@@ -156,11 +156,13 @@ func (s *TokenService) acquire(
 		err   error
 	)
 
+	info := s.authenticator.GetInfo()
 	if s.verificationFlow != VerificationFlowPIN &&
-		supportsUserVerificationForPermission(s.authenticator.GetInfo(), permission) {
+		supportsUserVerificationForPermission(info, permission) {
 		_, err = s.interactions.RequestInteraction(ctx, model.InteractionRequest{
 			Kind:       model.InteractionKindUserVerification,
 			Permission: permissionLabel(permission),
+			UVModality: info.UvModality,
 		})
 		if err != nil {
 			return nil, err

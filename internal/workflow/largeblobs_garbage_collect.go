@@ -27,6 +27,7 @@ type garbageCollectState struct {
 func (r Runner) GarbageCollectLargeBlobs(
 	ctx context.Context,
 	device LargeBlobDevice,
+	largeBlobState *LargeBlobState,
 	req applargeblobs.GarbageCollectOperation,
 ) (applargeblobs.MutationOutput, error) {
 	var output applargeblobs.MutationOutput
@@ -42,6 +43,7 @@ func (r Runner) GarbageCollectLargeBlobs(
 	state, err := r.loadGarbageCollectState(
 		ctx,
 		device,
+		largeBlobState,
 		inventoryPermission,
 	)
 	if err != nil {
@@ -68,12 +70,15 @@ func (r Runner) GarbageCollectLargeBlobs(
 		return device.SetLargeBlobs(ctx, token, state.replacement)
 	})
 	if err != nil {
+		largeBlobState.Clear()
+
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.AuthenticatorLargeBlobs,
 		))
 	}
 
+	largeBlobState.replaceBlobs(state.replacement)
 	output.Result = &result
 
 	return output, nil
@@ -82,13 +87,13 @@ func (r Runner) GarbageCollectLargeBlobs(
 func (r Runner) loadGarbageCollectState(
 	ctx context.Context,
 	device LargeBlobDevice,
+	largeBlobState *LargeBlobState,
 	grantPermission protocol.Permission,
 ) (garbageCollectState, error) {
-	inventory, err := r.credentialInventoryReport(ctx, device, grantPermission)
+	inventory, err := r.loadLargeBlobInventory(ctx, device, largeBlobState, grantPermission)
 	if err != nil {
 		return garbageCollectState{}, err
 	}
-	defer zeroCredentialInventoryReport(&inventory)
 
 	support := buildLargeBlobSupportReport(device.GetInfo())
 	if !support.LargeBlobs {
@@ -97,20 +102,15 @@ func (r Runner) loadGarbageCollectState(
 		)
 	}
 
-	blobs, err := r.readLargeBlobArray(ctx, device)
+	sizeBefore, err := serializedLargeBlobArraySize(inventory.blobs)
 	if err != nil {
 		return garbageCollectState{}, err
 	}
 
-	sizeBefore, err := serializedLargeBlobArraySize(blobs)
-	if err != nil {
-		return garbageCollectState{}, err
-	}
-
-	keys := largeBlobKeys(inventory)
-	replacement := make([]protocol.LargeBlob, 0, len(blobs))
+	keys := largeBlobKeys(inventory.credentials)
+	replacement := make([]protocol.LargeBlob, 0, len(inventory.blobs))
 	var matchedCount, unmatchedCount int
-	for _, blob := range blobs {
+	for _, blob := range inventory.blobs {
 		if !largeBlobMapConforming(blob) {
 			replacement = append(replacement, blob)
 			continue
@@ -124,7 +124,6 @@ func (r Runner) loadGarbageCollectState(
 
 		unmatchedCount++
 	}
-	zeroKeys(keys)
 
 	sizeAfter, err := serializedLargeBlobArraySize(replacement)
 	if err != nil {
@@ -137,7 +136,7 @@ func (r Runner) loadGarbageCollectState(
 
 	return garbageCollectState{
 		support:        support,
-		blobs:          blobs,
+		blobs:          inventory.blobs,
 		replacement:    replacement,
 		matchedCount:   matchedCount,
 		unmatchedCount: unmatchedCount,
@@ -224,10 +223,4 @@ func blobMatchesAnyKey(blob protocol.LargeBlob, keys [][]byte) bool {
 
 func largeBlobMapConforming(blob protocol.LargeBlob) bool {
 	return len(blob.Nonce) == 12 && blob.Ciphertext != nil
-}
-
-func zeroKeys(keys [][]byte) {
-	for _, key := range keys {
-		secret.Zero(key)
-	}
 }

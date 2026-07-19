@@ -55,9 +55,15 @@ func estimateSerializedArraySize(state targetBlobState, payload []byte, operatio
 		return 0, err
 	}
 
-	replacement := replaceBlob(state.blobs, state.currentBlobIndex, blob, operation)
+	if operation == applargeblobs.MutationReplace && state.currentBlobIndex >= 0 {
+		current := state.blobs[state.currentBlobIndex]
+		state.blobs[state.currentBlobIndex] = blob
+		size, sizeErr := serializedLargeBlobArraySize(state.blobs)
+		state.blobs[state.currentBlobIndex] = current
+		return size, sizeErr
+	}
 
-	size, err := serializedLargeBlobArraySize(replacement)
+	size, err := serializedLargeBlobArraySize(append(state.blobs, blob))
 	if err != nil {
 		return 0, err
 	}

@@ -117,6 +117,10 @@ func TestTokenServiceDefaultFlowRequestsUVInteractionBeforeUVCommand(t *testing.
 		t.Fatalf("interaction kind = %s, want user-verification", requests[0].Kind)
 	}
 
+	if requests[0].UVModality == nil || *requests[0].UVModality != protocol.UserVerifyFingerprintInternal {
+		t.Fatalf("interaction uv modality = %#v, want fingerprint", requests[0].UVModality)
+	}
+
 	if !authenticator.uvSawInteraction {
 		t.Fatal("UV command ran before user-verification interaction was recorded")
 	}
@@ -797,6 +801,7 @@ func acquireTokenForTest(
 
 func uvTokenInfo() protocol.AuthenticatorGetInfoResponse {
 	return protocol.AuthenticatorGetInfoResponse{
+		UvModality: new(protocol.UserVerifyFingerprintInternal),
 		Options: map[protocol.Option]bool{
 			protocol.OptionPinUvAuthToken:   true,
 			protocol.OptionUserVerification: true,

@@ -27,10 +27,14 @@ type targetBlobState struct {
 func (r Runner) loadTargetBlobState(
 	ctx context.Context,
 	device LargeBlobDevice,
-	inventory appcredentials.InventoryReport,
+	inventory *largeBlobInventory,
 	credentialIDHex string,
 ) (targetBlobState, error) {
-	target, err := rtcredentials.FindByHexID(inventory, credentialIDHex)
+	if err := ctx.Err(); err != nil {
+		return targetBlobState{}, err
+	}
+
+	target, err := rtcredentials.FindByHexID(inventory.credentials, credentialIDHex)
 	if err != nil {
 		return targetBlobState{}, err
 	}
@@ -50,12 +54,7 @@ func (r Runner) loadTargetBlobState(
 
 	key := target.Record.LargeBlobKey
 
-	blobs, err := r.readLargeBlobArray(ctx, device)
-	if err != nil {
-		return targetBlobState{}, err
-	}
-
-	sizeBefore, err := serializedLargeBlobArraySize(blobs)
+	sizeBefore, err := serializedLargeBlobArraySize(inventory.blobs)
 	if err != nil {
 		return targetBlobState{}, err
 	}
@@ -65,12 +64,12 @@ func (r Runner) loadTargetBlobState(
 		support:                   support,
 		target:                    target,
 		key:                       key,
-		blobs:                     blobs,
+		blobs:                     inventory.blobs,
 		currentBlobIndex:          -1,
 		serializedArraySizeBefore: sizeBefore,
 	}
 
-	for index, candidate := range blobs {
+	for index, candidate := range inventory.blobs {
 		raw, err := crypto.DecryptLargeBlob(key, candidate)
 		if err != nil {
 			continue
@@ -86,6 +85,5 @@ func (r Runner) loadTargetBlobState(
 }
 
 func (state *targetBlobState) zero() {
-	secret.Zero(state.key)
 	secret.Zero(state.currentBytes)
 }

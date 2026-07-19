@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"context"
-	"slices"
 	"strconv"
 
 	"github.com/fxamacker/cbor/v2"
@@ -73,15 +72,13 @@ func replaceBlob(
 	blob protocol.LargeBlob,
 	operation applargeblobs.MutationOperation,
 ) []protocol.LargeBlob {
-	out := slices.Clone(blobs)
-
 	if operation == applargeblobs.MutationReplace && index >= 0 {
-		out[index] = blob
+		blobs[index] = blob
 
-		return out
+		return blobs
 	}
 
-	return append(out, blob)
+	return append(blobs, blob)
 }
 
 func removeBlobAt(blobs []protocol.LargeBlob, index int) []protocol.LargeBlob {
