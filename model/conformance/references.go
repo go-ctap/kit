@@ -26,7 +26,7 @@ func getInfoRequirement(target Target, clause string, level RequirementLevel) Re
 	case SpecificationCTAP23:
 		return requirement(SpecificationCTAP23, "6.4", clause, ctap23URL+"#authenticatorGetInfo", level)
 	default:
-		panic("conformance: unsupported GetInfo specification " + string(target.Specification))
+		return RequirementRef{}
 	}
 }
 
@@ -37,7 +37,7 @@ func mandatoryRequirement(target Target, item, clause string) RequirementRef {
 	case SpecificationCTAP23:
 		return requirement(SpecificationCTAP23, "9", "item-"+item+"-"+clause, ctap23URL+"#mandatory-features", RequirementMust)
 	default:
-		panic("conformance: unsupported mandatory-features specification " + string(target.Specification))
+		return RequirementRef{}
 	}
 }
 
@@ -52,6 +52,6 @@ func featureRequirement(target Target, section, clause, anchor string, level Req
 	case SpecificationCTAP23:
 		return requirement(SpecificationCTAP23, section, clause, ctap23URL+anchor, level)
 	default:
-		panic("conformance: unsupported feature specification " + string(target.Specification))
+		return RequirementRef{}
 	}
 }

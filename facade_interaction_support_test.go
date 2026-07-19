@@ -1,6 +1,7 @@
 package ctapkit
 
 import (
+	"context"
 	"sync"
 	"testing"
 
@@ -10,8 +11,17 @@ import (
 
 type interactionHandlerFunc func(model.InteractionRequest) (model.InteractionResponse, error)
 
-func (f interactionHandlerFunc) RequestInteraction(req model.InteractionRequest) (model.InteractionResponse, error) {
+func (f interactionHandlerFunc) RequestInteraction(_ context.Context, req model.InteractionRequest) (model.InteractionResponse, error) {
 	return f(req)
+}
+
+type contextualInteractionHandlerFunc func(context.Context, model.InteractionRequest) (model.InteractionResponse, error)
+
+func (f contextualInteractionHandlerFunc) RequestInteraction(
+	ctx context.Context,
+	req model.InteractionRequest,
+) (model.InteractionResponse, error) {
+	return f(ctx, req)
 }
 
 func userVerificationHandler(t *testing.T) model.InteractionHandler {
@@ -31,7 +41,7 @@ type recordingEventSink struct {
 	events []model.OperationEvent
 }
 
-func (s *recordingEventSink) Emit(event model.OperationEvent) {
+func (s *recordingEventSink) Emit(_ context.Context, event model.OperationEvent) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

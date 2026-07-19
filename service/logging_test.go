@@ -45,11 +45,38 @@ func TestInvalidSelectionOperationAppendsCompletedEntry(t *testing.T) {
 	}
 }
 
+func TestOperationLoggingMarksDryRuns(t *testing.T) {
+	service := New()
+
+	_, err := service.DeleteCredential(context.Background(), CredentialDeleteRequest{
+		OperationRequest: OperationRequest{SelectionID: "missing-selection"},
+		CredentialIDHex:  "01",
+		DryRun:           true,
+	})
+	if err != nil {
+		t.Fatalf("DeleteCredential: %v", err)
+	}
+	_, err = service.DeleteCredential(context.Background(), CredentialDeleteRequest{
+		OperationRequest: OperationRequest{SelectionID: "missing-selection"},
+		CredentialIDHex:  "01",
+	})
+	if err != nil {
+		t.Fatalf("DeleteCredential execute: %v", err)
+	}
+
+	logs := serviceLogs(t, service)
+	if len(logs) != 2 || !logs[0].Entry.DryRun {
+		t.Fatalf("dry-run operation log = %#v", logs)
+	}
+	if logs[1].Entry.DryRun {
+		t.Fatalf("execute operation marked as dry-run = %#v", logs[1])
+	}
+}
+
 func TestOperationLoggingOmitsPayloadsAndSecrets(t *testing.T) {
 	const (
-		currentPIN   = "sentinel-current-pin-1182"
-		newPIN       = "sentinel-new-pin-9921"
-		confirmation = "sentinel-reset-confirmation-5512"
+		currentPIN = "sentinel-current-pin-1182"
+		newPIN     = "sentinel-new-pin-9921"
 	)
 	service := New()
 	service.selected = newSelection("selection-1", report.DeviceReport{}, &recordingAuthenticator{
@@ -57,11 +84,9 @@ func TestOperationLoggingOmitsPayloadsAndSecrets(t *testing.T) {
 	})
 
 	_, err := service.ChangePIN(context.Background(), PINChangeRequest{
-		OperationRequest:    OperationRequest{SelectionID: "selection-1"},
-		CurrentPIN:          currentPIN,
-		NewPIN:              newPIN,
-		Confirmed:           true,
-		ConfirmationMessage: confirmation,
+		OperationRequest: OperationRequest{SelectionID: "selection-1"},
+		CurrentPIN:       currentPIN,
+		NewPIN:           newPIN,
 	})
 	if err != nil {
 		t.Fatalf("ChangePIN: %v", err)
@@ -81,7 +106,7 @@ func TestOperationLoggingOmitsPayloadsAndSecrets(t *testing.T) {
 		t.Fatalf("Marshal logs: %v", err)
 	}
 	serialized := string(raw)
-	for _, secret := range []string{currentPIN, newPIN, confirmation} {
+	for _, secret := range []string{currentPIN, newPIN} {
 		if strings.Contains(serialized, secret) || strings.Contains(serialized, base64.StdEncoding.EncodeToString([]byte(secret))) {
 			t.Fatalf("logs contain %q: %s", secret, serialized)
 		}
@@ -187,13 +212,14 @@ func TestProgressLoggingDoesNotDuplicateOperationEvent(t *testing.T) {
 	emitter := newCountingLogEmitter()
 	service := New(WithEventEmitter(emitter))
 	service.selected = newSelection("selection-1", report.DeviceReport{}, nil)
-	service.selected.operations["operation-1"] = &operationState{
+	operation := &operationState{
 		id:          "operation-1",
 		selectionID: "selection-1",
 		kind:        model.OperationListCredentials,
 	}
+	service.selected.operations[operation.id] = operation
 
-	selectionEventSink{service: service, selectionID: "selection-1"}.Emit(model.OperationEvent{
+	operationEventSink{service: service, operation: operation}.Emit(context.Background(), model.OperationEvent{
 		Stage: model.OperationStageEnumeratingCredentials,
 	})
 	if got := emitter.count(EventOperationEvent); got != 1 {
@@ -224,7 +250,6 @@ func TestInteractionLoggingAppendsMetadataOnlyEntriesWithoutDuplicatePrompt(t *t
 	}
 	handler := interactionHandler{
 		service:     service,
-		ctx:         t.Context(),
 		done:        done,
 		selectionID: "selection-1",
 		operationID: "operation-1",
@@ -233,7 +258,7 @@ func TestInteractionLoggingAppendsMetadataOnlyEntriesWithoutDuplicatePrompt(t *t
 
 	result := make(chan error, 1)
 	go func() {
-		_, err := handler.RequestInteraction(model.InteractionRequest{Kind: model.InteractionKindPIN})
+		_, err := handler.RequestInteraction(t.Context(), model.InteractionRequest{Kind: model.InteractionKindPIN})
 		result <- err
 	}()
 	prompt := <-emitter.prompts

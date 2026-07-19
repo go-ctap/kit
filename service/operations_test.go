@@ -45,14 +45,12 @@ func TestCTAP23ServiceRequestsMapPresenceAndNewOperations(t *testing.T) {
 	runtime.result = model.AuthenticatorConfigOutput{}
 	if _, err := service.EnableLongTouchForReset(context.Background(), EnableLongTouchForResetRequest{
 		OperationRequest: OperationRequest{SelectionID: "selection-1"},
-		Confirmed:        true,
 	}); err != nil {
 		t.Fatalf("EnableLongTouchForReset: %v", err)
 	}
 
-	longTouch := runtime.operation.(model.EnableLongTouchForResetOperation)
-	if !longTouch.Confirmed {
-		t.Fatalf("long-touch operation = %#v", longTouch)
+	if _, ok := runtime.operation.(model.EnableLongTouchForResetOperation); !ok {
+		t.Fatalf("long-touch operation = %T", runtime.operation)
 	}
 }
 
@@ -156,11 +154,11 @@ func TestOperationEnvelopeReportsAndRetiresClosedSelection(t *testing.T) {
 
 func TestPINRequestsRoundTripSecrets(t *testing.T) {
 	var setPIN PINSetRequest
-	if err := json.Unmarshal([]byte(`{"selectionId":"selection-1","newPIN":"123456","confirmed":true}`), &setPIN); err != nil {
+	if err := json.Unmarshal([]byte(`{"selectionId":"selection-1","newPIN":"123456"}`), &setPIN); err != nil {
 		t.Fatalf("unmarshal set PIN request: %v", err)
 	}
 
-	if setPIN.SelectionID != "selection-1" || setPIN.NewPIN != "123456" || !setPIN.Confirmed {
+	if setPIN.SelectionID != "selection-1" || setPIN.NewPIN != "123456" {
 		t.Fatalf("unexpected set PIN request: %#v", setPIN)
 	}
 

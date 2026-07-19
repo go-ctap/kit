@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/errornorm"
-	"github.com/go-ctap/kit/internal/secret"
+	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/samber/lo"
@@ -18,13 +18,18 @@ func (r Runner) bioList(ctx context.Context) (appconfig.BioListReport, error) {
 		return appconfig.BioListReport{}, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.env.Authenticator, protocol.PermissionBioEnrollment, "")
-	if err != nil {
-		return appconfig.BioListReport{}, err
-	}
-	defer secret.Zero(token)
+	var report appconfig.BioListReport
+	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
+		Permission: protocol.PermissionBioEnrollment,
+		ReplaySafe: true,
+	}, func(token []byte) error {
+		var err error
+		report, err = r.bioListReport(ctx, status, token)
 
-	return r.bioListReport(ctx, status, token)
+		return err
+	})
+
+	return report, err
 }
 
 func (r Runner) bioSensorReport(ctx context.Context) (appconfig.BioSensorReport, error) {

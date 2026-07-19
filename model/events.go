@@ -1,5 +1,7 @@
 package model
 
+import "context"
+
 type OperationStage string
 
 const (
@@ -19,9 +21,9 @@ type OperationEvent struct {
 }
 
 type EventSink interface {
-	Emit(OperationEvent)
+	Emit(context.Context, OperationEvent)
 }
 
 type NoopEventSink struct{}
 
-func (NoopEventSink) Emit(OperationEvent) {}
+func (NoopEventSink) Emit(context.Context, OperationEvent) {}

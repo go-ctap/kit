@@ -9,6 +9,7 @@ import (
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/errornorm"
+	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
@@ -37,7 +38,10 @@ func (r Runner) credentialInventoryReport(
 	}
 
 	var report appcredentials.InventoryReport
-	err = r.env.Tokens.Use(ctx, r.env.Authenticator, grantPermission, "", func(token []byte) error {
+	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
+		Permission: grantPermission,
+		ReplaySafe: true,
+	}, func(token []byte) error {
 		current, err := r.buildCredentialInventoryReport(ctx, token, permission)
 		if err != nil {
 			return err
@@ -161,7 +165,7 @@ func (r Runner) buildCredentialInventoryReport(
 
 		rpResponses = append(rpResponses, rpResponse)
 
-		r.env.Events.Emit(model.OperationEvent{
+		r.env.Events.Emit(ctx, model.OperationEvent{
 			Stage:     model.OperationStageEnumeratingRPs,
 			Completed: new(uint64(len(rpResponses))),
 			Total:     &rpTotal,
@@ -226,7 +230,7 @@ func (r Runner) buildCredentialInventoryReport(
 			group.Credentials = append(group.Credentials, record)
 			report.Summary.TotalCredentials++
 
-			r.env.Events.Emit(model.OperationEvent{
+			r.env.Events.Emit(ctx, model.OperationEvent{
 				Stage:     model.OperationStageEnumeratingCredentials,
 				Completed: new(uint64(report.Summary.TotalCredentials)),
 				Total:     &credentialsTotal,

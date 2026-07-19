@@ -66,6 +66,7 @@ type LogEntry struct {
 	Outcome              LogOutcome        `json:"outcome"`
 	Code                 LogCode           `json:"code"`
 	Params               map[string]string `json:"params,omitempty"`
+	DryRun               bool              `json:"dryRun,omitempty"`
 	OperationKind        OperationKind     `json:"operationKind,omitempty"`
 	Command              string            `json:"command,omitempty"`
 	CommandCode          uint8             `json:"commandCode,omitempty"`

@@ -9,10 +9,8 @@ func (ConfigStatusOperation) IsDryRun() bool      { return false }
 func (ConfigStatusOperation) ctapkitOperation()   {}
 
 type SetAlwaysUVOperation struct {
-	Target              config.AlwaysUVTarget `json:"target"`
-	Confirmed           bool                  `json:"confirmed,omitempty"`
-	ConfirmationMessage string                `json:"confirmationMessage,omitempty"`
-	DryRun              bool                  `json:"dryRun,omitempty"`
+	Target config.AlwaysUVTarget `json:"target"`
+	DryRun bool                  `json:"dryRun,omitempty"`
 }
 
 func (SetAlwaysUVOperation) Kind() OperationKind { return OperationSetAlwaysUV }
@@ -24,8 +22,6 @@ type SetMinPINLengthOperation struct {
 	MinPINLengthRPIDs   []string `json:"minPinLengthRPIDs,omitempty"`
 	ForceChangePIN      bool     `json:"forceChangePin,omitempty"`
 	PINComplexityPolicy bool     `json:"pinComplexityPolicy,omitempty"`
-	Confirmed           bool     `json:"confirmed,omitempty"`
-	ConfirmationMessage string   `json:"confirmationMessage,omitempty"`
 	DryRun              bool     `json:"dryRun,omitempty"`
 }
 
@@ -34,9 +30,7 @@ func (op SetMinPINLengthOperation) IsDryRun() bool   { return op.DryRun }
 func (SetMinPINLengthOperation) ctapkitOperation()   {}
 
 type EnableLongTouchForResetOperation struct {
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	DryRun bool `json:"dryRun,omitempty"`
 }
 
 func (EnableLongTouchForResetOperation) Kind() OperationKind {

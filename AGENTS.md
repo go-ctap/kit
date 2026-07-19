@@ -12,8 +12,15 @@
 
 ## Boundaries
 - Public runtime API belongs in `ctapkit`; DTOs in `model`; device/transport abstractions in `device` and `transport`.
-- Sessions, operations, workflows, authenticator handles, caches, tokens, and secrets stay private under `internal/`.
+- Sessions, workflows, authenticator handles, caches, tokens, and secrets stay private under `internal/`.
+- Wails service facades, request envelopes, client interaction state, and product-specific orchestration belong in the consuming application, not in this runtime.
 - When behavior is unclear, read the package that owns the concern before changing it.
+
+## Trust Boundary
+- `ctapkit` and its consuming applications are trusted first-party layers. Do not add defensive copies, normalization, immutable wrappers, or redundant validation solely to protect one trusted layer from programmer mistakes in another.
+- Caller-owned result mutation is outside the runtime threat model. Protect runtime-owned mutable state from races, but do not redesign APIs merely because a caller could mutate a returned Go value.
+- Wails-compatible public DTOs may expose fields needed by binding generation. The application/client boundary owns transport redaction, display policy, and persistence policy for those fields.
+- The runtime must still never log secrets or retain them longer than required. Internal token material remains runtime-owned and must be wiped on release.
 
 ## Safety And Runtime
 - Rely on `go-ctaphid` for per-command CTAP serialization.
@@ -21,9 +28,9 @@
 - Do not add process-wide or cross-process device leases; CTAPHID channel isolation owns multi-client transport coordination.
 - Treat authenticator state as externally mutable between commands and handle resulting CTAP errors without assuming workflow-level atomicity.
 - Public close/cancel/continue paths must release owned resources and tolerate duplicate or racing consumer calls.
-- Never log, marshal, or expose `pinUvAuthToken`, PINs, reset phrases, or tokens.
-- When taking ownership of caller-provided secret bytes, copy them and wipe the caller-owned buffer at that boundary.
-- Mutating operations must support dry-run and explicit confirmation; destructive operations require strong confirmation semantics.
+- Never log or persist `pinUvAuthToken`, PINs, reset phrases, or tokens. Do not hide Wails-bound DTO fields with custom JSON marshaling merely to enforce this policy; the client boundary is responsible for transport and presentation redaction.
+- When the runtime creates or owns secret byte buffers, wipe them at release. Do not mutate caller-owned buffers unless the API explicitly transfers ownership.
+- Mutating operations should expose dry-run previews when useful, but dry-run is optional for callers and the runtime must not enforce product confirmation flows. The consuming client owns warnings, confirmation UX, and the decision to execute destructive operations.
 
 ## API And Go
 - Following Go formatting/style is critical: use `gofmt`/`goimports`, Google Go Style Guide, and Go Code Review Comments.

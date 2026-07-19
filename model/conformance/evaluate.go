@@ -99,17 +99,18 @@ func evaluateGetInfo(info protocol.AuthenticatorGetInfoResponse, target Target) 
 		}
 
 		if activeRules[rule.id] {
-			panic("conformance: multiple rule variants selected for " + string(rule.id))
+			continue
 		}
 		activeRules[rule.id] = true
 
 		baseReferences := rule.references(&context)
 		for _, result := range rule.evaluate(&context) {
-			references := lo.UniqBy(
+			references := lo.Filter(lo.UniqBy(
 				slices.Concat(baseReferences, result.references),
 				func(reference RequirementRef) RequirementID { return reference.ID },
-			)
-			validateAssessmentReferences(target, references)
+			), func(reference RequirementRef, _ int) bool {
+				return reference.ID != "" && reference.Specification == target.Specification
+			})
 			key := assessmentKey(rule.id, result)
 			if seen[key] {
 				continue
@@ -139,19 +140,6 @@ func evaluateGetInfo(info protocol.AuthenticatorGetInfoResponse, target Target) 
 	}
 
 	return report
-}
-
-func validateAssessmentReferences(target Target, references []RequirementRef) {
-	for _, reference := range references {
-		if reference.Specification != target.Specification {
-			panic(fmt.Sprintf(
-				"conformance: reference %q uses %q for target %q",
-				reference.ID,
-				reference.Specification,
-				target.Specification,
-			))
-		}
-	}
 }
 
 func assessmentKey(id RuleID, result assessment) string {

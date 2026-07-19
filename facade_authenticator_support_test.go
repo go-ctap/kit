@@ -63,7 +63,25 @@ func TestOpenAuthenticatorMakesJournalAvailableWhileOpeningAuthenticator(t *test
 	}
 }
 
-func openContractAuthenticator(t *testing.T, events model.EventSink, open authenticatorOpenFunc) *Authenticator {
+type contractAuthenticatorHandle struct {
+	*Authenticator
+	events model.EventSink
+}
+
+func (a *contractAuthenticatorHandle) Run(
+	ctx context.Context,
+	operation model.Operation,
+	handler model.InteractionHandler,
+	opts ...OperationOption,
+) (model.OperationResult, error) {
+	if a.events != nil {
+		opts = append(opts, WithEventSink(a.events))
+	}
+
+	return a.Authenticator.Run(ctx, operation, handler, opts...)
+}
+
+func openContractAuthenticator(t *testing.T, events model.EventSink, open authenticatorOpenFunc) *contractAuthenticatorHandle {
 	return openContractAuthenticatorWithOptions(t, events, open)
 }
 
@@ -72,7 +90,7 @@ func openContractAuthenticatorWithOptions(
 	events model.EventSink,
 	open authenticatorOpenFunc,
 	opts ...AuthenticatorOption,
-) *Authenticator {
+) *contractAuthenticatorHandle {
 	t.Helper()
 
 	if open == nil {
@@ -81,23 +99,17 @@ func openContractAuthenticatorWithOptions(
 		}
 	}
 
-	sessionOpts := []AuthenticatorOption(nil)
-	if events != nil {
-		sessionOpts = append(sessionOpts, WithEventSink(events))
-	}
-	sessionOpts = append(sessionOpts, opts...)
-
 	opened, err := openAuthenticatorHandle(
 		context.Background(),
 		newContractDevice(),
 		open,
-		sessionOpts...,
+		opts...,
 	)
 	if err != nil {
 		t.Fatalf("OpenAuthenticator: %v", err)
 	}
 
-	return opened
+	return &contractAuthenticatorHandle{Authenticator: opened, events: events}
 }
 
 func newContractDevice() Device {

@@ -1,6 +1,10 @@
 package runtime
 
-import "github.com/go-ctap/kit/model"
+import (
+	"context"
+
+	"github.com/go-ctap/kit/model"
+)
 
 type EventDispatcher struct {
 	sink model.EventSink
@@ -14,10 +18,10 @@ func NewEventDispatcher(sink model.EventSink) *EventDispatcher {
 	return &EventDispatcher{sink: sink}
 }
 
-func (d *EventDispatcher) Emit(event model.OperationEvent) {
+func (d *EventDispatcher) Emit(ctx context.Context, event model.OperationEvent) {
 	if d == nil || d.sink == nil {
 		return
 	}
 
-	d.sink.Emit(event)
+	d.sink.Emit(ctx, event)
 }

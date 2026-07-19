@@ -86,7 +86,7 @@ func TestEnableLongTouchForResetDryRunAndRefreshFailureCacheEffects(t *testing.T
 		t.Fatalf("dry run result/calls = %#v/%d", dryRun, a.enableCalls.Load())
 	}
 
-	result, err := session.Run(context.Background(), model.EnableLongTouchForResetOperation{Confirmed: true}, nil)
+	result, err := session.Run(context.Background(), model.EnableLongTouchForResetOperation{}, nil)
 	if !failure.IsCode(err, failure.CodeInternalError) || !errors.Is(err, refreshErr) {
 		t.Fatalf("execute error = %v, want refresh failure", err)
 	}
@@ -116,7 +116,7 @@ func TestEnableLongTouchForResetSuccess(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Run(context.Background(), model.EnableLongTouchForResetOperation{Confirmed: true}, nil)
+	result, err := session.Run(context.Background(), model.EnableLongTouchForResetOperation{}, nil)
 	if err != nil {
 		t.Fatalf("EnableLongTouchForReset: %v", err)
 	}
@@ -138,7 +138,6 @@ func TestSetMinPINLengthPassesParametersWithoutDefaults(t *testing.T) {
 		MinPINLengthRPIDs:   []string{"example.com"},
 		ForceChangePIN:      true,
 		PINComplexityPolicy: true,
-		Confirmed:           true,
 	}, nil)
 	if err != nil {
 		t.Fatalf("SetMinPINLength: %v", err)

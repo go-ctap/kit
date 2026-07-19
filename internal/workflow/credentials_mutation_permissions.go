@@ -30,16 +30,6 @@ func (r Runner) inventoryMutationPermissions(
 	return grant, grant, nil
 }
 
-func (r Runner) credentialMutationRPID(
-	target appcredentials.CredentialTarget,
-) string {
-	if !r.env.StrictPermissions {
-		return ""
-	}
-
-	return target.RP.ID
-}
-
 func credentialDescriptor(record appcredentials.CredentialRecord) (credential.PublicKeyCredentialDescriptor, error) {
 	id, err := hex.DecodeString(record.CredentialIDHex)
 	if err != nil {

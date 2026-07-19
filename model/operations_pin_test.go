@@ -4,17 +4,15 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-
-	"github.com/go-ctap/kit/model/failure"
 )
 
-func TestPINOperationsDecodeSecretsButDoNotMarshalThem(t *testing.T) {
+func TestPINOperationsParticipateInJSONTransport(t *testing.T) {
 	var setPIN SetPINOperation
-	if err := json.Unmarshal([]byte(`{"newPIN":"123456","confirmed":true}`), &setPIN); err != nil {
+	if err := json.Unmarshal([]byte(`{"newPIN":"123456"}`), &setPIN); err != nil {
 		t.Fatalf("unmarshal set PIN: %v", err)
 	}
 
-	if setPIN.NewPIN != "123456" || !setPIN.Confirmed {
+	if setPIN.NewPIN != "123456" {
 		t.Fatalf("unexpected set PIN operation: %#v", setPIN)
 	}
 
@@ -23,8 +21,8 @@ func TestPINOperationsDecodeSecretsButDoNotMarshalThem(t *testing.T) {
 		t.Fatalf("marshal set PIN: %v", err)
 	}
 
-	if strings.Contains(string(raw), "123456") || strings.Contains(string(raw), "newPIN") {
-		t.Fatalf("set PIN operation marshaled secret: %s", raw)
+	if !strings.Contains(string(raw), `"newPIN":"123456"`) {
+		t.Fatalf("set PIN operation JSON = %s", raw)
 	}
 
 	var changePIN ChangePINOperation
@@ -41,27 +39,19 @@ func TestPINOperationsDecodeSecretsButDoNotMarshalThem(t *testing.T) {
 		t.Fatalf("marshal change PIN: %v", err)
 	}
 
-	if strings.Contains(string(raw), "123456") || strings.Contains(string(raw), "654321") ||
-		strings.Contains(string(raw), "currentPIN") || strings.Contains(string(raw), "newPIN") {
-		t.Fatalf("change PIN operation marshaled secret: %s", raw)
+	if !strings.Contains(string(raw), `"currentPIN":"123456"`) ||
+		!strings.Contains(string(raw), `"newPIN":"654321"`) {
+		t.Fatalf("change PIN operation JSON = %s", raw)
 	}
 }
 
-func TestPINOperationsWrapInvalidJSONWithoutExposingInput(t *testing.T) {
-	const malformed = `{"newPIN":"super-secret","confirmed":"invalid"}`
+func TestPINOperationsRejectInvalidJSON(t *testing.T) {
+	const malformed = `{"newPIN":false}`
 
 	for _, target := range []any{new(SetPINOperation), new(ChangePINOperation)} {
 		err := json.Unmarshal([]byte(malformed), target)
-		if !failure.IsCode(err, failure.CodeRequestJSONInvalid) {
-			t.Fatalf("Unmarshal(%T) error = %v, want %s", target, err, failure.CodeRequestJSONInvalid)
-		}
-
-		if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
-			t.Fatalf("Unmarshal(%T) phase = %q, want %q", target, got, failure.PhaseValidation)
-		}
-
-		if strings.Contains(err.Error(), "super-secret") {
-			t.Fatalf("Unmarshal(%T) error exposed PIN input: %v", target, err)
+		if err == nil {
+			t.Fatalf("Unmarshal(%T) error = nil", target)
 		}
 	}
 }

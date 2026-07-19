@@ -13,6 +13,7 @@ import (
 	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
+	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/transport"
 	"github.com/samber/lo"
@@ -149,7 +150,6 @@ func TestCredentialMutationUsesInventoryFromSuccessfulRefresh(t *testing.T) {
 
 	if _, err := session.Run(context.Background(), model.DeleteCredentialOperation{
 		CredentialIDHex: "02",
-		Confirmed:       true,
 	}, userVerificationHandler(t)); err != nil {
 		t.Fatalf("DeleteCredential: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestCredentialInventoryProgressEventsIncludeCounts(t *testing.T) {
 	})
 }
 
-func TestCredentialDeleteUsesUnscopedMutationPermissionsByDefault(t *testing.T) {
+func TestCredentialDeleteReusesUnscopedInventoryGrant(t *testing.T) {
 	a := &credentialMutationTokenAuthenticator{}
 	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
@@ -194,7 +194,6 @@ func TestCredentialDeleteUsesUnscopedMutationPermissionsByDefault(t *testing.T) 
 
 	_, err := session.Run(context.Background(), model.DeleteCredentialOperation{
 		CredentialIDHex: "c05e",
-		Confirmed:       true,
 	}, userVerificationHandler(t))
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -203,36 +202,7 @@ func TestCredentialDeleteUsesUnscopedMutationPermissionsByDefault(t *testing.T) 
 	assertCredentialMutationToken(t, a.tokenRPIDs, []string{""}, a.deleteTokens, "token:")
 }
 
-func TestCredentialDeleteUsesScopedMutationPermissionsWhenStrict(t *testing.T) {
-	a := &credentialMutationTokenAuthenticator{}
-	session := openContractAuthenticatorWithOptions(
-		t,
-		nil,
-		func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-			return a, nil
-		},
-		WithStrictPermissions(),
-	)
-	defer func() { _ = session.Close() }()
-
-	_, err := session.Run(context.Background(), model.DeleteCredentialOperation{
-		CredentialIDHex: "c05e",
-		Confirmed:       true,
-	}, userVerificationHandler(t))
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-
-	assertCredentialMutationToken(
-		t,
-		a.tokenRPIDs,
-		[]string{"", "id.example"},
-		a.deleteTokens,
-		"token:id.example",
-	)
-}
-
-func TestCredentialUpdateUserUsesUnscopedMutationPermissionsByDefault(t *testing.T) {
+func TestCredentialUpdateUserUsesTargetWithoutInventory(t *testing.T) {
 	a := &credentialMutationTokenAuthenticator{}
 	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
@@ -240,47 +210,60 @@ func TestCredentialUpdateUserUsesUnscopedMutationPermissionsByDefault(t *testing
 	defer func() { _ = session.Close() }()
 
 	_, err := session.Run(context.Background(), model.UpdateCredentialUserOperation{
-		CredentialIDHex: "c05e",
-		Name:            "updated",
-		NameProvided:    true,
-		Confirmed:       true,
+		Target:       credentialMutationTarget(),
+		Name:         "updated",
+		NameProvided: true,
 	}, userVerificationHandler(t))
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
 	assertCredentialMutationToken(t, a.tokenRPIDs, []string{""}, a.updateTokens, "token:")
+	if got := a.metadataCalls.Load(); got != 0 {
+		t.Fatalf("metadata calls = %d, want 0", got)
+	}
 }
 
-func TestCredentialUpdateUserUsesScopedMutationPermissionsWhenStrict(t *testing.T) {
+func TestCredentialUpdateUserDryRunUsesTargetWithoutAuthenticatorCommands(t *testing.T) {
 	a := &credentialMutationTokenAuthenticator{}
-	session := openContractAuthenticatorWithOptions(
-		t,
-		nil,
-		func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-			return a, nil
-		},
-		WithStrictPermissions(),
-	)
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
 	defer func() { _ = session.Close() }()
 
-	_, err := session.Run(context.Background(), model.UpdateCredentialUserOperation{
-		CredentialIDHex: "c05e",
-		Name:            "updated",
-		NameProvided:    true,
-		Confirmed:       true,
-	}, userVerificationHandler(t))
+	result, err := session.Run(context.Background(), model.UpdateCredentialUserOperation{
+		Target:       credentialMutationTarget(),
+		Name:         "updated",
+		NameProvided: true,
+		DryRun:       true,
+	}, nil)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
-	assertCredentialMutationToken(
-		t,
-		a.tokenRPIDs,
-		[]string{"", "id.example"},
-		a.updateTokens,
-		"token:id.example",
-	)
+	output := result.(model.CredentialUpdateOutput)
+	if output.Preview.Proposed.Name != "updated" {
+		t.Fatalf("proposed name = %q, want updated", output.Preview.Proposed.Name)
+	}
+
+	if got := a.metadataCalls.Load(); got != 0 {
+		t.Fatalf("metadata calls = %d, want 0", got)
+	}
+
+	if len(a.tokenRPIDs) != 0 || len(a.updateTokens) != 0 {
+		t.Fatalf("dry-run token/update calls = %q/%q, want none", a.tokenRPIDs, a.updateTokens)
+	}
+}
+
+func credentialMutationTarget() appcredentials.CredentialTarget {
+	return appcredentials.CredentialTarget{
+		Record: appcredentials.CredentialRecord{
+			CredentialIDHex: "c05e",
+			CredentialType:  string(credential.PublicKeyCredentialTypePublicKey),
+		},
+		RP:   appcredentials.RelyingParty{ID: "id.example", Name: "Example"},
+		User: appcredentials.UserIdentity{UserIDHex: "75736572", Name: "savely", DisplayName: "Savely"},
+	}
 }
 
 type progressCredentialAuthenticator struct {
@@ -451,7 +434,7 @@ func (a *refreshCredentialAuthenticator) EnumerateCredentials(
 	}
 }
 
-func runCredentialList(t *testing.T, session *Authenticator, operation model.ListCredentialsOperation) model.CredentialsOutput {
+func runCredentialList(t *testing.T, session *contractAuthenticatorHandle, operation model.ListCredentialsOperation) model.CredentialsOutput {
 	t.Helper()
 
 	result, err := session.Run(context.Background(), operation, userVerificationHandler(t))
@@ -557,6 +540,7 @@ func progressCredentialResponse(
 type credentialMutationTokenAuthenticator struct {
 	contractAuthenticator
 	credentialManagementReadOnly bool
+	metadataCalls                atomic.Int32
 	tokenPermissions             []protocol.Permission
 	tokenRPIDs                   []string
 	deleteTokens                 []string
@@ -596,6 +580,8 @@ func (a *credentialMutationTokenAuthenticator) GetCredsMetadata(
 	context.Context,
 	[]byte,
 ) (protocol.AuthenticatorCredentialManagementResponse, error) {
+	a.metadataCalls.Add(1)
+
 	return protocol.AuthenticatorCredentialManagementResponse{
 		ExistingResidentCredentialsCount:             new(uint(1)),
 		MaxPossibleRemainingResidentCredentialsCount: new(uint(8)),

@@ -5,21 +5,21 @@ import (
 
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/authenticator"
+	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/report"
 )
 
 type Environment struct {
-	Selected          report.DeviceReport
-	Authenticator     authenticator.Device
-	Events            EventEmitter
-	Interactions      InteractionRequester
-	Tokens            TokenService
-	StrictPermissions bool
+	Selected      report.DeviceReport
+	Authenticator authenticator.Device
+	Events        EventEmitter
+	Interactions  InteractionRequester
+	Tokens        TokenService
 }
 
 type EventEmitter interface {
-	Emit(model.OperationEvent)
+	Emit(context.Context, model.OperationEvent)
 }
 
 type InteractionRequester interface {
@@ -27,12 +27,9 @@ type InteractionRequester interface {
 }
 
 type TokenService interface {
-	Acquire(context.Context, authenticator.TokenProvider, protocol.Permission, string) ([]byte, error)
 	Use(
 		context.Context,
-		authenticator.TokenProvider,
-		protocol.Permission,
-		string,
+		rtruntime.TokenUse,
 		func([]byte) error,
 	) error
 	Invalidate()

@@ -25,7 +25,6 @@ type Service struct {
 	mu                     sync.Mutex
 	deviceMetadataCacheMu  sync.Mutex
 	emitter                EventEmitter
-	strictPermissions      bool
 	closed                 bool
 	lastDiscoverMode       transport.Mode
 	monitorCancel          context.CancelFunc
@@ -94,12 +93,6 @@ func New(opts ...Option) *Service {
 	return service
 }
 
-func WithStrictPermissions(strict bool) Option {
-	return func(service *Service) {
-		service.strictPermissions = strict
-	}
-}
-
 func WithEventEmitter(emitter EventEmitter) Option {
 	return func(service *Service) {
 		service.emitter = emitter
@@ -127,6 +120,7 @@ func (s *Service) runOperation(ctx context.Context, req OperationRequest, operat
 			Timestamp:     started.UTC(),
 			Layer:         model.LogLayerOperation,
 			Code:          model.LogCodeOperationRun,
+			DryRun:        operation.IsDryRun(),
 			OperationKind: operation.Kind(),
 			SelectionID:   string(req.SelectionID),
 			OperationID:   string(operationID),
@@ -164,10 +158,10 @@ func (s *Service) runOperation(ctx context.Context, req OperationRequest, operat
 	defer s.unregisterOperation(selected, operationID)
 
 	opts := runOptions(req.VerificationFlow)
+	opts = append(opts, ctapkit.WithEventSink(operationEventSink{service: s, operation: state}))
 	ctx = kitlog.WithCorrelation(ctx, string(req.SelectionID), string(operationID), operation.Kind())
 	result, err := selected.runtime.Run(ctx, operation, interactionHandler{
 		service:     s,
-		ctx:         ctx,
 		done:        state.done,
 		selectionID: req.SelectionID,
 		operationID: operationID,
@@ -240,9 +234,8 @@ func (s *Service) ResolveInteraction(ctx context.Context, answer InteractionAnsw
 	}
 
 	response := model.InteractionResponse{
-		PIN:       []byte(answer.PIN),
-		Confirmed: answer.Confirmed,
-		Canceled:  answer.Canceled,
+		PIN:      []byte(answer.PIN),
+		Canceled: answer.Canceled,
 	}
 
 	select {
@@ -378,54 +371,43 @@ func (s *Service) emit(name string, payload any) {
 	emitter.Emit(name, payload)
 }
 
-type selectionEventSink struct {
-	service     *Service
-	selectionID SelectionID
+type operationEventSink struct {
+	service   *Service
+	operation *operationState
 }
 
-func (s selectionEventSink) Emit(event model.OperationEvent) {
-	s.service.emitOperationEvent(s.selectionID, event)
+func (s operationEventSink) Emit(_ context.Context, event model.OperationEvent) {
+	s.service.emitOperationEvent(s.operation, event)
 }
 
-func (s *Service) emitOperationEvent(selectionID SelectionID, event model.OperationEvent) {
+func (s *Service) emitOperationEvent(operation *operationState, event model.OperationEvent) {
 	s.mu.Lock()
 	selected := s.selected
-	ok := selected != nil && selected.id == selectionID
-	var operation *operationState
-	if ok {
-		for _, operation = range selected.operations {
-			break
-		}
-	}
-
+	ok := operation != nil && selected != nil && selected.id == operation.selectionID &&
+		selected.operations[operation.id] == operation
 	s.mu.Unlock()
 	if !ok {
 		return
 	}
 
-	operationID := OperationID("")
-	if operation != nil {
-		operationID = operation.id
-		s.logs.Append(operationEventLogEntry(operation, event))
-	}
+	s.logs.Append(operationEventLogEntry(operation, event))
 
 	s.emit(EventOperationEvent, OperationEventEnvelope{
-		OperationID: operationID,
-		SelectionID: selectionID,
+		OperationID: operation.id,
+		SelectionID: operation.selectionID,
 		Event:       event,
 	})
 }
 
 type interactionHandler struct {
 	service     *Service
-	ctx         context.Context
 	done        <-chan struct{}
 	selectionID SelectionID
 	operationID OperationID
 	kind        model.OperationKind
 }
 
-func (h interactionHandler) RequestInteraction(req model.InteractionRequest) (answer model.InteractionResponse, returnErr error) {
+func (h interactionHandler) RequestInteraction(ctx context.Context, req model.InteractionRequest) (answer model.InteractionResponse, returnErr error) {
 	requestStarted := time.Now()
 	prompt := InteractionPrompt{
 		InteractionID: InteractionID(uuid.NewString()),
@@ -466,7 +448,7 @@ func (h interactionHandler) RequestInteraction(req model.InteractionRequest) (an
 	select {
 	case answer = <-response:
 		return answer, nil
-	case <-h.ctx.Done():
+	case <-ctx.Done():
 	case <-h.done:
 	}
 

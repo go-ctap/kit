@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/errornorm"
-	"github.com/go-ctap/kit/internal/secret"
+	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
 )
@@ -47,16 +47,6 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 		return output, nil
 	}
 
-	if err := r.confirmMutation(ctx, confirmationRequest{
-		confirmed:       req.Confirmed,
-		message:         req.ConfirmationMessage,
-		fallbackMessage: "Write large blob for credential " + req.CredentialIDHex + "?",
-		destructive:     false,
-		preview:         preview,
-	}); err != nil {
-		return output, err
-	}
-
 	replacement, result, err := buildWriteMutation(state, req.Payload)
 	if err != nil && failure.IsCode(err, failure.CodeLargeBlobArrayTooLarge) && result.CredentialIDHex != "" {
 		output.Result = &result
@@ -66,13 +56,11 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 		return output, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.env.Authenticator, mutationPermission, "")
-	if err != nil {
-		return output, err
-	}
-	defer secret.Zero(token)
-
-	err = r.env.Authenticator.SetLargeBlobs(ctx, token, replacement)
+	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
+		Permission: mutationPermission,
+	}, func(token []byte) error {
+		return r.env.Authenticator.SetLargeBlobs(ctx, token, replacement)
+	})
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,
@@ -122,16 +110,6 @@ func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOp
 		return output, nil
 	}
 
-	if err := r.confirmMutation(ctx, confirmationRequest{
-		confirmed:       req.Confirmed,
-		message:         req.ConfirmationMessage,
-		fallbackMessage: "Delete large blob for credential " + req.CredentialIDHex + "?",
-		destructive:     true,
-		preview:         preview,
-	}); err != nil {
-		return output, err
-	}
-
 	replacement, result, noBlob, err := buildDeleteMutation(state)
 	if err != nil {
 		return output, err
@@ -143,13 +121,11 @@ func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOp
 		return output, nil
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.env.Authenticator, mutationPermission, "")
-	if err != nil {
-		return output, err
-	}
-	defer secret.Zero(token)
-
-	err = r.env.Authenticator.SetLargeBlobs(ctx, token, replacement)
+	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
+		Permission: mutationPermission,
+	}, func(token []byte) error {
+		return r.env.Authenticator.SetLargeBlobs(ctx, token, replacement)
+	})
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,

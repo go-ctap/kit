@@ -117,17 +117,17 @@ func TestAuthenticatorCloseCancelsActiveRunAndClosesAuthenticatorOnce(t *testing
 
 	interactionEntered := make(chan struct{})
 	runDone := make(chan error, 1)
-	handler := interactionHandlerFunc(func(_ model.InteractionRequest) (model.InteractionResponse, error) {
+	handler := contextualInteractionHandlerFunc(func(ctx context.Context, _ model.InteractionRequest) (model.InteractionResponse, error) {
 		close(interactionEntered)
+		<-ctx.Done()
 
-		select {}
+		return model.InteractionResponse{}, ctx.Err()
 	})
 
 	go func() {
 		_, err := opened.Run(context.Background(), model.WriteLargeBlobOperation{
 			CredentialIDHex: "c05e",
 			Payload:         []byte("test"),
-			Confirmed:       true,
 		}, handler)
 		runDone <- err
 	}()
@@ -173,7 +173,7 @@ func TestAuthenticatorCloseCancelsActiveRunAndClosesAuthenticatorOnce(t *testing
 	}
 }
 
-func TestAuthenticatorCloseDoesNotWaitForStuckInteractionHandler(t *testing.T) {
+func TestAuthenticatorCloseCancelsContextAwareInteractionHandler(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &cancelablePINAuthenticator{
 		pinOnlyLargeBlobWriteEventAuthenticator: pinOnlyLargeBlobWriteEventAuthenticator{
@@ -186,22 +186,18 @@ func TestAuthenticatorCloseDoesNotWaitForStuckInteractionHandler(t *testing.T) {
 	})
 
 	interactionEntered := make(chan struct{})
-	unblockHandler := make(chan struct{})
 	runDone := make(chan error, 1)
-	handler := interactionHandlerFunc(func(model.InteractionRequest) (model.InteractionResponse, error) {
+	handler := contextualInteractionHandlerFunc(func(ctx context.Context, _ model.InteractionRequest) (model.InteractionResponse, error) {
 		close(interactionEntered)
-		<-unblockHandler
+		<-ctx.Done()
 
-		return model.InteractionResponse{
-			PIN: []byte("1234"),
-		}, nil
+		return model.InteractionResponse{}, ctx.Err()
 	})
 
 	go func() {
 		_, err := opened.Run(context.Background(), model.WriteLargeBlobOperation{
 			CredentialIDHex: "c05e",
 			Payload:         []byte("test"),
-			Confirmed:       true,
 		}, handler)
 		runDone <- err
 	}()
@@ -222,7 +218,7 @@ func TestAuthenticatorCloseDoesNotWaitForStuckInteractionHandler(t *testing.T) {
 			t.Fatalf("Authenticator.Close: %v", err)
 		}
 	case <-time.After(time.Second):
-		t.Fatal("Authenticator.Close waited for stuck interaction handler")
+		t.Fatal("Authenticator.Close waited for canceled interaction handler")
 	}
 
 	select {
@@ -235,8 +231,6 @@ func TestAuthenticatorCloseDoesNotWaitForStuckInteractionHandler(t *testing.T) {
 	if got := a.closeCount.Load(); got != 1 {
 		t.Fatalf("authenticator close count = %d, want 1", got)
 	}
-
-	close(unblockHandler)
 }
 
 func TestAuthenticatorCloseCancelsBlockedAuthenticatorCommand(t *testing.T) {
@@ -250,7 +244,7 @@ func TestAuthenticatorCloseCancelsBlockedAuthenticatorCommand(t *testing.T) {
 	go func() {
 		_, err := opened.Run(
 			context.Background(),
-			model.SetAlwaysUVOperation{Target: appconfig.AlwaysUVTargetEnable, Confirmed: true},
+			model.SetAlwaysUVOperation{Target: appconfig.AlwaysUVTargetEnable},
 			userVerificationHandler(t),
 		)
 		runDone <- err
@@ -307,8 +301,7 @@ func TestTransportConnectionFailureClosesAuthenticator(t *testing.T) {
 			})
 
 			_, err := opened.Run(context.Background(), model.SetPINOperation{
-				NewPIN:    "1234",
-				Confirmed: true,
+				NewPIN: "1234",
 			}, nil)
 			requireFailureCode(t, err, failure.CodeTransportFailure)
 
@@ -349,8 +342,7 @@ func TestTransportFailureWithoutDeviceInvalidationKeepsAuthenticatorOpen(t *test
 			})
 
 			_, err := opened.Run(context.Background(), model.SetPINOperation{
-				NewPIN:    "1234",
-				Confirmed: true,
+				NewPIN: "1234",
 			}, nil)
 			requireFailureCode(t, err, failure.CodeTransportFailure)
 
@@ -384,8 +376,7 @@ func TestCanceledTransmitWithoutDeviceInvalidationKeepsAuthenticatorOpen(t *test
 	defer func() { _ = opened.Close() }()
 
 	_, err := opened.Run(context.Background(), model.SetPINOperation{
-		NewPIN:    "1234",
-		Confirmed: true,
+		NewPIN: "1234",
 	}, nil)
 	requireFailureCode(t, err, failure.CodeOperationCanceled)
 
@@ -437,19 +428,22 @@ func (a *transportFailureAuthenticator) Close() error {
 	return nil
 }
 
-func TestAuthenticatorEventSinksAreScopedToOpenedAuthenticator(t *testing.T) {
+func TestAuthenticatorEventSinksAreScopedToRun(t *testing.T) {
 	firstEvents := &recordingEventSink{}
 	secondEvents := &recordingEventSink{}
 
-	first := openContractAuthenticator(t, firstEvents, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	opened := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return &progressCredentialAuthenticator{}, nil
 	})
-	if _, err := first.Run(context.Background(), model.ListCredentialsOperation{}, userVerificationHandler(t)); err != nil {
-		t.Fatalf("first Run: %v", err)
-	}
+	defer func() { _ = opened.Close() }()
 
-	if err := first.Close(); err != nil {
-		t.Fatalf("first Close: %v", err)
+	if _, err := opened.Authenticator.Run(
+		context.Background(),
+		model.ListCredentialsOperation{},
+		userVerificationHandler(t),
+		WithEventSink(firstEvents),
+	); err != nil {
+		t.Fatalf("first Run: %v", err)
 	}
 
 	firstEventCount := len(firstEvents.Events())
@@ -458,25 +452,23 @@ func TestAuthenticatorEventSinksAreScopedToOpenedAuthenticator(t *testing.T) {
 	}
 
 	if got := len(secondEvents.Events()); got != 0 {
-		t.Fatalf("second sink events before second opened = %d, want 0", got)
+		t.Fatalf("second sink events before second run = %d, want 0", got)
 	}
 
-	second := openContractAuthenticator(t, secondEvents, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return &progressCredentialAuthenticator{}, nil
-	})
-	if _, err := second.Run(context.Background(), model.ListCredentialsOperation{}, userVerificationHandler(t)); err != nil {
+	if _, err := opened.Authenticator.Run(
+		context.Background(),
+		model.ListCredentialsOperation{},
+		userVerificationHandler(t),
+		WithEventSink(secondEvents),
+	); err != nil {
 		t.Fatalf("second Run: %v", err)
 	}
 
-	if err := second.Close(); err != nil {
-		t.Fatalf("second Close: %v", err)
-	}
-
 	if got := len(firstEvents.Events()); got != firstEventCount {
-		t.Fatalf("first sink events after second opened = %d, want %d", got, firstEventCount)
+		t.Fatalf("first sink events after second run = %d, want %d", got, firstEventCount)
 	}
 
 	if got := len(secondEvents.Events()); got == 0 {
-		t.Fatal("second opened emitted no events")
+		t.Fatal("second run emitted no events")
 	}
 }

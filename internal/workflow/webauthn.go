@@ -8,6 +8,7 @@ import (
 	"github.com/go-ctap/ctap/protocol"
 	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
 	"github.com/go-ctap/kit/internal/errornorm"
+	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
 	appwebauthn "github.com/go-ctap/kit/model/webauthn"
@@ -32,18 +33,12 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 		return output, nil
 	}
 
-	if err := r.confirmMutation(ctx, confirmationRequest{
-		confirmed:       req.Confirmed,
-		message:         req.ConfirmationMessage,
-		fallbackMessage: "Create WebAuthn credential for " + input.RP.ID + "?",
-		destructive:     false,
-		preview:         preview,
-	}); err != nil {
-		return output, err
-	}
-
 	var response protocol.AuthenticatorMakeCredentialResponse
-	err = r.runWithOptionalToken(ctx, protocol.PermissionMakeCredential, input.RP.ID, func(token []byte) error {
+	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
+		Permission: protocol.PermissionMakeCredential,
+		RPID:       input.RP.ID,
+		Optional:   true,
+	}, func(token []byte) error {
 		var err error
 		response, err = r.callMakeCredential(ctx, token, input)
 
@@ -88,18 +83,6 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 		return output, nil
 	}
 
-	if input.Extensions != nil && input.Extensions.LargeBlobInputs != nil && input.Extensions.LargeBlob.Write != nil {
-		if err := r.confirmMutation(ctx, confirmationRequest{
-			confirmed:       req.Confirmed,
-			message:         req.ConfirmationMessage,
-			fallbackMessage: "Write the WebAuthn large blob for " + input.RPID + "?",
-			destructive:     false,
-			preview:         preview,
-		}); err != nil {
-			return output, err
-		}
-	}
-
 	result := appwebauthn.GetAssertionResult{
 		DeviceFingerprint: r.env.Selected.Fingerprint,
 		RPID:              input.RPID,
@@ -127,7 +110,11 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 		return nil
 	}
 
-	if err := r.runWithOptionalToken(ctx, protocol.PermissionGetAssertion, input.RPID, readAssertions); err != nil {
+	if err := r.env.Tokens.Use(ctx, rtruntime.TokenUse{
+		Permission: protocol.PermissionGetAssertion,
+		RPID:       input.RPID,
+		Optional:   true,
+	}, readAssertions); err != nil {
 		return output, err
 	}
 

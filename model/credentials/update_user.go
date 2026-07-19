@@ -9,14 +9,12 @@ import (
 )
 
 type UpdateUserRequest struct {
-	CredentialIDHex string `json:"credentialIDHex"`
 	UserIDHex       string `json:"userIDHex,omitempty"`
 	Name            string `json:"name,omitempty"`
 	DisplayName     string `json:"displayName,omitempty"`
 	UserIDProvided  bool   `json:"-"`
 	NameProvided    bool   `json:"-"`
 	DisplayProvided bool   `json:"-"`
-	Confirmed       bool   `json:"-"`
 }
 
 type UpdateUserPreview struct {
@@ -37,14 +35,13 @@ type UpdateUserResult struct {
 	Current           UserIdentity `json:"current"`
 }
 
-func BuildUpdateUserPreview(report InventoryReport, req UpdateUserRequest) (UpdateUserPreview, error) {
-	if report.Support.PreviewOnly {
-		return UpdateUserPreview{}, failure.New(failure.CodeCredentialManagementUnsupported, failure.WithPhase(failure.PhaseValidation))
+func BuildUpdateUserPreview(target CredentialTarget, req UpdateUserRequest) (UpdateUserPreview, error) {
+	if strings.TrimSpace(target.Record.CredentialIDHex) == "" {
+		return UpdateUserPreview{}, failure.New(failure.CodeCredentialIDRequired, failure.WithPhase(failure.PhaseValidation))
 	}
 
-	target, err := FindCredentialByHexID(report, req.CredentialIDHex)
-	if err != nil {
-		return UpdateUserPreview{}, err
+	if strings.TrimSpace(target.RP.ID) == "" {
+		return UpdateUserPreview{}, failure.New(failure.CodeRelyingPartyIDRequired, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	proposed, err := ResolveUpdatedUser(target, req)

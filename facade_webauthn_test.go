@@ -92,7 +92,7 @@ func TestGetAssertionDryRunDoesNotAcquireTokenOrCallAuthenticator(t *testing.T) 
 	}
 }
 
-func TestGetAssertionLargeBlobWriteRequiresConfirmationIncludingEmptyBlob(t *testing.T) {
+func TestGetAssertionLargeBlobWriteExecutesWithoutRuntimeConfirmation(t *testing.T) {
 	a := &webauthnTestAuthenticator{}
 	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
@@ -109,24 +109,8 @@ func TestGetAssertionLargeBlobWriteRequiresConfirmationIncludingEmptyBlob(t *tes
 		},
 	}}
 
-	result, err := session.Run(context.Background(), op, interactionHandlerFunc(func(req model.InteractionRequest) (model.InteractionResponse, error) {
-		if req.Kind != model.InteractionKindConfirm {
-			t.Fatalf("interaction kind = %s, want confirm", req.Kind)
-		}
-
-		return model.InteractionResponse{}, nil
-	}))
-	if !failure.IsCode(err, failure.CodeConfirmationRequired) {
-		t.Fatalf("unconfirmed write error = %v", err)
-	}
-
-	if result.(model.GetAssertionOutput).Result != nil || a.getAssertionCalls != 0 {
-		t.Fatalf("unconfirmed result/calls = %#v/%d", result, a.getAssertionCalls)
-	}
-
-	op.Confirmed = true
 	if _, err := session.Run(context.Background(), op, nil); err != nil {
-		t.Fatalf("confirmed write: %v", err)
+		t.Fatalf("Run: %v", err)
 	}
 
 	if a.getAssertionCalls != 1 || a.getAssertionExtensions == nil ||
@@ -145,7 +129,6 @@ func TestMakeCredentialMapsRequestAndUsesRawClientDataJSON(t *testing.T) {
 	uv := true
 	rk := false
 	op := sampleMakeCredentialOperation(false)
-	op.Confirmed = true
 	op.Options = appwebauthn.AuthenticatorOptions{
 		ResidentKey:      &rk,
 		UserVerification: &uv,
@@ -214,7 +197,6 @@ func TestMakeCredentialAcquiresScopedTokenWhenCTAPRequiresIt(t *testing.T) {
 	defer func() { _ = session.Close() }()
 
 	op := sampleMakeCredentialOperation(false)
-	op.Confirmed = true
 	if _, err := session.Run(context.Background(), op, userVerificationHandler(t)); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -255,7 +237,6 @@ func TestMakeCredentialKeepsPartialResultAndInvalidatesInventoryOnRefreshFailure
 		t.Fatalf("optional inventory fields = %#v", record)
 	}
 	op := sampleMakeCredentialOperation(false)
-	op.Confirmed = true
 	result, err := session.Run(context.Background(), op, nil)
 	if !errors.Is(err, refreshErr) {
 		t.Fatalf("MakeCredential error = %v, want refresh error", err)
@@ -284,7 +265,6 @@ func TestMakeCredentialSkipsTokenWhenAuthenticatorDoesNotRequireIt(t *testing.T)
 	defer func() { _ = session.Close() }()
 
 	op := sampleMakeCredentialOperation(false)
-	op.Confirmed = true
 	if _, err := session.Run(context.Background(), op, nil); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -318,7 +298,6 @@ func TestCredentialInventoryAlwaysReadsFreshStateAroundMakeCredential(t *testing
 	}
 
 	op := sampleMakeCredentialOperation(false)
-	op.Confirmed = true
 	if _, err := session.Run(context.Background(), op, nil); err != nil {
 		t.Fatalf("MakeCredential: %v", err)
 	}
@@ -482,7 +461,6 @@ func TestWebAuthnDelegatesPRFRoutingToCTAP(t *testing.T) {
 	defer func() { _ = session.Close() }()
 
 	makeOperation := sampleMakeCredentialOperation(false)
-	makeOperation.Confirmed = true
 	makeOperation.Extensions = &webauthn.CreateAuthenticationExtensionsClientInputs{
 		PRFInputs: &webauthn.PRFInputs{PRF: webauthn.AuthenticationExtensionsPRFInputs{
 			Eval: webauthn.AuthenticationExtensionsPRFValues{First: []byte("make")},
@@ -528,7 +506,6 @@ func TestWebAuthnCTAPStatusMapsCodes(t *testing.T) {
 			name: "make credential excluded",
 			operation: model.MakeCredentialOperation{
 				MakeCredentialInput: sampleMakeCredentialOperation(false).MakeCredentialInput,
-				Confirmed:           true,
 			},
 			setupErr: func(a *webauthnTestAuthenticator) {
 				a.makeCredentialErr = &ctaptransport.CTAPError{

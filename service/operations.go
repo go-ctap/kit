@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/config"
+	"github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/webauthn"
 )
@@ -20,24 +21,20 @@ type CredentialListRequest struct {
 
 type CredentialDeleteRequest struct {
 	OperationRequest
-	CredentialIDHex     string `json:"credentialIdHex"`
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	CredentialIDHex string `json:"credentialIdHex"`
+	DryRun          bool   `json:"dryRun,omitempty"`
 }
 
 type CredentialUpdateRequest struct {
 	OperationRequest
-	CredentialIDHex     string `json:"credentialIdHex"`
-	UserIDHex           string `json:"userIdHex,omitempty"`
-	Name                string `json:"name,omitempty"`
-	DisplayName         string `json:"displayName,omitempty"`
-	UserIDProvided      bool   `json:"userIdProvided,omitempty"`
-	NameProvided        bool   `json:"nameProvided,omitempty"`
-	DisplayProvided     bool   `json:"displayProvided,omitempty"`
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	Target          credentials.CredentialTarget `json:"target"`
+	UserIDHex       string                       `json:"userIdHex,omitempty"`
+	Name            string                       `json:"name,omitempty"`
+	DisplayName     string                       `json:"displayName,omitempty"`
+	UserIDProvided  bool                         `json:"userIdProvided,omitempty"`
+	NameProvided    bool                         `json:"nameProvided,omitempty"`
+	DisplayProvided bool                         `json:"displayProvided,omitempty"`
+	DryRun          bool                         `json:"dryRun,omitempty"`
 }
 
 type LargeBlobReadRequest struct {
@@ -52,47 +49,37 @@ type LargeBlobListRequest struct {
 
 type LargeBlobMutationRequest struct {
 	OperationRequest
-	CredentialIDHex     string `json:"credentialIdHex"`
-	Payload             []byte `json:"payload,omitempty"`
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	CredentialIDHex string `json:"credentialIdHex"`
+	Payload         []byte `json:"payload,omitempty"`
+	DryRun          bool   `json:"dryRun,omitempty"`
 }
 
 type LargeBlobGarbageCollectRequest struct {
 	OperationRequest
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	DryRun bool `json:"dryRun,omitempty"`
 }
 
 type PINSetRequest struct {
 	OperationRequest
 	// NewPIN participates in JSON transport. Consumers own redaction at the
 	// application boundary and must not log or persist serialized requests.
-	NewPIN              string `json:"newPIN"`
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	NewPIN string `json:"newPIN"`
+	DryRun bool   `json:"dryRun,omitempty"`
 }
 
 type PINChangeRequest struct {
 	OperationRequest
 	// CurrentPIN and NewPIN participate in JSON transport. Consumers own
 	// redaction at the application boundary and must not log or persist them.
-	CurrentPIN          string `json:"currentPIN"`
-	NewPIN              string `json:"newPIN"`
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	CurrentPIN string `json:"currentPIN"`
+	NewPIN     string `json:"newPIN"`
+	DryRun     bool   `json:"dryRun,omitempty"`
 }
 
 type AlwaysUVRequest struct {
 	OperationRequest
-	Target              config.AlwaysUVTarget `json:"target"`
-	Confirmed           bool                  `json:"confirmed,omitempty"`
-	ConfirmationMessage string                `json:"confirmationMessage,omitempty"`
-	DryRun              bool                  `json:"dryRun,omitempty"`
+	Target config.AlwaysUVTarget `json:"target"`
+	DryRun bool                  `json:"dryRun,omitempty"`
 }
 
 type MinPINLengthRequest struct {
@@ -101,64 +88,48 @@ type MinPINLengthRequest struct {
 	MinPINLengthRPIDs   []string `json:"minPinLengthRPIDs,omitempty"`
 	ForceChangePIN      bool     `json:"forceChangePin,omitempty"`
 	PINComplexityPolicy bool     `json:"pinComplexityPolicy,omitempty"`
-	Confirmed           bool     `json:"confirmed,omitempty"`
-	ConfirmationMessage string   `json:"confirmationMessage,omitempty"`
 	DryRun              bool     `json:"dryRun,omitempty"`
 }
 
 type EnableLongTouchForResetRequest struct {
 	OperationRequest
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	DryRun bool `json:"dryRun,omitempty"`
 }
 
 type BioEnrollRequest struct {
 	OperationRequest
-	TimeoutMilliseconds uint   `json:"timeoutMilliseconds,omitempty"`
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	TimeoutMilliseconds uint `json:"timeoutMilliseconds,omitempty"`
+	DryRun              bool `json:"dryRun,omitempty"`
 }
 
 type BioRenameRequest struct {
 	OperationRequest
-	TemplateIDHex       string `json:"templateIdHex"`
-	FriendlyName        string `json:"friendlyName"`
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	TemplateIDHex string `json:"templateIdHex"`
+	FriendlyName  string `json:"friendlyName"`
+	DryRun        bool   `json:"dryRun,omitempty"`
 }
 
 type BioRemoveRequest struct {
 	OperationRequest
-	TemplateIDHex       string `json:"templateIdHex"`
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	TemplateIDHex string `json:"templateIdHex"`
+	DryRun        bool   `json:"dryRun,omitempty"`
 }
 
 type ResetFactoryRequest struct {
 	OperationRequest
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	DryRun bool `json:"dryRun,omitempty"`
 }
 
 type MakeCredentialRequest struct {
 	OperationRequest
 	webauthn.MakeCredentialInput
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	DryRun bool `json:"dryRun,omitempty"`
 }
 
 type GetAssertionRequest struct {
 	OperationRequest
 	webauthn.GetAssertionInput
-	Confirmed           bool   `json:"confirmed,omitempty"`
-	ConfirmationMessage string `json:"confirmationMessage,omitempty"`
-	DryRun              bool   `json:"dryRun,omitempty"`
+	DryRun bool `json:"dryRun,omitempty"`
 }
 
 func (s *Service) Inspect(ctx context.Context, req OperationRequest) (InspectEnvelope, error) {
@@ -186,26 +157,22 @@ func (s *Service) CredentialStoreState(ctx context.Context, req OperationRequest
 
 func (s *Service) DeleteCredential(ctx context.Context, req CredentialDeleteRequest) (CredentialDeleteEnvelope, error) {
 	meta, result, err := runTypedOperation[model.CredentialDeleteOutput](s, ctx, req.OperationRequest, model.DeleteCredentialOperation{
-		CredentialIDHex:     req.CredentialIDHex,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		CredentialIDHex: req.CredentialIDHex,
+		DryRun:          req.DryRun,
 	})
 	return CredentialDeleteEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
 func (s *Service) UpdateCredentialUser(ctx context.Context, req CredentialUpdateRequest) (CredentialUpdateEnvelope, error) {
 	meta, result, err := runTypedOperation[model.CredentialUpdateOutput](s, ctx, req.OperationRequest, model.UpdateCredentialUserOperation{
-		CredentialIDHex:     req.CredentialIDHex,
-		UserIDHex:           req.UserIDHex,
-		Name:                req.Name,
-		DisplayName:         req.DisplayName,
-		UserIDProvided:      req.UserIDProvided,
-		NameProvided:        req.NameProvided,
-		DisplayProvided:     req.DisplayProvided,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		Target:          req.Target,
+		UserIDHex:       req.UserIDHex,
+		Name:            req.Name,
+		DisplayName:     req.DisplayName,
+		UserIDProvided:  req.UserIDProvided,
+		NameProvided:    req.NameProvided,
+		DisplayProvided: req.DisplayProvided,
+		DryRun:          req.DryRun,
 	})
 	return CredentialUpdateEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
@@ -225,30 +192,24 @@ func (s *Service) ListLargeBlobs(ctx context.Context, req LargeBlobListRequest) 
 
 func (s *Service) WriteLargeBlob(ctx context.Context, req LargeBlobMutationRequest) (LargeBlobMutationEnvelope, error) {
 	meta, result, err := runTypedOperation[model.LargeBlobMutationOutput](s, ctx, req.OperationRequest, model.WriteLargeBlobOperation{
-		CredentialIDHex:     req.CredentialIDHex,
-		Payload:             req.Payload,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		CredentialIDHex: req.CredentialIDHex,
+		Payload:         req.Payload,
+		DryRun:          req.DryRun,
 	})
 	return LargeBlobMutationEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
 func (s *Service) DeleteLargeBlob(ctx context.Context, req LargeBlobMutationRequest) (LargeBlobMutationEnvelope, error) {
 	meta, result, err := runTypedOperation[model.LargeBlobMutationOutput](s, ctx, req.OperationRequest, model.DeleteLargeBlobOperation{
-		CredentialIDHex:     req.CredentialIDHex,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		CredentialIDHex: req.CredentialIDHex,
+		DryRun:          req.DryRun,
 	})
 	return LargeBlobMutationEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
 func (s *Service) GarbageCollectLargeBlobs(ctx context.Context, req LargeBlobGarbageCollectRequest) (LargeBlobMutationEnvelope, error) {
 	meta, result, err := runTypedOperation[model.LargeBlobMutationOutput](s, ctx, req.OperationRequest, model.GarbageCollectLargeBlobsOperation{
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		DryRun: req.DryRun,
 	})
 	return LargeBlobMutationEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
@@ -260,31 +221,25 @@ func (s *Service) ConfigStatus(ctx context.Context, req OperationRequest) (Confi
 
 func (s *Service) SetPIN(ctx context.Context, req PINSetRequest) (PINEnvelope, error) {
 	meta, result, err := runTypedOperation[model.PINOutput](s, ctx, req.OperationRequest, model.SetPINOperation{
-		NewPIN:              req.NewPIN,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		NewPIN: req.NewPIN,
+		DryRun: req.DryRun,
 	})
 	return PINEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
 func (s *Service) ChangePIN(ctx context.Context, req PINChangeRequest) (PINEnvelope, error) {
 	meta, result, err := runTypedOperation[model.PINOutput](s, ctx, req.OperationRequest, model.ChangePINOperation{
-		CurrentPIN:          req.CurrentPIN,
-		NewPIN:              req.NewPIN,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		CurrentPIN: req.CurrentPIN,
+		NewPIN:     req.NewPIN,
+		DryRun:     req.DryRun,
 	})
 	return PINEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
 func (s *Service) SetAlwaysUV(ctx context.Context, req AlwaysUVRequest) (AuthenticatorConfigEnvelope, error) {
 	meta, result, err := runTypedOperation[model.AuthenticatorConfigOutput](s, ctx, req.OperationRequest, model.SetAlwaysUVOperation{
-		Target:              req.Target,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		Target: req.Target,
+		DryRun: req.DryRun,
 	})
 	return AuthenticatorConfigEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
@@ -295,8 +250,6 @@ func (s *Service) SetMinPINLength(ctx context.Context, req MinPINLengthRequest) 
 		MinPINLengthRPIDs:   req.MinPINLengthRPIDs,
 		ForceChangePIN:      req.ForceChangePIN,
 		PINComplexityPolicy: req.PINComplexityPolicy,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
 	return AuthenticatorConfigEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
@@ -304,9 +257,7 @@ func (s *Service) SetMinPINLength(ctx context.Context, req MinPINLengthRequest) 
 
 func (s *Service) EnableLongTouchForReset(ctx context.Context, req EnableLongTouchForResetRequest) (AuthenticatorConfigEnvelope, error) {
 	meta, result, err := runTypedOperation[model.AuthenticatorConfigOutput](s, ctx, req.OperationRequest, model.EnableLongTouchForResetOperation{
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		DryRun: req.DryRun,
 	})
 
 	return AuthenticatorConfigEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
@@ -325,8 +276,6 @@ func (s *Service) BioList(ctx context.Context, req OperationRequest) (BioListEnv
 func (s *Service) BioEnroll(ctx context.Context, req BioEnrollRequest) (BioEnrollEnvelope, error) {
 	meta, result, err := runTypedOperation[model.BioEnrollOutput](s, ctx, req.OperationRequest, model.BioEnrollOperation{
 		TimeoutMilliseconds: req.TimeoutMilliseconds,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
 	return BioEnrollEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
@@ -334,30 +283,24 @@ func (s *Service) BioEnroll(ctx context.Context, req BioEnrollRequest) (BioEnrol
 
 func (s *Service) BioRename(ctx context.Context, req BioRenameRequest) (BioMutationEnvelope, error) {
 	meta, result, err := runTypedOperation[model.BioMutationOutput](s, ctx, req.OperationRequest, model.BioRenameOperation{
-		TemplateIDHex:       req.TemplateIDHex,
-		FriendlyName:        req.FriendlyName,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		TemplateIDHex: req.TemplateIDHex,
+		FriendlyName:  req.FriendlyName,
+		DryRun:        req.DryRun,
 	})
 	return BioMutationEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
 func (s *Service) BioRemove(ctx context.Context, req BioRemoveRequest) (BioMutationEnvelope, error) {
 	meta, result, err := runTypedOperation[model.BioMutationOutput](s, ctx, req.OperationRequest, model.BioRemoveOperation{
-		TemplateIDHex:       req.TemplateIDHex,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		TemplateIDHex: req.TemplateIDHex,
+		DryRun:        req.DryRun,
 	})
 	return BioMutationEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
 
 func (s *Service) ResetFactory(ctx context.Context, req ResetFactoryRequest) (ResetFactoryEnvelope, error) {
 	meta, result, err := runTypedOperation[model.ResetFactoryOutput](s, ctx, req.OperationRequest, model.ResetFactoryOperation{
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		DryRun: req.DryRun,
 	})
 	return ResetFactoryEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }
@@ -365,8 +308,6 @@ func (s *Service) ResetFactory(ctx context.Context, req ResetFactoryRequest) (Re
 func (s *Service) MakeCredential(ctx context.Context, req MakeCredentialRequest) (MakeCredentialEnvelope, error) {
 	meta, result, err := runTypedOperation[model.MakeCredentialOutput](s, ctx, req.OperationRequest, model.MakeCredentialOperation{
 		MakeCredentialInput: req.MakeCredentialInput,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
 		DryRun:              req.DryRun,
 	})
 	return MakeCredentialEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
@@ -374,10 +315,8 @@ func (s *Service) MakeCredential(ctx context.Context, req MakeCredentialRequest)
 
 func (s *Service) GetAssertion(ctx context.Context, req GetAssertionRequest) (GetAssertionEnvelope, error) {
 	meta, result, err := runTypedOperation[model.GetAssertionOutput](s, ctx, req.OperationRequest, model.GetAssertionOperation{
-		GetAssertionInput:   req.GetAssertionInput,
-		Confirmed:           req.Confirmed,
-		ConfirmationMessage: req.ConfirmationMessage,
-		DryRun:              req.DryRun,
+		GetAssertionInput: req.GetAssertionInput,
+		DryRun:            req.DryRun,
 	})
 	return GetAssertionEnvelope{OperationEnvelopeMeta: meta, Result: result}, err
 }

@@ -1,9 +1,13 @@
 package model
 
-import "github.com/go-ctap/kit/model/failure"
+import (
+	"context"
+
+	"github.com/go-ctap/kit/model/failure"
+)
 
 type InteractionHandler interface {
-	RequestInteraction(InteractionRequest) (InteractionResponse, error)
+	RequestInteraction(context.Context, InteractionRequest) (InteractionResponse, error)
 }
 
 type InteractionKind string
@@ -12,7 +16,6 @@ const (
 	InteractionKindPIN              InteractionKind = "pin"
 	InteractionKindUserVerification InteractionKind = "user-verification"
 	InteractionKindTouch            InteractionKind = "touch"
-	InteractionKindConfirm          InteractionKind = "confirm"
 )
 
 type InteractionRequest struct {
@@ -31,7 +34,6 @@ type PINInteractionState struct {
 }
 
 type InteractionResponse struct {
-	PIN       []byte `json:"-"`
-	Confirmed bool   `json:"confirmed,omitempty"`
-	Canceled  bool   `json:"canceled,omitempty"`
+	PIN      []byte `json:"-"`
+	Canceled bool   `json:"canceled,omitempty"`
 }

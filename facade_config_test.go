@@ -140,40 +140,6 @@ func TestBioSensorInfoOmitsUnknownSpecValues(t *testing.T) {
 	}
 }
 
-func TestResetDeclinedConfirmDoesNotEmitTouchOrReset(t *testing.T) {
-	a := &resetCountingAuthenticator{}
-	events := &recordingEventSink{}
-	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
-	defer func() { _ = session.Close() }()
-
-	handler := interactionHandlerFunc(func(req model.InteractionRequest) (model.InteractionResponse, error) {
-		if req.Kind != model.InteractionKindConfirm {
-			t.Fatalf("interaction kind = %s, want confirm", req.Kind)
-		}
-
-		if !req.Destructive {
-			t.Fatal("reset confirm interaction destructive = false, want true")
-		}
-
-		return model.InteractionResponse{}, nil
-	})
-
-	_, err := session.Run(context.Background(), model.ResetFactoryOperation{}, handler)
-	requireFailureCode(t, err, failure.CodeConfirmationRequired)
-
-	if got := a.resetCount.Load(); got != 0 {
-		t.Fatalf("Reset count = %d, want 0", got)
-	}
-
-	for _, event := range events.Events() {
-		if event.Kind == model.InteractionKindTouch {
-			t.Fatal("touch interaction emitted for invalid reset phrase")
-		}
-	}
-}
-
 func TestResetRequestsTouchInteractionBeforeReset(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &resetCountingAuthenticator{events: events}
@@ -190,9 +156,7 @@ func TestResetRequestsTouchInteractionBeforeReset(t *testing.T) {
 		return model.InteractionResponse{}, nil
 	})
 
-	_, err := session.Run(context.Background(), model.ResetFactoryOperation{
-		Confirmed: true,
-	}, handler)
+	_, err := session.Run(context.Background(), model.ResetFactoryOperation{}, handler)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -267,7 +231,7 @@ func TestRunContextReachesTokenAndAuthenticatorCommand(t *testing.T) {
 
 	marker := new(int)
 	ctx := context.WithValue(context.Background(), contextKey{}, marker)
-	if _, err := session.Run(ctx, model.SetAlwaysUVOperation{Target: appconfig.AlwaysUVTargetEnable, Confirmed: true}, userVerificationHandler(t)); err != nil {
+	if _, err := session.Run(ctx, model.SetAlwaysUVOperation{Target: appconfig.AlwaysUVTargetEnable}, userVerificationHandler(t)); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -296,7 +260,7 @@ func TestBioEnrollmentCleanupUsesBoundedIndependentContext(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Run(ctx, model.BioEnrollOperation{Confirmed: true}, userVerificationHandler(t))
+	result, err := session.Run(ctx, model.BioEnrollOperation{}, userVerificationHandler(t))
 	if !errors.Is(err, operationErr) {
 		t.Fatalf("Run error = %v, want original capture error", err)
 	}
@@ -337,7 +301,7 @@ func TestBioEnrollmentSuccessfulCleanupIsReported(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Run(context.Background(), model.BioEnrollOperation{Confirmed: true}, userVerificationHandler(t))
+	result, err := session.Run(context.Background(), model.BioEnrollOperation{}, userVerificationHandler(t))
 	if !errors.Is(err, operationErr) {
 		t.Fatalf("Run error = %v, want original capture error", err)
 	}
@@ -372,7 +336,7 @@ func runConfirmedResetWithErrorAndEvents(t *testing.T, events *recordingEventSin
 		return model.InteractionResponse{}, nil
 	})
 
-	_, err := session.Run(context.Background(), model.ResetFactoryOperation{Confirmed: true}, handler)
+	_, err := session.Run(context.Background(), model.ResetFactoryOperation{}, handler)
 	if err == nil {
 		t.Fatal("Run error = nil, want error")
 	}
@@ -494,17 +458,17 @@ func TestPINMutationsRejectEmptyPINAtSessionRun(t *testing.T) {
 	}{
 		{
 			name:      "set empty new PIN",
-			operation: model.SetPINOperation{Confirmed: true},
+			operation: model.SetPINOperation{},
 		},
 		{
 			name:       "change empty current PIN",
 			configured: true,
-			operation:  model.ChangePINOperation{NewPIN: "5678", Confirmed: true},
+			operation:  model.ChangePINOperation{NewPIN: "5678"},
 		},
 		{
 			name:       "change empty new PIN",
 			configured: true,
-			operation:  model.ChangePINOperation{CurrentPIN: "1234", Confirmed: true},
+			operation:  model.ChangePINOperation{CurrentPIN: "1234"},
 		},
 	}
 
@@ -551,8 +515,7 @@ func TestUVTokenAcquisitionRequestsUserVerificationInteraction(t *testing.T) {
 	})
 
 	result, err := session.Run(context.Background(), model.SetAlwaysUVOperation{
-		Target:    appconfig.AlwaysUVTargetEnable,
-		Confirmed: true,
+		Target: appconfig.AlwaysUVTargetEnable,
 	}, handler)
 	if err != nil {
 		t.Fatalf("Run: %v", err)

@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/errornorm"
+	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
@@ -32,17 +33,10 @@ func (r Runner) setAlwaysUV(ctx context.Context, req model.SetAlwaysUVOperation)
 		return output, nil
 	}
 
-	if err := r.confirmMutation(ctx, confirmationRequest{
-		confirmed:       req.Confirmed,
-		message:         req.ConfirmationMessage,
-		fallbackMessage: "Set alwaysUv " + string(req.Target) + " on authenticator " + r.env.Selected.Fingerprint + "?",
-		destructive:     false,
-		preview:         preview,
-	}); err != nil {
-		return output, err
-	}
-
-	err = r.runWithOptionalToken(ctx, protocol.PermissionAuthenticatorConfiguration, "", func(token []byte) error {
+	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
+		Permission: protocol.PermissionAuthenticatorConfiguration,
+		Optional:   true,
+	}, func(token []byte) error {
 		return r.env.Authenticator.ToggleAlwaysUV(ctx, token)
 	})
 	if err != nil {
@@ -87,17 +81,10 @@ func (r Runner) setMinPINLength(ctx context.Context, req model.SetMinPINLengthOp
 		return output, nil
 	}
 
-	if err := r.confirmMutation(ctx, confirmationRequest{
-		confirmed:       req.Confirmed,
-		message:         req.ConfirmationMessage,
-		fallbackMessage: "Set minimum PIN length on authenticator " + r.env.Selected.Fingerprint + "?",
-		destructive:     false,
-		preview:         preview,
-	}); err != nil {
-		return output, err
-	}
-
-	err = r.runWithOptionalToken(ctx, protocol.PermissionAuthenticatorConfiguration, "", func(token []byte) error {
+	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
+		Permission: protocol.PermissionAuthenticatorConfiguration,
+		Optional:   true,
+	}, func(token []byte) error {
 		return r.env.Authenticator.SetMinPINLength(ctx, token, protocol.SetMinPINLengthConfigSubCommandParams{
 			NewMinPINLength:     req.NewMinPINLength,
 			MinPINLengthRPIDs:   req.MinPINLengthRPIDs,

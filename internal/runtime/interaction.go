@@ -2,13 +2,11 @@ package runtime
 
 import (
 	"context"
-	"slices"
 
 	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
-	"github.com/samber/mo"
 )
 
 type InteractionBroker struct {
@@ -37,7 +35,7 @@ func (b *InteractionBroker) RequestInteraction(
 		)
 	}
 
-	b.events.Emit(model.OperationEvent{
+	b.events.Emit(ctx, model.OperationEvent{
 		Stage:   model.OperationStageInteractionRequired,
 		Kind:    req.Kind,
 		Message: req.Message,
@@ -49,9 +47,15 @@ func (b *InteractionBroker) RequestInteraction(
 		)
 	}
 
-	response, err := callInteractionHandler(ctx, b.handler, req)
+	response, err := b.handler.RequestInteraction(ctx, req)
 	if err != nil {
-		return model.InteractionResponse{}, err
+		secret.Zero(response.PIN)
+
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			err = ctxErr
+		}
+
+		return model.InteractionResponse{}, annotateInteractionError(err)
 	}
 
 	if err := validateInteractionResponse(req, response); err != nil {
@@ -60,64 +64,13 @@ func (b *InteractionBroker) RequestInteraction(
 		return model.InteractionResponse{}, err
 	}
 
-	return response, nil
-}
-
-func callInteractionHandler(
-	ctx context.Context,
-	handler model.InteractionHandler,
-	req model.InteractionRequest,
-) (model.InteractionResponse, error) {
 	if err := ctx.Err(); err != nil {
+		secret.Zero(response.PIN)
+
 		return model.InteractionResponse{}, annotateInteractionError(err)
 	}
 
-	result := make(chan mo.Either[model.InteractionResponse, error])
-
-	go func() {
-		response, err := handler.RequestInteraction(req)
-
-		if len(response.PIN) != 0 {
-			pin := slices.Clone(response.PIN)
-			secret.Zero(response.PIN)
-			response.PIN = pin
-		}
-
-		resolution := mo.Left[model.InteractionResponse, error](response)
-		if err != nil {
-			secret.Zero(response.PIN)
-
-			resolution = mo.Right[model.InteractionResponse, error](err)
-		}
-
-		select {
-		case result <- resolution:
-		case <-ctx.Done():
-			secret.Zero(response.PIN)
-		}
-	}()
-
-	select {
-	case resolution := <-result:
-		response, err := resolution.Unpack()
-		if err != nil {
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				err = ctxErr
-			}
-
-			return model.InteractionResponse{}, annotateInteractionError(err)
-		}
-
-		if err := ctx.Err(); err != nil {
-			secret.Zero(response.PIN)
-
-			return model.InteractionResponse{}, annotateInteractionError(err)
-		}
-
-		return response, nil
-	case <-ctx.Done():
-		return model.InteractionResponse{}, annotateInteractionError(ctx.Err())
-	}
+	return response, nil
 }
 
 func validateInteractionResponse(req model.InteractionRequest, response model.InteractionResponse) error {

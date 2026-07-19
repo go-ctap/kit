@@ -191,15 +191,20 @@ power-cycle state. The submitted PIN remains redacted.
 ## Rejected Token Recovery
 
 `PIN_UV_AUTH_INVALID` can occur after successful token acquisition when an
-authenticator rejects that token on a consuming command. `TokenService.Use`
-owns token acquisition, caller-copy wiping, rejection classification, cache
-invalidation, and one reacquisition. Its caller must supply an entire callback
-that is safe to replay. Credential inventory supplies such a callback; it does
-not decide which token errors invalidate the cache. The first rejection is
-therefore not returned as the final `credentials.list` error.
+authenticator rejects that token on a consuming command. Every token-backed
+workflow goes through `TokenService.Use`, which owns token acquisition,
+caller-copy wiping, rejection classification, and cache invalidation. Optional
+uses first run without a token and acquire one only after the authenticator
+reports that PIN/UV authorization is required.
 
-Persistent credential-store state uses the ordinary replay-safe token path.
-Before acquisition, the authenticator token store retains only an already-standalone
+A `TokenUse` marked `ReplaySafe` permits one reacquisition after a rejected
+token. Credential inventory, biometric enrollment listing, and persistent
+credential-store state use this policy because their complete consumers are
+safe to replay. Mutating consumers leave replay disabled; a rejected token is
+still invalidated, but the mutation callback is not called again.
+
+Before persistent credential-store state acquisition, the authenticator token
+store retains only an already-standalone
 `persistentCredentialManagementReadOnly` grant; credential-management and
 composite grants are discarded.
 

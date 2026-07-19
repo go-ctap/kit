@@ -167,7 +167,7 @@ func TestTouchInteractionJSON(t *testing.T) {
 
 func TestInteractionRequestJSONIncludesPreviewAndResponseOmitsPIN(t *testing.T) {
 	request := model.InteractionRequest{
-		Kind:        model.InteractionKindConfirm,
+		Kind:        model.InteractionKindTouch,
 		Message:     "Factory reset fingerprint-1?",
 		Destructive: true,
 		Preview: map[string]any{

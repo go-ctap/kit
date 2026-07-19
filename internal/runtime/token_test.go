@@ -21,6 +21,7 @@ func TestTokenServiceCachesByPermissionAndRPID(t *testing.T) {
 	cache := &testTokenCache{}
 	tokens := NewTokenService(
 		cache,
+		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{}),
 		model.VerificationFlowDefault,
 	)
@@ -45,6 +46,7 @@ func TestTokenServiceCompositeGrantCoversPermissionSubsets(t *testing.T) {
 	authenticator := &recordingTokenDevice{info: uvTokenInfo()}
 	tokens := NewTokenService(
 		&testTokenCache{},
+		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{}),
 		model.VerificationFlowDefault,
 	)
@@ -100,6 +102,7 @@ func TestTokenServiceDefaultFlowRequestsUVInteractionBeforeUVCommand(t *testing.
 	cache := &testTokenCache{}
 	tokens := NewTokenService(
 		cache,
+		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{}),
 		model.VerificationFlowDefault,
 	)
@@ -124,15 +127,15 @@ func TestTokenServiceDefaultFlowCanceledUVInteractionSkipsUVCommand(t *testing.T
 	cache := &testTokenCache{}
 	tokens := NewTokenService(
 		cache,
+		authenticator,
 		NewInteractionBroker(model.NoopEventSink{}, interactionHandlerFunc(func(model.InteractionRequest) (model.InteractionResponse, error) {
 			return model.InteractionResponse{Canceled: true}, nil
 		})),
 		model.VerificationFlowDefault,
 	)
 
-	token, err := tokens.Acquire(
+	token, err := tokens.acquire(
 		context.Background(),
-		authenticator,
 		protocol.PermissionCredentialManagement,
 		"",
 	)
@@ -159,6 +162,7 @@ func TestTokenServiceDefaultFlowFallsBackToPINAfterUVFallbackError(t *testing.T)
 	cache := &testTokenCache{}
 	tokens := NewTokenService(
 		cache,
+		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{PIN: []byte("1234")}),
 		model.VerificationFlowDefault,
 	)
@@ -189,6 +193,7 @@ func TestTokenServicePINFlowSkipsUVInteractionAndCommand(t *testing.T) {
 	cache := &testTokenCache{}
 	tokens := NewTokenService(
 		cache,
+		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{PIN: []byte("1234")}),
 		model.VerificationFlowPIN,
 	)
@@ -230,7 +235,7 @@ func TestTokenServicePINInvalidRequestsAnotherPINWithRetryState(t *testing.T) {
 			return model.InteractionResponse{PIN: pin}, nil
 		}),
 	)
-	tokens := NewTokenService(&testTokenCache{}, interactions, model.VerificationFlowPIN)
+	tokens := NewTokenService(&testTokenCache{}, authenticator, interactions, model.VerificationFlowPIN)
 
 	acquireTokenForTest(t, tokens, authenticator, protocol.PermissionCredentialManagement, "")
 
@@ -306,11 +311,12 @@ func TestTokenServicePINBlockedDoesNotRequestAnotherPIN(t *testing.T) {
 	}
 	tokens := NewTokenService(
 		&testTokenCache{},
+		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{PIN: []byte("1234")}),
 		model.VerificationFlowPIN,
 	)
 
-	token, err := tokens.Acquire(context.Background(), authenticator, protocol.PermissionCredentialManagement, "")
+	token, err := tokens.acquire(context.Background(), protocol.PermissionCredentialManagement, "")
 	if token != nil {
 		secret.Zero(token)
 		t.Fatalf("token = %q, want nil", token)
@@ -348,11 +354,12 @@ func TestTokenServicePINRetriesFailureStopsRetryFlow(t *testing.T) {
 	}
 	tokens := NewTokenService(
 		&testTokenCache{},
+		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{PIN: []byte("1234")}),
 		model.VerificationFlowPIN,
 	)
 
-	token, err := tokens.Acquire(context.Background(), authenticator, protocol.PermissionCredentialManagement, "")
+	token, err := tokens.acquire(context.Background(), protocol.PermissionCredentialManagement, "")
 	if token != nil {
 		secret.Zero(token)
 		t.Fatalf("token = %q, want nil", token)
@@ -389,11 +396,12 @@ func TestTokenServiceDelegatesPINValidationToAuthenticator(t *testing.T) {
 	}
 	tokens := NewTokenService(
 		&testTokenCache{},
+		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{PIN: []byte("123")}),
 		model.VerificationFlowPIN,
 	)
 
-	token, err := tokens.Acquire(context.Background(), authenticator, protocol.PermissionCredentialManagement, "")
+	token, err := tokens.acquire(context.Background(), protocol.PermissionCredentialManagement, "")
 	if token != nil {
 		secret.Zero(token)
 		t.Fatalf("token = %q, want nil", token)
@@ -416,6 +424,7 @@ func TestTokenServiceCachedPINFlowPerformsNoInteraction(t *testing.T) {
 	authenticator := &recordingTokenDevice{info: uvTokenInfo()}
 	tokens := NewTokenService(
 		cache,
+		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{PIN: []byte("1234")}),
 		model.VerificationFlowPIN,
 	)
@@ -436,6 +445,7 @@ func TestTokenServiceUseReacquiresRejectedTokenOnce(t *testing.T) {
 	authenticator := &recordingTokenDevice{info: uvTokenInfo()}
 	tokens := NewTokenService(
 		&testTokenCache{},
+		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{}),
 		model.VerificationFlowDefault,
 	)
@@ -443,9 +453,10 @@ func TestTokenServiceUseReacquiresRejectedTokenOnce(t *testing.T) {
 	var usedTokens [][]byte
 	err := tokens.Use(
 		context.Background(),
-		authenticator,
-		protocol.PermissionCredentialManagement,
-		"",
+		TokenUse{
+			Permission: protocol.PermissionCredentialManagement,
+			ReplaySafe: true,
+		},
 		func(token []byte) error {
 			usedTokens = append(usedTokens, token)
 			if len(usedTokens) == 1 {
@@ -481,6 +492,184 @@ func TestTokenServiceUseReacquiresRejectedTokenOnce(t *testing.T) {
 	}
 }
 
+func TestTokenServiceUseInvalidatesRejectedTokenWithoutReplayingUnsafeConsumer(t *testing.T) {
+	cache := &testTokenCache{}
+	key := TokenKey{Permission: protocol.PermissionCredentialManagement}
+	cache.SetToken(key, secret.New([]byte("cached-token")))
+	authenticator := &recordingTokenDevice{info: uvTokenInfo()}
+	tokens := NewTokenService(cache, authenticator, nil, model.VerificationFlowDefault)
+	consumerErr := &ctaptransport.CTAPError{
+		Command:    protocol.AuthenticatorCredentialManagement,
+		StatusCode: ctaptransport.CTAP2_ERR_PIN_AUTH_INVALID,
+	}
+
+	var usedToken []byte
+	uses := 0
+	err := tokens.Use(
+		context.Background(),
+		TokenUse{Permission: protocol.PermissionCredentialManagement},
+		func(token []byte) error {
+			uses++
+			usedToken = token
+
+			return consumerErr
+		},
+	)
+	if !errors.Is(err, consumerErr) {
+		t.Fatalf("Use error = %v, want consumer error", err)
+	}
+
+	if uses != 1 {
+		t.Fatalf("token uses = %d, want 1", uses)
+	}
+
+	if _, present, _ := cache.GetToken(key); present {
+		t.Fatal("rejected token remained cached")
+	}
+
+	if !slices.Equal(usedToken, make([]byte, len(usedToken))) {
+		t.Fatalf("used token was not zeroed: %#v", usedToken)
+	}
+}
+
+func TestTokenServiceUseOptionalAcquiresOnlyWhenRequired(t *testing.T) {
+	var requests []model.InteractionRequest
+	authenticator := &recordingTokenDevice{info: uvTokenInfo()}
+	tokens := NewTokenService(
+		&testTokenCache{},
+		authenticator,
+		recordingInteractionHandler(&requests, model.InteractionResponse{}),
+		model.VerificationFlowDefault,
+	)
+
+	var usedTokens [][]byte
+	err := tokens.Use(
+		context.Background(),
+		TokenUse{
+			Permission: protocol.PermissionMakeCredential,
+			RPID:       "example.com",
+			Optional:   true,
+		},
+		func(token []byte) error {
+			usedTokens = append(usedTokens, token)
+			if token == nil {
+				return ctapdevice.ErrPinUvAuthTokenRequired
+			}
+
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("Use: %v", err)
+	}
+
+	if got := len(usedTokens); got != 2 {
+		t.Fatalf("token uses = %d, want 2", got)
+	}
+
+	if usedTokens[0] != nil {
+		t.Fatalf("initial token = %q, want nil", usedTokens[0])
+	}
+
+	if !slices.Equal(usedTokens[1], make([]byte, len(usedTokens[1]))) {
+		t.Fatalf("acquired token was not zeroed: %#v", usedTokens[1])
+	}
+
+	if want := []string{"example.com"}; !slices.Equal(authenticator.uvRPIDs, want) {
+		t.Fatalf("UV token rpIds = %v, want %v", authenticator.uvRPIDs, want)
+	}
+
+	if got := len(requests); got != 1 {
+		t.Fatalf("interactions = %d, want 1", got)
+	}
+}
+
+func TestTokenServiceUseOptionalTriesWithoutTokenBeforeCachedToken(t *testing.T) {
+	cache := &testTokenCache{}
+	key := TokenKey{Permission: protocol.PermissionMakeCredential, RPID: "example.com"}
+	cache.SetToken(key, secret.New([]byte("cached-token")))
+	authenticator := &recordingTokenDevice{info: uvTokenInfo()}
+	tokens := NewTokenService(cache, authenticator, nil, model.VerificationFlowDefault)
+
+	uses := 0
+	err := tokens.Use(
+		context.Background(),
+		TokenUse{
+			Permission: protocol.PermissionMakeCredential,
+			RPID:       "example.com",
+			Optional:   true,
+		},
+		func(token []byte) error {
+			uses++
+			if token != nil {
+				t.Fatalf("token = %q, want nil", token)
+			}
+
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("Use: %v", err)
+	}
+
+	if uses != 1 {
+		t.Fatalf("token uses = %d, want 1", uses)
+	}
+
+	if _, present, _ := cache.GetToken(key); !present {
+		t.Fatal("unused cached token was invalidated")
+	}
+
+	if len(authenticator.uvRPIDs) != 0 {
+		t.Fatalf("UV token calls = %d, want 0", len(authenticator.uvRPIDs))
+	}
+}
+
+func TestTokenServiceUseOptionalDoesNotReplayRejectedToken(t *testing.T) {
+	cache := &testTokenCache{}
+	key := TokenKey{Permission: protocol.PermissionMakeCredential, RPID: "example.com"}
+	cache.SetToken(key, secret.New([]byte("cached-token")))
+	authenticator := &recordingTokenDevice{info: uvTokenInfo()}
+	tokens := NewTokenService(cache, authenticator, nil, model.VerificationFlowDefault)
+	consumerErr := &ctaptransport.CTAPError{
+		Command:    protocol.AuthenticatorMakeCredential,
+		StatusCode: ctaptransport.CTAP2_ERR_PIN_AUTH_INVALID,
+	}
+
+	uses := 0
+	err := tokens.Use(
+		context.Background(),
+		TokenUse{
+			Permission: protocol.PermissionMakeCredential,
+			RPID:       "example.com",
+			Optional:   true,
+		},
+		func(token []byte) error {
+			uses++
+			if token == nil {
+				return ctapdevice.ErrPinUvAuthTokenRequired
+			}
+
+			return consumerErr
+		},
+	)
+	if !errors.Is(err, consumerErr) {
+		t.Fatalf("Use error = %v, want consumer error", err)
+	}
+
+	if uses != 2 {
+		t.Fatalf("token uses = %d, want 2", uses)
+	}
+
+	if _, present, _ := cache.GetToken(key); present {
+		t.Fatal("rejected token remained cached")
+	}
+
+	if len(authenticator.uvRPIDs) != 0 {
+		t.Fatalf("UV token calls = %d, want 0", len(authenticator.uvRPIDs))
+	}
+}
+
 func TestTokenServiceUseKeepsTokenAfterOtherConsumerFailures(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -509,7 +698,8 @@ func TestTokenServiceUseKeepsTokenAfterOtherConsumerFailures(t *testing.T) {
 			cache := &testTokenCache{}
 			key := TokenKey{Permission: protocol.PermissionCredentialManagement}
 			cache.SetToken(key, secret.New([]byte("cached-token")))
-			tokens := NewTokenService(cache, nil, model.VerificationFlowDefault)
+			authenticator := &recordingTokenDevice{info: uvTokenInfo()}
+			tokens := NewTokenService(cache, authenticator, nil, model.VerificationFlowDefault)
 			consumerErr := &ctaptransport.CTAPError{
 				Command:    protocol.AuthenticatorCredentialManagement,
 				StatusCode: tt.status,
@@ -518,9 +708,7 @@ func TestTokenServiceUseKeepsTokenAfterOtherConsumerFailures(t *testing.T) {
 			uses := 0
 			err := tokens.Use(
 				context.Background(),
-				&recordingTokenDevice{info: uvTokenInfo()},
-				protocol.PermissionCredentialManagement,
-				"",
+				TokenUse{Permission: protocol.PermissionCredentialManagement},
 				func([]byte) error {
 					uses++
 
@@ -547,13 +735,13 @@ func TestTokenServiceMissingHandlerForUVReturnsInvalidStateBeforeUVCommand(t *te
 	cache := &testTokenCache{}
 	tokens := NewTokenService(
 		cache,
+		authenticator,
 		NewInteractionBroker(model.NoopEventSink{}, nil),
 		model.VerificationFlowDefault,
 	)
 
-	token, err := tokens.Acquire(
+	token, err := tokens.acquire(
 		context.Background(),
-		authenticator,
 		protocol.PermissionCredentialManagement,
 		"",
 	)
@@ -592,13 +780,13 @@ func recordingInteractionHandler(
 func acquireTokenForTest(
 	t *testing.T,
 	tokens *TokenService,
-	authenticator *recordingTokenDevice,
+	_ *recordingTokenDevice,
 	permission protocol.Permission,
 	rpID string,
 ) []byte {
 	t.Helper()
 
-	token, err := tokens.Acquire(context.Background(), authenticator, permission, rpID)
+	token, err := tokens.acquire(context.Background(), permission, rpID)
 	if err != nil {
 		t.Fatalf("Acquire: %v", err)
 	}

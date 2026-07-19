@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/errornorm"
+	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
@@ -29,17 +30,10 @@ func (r Runner) enableLongTouchForReset(ctx context.Context, req model.EnableLon
 		return output, nil
 	}
 
-	if err := r.confirmMutation(ctx, confirmationRequest{
-		confirmed:       req.Confirmed,
-		message:         req.ConfirmationMessage,
-		fallbackMessage: "Enable long touch for reset on authenticator " + r.env.Selected.Fingerprint + "?",
-		destructive:     false,
-		preview:         preview,
-	}); err != nil {
-		return output, err
-	}
-
-	err = r.runWithOptionalToken(ctx, protocol.PermissionAuthenticatorConfiguration, "", func(token []byte) error {
+	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
+		Permission: protocol.PermissionAuthenticatorConfiguration,
+		Optional:   true,
+	}, func(token []byte) error {
 		return r.env.Authenticator.EnableLongTouchForReset(ctx, token)
 	})
 	if err != nil {

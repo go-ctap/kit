@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/errornorm"
-	"github.com/go-ctap/kit/internal/secret"
+	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
@@ -33,28 +33,17 @@ func (r Runner) renameBio(ctx context.Context, req model.BioRenameOperation) (mo
 		return output, nil
 	}
 
-	if err := r.confirmMutation(ctx, confirmationRequest{
-		confirmed:       req.Confirmed,
-		message:         req.ConfirmationMessage,
-		fallbackMessage: "Rename biometric enrollment " + req.TemplateIDHex + "?",
-		destructive:     false,
-		preview:         preview,
-	}); err != nil {
-		return output, err
-	}
-
 	templateID, err := appconfig.DecodeTemplateID(req.TemplateIDHex)
 	if err != nil {
 		return output, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.env.Authenticator, protocol.PermissionBioEnrollment, "")
+	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
+		Permission: protocol.PermissionBioEnrollment,
+	}, func(token []byte) error {
+		return r.env.Authenticator.SetFriendlyName(ctx, token, templateID, req.FriendlyName)
+	})
 	if err != nil {
-		return output, err
-	}
-	defer secret.Zero(token)
-
-	if err := r.env.Authenticator.SetFriendlyName(ctx, token, templateID, req.FriendlyName); err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 			failure.PhaseAuthenticatorCommand,
 			bioEnrollmentCommand(status),
@@ -95,28 +84,16 @@ func (r Runner) removeBio(ctx context.Context, req model.BioRemoveOperation) (mo
 		return output, nil
 	}
 
-	if err := r.confirmMutation(ctx, confirmationRequest{
-		confirmed:       req.Confirmed,
-		message:         req.ConfirmationMessage,
-		fallbackMessage: "Remove biometric enrollment " + req.TemplateIDHex + "?",
-		destructive:     true,
-		preview:         preview,
-	}); err != nil {
-		return output, err
-	}
-
 	templateID, err := appconfig.DecodeTemplateID(req.TemplateIDHex)
 	if err != nil {
 		return output, err
 	}
 
-	token, err := r.env.Tokens.Acquire(ctx, r.env.Authenticator, protocol.PermissionBioEnrollment, "")
-	if err != nil {
-		return output, err
-	}
-	defer secret.Zero(token)
-
-	err = r.env.Authenticator.RemoveEnrollment(ctx, token, templateID)
+	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
+		Permission: protocol.PermissionBioEnrollment,
+	}, func(token []byte) error {
+		return r.env.Authenticator.RemoveEnrollment(ctx, token, templateID)
+	})
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 			failure.PhaseAuthenticatorCommand,

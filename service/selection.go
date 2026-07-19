@@ -184,12 +184,7 @@ func (s *Service) openSelection(
 	}()
 
 	opts := []ctapkit.AuthenticatorOption{
-		ctapkit.WithEventSink(selectionEventSink{service: s, selectionID: selectionID}),
 		ctapkit.WithLogJournal(s.logs),
-	}
-
-	if s.strictPermissions {
-		opts = append(opts, ctapkit.WithStrictPermissions())
 	}
 
 	runtime, err := s.openAuthenticator(

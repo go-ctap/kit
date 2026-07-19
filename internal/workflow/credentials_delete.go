@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/errornorm"
-	"github.com/go-ctap/kit/internal/secret"
+	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
@@ -41,16 +41,6 @@ func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredential
 		return output, nil
 	}
 
-	if err := r.confirmMutation(ctx, confirmationRequest{
-		confirmed:       req.Confirmed,
-		message:         req.ConfirmationMessage,
-		fallbackMessage: "Delete resident credential " + req.CredentialIDHex + "?",
-		destructive:     true,
-		preview:         preview,
-	}); err != nil {
-		return output, err
-	}
-
 	publicTarget, err := appcredentials.FindCredentialByHexID(report, req.CredentialIDHex)
 	if err != nil {
 		return output, err
@@ -61,18 +51,11 @@ func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredential
 		return output, err
 	}
 
-	token, err := r.env.Tokens.Acquire(
-		ctx,
-		r.env.Authenticator,
-		mutationPermission,
-		r.credentialMutationRPID(publicTarget),
-	)
-	if err != nil {
-		return output, err
-	}
-	defer secret.Zero(token)
-
-	err = r.env.Authenticator.DeleteCredential(ctx, token, descriptor)
+	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
+		Permission: mutationPermission,
+	}, func(token []byte) error {
+		return r.env.Authenticator.DeleteCredential(ctx, token, descriptor)
+	})
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 			failure.PhaseAuthenticatorCommand,

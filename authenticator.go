@@ -18,19 +18,18 @@ import (
 type AuthenticatorOption func(*authenticatorConfig)
 
 type authenticatorConfig struct {
-	events            model.EventSink
-	journal           *LogJournal
-	strictPermissions bool
+	journal *LogJournal
 }
 
 type OperationOption func(*operationConfig)
 
 type operationConfig struct {
 	verificationFlow model.VerificationFlow
+	events           model.EventSink
 }
 
-func WithEventSink(events model.EventSink) AuthenticatorOption {
-	return func(config *authenticatorConfig) {
+func WithEventSink(events model.EventSink) OperationOption {
+	return func(config *operationConfig) {
 		config.events = events
 	}
 }
@@ -38,14 +37,6 @@ func WithEventSink(events model.EventSink) AuthenticatorOption {
 func WithLogJournal(journal *LogJournal) AuthenticatorOption {
 	return func(config *authenticatorConfig) {
 		config.journal = journal
-	}
-}
-
-// WithStrictPermissions scopes credential management mutation tokens to the
-// target RP ID for credentials.delete and credentials.updateUser operations.
-func WithStrictPermissions() AuthenticatorOption {
-	return func(config *authenticatorConfig) {
-		config.strictPermissions = true
 	}
 }
 
@@ -58,11 +49,9 @@ func WithVerificationFlow(flow model.VerificationFlow) OperationOption {
 // Authenticator is one opened authenticator channel. It owns transport
 // lifecycle, operation serialization, and runtime token state until Close.
 type Authenticator struct {
-	selected          report.DeviceReport
-	device            authenticator.Device
-	events            *rtruntime.EventDispatcher
-	tokens            *rtruntime.TokenStore
-	strictPermissions bool
+	selected report.DeviceReport
+	device   authenticator.Device
+	tokens   *rtruntime.TokenStore
 
 	runMu   sync.Mutex
 	stateMu sync.Mutex
@@ -87,15 +76,11 @@ func openAuthenticatorHandle(
 	open authenticatorOpenFunc,
 	opts ...AuthenticatorOption,
 ) (*Authenticator, error) {
-	config := authenticatorConfig{events: model.NoopEventSink{}}
+	var config authenticatorConfig
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&config)
 		}
-	}
-
-	if config.events == nil {
-		config.events = model.NoopEventSink{}
 	}
 
 	if !device.valid {
@@ -115,11 +100,9 @@ func openAuthenticatorHandle(
 	}
 
 	return &Authenticator{
-		selected:          selected,
-		device:            opened,
-		events:            rtruntime.NewEventDispatcher(config.events),
-		tokens:            rtruntime.NewTokenStore(),
-		strictPermissions: config.strictPermissions,
+		selected: selected,
+		device:   opened,
+		tokens:   rtruntime.NewTokenStore(),
 	}, nil
 }
 
@@ -176,16 +159,16 @@ func (a *Authenticator) run(
 	}
 	defer a.finish()
 
-	interactions := rtruntime.NewInteractionBroker(a.events, handler)
-	tokens := rtruntime.NewTokenService(a.tokens, interactions, config.verificationFlow)
+	events := rtruntime.NewEventDispatcher(config.events)
+	interactions := rtruntime.NewInteractionBroker(events, handler)
+	tokens := rtruntime.NewTokenService(a.tokens, a.device, interactions, config.verificationFlow)
 
 	return workflow.Run(childCtx, workflow.Environment{
-		Selected:          a.selected,
-		Authenticator:     a.device,
-		Events:            a.events,
-		Interactions:      interactions,
-		Tokens:            tokens,
-		StrictPermissions: a.strictPermissions,
+		Selected:      a.selected,
+		Authenticator: a.device,
+		Events:        events,
+		Interactions:  interactions,
+		Tokens:        tokens,
 	}, operation)
 }
 

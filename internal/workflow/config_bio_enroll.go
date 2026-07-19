@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/errornorm"
-	"github.com/go-ctap/kit/internal/secret"
+	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
@@ -37,36 +37,26 @@ func (r Runner) enrollBio(ctx context.Context, req model.BioEnrollOperation) (mo
 		return output, nil
 	}
 
-	if err := r.confirmMutation(ctx, confirmationRequest{
-		confirmed:       req.Confirmed,
-		message:         req.ConfirmationMessage,
-		fallbackMessage: "Start biometric enrollment on authenticator " + r.env.Selected.Fingerprint + "?",
-		destructive:     false,
-		preview:         preview,
-	}); err != nil {
-		return output, err
-	}
+	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
+		Permission: protocol.PermissionBioEnrollment,
+	}, func(token []byte) error {
+		result, err := r.runBioEnrollment(
+			ctx,
+			appconfig.BioEnrollRequest{
+				TimeoutMilliseconds: req.TimeoutMilliseconds,
+			},
+			preview,
+			token,
+		)
+		output.Result = &result
 
-	token, err := r.env.Tokens.Acquire(ctx, r.env.Authenticator, protocol.PermissionBioEnrollment, "")
-	if err != nil {
-		return output, err
-	}
-	defer secret.Zero(token)
+		return err
+	})
 
-	result, err := r.runBioEnrollment(
-		ctx,
-		appconfig.BioEnrollRequest{
-			TimeoutMilliseconds: req.TimeoutMilliseconds,
-			Confirmed:           true,
-		},
-		preview,
-		token,
-	)
-	output.Result = &result
 	return output, err
 }
 
-func (r Runner) bioEnrollmentProgress() appconfig.BioEnrollProgress {
+func (r Runner) bioEnrollmentProgress(ctx context.Context) appconfig.BioEnrollProgress {
 	var completed uint64
 
 	return func(sample appconfig.BioEnrollSample) error {
@@ -81,7 +71,7 @@ func (r Runner) bioEnrollmentProgress() appconfig.BioEnrollProgress {
 			total := completed + uint64(*sample.RemainingSamples)
 			event.Total = new(total)
 		}
-		r.env.Events.Emit(event)
+		r.env.Events.Emit(ctx, event)
 
 		return nil
 	}
@@ -94,7 +84,7 @@ func (r Runner) runBioEnrollment(
 	token []byte,
 ) (appconfig.BioEnrollResult, error) {
 	authenticator := r.env.Authenticator
-	progress := r.bioEnrollmentProgress()
+	progress := r.bioEnrollmentProgress(ctx)
 	result := appconfig.BioEnrollResult{
 		DeviceFingerprint: preview.Device.Fingerprint,
 		PreviewOnly:       preview.PreviewOnly,

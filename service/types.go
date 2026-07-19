@@ -187,7 +187,6 @@ type InteractionPrompt struct {
 type InteractionAnswer struct {
 	InteractionID InteractionID `json:"interactionId"`
 	PIN           string        `json:"pin,omitempty"`
-	Confirmed     bool          `json:"confirmed,omitempty"`
 	Canceled      bool          `json:"canceled,omitempty"`
 }
 

@@ -49,7 +49,6 @@ type BioEnrollmentRecord struct {
 
 type BioEnrollRequest struct {
 	TimeoutMilliseconds uint `json:"timeoutMilliseconds"`
-	Confirmed           bool `json:"-"`
 }
 
 type BioEnrollPreview struct {

@@ -7,9 +7,9 @@ import (
 )
 
 type CredentialTarget struct {
-	Record CredentialRecord
-	RP     RelyingParty
-	User   UserIdentity
+	Record CredentialRecord `json:"record"`
+	RP     RelyingParty     `json:"rp"`
+	User   UserIdentity     `json:"user"`
 }
 
 type RelyingParty struct {

@@ -49,9 +49,8 @@ flowchart TD
   C -->|failure| Y["Normalized transport failure"]
 ```
 
-Opening options configure the event sink, log journal, and strict credential
-mutation permissions. They remain fixed for the lifetime of the opened
-authenticator.
+Opening options configure the log journal for the lifetime of the opened
+authenticator. Event sinks belong to individual operations.
 
 ## Run Operation
 
@@ -88,10 +87,13 @@ Every operation reads current authenticator state. This avoids stale report
 semantics and removes public `refresh` and `prepareInventoryRefresh` controls.
 
 The token store is intentionally different from a report cache. Reusing a
-valid token avoids repeated PIN/UV prompts. Consuming commands still handle
-`PIN_UV_AUTH_INVALID`: the token is wiped, reacquired, and a replay-safe read is
-retried once. PIN changes, reset, and user-presence rules invalidate or narrow
-the stored grant.
+valid token avoids repeated PIN/UV prompts. Every token consumer goes through
+one operation-scoped token service, which owns acquisition, callback-copy
+wiping, and rejected-token invalidation. Optional consumers first try the
+authenticator command without a token. Reads explicitly marked replay-safe are
+reacquired and retried once after `PIN_UV_AUTH_INVALID`; mutations are not
+replayed. PIN changes, reset, and user-presence rules invalidate or narrow the
+stored grant.
 
 ## Close And Cancellation
 

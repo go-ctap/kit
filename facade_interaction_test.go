@@ -12,7 +12,7 @@ import (
 	"github.com/go-ctap/kit/transport"
 )
 
-func TestTypedOperationDoesNotMarshalSecrets(t *testing.T) {
+func TestTypedOperationMarshalsSecretsForBindingTransport(t *testing.T) {
 	req := model.ChangePINOperation{
 		CurrentPIN: "1234",
 		NewPIN:     "5678",
@@ -23,7 +23,7 @@ func TestTypedOperationDoesNotMarshalSecrets(t *testing.T) {
 		t.Fatalf("Marshal: %v", err)
 	}
 
-	if string(raw) != `{}` {
+	if string(raw) != `{"currentPIN":"1234","newPIN":"5678"}` {
 		t.Fatalf("marshaled operation = %s", raw)
 	}
 }
@@ -45,7 +45,6 @@ func TestPINInteractionRejectsEmptyPINAtSessionRun(t *testing.T) {
 	_, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-		Confirmed:       true,
 	}, handler)
 	requireFailureCode(t, err, failure.CodePINRequired)
 
@@ -67,7 +66,6 @@ func TestPINInteractionWithoutHandlerReturnsInvalidState(t *testing.T) {
 	_, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-		Confirmed:       true,
 	}, nil)
 	requireFailureCode(t, err, failure.CodeInteractionHandlerRequired)
 
@@ -100,7 +98,6 @@ func TestCanceledContextDuringInteractionReturnsCanceledFailure(t *testing.T) {
 	_, err := session.Run(ctx, model.WriteLargeBlobOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-		Confirmed:       true,
 	}, handler)
 	requireFailureCode(t, err, failure.CodeOperationCanceled)
 
@@ -109,34 +106,26 @@ func TestCanceledContextDuringInteractionReturnsCanceledFailure(t *testing.T) {
 	}
 }
 
-func TestConfirmInteractionCanceledReturnsCanceledFailure(t *testing.T) {
-	events := &recordingEventSink{}
+func TestSetPINExecutesWithoutConfirmationInteraction(t *testing.T) {
 	a := &pinMutationCountingAuthenticator{}
-	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
 	defer func() { _ = session.Close() }()
 
-	handler := interactionHandlerFunc(func(req model.InteractionRequest) (model.InteractionResponse, error) {
-		if req.Kind != model.InteractionKindConfirm {
-			t.Fatalf("interaction kind = %s, want confirm", req.Kind)
-		}
-
-		return model.InteractionResponse{Canceled: true}, nil
-	})
-
 	_, err := session.Run(context.Background(), model.SetPINOperation{
 		NewPIN: "1234",
-	}, handler)
-	requireFailureCode(t, err, failure.CodeInteractionCanceled)
-
-	if got := a.setCalls.Load(); got != 0 {
-		t.Fatalf("SetPIN calls = %d, want 0", got)
+	}, nil)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
 	}
 
+	if got := a.setCalls.Load(); got != 1 {
+		t.Fatalf("SetPIN calls = %d, want 1", got)
+	}
 }
 
-func TestResetConfirmInteractionCanceledReturnsCanceledFailure(t *testing.T) {
+func TestResetTouchInteractionCanceledReturnsCanceledFailure(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &resetCountingAuthenticator{}
 	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
@@ -145,12 +134,12 @@ func TestResetConfirmInteractionCanceledReturnsCanceledFailure(t *testing.T) {
 	defer func() { _ = session.Close() }()
 
 	handler := interactionHandlerFunc(func(req model.InteractionRequest) (model.InteractionResponse, error) {
-		if req.Kind != model.InteractionKindConfirm {
-			t.Fatalf("interaction kind = %s, want confirm", req.Kind)
+		if req.Kind != model.InteractionKindTouch {
+			t.Fatalf("interaction kind = %s, want touch", req.Kind)
 		}
 
 		if !req.Destructive {
-			t.Fatal("reset confirm interaction destructive = false, want true")
+			t.Fatal("reset touch interaction destructive = false, want true")
 		}
 
 		return model.InteractionResponse{Canceled: true}, nil
@@ -161,12 +150,6 @@ func TestResetConfirmInteractionCanceledReturnsCanceledFailure(t *testing.T) {
 
 	if got := a.resetCount.Load(); got != 0 {
 		t.Fatalf("Reset count = %d, want 0", got)
-	}
-
-	for _, event := range events.Events() {
-		if event.Kind == model.InteractionKindTouch {
-			t.Fatal("touch interaction emitted for canceled confirm")
-		}
 	}
 
 }
@@ -199,7 +182,6 @@ func TestPINInteractionHandlerReceivesRequestAndValidPINContinues(t *testing.T) 
 	result, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-		Confirmed:       true,
 	}, handler)
 	if err != nil {
 		t.Fatalf("Run: %v", err)

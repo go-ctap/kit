@@ -7,7 +7,7 @@ import (
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/errornorm"
-	"github.com/go-ctap/kit/internal/secret"
+	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
@@ -16,34 +16,16 @@ import (
 func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCredentialUserOperation) (model.OperationResult, error) {
 	var output model.CredentialUpdateOutput
 
-	inventoryPermission, mutationPermission, err := r.inventoryMutationPermissions(
-		protocol.PermissionCredentialManagement,
-	)
-	if err != nil {
-		return output, err
-	}
-
-	report, err := r.credentialInventoryReport(
-		ctx,
-		inventoryPermission,
-	)
-	if err != nil {
-		return output, err
-	}
-	defer zeroCredentialInventoryReport(&report)
-
 	updateReq := appcredentials.UpdateUserRequest{
-		CredentialIDHex: req.CredentialIDHex,
 		UserIDHex:       req.UserIDHex,
 		Name:            req.Name,
 		DisplayName:     req.DisplayName,
 		UserIDProvided:  req.UserIDProvided,
 		NameProvided:    req.NameProvided,
 		DisplayProvided: req.DisplayProvided,
-		Confirmed:       req.Confirmed,
 	}
 
-	preview, err := appcredentials.BuildUpdateUserPreview(report, updateReq)
+	preview, err := appcredentials.BuildUpdateUserPreview(req.Target, updateReq)
 	if err != nil {
 		return output, err
 	}
@@ -54,56 +36,34 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 		return output, nil
 	}
 
-	if err := r.confirmMutation(ctx, confirmationRequest{
-		confirmed:       req.Confirmed,
-		message:         req.ConfirmationMessage,
-		fallbackMessage: "Update resident credential " + req.CredentialIDHex + "?",
-		destructive:     false,
-		preview:         preview,
-	}); err != nil {
-		return output, err
-	}
-
-	updateReq.Confirmed = true
-
-	publicTarget, err := appcredentials.FindCredentialByHexID(report, req.CredentialIDHex)
+	_, mutationPermission, err := r.inventoryMutationPermissions(
+		protocol.PermissionCredentialManagement,
+	)
 	if err != nil {
 		return output, err
 	}
 
-	proposed, err := appcredentials.ResolveUpdatedUser(publicTarget, updateReq)
+	userID, err := decodeCredentialHex(preview.Proposed.UserIDHex)
 	if err != nil {
 		return output, err
 	}
 
-	userID, err := decodeCredentialHex(proposed.UserIDHex)
-	if err != nil {
-		return output, err
-	}
-
-	descriptor, err := credentialDescriptor(publicTarget.Record)
+	descriptor, err := credentialDescriptor(req.Target.Record)
 	if err != nil {
 		return output, err
 	}
 
 	updatedUser := credential.PublicKeyCredentialUserEntity{
 		ID:          userID,
-		Name:        proposed.Name,
-		DisplayName: proposed.DisplayName,
+		Name:        preview.Proposed.Name,
+		DisplayName: preview.Proposed.DisplayName,
 	}
 
-	token, err := r.env.Tokens.Acquire(
-		ctx,
-		r.env.Authenticator,
-		mutationPermission,
-		r.credentialMutationRPID(publicTarget),
-	)
-	if err != nil {
-		return output, err
-	}
-	defer secret.Zero(token)
-
-	err = r.env.Authenticator.UpdateUserInformation(ctx, token, descriptor, updatedUser)
+	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
+		Permission: mutationPermission,
+	}, func(token []byte) error {
+		return r.env.Authenticator.UpdateUserInformation(ctx, token, descriptor, updatedUser)
+	})
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 			failure.PhaseAuthenticatorCommand,
@@ -114,11 +74,11 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 
 	result := appcredentials.UpdateUserResult{
 		DeviceFingerprint: r.env.Selected.Fingerprint,
-		CredentialIDHex:   publicTarget.Record.CredentialIDHex,
-		RPID:              publicTarget.RP.ID,
-		RPName:            publicTarget.RP.Name,
-		Previous:          publicTarget.User,
-		Current:           proposed,
+		CredentialIDHex:   req.Target.Record.CredentialIDHex,
+		RPID:              req.Target.RP.ID,
+		RPName:            req.Target.RP.Name,
+		Previous:          req.Target.User,
+		Current:           preview.Proposed,
 	}
 
 	output.Result = &result

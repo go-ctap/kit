@@ -64,11 +64,15 @@ func TestBuildDeletePreviewMissingCredential(t *testing.T) {
 }
 
 func TestBuildUpdateUserPreviewRejectsInvalidUserIDHex(t *testing.T) {
+	target, err := FindCredentialByHexID(sampleInventoryReport(), "deadbeef")
+	if err != nil {
+		t.Fatalf("FindCredentialByHexID: %v", err)
+	}
+
 	for _, userIDHex := range []string{"zz", "abc"} {
-		_, err := BuildUpdateUserPreview(sampleInventoryReport(), UpdateUserRequest{
-			CredentialIDHex: "deadbeef",
-			UserIDHex:       userIDHex,
-			UserIDProvided:  true,
+		_, err := BuildUpdateUserPreview(target, UpdateUserRequest{
+			UserIDHex:      userIDHex,
+			UserIDProvided: true,
 		})
 		if !failure.IsCode(err, failure.CodeUserIDHexInvalid) {
 			t.Fatalf("BuildUpdateUserPreview(%q) error = %v, want %s", userIDHex, err, failure.CodeUserIDHexInvalid)
@@ -80,12 +84,10 @@ func TestBuildUpdateUserPreviewRejectsInvalidUserIDHex(t *testing.T) {
 	}
 }
 
-func TestBuildUpdateUserPreviewRequiresSupportedChange(t *testing.T) {
-	report := sampleInventoryReport()
-	report.Support.PreviewOnly = true
-	_, err := BuildUpdateUserPreview(report, UpdateUserRequest{CredentialIDHex: "deadbeef"})
-	if !failure.IsCode(err, failure.CodeCredentialManagementUnsupported) {
-		t.Fatalf("BuildUpdateUserPreview(preview-only) error = %v, want %s", err, failure.CodeCredentialManagementUnsupported)
+func TestBuildUpdateUserPreviewRequiresTargetAndChange(t *testing.T) {
+	_, err := BuildUpdateUserPreview(CredentialTarget{}, UpdateUserRequest{NameProvided: true})
+	if !failure.IsCode(err, failure.CodeCredentialIDRequired) {
+		t.Fatalf("BuildUpdateUserPreview(empty target) error = %v, want %s", err, failure.CodeCredentialIDRequired)
 	}
 
 	_, err = ResolveUpdatedUser(CredentialTarget{}, UpdateUserRequest{})
@@ -95,10 +97,14 @@ func TestBuildUpdateUserPreviewRequiresSupportedChange(t *testing.T) {
 }
 
 func TestBuildUpdateUserPreviewNormalizesUserIDHex(t *testing.T) {
-	preview, err := BuildUpdateUserPreview(sampleInventoryReport(), UpdateUserRequest{
-		CredentialIDHex: "deadbeef",
-		UserIDHex:       "0A0B",
-		UserIDProvided:  true,
+	target, err := FindCredentialByHexID(sampleInventoryReport(), "deadbeef")
+	if err != nil {
+		t.Fatalf("FindCredentialByHexID: %v", err)
+	}
+
+	preview, err := BuildUpdateUserPreview(target, UpdateUserRequest{
+		UserIDHex:      "0A0B",
+		UserIDProvided: true,
 	})
 	if err != nil {
 		t.Fatalf("BuildUpdateUserPreview: %v", err)
@@ -110,12 +116,16 @@ func TestBuildUpdateUserPreviewNormalizesUserIDHex(t *testing.T) {
 }
 
 func TestBuildUpdateUserPreviewEmptyProvidedUserIDFallsBack(t *testing.T) {
-	preview, err := BuildUpdateUserPreview(sampleInventoryReport(), UpdateUserRequest{
-		CredentialIDHex: "deadbeef",
-		UserIDHex:       " ",
-		UserIDProvided:  true,
-		Name:            "alice-new@example.com",
-		NameProvided:    true,
+	target, err := FindCredentialByHexID(sampleInventoryReport(), "deadbeef")
+	if err != nil {
+		t.Fatalf("FindCredentialByHexID: %v", err)
+	}
+
+	preview, err := BuildUpdateUserPreview(target, UpdateUserRequest{
+		UserIDHex:      " ",
+		UserIDProvided: true,
+		Name:           "alice-new@example.com",
+		NameProvided:   true,
 	})
 	if err != nil {
 		t.Fatalf("BuildUpdateUserPreview: %v", err)

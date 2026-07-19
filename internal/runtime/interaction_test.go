@@ -9,29 +9,39 @@ import (
 
 type interactionHandlerFunc func(model.InteractionRequest) (model.InteractionResponse, error)
 
-func (f interactionHandlerFunc) RequestInteraction(req model.InteractionRequest) (model.InteractionResponse, error) {
+func (f interactionHandlerFunc) RequestInteraction(_ context.Context, req model.InteractionRequest) (model.InteractionResponse, error) {
 	return f(req)
 }
 
-func TestRequestInteractionPassesPromptPayloadOnly(t *testing.T) {
+type contextualInteractionHandlerFunc func(context.Context, model.InteractionRequest) (model.InteractionResponse, error)
+
+func (f contextualInteractionHandlerFunc) RequestInteraction(
+	ctx context.Context,
+	req model.InteractionRequest,
+) (model.InteractionResponse, error) {
+	return f(ctx, req)
+}
+
+func TestRequestInteractionPassesPromptAndContext(t *testing.T) {
 	events := &recordingEventSink{}
 	var got model.InteractionRequest
+	ctx := context.WithValue(context.Background(), interactionContextKey{}, "operation-1")
 
-	broker := NewInteractionBroker(events, interactionHandlerFunc(func(req model.InteractionRequest) (model.InteractionResponse, error) {
+	broker := NewInteractionBroker(events, contextualInteractionHandlerFunc(func(handlerCtx context.Context, req model.InteractionRequest) (model.InteractionResponse, error) {
+		if handlerCtx.Value(interactionContextKey{}) != "operation-1" {
+			t.Fatalf("handler context did not preserve operation value")
+		}
 		got = req
 
-		return model.InteractionResponse{
-			Confirmed: true,
-		}, nil
+		return model.InteractionResponse{}, nil
 	}))
 
 	req := model.InteractionRequest{
-		Kind:        model.InteractionKindConfirm,
-		Message:     "confirm?",
-		Destructive: true,
+		Kind:    model.InteractionKindTouch,
+		Message: "touch",
 	}
 
-	response, err := broker.RequestInteraction(context.Background(), req)
+	_, err := broker.RequestInteraction(ctx, req)
 	if err != nil {
 		t.Fatalf("RequestInteraction: %v", err)
 	}
@@ -40,12 +50,11 @@ func TestRequestInteractionPassesPromptPayloadOnly(t *testing.T) {
 		t.Fatalf("handler request = %#v, want %#v", got, req)
 	}
 
-	if !response.Confirmed {
-		t.Fatal("response confirmed = false, want true")
-	}
-
 	if len(events.events) != 1 {
 		t.Fatalf("events = %d, want 1", len(events.events))
+	}
+	if events.contexts[0].Value(interactionContextKey{}) != "operation-1" {
+		t.Fatal("event context did not preserve operation value")
 	}
 
 	event := events.events[0]
@@ -55,9 +64,13 @@ func TestRequestInteractionPassesPromptPayloadOnly(t *testing.T) {
 }
 
 type recordingEventSink struct {
-	events []model.OperationEvent
+	contexts []context.Context
+	events   []model.OperationEvent
 }
 
-func (s *recordingEventSink) Emit(event model.OperationEvent) {
+func (s *recordingEventSink) Emit(ctx context.Context, event model.OperationEvent) {
+	s.contexts = append(s.contexts, ctx)
 	s.events = append(s.events, event)
 }
+
+type interactionContextKey struct{}

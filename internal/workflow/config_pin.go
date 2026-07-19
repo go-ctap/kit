@@ -32,16 +32,6 @@ func (r Runner) setPIN(ctx context.Context, req model.SetPINOperation) (model.Op
 		return output, nil
 	}
 
-	if err := r.confirmMutation(ctx, confirmationRequest{
-		confirmed:       req.Confirmed,
-		message:         req.ConfirmationMessage,
-		fallbackMessage: "Set PIN on authenticator " + r.env.Selected.Fingerprint + "?",
-		destructive:     false,
-		preview:         preview,
-	}); err != nil {
-		return output, err
-	}
-
 	err = r.env.Authenticator.SetPIN(ctx, req.NewPIN)
 	r.env.Tokens.Invalidate()
 
@@ -75,16 +65,6 @@ func (r Runner) changePIN(ctx context.Context, req model.ChangePINOperation) (mo
 
 	if req.DryRun {
 		return output, nil
-	}
-
-	if err := r.confirmMutation(ctx, confirmationRequest{
-		confirmed:       req.Confirmed,
-		message:         req.ConfirmationMessage,
-		fallbackMessage: "Change PIN on authenticator " + r.env.Selected.Fingerprint + "?",
-		destructive:     false,
-		preview:         preview,
-	}); err != nil {
-		return output, err
 	}
 
 	err = r.env.Authenticator.ChangePIN(ctx, req.CurrentPIN, req.NewPIN)
