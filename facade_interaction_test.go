@@ -12,7 +12,7 @@ import (
 	"github.com/go-ctap/kit/transport"
 )
 
-func TestTypedOperationMarshalsSecretsForBindingTransport(t *testing.T) {
+func TestTypedOperationDoesNotMarshalSecrets(t *testing.T) {
 	req := model.ChangePINOperation{
 		CurrentPIN: "1234",
 		NewPIN:     "5678",
@@ -23,8 +23,9 @@ func TestTypedOperationMarshalsSecretsForBindingTransport(t *testing.T) {
 		t.Fatalf("Marshal: %v", err)
 	}
 
-	if string(raw) != `{"currentPIN":"1234","newPIN":"5678"}` {
-		t.Fatalf("marshaled operation = %s", raw)
+	if bytes.Contains(raw, []byte("1234")) || bytes.Contains(raw, []byte("5678")) ||
+		bytes.Contains(raw, []byte("currentPIN")) || bytes.Contains(raw, []byte("newPIN")) {
+		t.Fatalf("marshaled operation exposed PIN: %s", raw)
 	}
 }
 

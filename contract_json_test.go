@@ -48,11 +48,11 @@ func TestOperationEventIncludesStateStages(t *testing.T) {
 }
 
 func TestWebAuthnOperationKindStrings(t *testing.T) {
-	if got := (model.MakeCredentialOperation{}).Kind(); got != "webauthn.makeCredential" {
+	if got := model.OperationMakeCredential; got != "webauthn.makeCredential" {
 		t.Fatalf("MakeCredential kind = %q", got)
 	}
 
-	if got := (model.GetAssertionOperation{}).Kind(); got != "webauthn.getAssertion" {
+	if got := model.OperationGetAssertion; got != "webauthn.getAssertion" {
 		t.Fatalf("GetAssertion kind = %q", got)
 	}
 }

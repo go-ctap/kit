@@ -7,14 +7,13 @@ import (
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
-	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/report"
 )
 
-func (r Runner) listLargeBlobs(ctx context.Context, req model.ListLargeBlobsOperation) (applargeblobs.ListReport, error) {
+func (r Runner) listLargeBlobs(ctx context.Context) (applargeblobs.ListReport, error) {
 	inventory, err := r.credentialInventoryReport(ctx, protocol.PermissionNone)
 	if err != nil {
 		return applargeblobs.ListReport{}, err

@@ -112,7 +112,7 @@ func (a *Authenticator) DeleteCredential(
 	handler model.InteractionHandler,
 	opts ...OperationOption,
 ) (*model.CredentialDeleteOutput, error) {
-	return executeOperation(a, ctx, operation.Kind(), handler, func(runner workflow.Runner, ctx context.Context) (model.CredentialDeleteOutput, error) {
+	return executeOperation(a, ctx, model.OperationDeleteCredential, handler, func(runner workflow.Runner, ctx context.Context) (model.CredentialDeleteOutput, error) {
 		return runner.DeleteCredential(ctx, operation)
 	}, opts...)
 }
@@ -123,7 +123,7 @@ func (a *Authenticator) UpdateCredentialUser(
 	handler model.InteractionHandler,
 	opts ...OperationOption,
 ) (*model.CredentialUpdateOutput, error) {
-	return executeOperation(a, ctx, operation.Kind(), handler, func(runner workflow.Runner, ctx context.Context) (model.CredentialUpdateOutput, error) {
+	return executeOperation(a, ctx, model.OperationUpdateCredentialUser, handler, func(runner workflow.Runner, ctx context.Context) (model.CredentialUpdateOutput, error) {
 		return runner.UpdateCredentialUser(ctx, operation)
 	}, opts...)
 }
@@ -134,7 +134,7 @@ func (a *Authenticator) ReadLargeBlob(
 	handler model.InteractionHandler,
 	opts ...OperationOption,
 ) (*model.LargeBlobReadOutput, error) {
-	return executeOperation(a, ctx, operation.Kind(), handler, func(runner workflow.Runner, ctx context.Context) (model.LargeBlobReadOutput, error) {
+	return executeOperation(a, ctx, model.OperationReadLargeBlob, handler, func(runner workflow.Runner, ctx context.Context) (model.LargeBlobReadOutput, error) {
 		return runner.ReadLargeBlob(ctx, operation)
 	}, opts...)
 }
@@ -153,7 +153,7 @@ func (a *Authenticator) WriteLargeBlob(
 	handler model.InteractionHandler,
 	opts ...OperationOption,
 ) (*model.LargeBlobMutationOutput, error) {
-	return executeOperation(a, ctx, operation.Kind(), handler, func(runner workflow.Runner, ctx context.Context) (model.LargeBlobMutationOutput, error) {
+	return executeOperation(a, ctx, model.OperationWriteLargeBlob, handler, func(runner workflow.Runner, ctx context.Context) (model.LargeBlobMutationOutput, error) {
 		return runner.WriteLargeBlob(ctx, operation)
 	}, opts...)
 }
@@ -164,7 +164,7 @@ func (a *Authenticator) DeleteLargeBlob(
 	handler model.InteractionHandler,
 	opts ...OperationOption,
 ) (*model.LargeBlobMutationOutput, error) {
-	return executeOperation(a, ctx, operation.Kind(), handler, func(runner workflow.Runner, ctx context.Context) (model.LargeBlobMutationOutput, error) {
+	return executeOperation(a, ctx, model.OperationDeleteLargeBlob, handler, func(runner workflow.Runner, ctx context.Context) (model.LargeBlobMutationOutput, error) {
 		return runner.DeleteLargeBlob(ctx, operation)
 	}, opts...)
 }
@@ -175,7 +175,7 @@ func (a *Authenticator) GarbageCollectLargeBlobs(
 	handler model.InteractionHandler,
 	opts ...OperationOption,
 ) (*model.LargeBlobMutationOutput, error) {
-	return executeOperation(a, ctx, operation.Kind(), handler, func(runner workflow.Runner, ctx context.Context) (model.LargeBlobMutationOutput, error) {
+	return executeOperation(a, ctx, model.OperationGarbageCollectLargeBlobs, handler, func(runner workflow.Runner, ctx context.Context) (model.LargeBlobMutationOutput, error) {
 		return runner.GarbageCollectLargeBlobs(ctx, operation)
 	}, opts...)
 }
@@ -195,10 +195,10 @@ func (a *Authenticator) SetPIN(
 	opts ...OperationOption,
 ) (*model.PINOutput, error) {
 	if operation.NewPIN == "" {
-		return nil, normalizeRunError(runtimePINRequiredError("newPIN"), string(operation.Kind()))
+		return nil, normalizeRunError(runtimePINRequiredError("newPIN"), string(model.OperationSetPIN))
 	}
 
-	return executeOperation(a, ctx, operation.Kind(), handler, func(runner workflow.Runner, ctx context.Context) (model.PINOutput, error) {
+	return executeOperation(a, ctx, model.OperationSetPIN, handler, func(runner workflow.Runner, ctx context.Context) (model.PINOutput, error) {
 		return runner.SetPIN(ctx, operation)
 	}, opts...)
 }
@@ -210,14 +210,14 @@ func (a *Authenticator) ChangePIN(
 	opts ...OperationOption,
 ) (*model.PINOutput, error) {
 	if operation.CurrentPIN == "" {
-		return nil, normalizeRunError(runtimePINRequiredError("currentPIN"), string(operation.Kind()))
+		return nil, normalizeRunError(runtimePINRequiredError("currentPIN"), string(model.OperationChangePIN))
 	}
 
 	if operation.NewPIN == "" {
-		return nil, normalizeRunError(runtimePINRequiredError("newPIN"), string(operation.Kind()))
+		return nil, normalizeRunError(runtimePINRequiredError("newPIN"), string(model.OperationChangePIN))
 	}
 
-	return executeOperation(a, ctx, operation.Kind(), handler, func(runner workflow.Runner, ctx context.Context) (model.PINOutput, error) {
+	return executeOperation(a, ctx, model.OperationChangePIN, handler, func(runner workflow.Runner, ctx context.Context) (model.PINOutput, error) {
 		return runner.ChangePIN(ctx, operation)
 	}, opts...)
 }
@@ -228,7 +228,7 @@ func (a *Authenticator) SetAlwaysUV(
 	handler model.InteractionHandler,
 	opts ...OperationOption,
 ) (*model.AuthenticatorConfigOutput, error) {
-	return executeOperation(a, ctx, operation.Kind(), handler, func(runner workflow.Runner, ctx context.Context) (model.AuthenticatorConfigOutput, error) {
+	return executeOperation(a, ctx, model.OperationSetAlwaysUV, handler, func(runner workflow.Runner, ctx context.Context) (model.AuthenticatorConfigOutput, error) {
 		return runner.SetAlwaysUV(ctx, operation)
 	}, opts...)
 }
@@ -239,7 +239,7 @@ func (a *Authenticator) SetMinPINLength(
 	handler model.InteractionHandler,
 	opts ...OperationOption,
 ) (*model.AuthenticatorConfigOutput, error) {
-	return executeOperation(a, ctx, operation.Kind(), handler, func(runner workflow.Runner, ctx context.Context) (model.AuthenticatorConfigOutput, error) {
+	return executeOperation(a, ctx, model.OperationSetMinPINLength, handler, func(runner workflow.Runner, ctx context.Context) (model.AuthenticatorConfigOutput, error) {
 		return runner.SetMinPINLength(ctx, operation)
 	}, opts...)
 }
@@ -250,7 +250,7 @@ func (a *Authenticator) EnableLongTouchForReset(
 	handler model.InteractionHandler,
 	opts ...OperationOption,
 ) (*model.AuthenticatorConfigOutput, error) {
-	return executeOperation(a, ctx, operation.Kind(), handler, func(runner workflow.Runner, ctx context.Context) (model.AuthenticatorConfigOutput, error) {
+	return executeOperation(a, ctx, model.OperationEnableLongTouchForReset, handler, func(runner workflow.Runner, ctx context.Context) (model.AuthenticatorConfigOutput, error) {
 		return runner.EnableLongTouchForReset(ctx, operation)
 	}, opts...)
 }
@@ -277,7 +277,7 @@ func (a *Authenticator) BioEnroll(
 	handler model.InteractionHandler,
 	opts ...OperationOption,
 ) (*model.BioEnrollOutput, error) {
-	return executeOperation(a, ctx, operation.Kind(), handler, func(runner workflow.Runner, ctx context.Context) (model.BioEnrollOutput, error) {
+	return executeOperation(a, ctx, model.OperationBioEnroll, handler, func(runner workflow.Runner, ctx context.Context) (model.BioEnrollOutput, error) {
 		return runner.BioEnroll(ctx, operation)
 	}, opts...)
 }
@@ -288,7 +288,7 @@ func (a *Authenticator) BioRename(
 	handler model.InteractionHandler,
 	opts ...OperationOption,
 ) (*model.BioMutationOutput, error) {
-	return executeOperation(a, ctx, operation.Kind(), handler, func(runner workflow.Runner, ctx context.Context) (model.BioMutationOutput, error) {
+	return executeOperation(a, ctx, model.OperationBioRename, handler, func(runner workflow.Runner, ctx context.Context) (model.BioMutationOutput, error) {
 		return runner.BioRename(ctx, operation)
 	}, opts...)
 }
@@ -299,7 +299,7 @@ func (a *Authenticator) BioRemove(
 	handler model.InteractionHandler,
 	opts ...OperationOption,
 ) (*model.BioMutationOutput, error) {
-	return executeOperation(a, ctx, operation.Kind(), handler, func(runner workflow.Runner, ctx context.Context) (model.BioMutationOutput, error) {
+	return executeOperation(a, ctx, model.OperationBioRemove, handler, func(runner workflow.Runner, ctx context.Context) (model.BioMutationOutput, error) {
 		return runner.BioRemove(ctx, operation)
 	}, opts...)
 }
@@ -310,7 +310,7 @@ func (a *Authenticator) ResetFactory(
 	handler model.InteractionHandler,
 	opts ...OperationOption,
 ) (*model.ResetFactoryOutput, error) {
-	return executeOperation(a, ctx, operation.Kind(), handler, func(runner workflow.Runner, ctx context.Context) (model.ResetFactoryOutput, error) {
+	return executeOperation(a, ctx, model.OperationResetFactory, handler, func(runner workflow.Runner, ctx context.Context) (model.ResetFactoryOutput, error) {
 		return runner.ResetFactory(ctx, operation)
 	}, opts...)
 }
@@ -321,7 +321,7 @@ func (a *Authenticator) MakeCredential(
 	handler model.InteractionHandler,
 	opts ...OperationOption,
 ) (*model.MakeCredentialOutput, error) {
-	return executeOperation(a, ctx, operation.Kind(), handler, func(runner workflow.Runner, ctx context.Context) (model.MakeCredentialOutput, error) {
+	return executeOperation(a, ctx, model.OperationMakeCredential, handler, func(runner workflow.Runner, ctx context.Context) (model.MakeCredentialOutput, error) {
 		return runner.MakeCredential(ctx, operation)
 	}, opts...)
 }
@@ -332,7 +332,7 @@ func (a *Authenticator) GetAssertion(
 	handler model.InteractionHandler,
 	opts ...OperationOption,
 ) (*model.GetAssertionOutput, error) {
-	return executeOperation(a, ctx, operation.Kind(), handler, func(runner workflow.Runner, ctx context.Context) (model.GetAssertionOutput, error) {
+	return executeOperation(a, ctx, model.OperationGetAssertion, handler, func(runner workflow.Runner, ctx context.Context) (model.GetAssertionOutput, error) {
 		return runner.GetAssertion(ctx, operation)
 	}, opts...)
 }

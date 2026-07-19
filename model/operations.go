@@ -28,15 +28,3 @@ const (
 	OperationMakeCredential           OperationKind = "webauthn.makeCredential"
 	OperationGetAssertion             OperationKind = "webauthn.getAssertion"
 )
-
-type Operation interface {
-	Kind() OperationKind
-	IsDryRun() bool
-	ctapkitOperation()
-}
-
-type InspectOperation struct{}
-
-func (InspectOperation) Kind() OperationKind { return OperationInspect }
-func (InspectOperation) IsDryRun() bool      { return false }
-func (InspectOperation) ctapkitOperation()   {}

@@ -57,7 +57,7 @@ func (r Runner) ReadLargeBlob(
 }
 
 func (r Runner) ListLargeBlobs(ctx context.Context) (model.LargeBlobListOutput, error) {
-	result, err := r.listLargeBlobs(ctx, model.ListLargeBlobsOperation{})
+	result, err := r.listLargeBlobs(ctx)
 
 	return model.LargeBlobListOutput{Report: result}, err
 }

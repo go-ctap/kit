@@ -115,8 +115,9 @@ returns `AUTHENTICATOR_CLOSED`.
 
 A consuming application may maintain an in-memory metadata cache for the
 current discovery topology and a small persistent cache keyed by attachment
-fingerprint. Vendor probes are short-lived and independent from the selected
-authenticator:
+fingerprint. A vendor probe accepts the opaque `Device` handle from the same
+discovery snapshot; caller-constructed reports cannot be used to open a probe
+channel. Probes are short-lived and independent from the selected authenticator:
 
 ```mermaid
 flowchart LR
@@ -136,10 +137,12 @@ background.
 
 ## Safety Properties
 
-- PINs and `pinUvAuthToken` bytes are copied, wiped, and never exposed through
-  public results or logs.
-- Mutations retain dry-run and explicit confirmation behavior.
-- Destructive operations retain strong confirmation semantics.
+- Runtime-owned PIN byte buffers and `pinUvAuthToken` bytes are copied, wiped,
+  and never exposed through public results or logs. Public PIN operation DTOs
+  also omit PIN fields during JSON encoding.
+- Mutations retain preview and dry-run behavior where useful.
+- The consuming application owns warnings, confirmation UX, and the decision
+  to invoke destructive operations.
 - Transport command serialization remains owned by `go-ctaphid`; the kit only
   serializes complete workflows on one opened authenticator.
 - Authenticator state is treated as externally mutable between commands.

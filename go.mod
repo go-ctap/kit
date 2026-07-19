@@ -11,7 +11,6 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/samber/lo v1.53.0
-	github.com/samber/mo v1.17.0
 	golang.org/x/sys v0.47.0
 )
 
