@@ -10,13 +10,17 @@ import (
 )
 
 type InteractionBroker struct {
-	events  model.EventSink
-	handler model.InteractionHandler
+	events  EventSink
+	handler InteractionHandler
 }
 
-func NewInteractionBroker(events model.EventSink, handler model.InteractionHandler) *InteractionBroker {
+type InteractionHandler interface {
+	RequestInteraction(context.Context, model.InteractionRequest) (model.InteractionResponse, error)
+}
+
+func NewInteractionBroker(events EventSink, handler InteractionHandler) *InteractionBroker {
 	if events == nil {
-		events = model.NoopEventSink{}
+		events = noopEventSink{}
 	}
 
 	return &InteractionBroker{

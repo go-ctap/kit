@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"strings"
 
+	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/safety"
 )
@@ -14,24 +15,24 @@ const (
 	warningBioRemoveMutation = "bio.remove.destructive"
 )
 
-type BioEnrollProgress func(BioEnrollSample) error
+type BioEnrollProgress func(appconfig.BioEnrollSample) error
 
 func BuildBioEnrollPreview(
-	status StatusReport,
+	status appconfig.StatusReport,
 	timeoutMilliseconds uint,
 	mode safety.PreviewMode,
-) (BioEnrollPreview, error) {
+) (appconfig.BioEnrollPreview, error) {
 	if !status.Bio.Supported {
-		return BioEnrollPreview{}, failure.New(failure.CodeBioUnsupported, failure.WithPhase(failure.PhaseValidation))
+		return appconfig.BioEnrollPreview{}, failure.New(failure.CodeBioUnsupported, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	warnings := []safety.Warning{{
 		Severity: safety.SeverityWarning,
 		Code:     warningBioEnrollMutation,
-		Message:  "A biometric enrollment workflow will be started on this authenticator.",
+		Message:  "Starting enrollment cancels any unfinished enrollment and begins capturing a new fingerprint template; completion requires samples until remainingSamples reaches zero.",
 	}}
 
-	return BioEnrollPreview{
+	return appconfig.BioEnrollPreview{
 		Device:              status.Device,
 		PreviewOnly:         status.Bio.PreviewOnly,
 		TimeoutMilliseconds: timeoutMilliseconds,
@@ -41,56 +42,56 @@ func BuildBioEnrollPreview(
 }
 
 func BuildBioRenamePreview(
-	status StatusReport,
+	status appconfig.StatusReport,
 	templateIDHex string,
 	friendlyName string,
 	mode safety.PreviewMode,
-) (BioMutationPreview, error) {
-	return buildBioMutationPreview(status, BioMutationRename, templateIDHex, friendlyName, mode)
+) (appconfig.BioMutationPreview, error) {
+	return buildBioMutationPreview(status, appconfig.BioMutationRename, templateIDHex, friendlyName, mode)
 }
 
 func BuildBioRemovePreview(
-	status StatusReport,
+	status appconfig.StatusReport,
 	templateIDHex string,
 	mode safety.PreviewMode,
-) (BioMutationPreview, error) {
-	return buildBioMutationPreview(status, BioMutationRemove, templateIDHex, "", mode)
+) (appconfig.BioMutationPreview, error) {
+	return buildBioMutationPreview(status, appconfig.BioMutationRemove, templateIDHex, "", mode)
 }
 
 func buildBioMutationPreview(
-	status StatusReport,
-	operation BioMutationOperation,
+	status appconfig.StatusReport,
+	operation appconfig.BioMutationOperation,
 	templateIDHex string,
 	friendlyName string,
 	mode safety.PreviewMode,
-) (BioMutationPreview, error) {
+) (appconfig.BioMutationPreview, error) {
 	if !status.Bio.Supported {
-		return BioMutationPreview{}, failure.New(failure.CodeBioUnsupported, failure.WithPhase(failure.PhaseValidation))
+		return appconfig.BioMutationPreview{}, failure.New(failure.CodeBioUnsupported, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	if status.Bio.Configured != nil && !*status.Bio.Configured {
-		return BioMutationPreview{}, failure.New(failure.CodeBioNoEnrollments, failure.WithPhase(failure.PhaseValidation))
+		return appconfig.BioMutationPreview{}, failure.New(failure.CodeBioNoEnrollments, failure.WithPhase(failure.PhaseValidation))
 	}
 
 	if _, err := decodeTemplateID(templateIDHex); err != nil {
-		return BioMutationPreview{}, err
+		return appconfig.BioMutationPreview{}, err
 	}
 
 	warning := safety.Warning{
 		Severity: safety.SeverityWarning,
 		Code:     warningBioRenameMutation,
-		Message:  "The friendly name metadata for this biometric enrollment will be changed.",
+		Message:  "Only this fingerprint template's friendly name is changed; the enrolled biometric template itself is unchanged.",
 	}
 
-	if operation == BioMutationRemove {
+	if operation == appconfig.BioMutationRemove {
 		warning = safety.Warning{
 			Severity: safety.SeverityDestructive,
 			Code:     warningBioRemoveMutation,
-			Message:  "This biometric enrollment template will be removed from the authenticator.",
+			Message:  "The selected fingerprint enrollment is deleted and cannot be restored except by enrolling that fingerprint again.",
 		}
 	}
 
-	return BioMutationPreview{
+	return appconfig.BioMutationPreview{
 		Operation:     operation,
 		Device:        status.Device,
 		PreviewOnly:   status.Bio.PreviewOnly,

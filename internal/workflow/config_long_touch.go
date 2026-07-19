@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/go-ctap/ctap/protocol"
+	rtconfig "github.com/go-ctap/kit/internal/config"
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	appconfig "github.com/go-ctap/kit/model/config"
@@ -23,7 +24,7 @@ func (r Runner) EnableLongTouchForReset(
 		mode = safety.PreviewModeExecute
 	}
 
-	preview, err := appconfig.BuildEnableLongTouchForResetPreview(appconfig.BuildStatusReport(r.env.Selected, device.GetInfo()), mode)
+	preview, err := rtconfig.BuildEnableLongTouchForResetPreview(rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo()), mode)
 	if err != nil {
 		return output, err
 	}
@@ -46,7 +47,7 @@ func (r Runner) EnableLongTouchForReset(
 		))
 	}
 
-	output.Result = new(appconfig.LongTouchForResetResult(r.env.Selected.Fingerprint))
+	output.Result = new(rtconfig.LongTouchForResetResult(r.env.Selected.Fingerprint))
 
 	return output, nil
 }

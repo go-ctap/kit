@@ -17,19 +17,3 @@ type Result struct {
 	Device report.DeviceReport `json:"device"`
 	Info   Info                `json:"info"`
 }
-
-func NewResult(device report.DeviceReport, info protocol.AuthenticatorGetInfoResponse) Result {
-	result := Result{
-		Device: device,
-		Info: Info{
-			AuthenticatorGetInfoResponse: info,
-			Conformance:                  conformance.EvaluateGetInfo(info),
-		},
-	}
-
-	if info.UvModality != nil {
-		result.Info.UVModalityLabel = info.UvModality.String()
-	}
-
-	return result
-}

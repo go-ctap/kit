@@ -10,6 +10,7 @@ import (
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
+	rtwebauthn "github.com/go-ctap/kit/internal/webauthn"
 	"github.com/go-ctap/kit/model/failure"
 	appwebauthn "github.com/go-ctap/kit/model/webauthn"
 	"github.com/samber/lo"
@@ -22,12 +23,12 @@ func (r Runner) MakeCredential(
 ) (appwebauthn.MakeCredentialOutput, error) {
 	var output appwebauthn.MakeCredentialOutput
 
-	input, err := appwebauthn.NormalizeMakeCredentialInput(req.MakeCredentialInput)
+	input, err := rtwebauthn.NormalizeMakeCredentialInput(req.MakeCredentialInput)
 	if err != nil {
 		return output, err
 	}
 
-	preview, err := appwebauthn.BuildMakeCredentialPreview(r.env.Selected, device.GetInfo(), input)
+	preview, err := rtwebauthn.BuildMakeCredentialPreview(r.env.Selected, device.GetInfo(), input)
 	if err != nil {
 		return output, err
 	}
@@ -76,12 +77,12 @@ func (r Runner) GetAssertion(
 ) (appwebauthn.GetAssertionOutput, error) {
 	var output appwebauthn.GetAssertionOutput
 
-	input, err := appwebauthn.NormalizeGetAssertionInput(req.GetAssertionInput)
+	input, err := rtwebauthn.NormalizeGetAssertionInput(req.GetAssertionInput)
 	if err != nil {
 		return output, err
 	}
 
-	preview, err := appwebauthn.BuildGetAssertionPreview(r.env.Selected, device.GetInfo(), input)
+	preview, err := rtwebauthn.BuildGetAssertionPreview(r.env.Selected, device.GetInfo(), input)
 	if err != nil {
 		return output, err
 	}

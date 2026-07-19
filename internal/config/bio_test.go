@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-ctap/ctap/protocol"
+	. "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/safety"
 )

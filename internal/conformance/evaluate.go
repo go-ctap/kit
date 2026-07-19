@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
+	model "github.com/go-ctap/kit/model/conformance"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/samber/lo"
 )
@@ -21,37 +22,37 @@ const (
 
 type assessment struct {
 	outcome      assessmentOutcome
-	expectations []Expectation
-	evidence     []Evidence
-	gap          EvidenceGapID
-	references   []RequirementRef
+	expectations []model.Expectation
+	evidence     []model.Evidence
+	gap          model.EvidenceGapID
+	references   []model.RequirementRef
 }
 
 type getInfoContext struct {
 	info             protocol.AuthenticatorGetInfoResponse
-	target           Target
-	advertised       []Profile
+	target           model.Target
+	advertised       []model.Profile
 	commandsKnown    bool
 	inventoryApplies bool
 }
 
 type getInfoRule struct {
-	id         RuleID
+	id         model.RuleID
 	selector   func(*getInfoContext) bool
-	references func(*getInfoContext) []RequirementRef
+	references func(*getInfoContext) []model.RequirementRef
 	evaluate   func(*getInfoContext) []assessment
 }
 
 // EvaluateGetInfo resolves the highest stable advertised profile and evaluates
 // the response against the immutable specification edition owned by that
 // profile.
-func EvaluateGetInfo(info protocol.AuthenticatorGetInfoResponse) Report {
+func EvaluateGetInfo(info protocol.AuthenticatorGetInfoResponse) model.Report {
 	target, resolved := resolveTarget(info.Versions)
 	if !resolved {
-		return Report{
+		return model.Report{
 			AdvertisedProfiles: advertisedProfiles(info.Versions),
-			Findings:           make([]Finding, 0),
-			Inconclusive:       make([]Inconclusive, 0),
+			Findings:           make([]model.Finding, 0),
+			Inconclusive:       make([]model.Inconclusive, 0),
 		}
 	}
 
@@ -61,9 +62,9 @@ func EvaluateGetInfo(info protocol.AuthenticatorGetInfoResponse) Report {
 // EvaluateGetInfoAgainst evaluates against an explicit canonical profile and
 // specification pair. It rejects mixed-edition targets rather than producing
 // findings whose rules and references come from different documents.
-func EvaluateGetInfoAgainst(info protocol.AuthenticatorGetInfoResponse, target Target) (Report, error) {
+func EvaluateGetInfoAgainst(info protocol.AuthenticatorGetInfoResponse, target model.Target) (model.Report, error) {
 	if !isCanonicalTarget(target) {
-		return Report{}, failure.New(failure.CodeConformanceTargetInvalid,
+		return model.Report{}, failure.New(failure.CodeConformanceTargetInvalid,
 			failure.WithParams(map[string]string{
 				"specification": string(target.Specification),
 				"profile":       string(target.Profile),
@@ -75,22 +76,22 @@ func EvaluateGetInfoAgainst(info protocol.AuthenticatorGetInfoResponse, target T
 	return evaluateGetInfo(info, target), nil
 }
 
-func evaluateGetInfo(info protocol.AuthenticatorGetInfoResponse, target Target) Report {
+func evaluateGetInfo(info protocol.AuthenticatorGetInfoResponse, target model.Target) model.Report {
 	context := getInfoContext{
 		info:       info,
 		target:     target,
 		advertised: advertisedProfiles(info.Versions),
 	}
-	context.inventoryApplies = target.Specification == SpecificationCTAP23
+	context.inventoryApplies = target.Specification == model.SpecificationCTAP23
 	context.commandsKnown = context.inventoryApplies && info.AuthenticatorConfigCommands != nil
 
-	report := Report{
+	report := model.Report{
 		Target:             &target,
 		AdvertisedProfiles: context.advertised,
-		Findings:           make([]Finding, 0),
-		Inconclusive:       make([]Inconclusive, 0),
+		Findings:           make([]model.Finding, 0),
+		Inconclusive:       make([]model.Inconclusive, 0),
 	}
-	activeRules := make(map[RuleID]bool)
+	activeRules := make(map[model.RuleID]bool)
 	seen := make(map[string]bool)
 
 	for _, rule := range getInfoRules {
@@ -107,8 +108,8 @@ func evaluateGetInfo(info protocol.AuthenticatorGetInfoResponse, target Target) 
 		for _, result := range rule.evaluate(&context) {
 			references := lo.Filter(lo.UniqBy(
 				slices.Concat(baseReferences, result.references),
-				func(reference RequirementRef) RequirementID { return reference.ID },
-			), func(reference RequirementRef, _ int) bool {
+				func(reference model.RequirementRef) model.RequirementID { return reference.ID },
+			), func(reference model.RequirementRef, _ int) bool {
 				return reference.ID != "" && reference.Specification == target.Specification
 			})
 			key := assessmentKey(rule.id, result)
@@ -119,7 +120,7 @@ func evaluateGetInfo(info protocol.AuthenticatorGetInfoResponse, target Target) 
 
 			switch result.outcome {
 			case assessmentFinding:
-				report.Findings = append(report.Findings, Finding{
+				report.Findings = append(report.Findings, model.Finding{
 					RuleID:       rule.id,
 					Profile:      target.Profile,
 					Expectations: nonNil(result.expectations),
@@ -127,7 +128,7 @@ func evaluateGetInfo(info protocol.AuthenticatorGetInfoResponse, target Target) 
 					References:   nonNil(references),
 				})
 			case assessmentInconclusive:
-				report.Inconclusive = append(report.Inconclusive, Inconclusive{
+				report.Inconclusive = append(report.Inconclusive, model.Inconclusive{
 					RuleID:       rule.id,
 					Profile:      target.Profile,
 					Reason:       result.gap,
@@ -142,7 +143,7 @@ func evaluateGetInfo(info protocol.AuthenticatorGetInfoResponse, target Target) 
 	return report
 }
 
-func assessmentKey(id RuleID, result assessment) string {
+func assessmentKey(id model.RuleID, result assessment) string {
 	parts := []string{string(id), string(result.outcome), string(result.gap)}
 	for _, expectation := range result.expectations {
 		parts = append(parts, string(expectation.Quantifier), string(expectation.Kind))
@@ -155,26 +156,26 @@ func assessmentKey(id RuleID, result assessment) string {
 	return strings.Join(parts, "\x00")
 }
 
-func finding(subjects []FieldPath, expectation Expectation, evidence ...Evidence) []assessment {
+func finding(subjects []model.FieldPath, expectation model.Expectation, evidence ...model.Evidence) []assessment {
 	expectation.Subjects = nonNil(subjects)
 	return []assessment{{
 		outcome:      assessmentFinding,
-		expectations: []Expectation{expectation},
+		expectations: []model.Expectation{expectation},
 		evidence:     evidence,
 	}}
 }
 
-func findingWithReferences(subjects []FieldPath, expectation Expectation, evidence []Evidence, references ...RequirementRef) assessment {
+func findingWithReferences(subjects []model.FieldPath, expectation model.Expectation, evidence []model.Evidence, references ...model.RequirementRef) assessment {
 	expectation.Subjects = nonNil(subjects)
 	return assessment{
 		outcome:      assessmentFinding,
-		expectations: []Expectation{expectation},
+		expectations: []model.Expectation{expectation},
 		evidence:     evidence,
 		references:   references,
 	}
 }
 
-func findingWithExpectations(expectations []Expectation, evidence []Evidence, references ...RequirementRef) []assessment {
+func findingWithExpectations(expectations []model.Expectation, evidence []model.Evidence, references ...model.RequirementRef) []assessment {
 	return []assessment{{
 		outcome:      assessmentFinding,
 		expectations: nonNil(expectations),
@@ -183,63 +184,63 @@ func findingWithExpectations(expectations []Expectation, evidence []Evidence, re
 	}}
 }
 
-func inconclusive(subjects []FieldPath, expectation Expectation, gap EvidenceGapID, evidence ...Evidence) []assessment {
+func inconclusive(subjects []model.FieldPath, expectation model.Expectation, gap model.EvidenceGapID, evidence ...model.Evidence) []assessment {
 	expectation.Subjects = nonNil(subjects)
 	return []assessment{{
 		outcome:      assessmentInconclusive,
-		expectations: []Expectation{expectation},
+		expectations: []model.Expectation{expectation},
 		gap:          gap,
 		evidence:     evidence,
 	}}
 }
 
-func expected(kind ExpectationKind, values ...string) Expectation {
-	return Expectation{Quantifier: ExpectationAll, Kind: kind, Values: nonNil(values)}
+func expected(kind model.ExpectationKind, values ...string) model.Expectation {
+	return model.Expectation{Quantifier: model.ExpectationAll, Kind: kind, Values: nonNil(values)}
 }
 
-func expectedAny(kind ExpectationKind, values ...string) Expectation {
-	return Expectation{Quantifier: ExpectationAny, Kind: kind, Values: nonNil(values)}
+func expectedAny(kind model.ExpectationKind, values ...string) model.Expectation {
+	return model.Expectation{Quantifier: model.ExpectationAny, Kind: kind, Values: nonNil(values)}
 }
 
-func expectedFor(subjects []FieldPath, kind ExpectationKind, values ...string) Expectation {
+func expectedFor(subjects []model.FieldPath, kind model.ExpectationKind, values ...string) model.Expectation {
 	expectation := expected(kind, values...)
 	expectation.Subjects = nonNil(subjects)
 
 	return expectation
 }
 
-func observed(path FieldPath, state EvidenceState, values ...string) Evidence {
-	return Evidence{Path: path, State: state, Values: nonNil(values)}
+func observed(path model.FieldPath, state model.EvidenceState, values ...string) model.Evidence {
+	return model.Evidence{Path: path, State: state, Values: nonNil(values)}
 }
 
-func observedOption(info protocol.AuthenticatorGetInfoResponse, option protocol.Option) Evidence {
-	path := FieldPath("options." + string(option))
+func observedOption(info protocol.AuthenticatorGetInfoResponse, option protocol.Option) model.Evidence {
+	path := model.FieldPath("options." + string(option))
 	value, ok := info.Options[option]
 	if !ok {
-		return observed(path, EvidenceAbsent)
+		return observed(path, model.EvidenceAbsent)
 	}
 
 	if value {
-		return observed(path, EvidenceTrue)
+		return observed(path, model.EvidenceTrue)
 	}
 
-	return observed(path, EvidenceFalse)
+	return observed(path, model.EvidenceFalse)
 }
 
-func observedStrings(path FieldPath, known bool, values []string) Evidence {
+func observedStrings(path model.FieldPath, known bool, values []string) model.Evidence {
 	if !known {
-		return observed(path, EvidenceAbsent)
+		return observed(path, model.EvidenceAbsent)
 	}
 
 	if len(values) == 0 {
-		return observed(path, EvidencePresentEmpty)
+		return observed(path, model.EvidencePresentEmpty)
 	}
 
-	return observed(path, EvidencePresent, values...)
+	return observed(path, model.EvidencePresent, values...)
 }
 
-func observedUnsigned(path FieldPath, value uint) Evidence {
-	return observed(path, EvidenceValue, strconv.FormatUint(uint64(value), 10))
+func observedUnsigned(path model.FieldPath, value uint) model.Evidence {
+	return observed(path, model.EvidenceValue, strconv.FormatUint(uint64(value), 10))
 }
 
 func optionPresent(info protocol.AuthenticatorGetInfoResponse, option protocol.Option) bool {
@@ -326,19 +327,19 @@ func nonNil[T any](values []T) []T {
 func selectAny(*getInfoContext) bool { return true }
 
 func selectCTAP21OrLater(context *getInfoContext) bool {
-	return context.target.Profile == ProfileFIDO21 || context.target.Profile == ProfileFIDO23
+	return context.target.Profile == model.ProfileFIDO21 || context.target.Profile == model.ProfileFIDO23
 }
 
-func selectFIDO21(context *getInfoContext) bool { return context.target.Profile == ProfileFIDO21 }
+func selectFIDO21(context *getInfoContext) bool { return context.target.Profile == model.ProfileFIDO21 }
 
-func selectFIDO23(context *getInfoContext) bool { return context.target.Profile == ProfileFIDO23 }
+func selectFIDO23(context *getInfoContext) bool { return context.target.Profile == model.ProfileFIDO23 }
 
 func selectCTAP21Document(context *getInfoContext) bool {
-	return context.target.Specification == SpecificationCTAP21
+	return context.target.Specification == model.SpecificationCTAP21
 }
 
 func selectCTAP23Document(context *getInfoContext) bool {
-	return context.target.Specification == SpecificationCTAP23
+	return context.target.Specification == model.SpecificationCTAP23
 }
 
 func selectConfigInventory(context *getInfoContext) bool { return context.inventoryApplies }

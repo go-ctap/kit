@@ -3,35 +3,37 @@ package conformance
 import (
 	"slices"
 	"strconv"
+
+	model "github.com/go-ctap/kit/model/conformance"
 )
 
 func structuralRules() []getInfoRule {
 	return []getInfoRule{
 		{
-			id:       RuleVersionsRequired,
+			id:       model.RuleVersionsRequired,
 			selector: selectAny,
-			references: func(context *getInfoContext) []RequirementRef {
-				return []RequirementRef{getInfoRequirement(context.target, "versions-required", RequirementMust)}
+			references: func(context *getInfoContext) []model.RequirementRef {
+				return []model.RequirementRef{getInfoRequirement(context.target, "versions-required", model.RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				if len(context.info.Versions) > 0 {
 					return nil
 				}
 
-				state := EvidenceAbsent
+				state := model.EvidenceAbsent
 				if context.info.Versions != nil {
-					state = EvidencePresentEmpty
+					state = model.EvidencePresentEmpty
 				}
 
 				return finding(
-					[]FieldPath{"versions"},
-					expected(ExpectationNonEmpty),
+					[]model.FieldPath{"versions"},
+					expected(model.ExpectationNonEmpty),
 					observed("versions", state),
 				)
 			},
 		},
 		listNonEmptyRule(
-			RulePinUVAuthProtocolsNonEmpty,
+			model.RulePinUVAuthProtocolsNonEmpty,
 			selectCTAP21OrLater,
 			"pinUvAuthProtocols",
 			"pin-uv-auth-protocols-nonempty",
@@ -40,7 +42,7 @@ func structuralRules() []getInfoRule {
 			},
 		),
 		listUniqueRule(
-			RulePinUVAuthProtocolsUnique,
+			model.RulePinUVAuthProtocolsUnique,
 			selectCTAP21OrLater,
 			"pinUvAuthProtocols",
 			"pin-uv-auth-protocols-unique",
@@ -49,7 +51,7 @@ func structuralRules() []getInfoRule {
 			},
 		),
 		listNonEmptyRule(
-			RuleTransportsNonEmpty,
+			model.RuleTransportsNonEmpty,
 			selectCTAP21OrLater,
 			"transports",
 			"transports-nonempty",
@@ -58,7 +60,7 @@ func structuralRules() []getInfoRule {
 			},
 		),
 		listUniqueRule(
-			RuleTransportsUnique,
+			model.RuleTransportsUnique,
 			selectCTAP21OrLater,
 			"transports",
 			"transports-unique",
@@ -67,7 +69,7 @@ func structuralRules() []getInfoRule {
 			},
 		),
 		listNonEmptyRule(
-			RuleAlgorithmsNonEmpty,
+			model.RuleAlgorithmsNonEmpty,
 			selectCTAP21OrLater,
 			"algorithms",
 			"algorithms-nonempty",
@@ -76,7 +78,7 @@ func structuralRules() []getInfoRule {
 			},
 		),
 		listUniqueRule(
-			RuleAlgorithmsUnique,
+			model.RuleAlgorithmsUnique,
 			selectCTAP21OrLater,
 			"algorithms",
 			"algorithms-unique",
@@ -85,7 +87,7 @@ func structuralRules() []getInfoRule {
 			},
 		),
 		listNonEmptyRule(
-			RuleTransportsForResetNonEmpty,
+			model.RuleTransportsForResetNonEmpty,
 			selectCTAP23Document,
 			"transportsForReset",
 			"transports-for-reset-nonempty",
@@ -94,7 +96,7 @@ func structuralRules() []getInfoRule {
 			},
 		),
 		listUniqueRule(
-			RuleTransportsForResetUnique,
+			model.RuleTransportsForResetUnique,
 			selectCTAP23Document,
 			"transportsForReset",
 			"transports-for-reset-unique",
@@ -103,7 +105,7 @@ func structuralRules() []getInfoRule {
 			},
 		),
 		listNonEmptyRule(
-			RuleAttestationFormatsNonEmpty,
+			model.RuleAttestationFormatsNonEmpty,
 			selectCTAP23Document,
 			"attestationFormats",
 			"attestation-formats-nonempty",
@@ -112,7 +114,7 @@ func structuralRules() []getInfoRule {
 			},
 		),
 		listUniqueRule(
-			RuleAttestationFormatsUnique,
+			model.RuleAttestationFormatsUnique,
 			selectCTAP23Document,
 			"attestationFormats",
 			"attestation-formats-unique",
@@ -121,10 +123,10 @@ func structuralRules() []getInfoRule {
 			},
 		),
 		{
-			id:       RuleAttestationFormatsNoneOmitted,
+			id:       model.RuleAttestationFormatsNoneOmitted,
 			selector: selectCTAP23Document,
-			references: func(context *getInfoContext) []RequirementRef {
-				return []RequirementRef{getInfoRequirement(context.target, "attestation-format-none-omitted", RequirementMust)}
+			references: func(context *getInfoContext) []model.RequirementRef {
+				return []model.RequirementRef{getInfoRequirement(context.target, "attestation-format-none-omitted", model.RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				if !slices.Contains(context.info.AttestationFormats, "none") {
@@ -132,22 +134,22 @@ func structuralRules() []getInfoRule {
 				}
 
 				return finding(
-					[]FieldPath{"attestationFormats"},
-					expected(ExpectationExcludes, "none"),
+					[]model.FieldPath{"attestationFormats"},
+					expected(model.ExpectationExcludes, "none"),
 					observedStrings("attestationFormats", true, stringValues(context.info.AttestationFormats)),
 				)
 			},
 		},
 		{
-			id:       RuleCertificationLevelRange,
+			id:       model.RuleCertificationLevelRange,
 			selector: selectCTAP21OrLater,
-			references: func(context *getInfoContext) []RequirementRef {
-				return []RequirementRef{featureRequirement(
+			references: func(context *getInfoContext) []model.RequirementRef {
+				return []model.RequirementRef{featureRequirement(
 					context.target,
 					"7.3.1",
 					"defined-certification-level-ranges",
 					"#sctn-authenticator-certifications-authenticator-actions",
-					RequirementConstraint,
+					model.RequirementConstraint,
 				)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
@@ -155,22 +157,22 @@ func structuralRules() []getInfoRule {
 					id       string
 					minimum  uint64
 					maximum  uint64
-					fromCTAP SpecificationID
+					fromCTAP model.SpecificationID
 				}
 
 				ranges := []certificationRange{
-					{id: "FIPS-CMVP-2", minimum: 1, maximum: 4, fromCTAP: SpecificationCTAP21},
-					{id: "FIPS-CMVP-3", minimum: 1, maximum: 4, fromCTAP: SpecificationCTAP21},
-					{id: "FIPS-CMVP-2-PHY", minimum: 1, maximum: 4, fromCTAP: SpecificationCTAP21},
-					{id: "FIPS-CMVP-3-PHY", minimum: 1, maximum: 4, fromCTAP: SpecificationCTAP21},
-					{id: "CC-EAL", minimum: 1, maximum: 7, fromCTAP: SpecificationCTAP21},
-					{id: "FIDO", minimum: 1, maximum: 6, fromCTAP: SpecificationCTAP21},
-					{id: "CCN-CPSTIC", minimum: 1, maximum: 1, fromCTAP: SpecificationCTAP23},
+					{id: "FIPS-CMVP-2", minimum: 1, maximum: 4, fromCTAP: model.SpecificationCTAP21},
+					{id: "FIPS-CMVP-3", minimum: 1, maximum: 4, fromCTAP: model.SpecificationCTAP21},
+					{id: "FIPS-CMVP-2-PHY", minimum: 1, maximum: 4, fromCTAP: model.SpecificationCTAP21},
+					{id: "FIPS-CMVP-3-PHY", minimum: 1, maximum: 4, fromCTAP: model.SpecificationCTAP21},
+					{id: "CC-EAL", minimum: 1, maximum: 7, fromCTAP: model.SpecificationCTAP21},
+					{id: "FIDO", minimum: 1, maximum: 6, fromCTAP: model.SpecificationCTAP21},
+					{id: "CCN-CPSTIC", minimum: 1, maximum: 1, fromCTAP: model.SpecificationCTAP23},
 				}
 
 				results := make([]assessment, 0)
 				for _, validRange := range ranges {
-					if validRange.fromCTAP == SpecificationCTAP23 && context.target.Specification != SpecificationCTAP23 {
+					if validRange.fromCTAP == model.SpecificationCTAP23 && context.target.Specification != model.SpecificationCTAP23 {
 						continue
 					}
 
@@ -180,15 +182,15 @@ func structuralRules() []getInfoRule {
 					}
 
 					results = append(results, findingWithReferences(
-						[]FieldPath{FieldPath("certifications." + validRange.id)},
+						[]model.FieldPath{model.FieldPath("certifications." + validRange.id)},
 						expected(
-							ExpectationRange,
+							model.ExpectationRange,
 							strconv.FormatUint(validRange.minimum, 10),
 							strconv.FormatUint(validRange.maximum, 10),
 						),
-						[]Evidence{observed(
-							FieldPath("certifications."+validRange.id),
-							EvidenceValue,
+						[]model.Evidence{observed(
+							model.FieldPath("certifications."+validRange.id),
+							model.EvidenceValue,
 							strconv.FormatUint(level, 10),
 						)},
 					))
@@ -200,12 +202,12 @@ func structuralRules() []getInfoRule {
 	}
 }
 
-func listNonEmptyRule(id RuleID, selector func(*getInfoContext) bool, path FieldPath, clause string, value func(*getInfoContext) (bool, []string)) getInfoRule {
+func listNonEmptyRule(id model.RuleID, selector func(*getInfoContext) bool, path model.FieldPath, clause string, value func(*getInfoContext) (bool, []string)) getInfoRule {
 	return getInfoRule{
 		id:       id,
 		selector: selector,
-		references: func(context *getInfoContext) []RequirementRef {
-			return []RequirementRef{getInfoRequirement(context.target, clause, RequirementMustNot)}
+		references: func(context *getInfoContext) []model.RequirementRef {
+			return []model.RequirementRef{getInfoRequirement(context.target, clause, model.RequirementMustNot)}
 		},
 		evaluate: func(context *getInfoContext) []assessment {
 			known, values := value(context)
@@ -214,20 +216,20 @@ func listNonEmptyRule(id RuleID, selector func(*getInfoContext) bool, path Field
 			}
 
 			return finding(
-				[]FieldPath{path},
-				expected(ExpectationNonEmpty),
-				observed(path, EvidencePresentEmpty),
+				[]model.FieldPath{path},
+				expected(model.ExpectationNonEmpty),
+				observed(path, model.EvidencePresentEmpty),
 			)
 		},
 	}
 }
 
-func listUniqueRule(id RuleID, selector func(*getInfoContext) bool, path FieldPath, clause string, value func(*getInfoContext) (bool, []string)) getInfoRule {
+func listUniqueRule(id model.RuleID, selector func(*getInfoContext) bool, path model.FieldPath, clause string, value func(*getInfoContext) (bool, []string)) getInfoRule {
 	return getInfoRule{
 		id:       id,
 		selector: selector,
-		references: func(context *getInfoContext) []RequirementRef {
-			return []RequirementRef{getInfoRequirement(context.target, clause, RequirementMustNot)}
+		references: func(context *getInfoContext) []model.RequirementRef {
+			return []model.RequirementRef{getInfoRequirement(context.target, clause, model.RequirementMustNot)}
 		},
 		evaluate: func(context *getInfoContext) []assessment {
 			known, values := value(context)
@@ -236,8 +238,8 @@ func listUniqueRule(id RuleID, selector func(*getInfoContext) bool, path FieldPa
 			}
 
 			return finding(
-				[]FieldPath{path},
-				expected(ExpectationUnique),
+				[]model.FieldPath{path},
+				expected(model.ExpectationUnique),
 				observedStrings(path, true, values),
 			)
 		},

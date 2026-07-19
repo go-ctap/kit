@@ -147,6 +147,19 @@ func (r Runner) loadGarbageCollectState(
 }
 
 func (r Runner) buildGarbageCollectPreview(state garbageCollectState) applargeblobs.MutationPreview {
+	warning := safety.Warning{
+		Severity: safety.SeverityDestructive,
+		Code:     "large_blob.garbage_collect_unmatched",
+		Message:  "Every conforming large-blob entry that cannot be decrypted with any largeBlobKey in the current discoverable-credential inventory will be removed; malformed entries are retained.",
+	}
+	if state.unmatchedCount == 0 {
+		warning = safety.Warning{
+			Severity: safety.SeverityInfo,
+			Code:     "large_blob.garbage_collect_noop",
+			Message:  "Every conforming large-blob entry matches a current discoverable credential; garbage collection is a no-op and malformed entries are retained.",
+		}
+	}
+
 	return applargeblobs.MutationPreview{
 		Operation:                          applargeblobs.MutationGC,
 		Device:                             r.env.Selected,
@@ -159,13 +172,7 @@ func (r Runner) buildGarbageCollectPreview(state garbageCollectState) applargebl
 		MatchedBlobCount:                   state.matchedCount,
 		UnmatchedBlobCount:                 state.unmatchedCount,
 		Noop:                               state.unmatchedCount == 0,
-		Warnings: []safety.Warning{
-			{
-				Severity: safety.SeverityDestructive,
-				Code:     "large_blob.garbage_collect_unmatched",
-				Message:  "Unmatched large-blob entries will be removed from the shared array.",
-			},
-		},
+		Warnings:                           []safety.Warning{warning},
 	}
 }
 

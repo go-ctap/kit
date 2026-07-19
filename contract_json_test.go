@@ -8,11 +8,11 @@ import (
 	"github.com/go-ctap/ctap/attestation"
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
+	rtinspect "github.com/go-ctap/kit/internal/inspect"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
-	appinspect "github.com/go-ctap/kit/model/inspect"
 	"github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/operation"
 	"github.com/go-ctap/kit/model/report"
@@ -72,7 +72,7 @@ func TestUserVerificationInteractionJSON(t *testing.T) {
 		t.Fatalf("user-verification JSON contract missing: %s", raw)
 	}
 
-	flow, err := json.Marshal(model.VerificationFlowPIN)
+	flow, err := json.Marshal(VerificationFlowPIN)
 	if err != nil {
 		t.Fatalf("marshal verification flow: %v", err)
 	}
@@ -238,7 +238,7 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 	}{
 		{
 			name: "inspect mirrors authenticator get info",
-			value: appinspect.NewResult(report.DeviceReport{}, protocol.AuthenticatorGetInfoResponse{
+			value: rtinspect.BuildResult(report.DeviceReport{}, protocol.AuthenticatorGetInfoResponse{
 				ForcePINChange:                true,
 				MinPINLength:                  4,
 				MaxCredentialIdLength:         32,

@@ -24,7 +24,7 @@ func (f contextualInteractionHandlerFunc) RequestInteraction(
 	return f(ctx, req)
 }
 
-func userVerificationHandler(t *testing.T) model.InteractionHandler {
+func userVerificationHandler(t *testing.T) InteractionHandler {
 	t.Helper()
 
 	return interactionHandlerFunc(func(req model.InteractionRequest) (model.InteractionResponse, error) {

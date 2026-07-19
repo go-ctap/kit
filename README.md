@@ -1,72 +1,233 @@
 # go-ctap/kit
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/go-ctap/kit.svg)](https://pkg.go.dev/github.com/go-ctap/kit)
 [![Go](https://github.com/go-ctap/kit/actions/workflows/go.yml/badge.svg)](https://github.com/go-ctap/kit/actions/workflows/go.yml)
 
-Reusable CTAP/FIDO2 runtime core for the `go-ctap` application family.
+`go-ctap/kit` is a reusable Go runtime for applications that work with local
+FIDO2 authenticators. It provides device discovery, safe multi-step workflows,
+typed results, user interaction callbacks, and stable errors.
 
-The runtime currently targets `github.com/go-ctap/ctap` v0.32.0 and exposes the
-CTAP 2.3 operation model without legacy API aliases.
+The library is the shared runtime used by the `go-ctap` application family. It
+can be used by desktop, command-line, and terminal applications, but it does not
+contain any user interface code.
 
-The current Go module is:
+> [!WARNING]
+> The project is in active development and is not yet v1.0. Minor releases may
+> include breaking API changes.
 
-```go
-module github.com/go-ctap/kit
+## Support
+
+The runtime is built on [`go-ctap/ctap`](https://github.com/go-ctap/ctap) and
+supports authenticator features from CTAP 2.0 through CTAP 2.3. Each operation
+still depends on the capabilities reported by the connected authenticator.
+
+Main features include:
+
+- authenticator inspection and CTAP conformance reports;
+- PIN setup and change;
+- built-in user verification and biometric enrollment;
+- authenticator configuration and factory reset;
+- resident credential listing, update, and deletion;
+- large-blob reading, writing, deletion, and garbage collection;
+- WebAuthn credential creation and assertion;
+- optional vendor device model, firmware, and interface metadata;
+- FIDO Metadata Service (MDS3) lookup and verification;
+- operation progress events and interaction callbacks;
+- bounded and redacted CTAP diagnostic logs.
+
+This repository is a library, not a CLI. It does not provide command parsing,
+prompts, confirmation screens, tables, JSON rendering, or product-specific
+workflows. Applications must provide those parts.
+
+## Transports
+
+| Mode | Platform | Behavior |
+|---|---|---|
+| `transport.ModeAuto` | Linux, macOS, Windows | Uses HID on Linux and macOS. On Windows, it uses HID for an elevated process and the Windows proxy otherwise. |
+| `transport.ModeHID` | Linux, macOS, Windows | Opens the authenticator through direct USB HID access. |
+| `transport.ModeWindowsProxy` | Windows | Connects to a running [`go-ctap/windows-proxy`](https://github.com/go-ctap/windows-proxy). |
+
+NFC, BLE, hybrid, and generic smart-card transports are not part of this
+runtime.
+
+## Installation
+
+```sh
+go get github.com/go-ctap/kit@latest
 ```
 
-The root package is imported as:
+See [`go.mod`](go.mod) for the required Go version.
+
+## Quick start
+
+The example below discovers authenticators, opens the first one, and reads its
+public information. A real application should let the user choose when more
+than one device is available.
 
 ```go
-import "github.com/go-ctap/kit"
-import "github.com/go-ctap/kit/model"
-import "github.com/go-ctap/kit/transport"
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+
+	ctapkit "github.com/go-ctap/kit"
+	"github.com/go-ctap/kit/transport"
+)
+
+func main() {
+	ctx := context.Background()
+
+	devices, err := ctapkit.DiscoverDevices(ctx, transport.ModeAuto)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(devices) == 0 {
+		log.Fatal("no FIDO2 authenticator found")
+	}
+
+	authenticator, err := ctapkit.OpenAuthenticator(ctx, devices[0])
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		if err := authenticator.Close(); err != nil {
+			log.Printf("close authenticator: %v", err)
+		}
+	}()
+
+	inspection, err := authenticator.Inspect(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("product: %s\n", inspection.Device.Product)
+	fmt.Printf("versions: %v\n", inspection.Info.Versions)
+	fmt.Printf("AAGUID: %s\n", inspection.Info.AAGUID)
+}
 ```
 
-## What This Is
+`DiscoverDevices` returns `ctapkit.Device` handles. Use `Device.Report`
+to show safe discovery details. `ctapkit.SelectDevice` can resolve a displayed
+fingerprint or ordinal alias from the same discovery result.
 
-`ctapkit` provides the shared runtime boundary for applications that need to discover, inspect, and safely control local FIDO2 authenticators. It is designed for CLI, GUI, and TUI consumers that want the same device/authenticator/operation semantics without duplicating CTAP safety logic.
+## Runtime lifecycle
 
-This repository does not own terminal UX, command parsing, output rendering, MDS presentation, release packaging, or product-specific workflows. Those live in consumer applications.
+A normal application follows this lifecycle:
 
-## Package Layout
+1. Discover the connected devices.
+2. Choose one `ctapkit.Device` from that discovery result.
+3. Open it with `ctapkit.OpenAuthenticator`.
+4. Run typed operations on the returned `*ctapkit.Authenticator`.
+5. Close it when the selected device changes or the application exits.
 
-- `ctapkit`: public runtime facade.
-- `model`: public operation, event, and interaction DTOs.
-- `model/failure`: stable machine-readable failure codes and transport-safe snapshots.
-- `model/operation`: canonical public operation identifiers used by failures and diagnostics.
-- `model/config`: authenticator config DTOs and reports.
-- `model/credentials`: credential DTOs, previews, and reports.
-- `model/largeblobs`: large-blob DTOs, previews, and reports.
-- `model/report`: shared report DTOs used across model domains.
-- `model/safety`: shared preview modes and safety-warning DTOs.
-- `transport`: HID and Windows proxy transport boundary.
-- `internal/device`: runtime attachment fingerprints derived from transport descriptors.
-- `internal/runtime`: event, interaction, and token policies.
-- `internal/workflow`: typed domain workflow bodies over a shared execution environment and narrow per-domain authenticator capabilities.
+An `Authenticator` owns one open transport channel, its token cache, and its
+close and cancellation state. It runs one complete workflow at a time. This
+prevents two multi-command operations on the same channel from mixing with each
+other.
 
-## Authenticator Flow
+The runtime does not cache credential lists, configuration reports, or
+large-blob reports. It reads them again for each operation because another
+client may change authenticator state between commands.
 
-A consumer should generally do this:
+`Authenticator.Close` is safe to call more than once or while another goroutine
+is using the authenticator. It cancels the active operation, clears owned secret
+state, and closes the transport.
 
-1. Convert application input into the typed domain-model input for the operation.
-2. Discover devices with `ctapkit.DiscoverDevices`.
-3. Pick one returned `ctapkit.Device` handle and open it with `ctapkit.OpenAuthenticator`.
-4. Call the corresponding typed `Authenticator` method synchronously.
-5. Close the authenticator when the selected device changes or the application exits.
+## Operations
 
-`Authenticator` is the single long-lived runtime entity for an opened transport channel. It owns close/cancel behavior, whole-operation serialization, and one reusable `pinUvAuthToken`. It does not cache credential inventories, configuration reports, or large-blob reports; those values are read from the authenticator for every operation because device state can be changed by another channel between commands.
+The root `ctapkit` package is the public runtime facade. Operation inputs and
+results are typed DTOs from the `model` packages.
 
-Each operation method returns a pointer to its concrete domain type. Read-only methods return reports directly; for example, `Authenticator.ListCredentials` returns `*credentials.InventoryReport`. Mutations and WebAuthn operations return `{preview, result}` outputs; `Authenticator.DeleteCredential` accepts `credentials.DeleteOperation` and returns `*credentials.DeleteOutput`. A nil pointer means execution stopped before the workflow started, while a non-nil value can contain partial state together with an error. Consumers that need non-blocking UI can call these methods from their own goroutine or task. Attach progress with `ctapkit.WithEventSink` and PIN, user-verification, or touch participation with `ctapkit.WithInteractionHandler`.
-Interaction requests and operation events contain only their prompt or event payload; consumers should correlate work through the `*ctapkit.Authenticator` handle and their own event sink ownership.
+| Area          | Main methods                                                                                                       |
+|---------------|--------------------------------------------------------------------------------------------------------------------|
+| Inspection    | `Inspect`                                                                                                          |
+| Configuration | `ConfigStatus`, `SetPIN`, `ChangePIN`, `SetAlwaysUV`, `SetMinPINLength`, `EnableLongTouchForReset`, `ResetFactory` |
+| Biometrics    | `BioSensorInfo`, `BioList`, `BioEnroll`, `BioRename`, `BioRemove`                                                  |
+| Credentials   | `ListCredentials`, `CredentialStoreState`, `DeleteCredential`, `UpdateCredentialUser`                              |
+| Large blobs   | `ReadLargeBlob`, `ListLargeBlobs`, `WriteLargeBlob`, `DeleteLargeBlob`, `GarbageCollectLargeBlobs`                 |
+| WebAuthn      | `MakeCredential`, `GetAssertion`                                                                                   |
+| Device metadata | `CanProbeDeviceMetadata`, `ProbeDeviceMetadata`                                                                  |
+| Metadata      | `ctapkit.LookupMDS`                                                                                                |
 
-Public failures use stable codes, optional safe interpolation parameters, and
-exact CTAP provenance. See the [machine-readable error
-contract](docs/error-contract.md).
+Operation methods return pointers to concrete result types. A nil pointer means
+that the workflow did not start. A non-nil value may contain a preview or other
+partial data together with an error.
 
-Verification defaults to UV when the authenticator supports it, with PIN fallback when CTAP reports a fallback condition. A consumer that wants to offer "use PIN" before starting work can pass `ctapkit.WithVerificationFlow(model.VerificationFlowPIN)` to the typed operation method. User-verification interactions are pre-command prompt and cancel points; the authenticator remains authoritative for whether UV actually succeeds.
+## Interactions and verification
 
-Core operations are intentionally UI-neutral. PIN prompts, user verification messages, spinners, progress bars, tables, JSON/YAML formatting, and GUI/TUI event presentation belong to the consumer.
+Some operations need a PIN, built-in user verification, or a physical touch.
+Pass `ctapkit.WithInteractionHandler` to the operation that may need this input.
+The handler receives a typed `model.InteractionRequest` and returns a typed
+`model.InteractionResponse`.
 
-MDS lookup is exposed as a root facade helper rather than an authenticator operation:
+Progress is separate from interaction. Pass `ctapkit.WithEventSink` to receive
+typed `model.OperationEvent` values, such as credential enumeration or
+biometric sample progress.
+
+Both callbacks belong to one operation. The runtime does not store them on the
+open authenticator. This makes request ownership and cancellation easier for
+applications with several tasks or windows.
+
+The default verification flow prefers built-in user verification when the
+authenticator supports it and falls back to PIN when CTAP allows this. To ask
+for PIN first, pass:
+
+```go
+ctapkit.WithVerificationFlow(ctapkit.VerificationFlowPIN)
+```
+
+The authenticator always makes the final decision about whether a verification
+method succeeds.
+
+## Previews and dry runs
+
+Mutating operations return a typed preview before they change authenticator
+state. Many operation DTOs also have a `DryRun` field.
+
+```go
+output, err := authenticator.DeleteCredential(
+	ctx,
+	credentials.DeleteOperation{
+		CredentialIDHex: credentialID,
+		DryRun:          true,
+	},
+)
+```
+
+For a dry run, the preview is filled and the mutation result is nil. The
+consumer must show warnings, ask for confirmation when needed, and decide
+whether to run the real operation. The runtime does not implement product
+confirmation rules.
+
+## Errors
+
+Public failures use `model/failure`. Each known error has a stable code and a
+recovery category. CTAP errors can also include the command, subcommand, and
+status that caused the failure.
+
+```go
+result, err := authenticator.ListCredentials(ctx)
+if err != nil {
+	if failure.IsCode(err, failure.CodeInteractionHandlerRequired) {
+		// Run the operation again with an interaction handler.
+	}
+
+	snapshot := failure.Snapshot(err)
+	_ = result
+	_ = snapshot
+}
+```
+
+Use `failure.IsCode` for application decisions. Do not parse `err.Error()`.
+The full wire format and recovery rules are described in
+[`docs/error-contract.md`](docs/error-contract.md).
+
+## FIDO Metadata Service
+
+`ctapkit.LookupMDS` fetches and verifies the FIDO MDS3 blob, finds an entry by
+AAGUID, and caches the verified blob in memory and on disk.
 
 ```go
 inspection, err := authenticator.Inspect(ctx)
@@ -75,75 +236,104 @@ if err != nil {
 }
 
 metadata, err := ctapkit.LookupMDS(ctx, inspection.Info.AAGUID)
+if err != nil {
+	return err
+}
 ```
 
-The runtime fetches and verifies the FIDO MDS3 blob, indexes entries by AAGUID,
-and caches the verified response in memory and on disk under the user cache
-directory. Disk cache entries are verified again before use. Consumers own any
-MDS presentation or policy decisions. A disk entry that cannot currently be
-verified is retained for a later retry but is never returned as verified data.
+The runtime verifies disk cache entries again before it uses them. Applications
+own metadata presentation and trust policy.
 
-## CTAP 2.3 Runtime Surface
+## Diagnostic journal
 
-- `inspect.Result.Info` embeds `protocol.AuthenticatorGetInfoResponse`, so
-  get-info fields and types track `ctap` directly; the kit only adds the UV
-  modality label and conformance report.
-- `Authenticator.CredentialStoreState` reads the persistent credential-store
-  identifiers with a standalone `pcmr` token. The result contains lowercase
-  hexadecimal identifiers and must be treated as sensitive.
-- `config.EnableLongTouchForResetOperation` supports preview and dry-run before
-  enabling the reset gesture requirement. The consumer owns confirmation UX.
-- `config.SetMinPINLengthOperation` mirrors the upstream config parameters:
-  `NewMinPINLength` is optional, while RP-ID and boolean fields use their zero
-  values when omitted.
-- WebAuthn make-credential and get-assertion operations delegate direct and
-  legacy `largeBlob` processing to `ctap`. The consumer must confirm a non-nil
-  get-assertion `largeBlob.write`, including an empty blob, before invoking the
-  operation. The existing `largeBlobs.*` operations remain the explicit
-  legacy-array management API.
-- WebAuthn extension results preserve present-empty large blobs, explicit false
-  `written`/`thirdPartyPayment` values, and make-credential `supported` output.
+Create a journal and pass it when the authenticator is opened:
 
-## Safety Model
+```go
+journal := ctapkit.NewLogJournal()
 
-- Per-authenticator workflow serialization prevents multi-step flows on the same opened channel from interleaving.
-- CTAPHID channel isolation and per-command serialization allow independent clients to share an authenticator; external state changes remain possible between commands and must be handled as normal runtime errors.
-- `pinUvAuthToken` values and other runtime-owned secrets are never exposed through public results. PIN operations in `model/config` omit PINs during JSON encoding; consumer-owned transport DTOs own secret decoding and must redact those fields without logging or persistence.
-- Mutating operations expose previews and dry-run behavior where useful. The runtime never treats a product confirmation flag as authorization.
-- Consumers own warnings and explicit confirmation for destructive flows such as reset, credential deletion, and large-blob deletion.
-- Factory reset must be executed shortly after authenticator power-up on many authenticators; consumers should collect strong confirmation before reconnecting and then invoke reset promptly.
+authenticator, err := ctapkit.OpenAuthenticator(
+	ctx,
+	device,
+	ctapkit.WithLogJournal(journal),
+)
+if err != nil {
+	return err
+}
 
-## Engineering Journal
+batch := journal.Read(0)
+```
 
-Passing `ctapkit.WithLogJournal` when opening an authenticator records CTAP
-exchanges without changing any operation method. Each journal entry
-contains command metadata and bounded request/response CBOR diagnostic notation
-in `cborDiagnostic`; fields marked for redaction by `go-ctap` are replaced
-before the event reaches the journal. Internally, kit installs go-ctap's typed
-`diagnostic.Sink`; application code does not need to receive or forward these
-events.
+The journal stores a bounded, in-memory list of CTAP exchanges. Request and
+response CBOR is decoded through known protocol types and sensitive fields are
+redacted. It is useful for debugging, but it is not a byte-exact wire capture.
+Unknown CBOR fields may be missing.
 
-The runtime assigns `operationKind` while executing a typed authenticator
-operation. Exchanges emitted while opening an authenticator have no operation
-kind. The journal accepts only runtime CTAP diagnostics; application and
-product logging belong to the consuming application.
+Diagnostic records can still contain device, relying-party, user, credential,
+or biometric identifiers. Treat them as sensitive data.
 
-The diagnostic payload is a normalized view of fields known to the installed
-`go-ctap` protocol structures. Unknown CBOR fields are omitted, so it must not
-be treated as a byte-exact wire capture. `originalBytes` reports the size of the
-CBOR body; the command byte is reported separately as `commandCode`.
+## Packages
 
-## Verification
+| Package                                                                             | Use it for                                                                                |
+|-------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
+| `ctapkit`                                                                           | Device discovery, authenticator lifecycle, typed operations, MDS, and diagnostic journals |
+| `model`                                                                             | Shared event, interaction, and log DTOs                                                   |
+| `model/config`                                                                      | Configuration and biometric operation DTOs                                                |
+| `model/credentials`                                                                 | Credential inventory and mutation DTOs                                                    |
+| `model/inspect`                                                                     | Authenticator inspection DTOs                                                             |
+| `model/largeblobs`                                                                  | Large-blob operation DTOs                                                                 |
+| `model/webauthn`                                                                    | WebAuthn operation DTOs                                                                   |
+| `model/failure`                                                                     | Stable public error codes and snapshots                                                   |
+| `model/conformance`, `model/mds`, `model/operation`, `model/report`, `model/safety` | Shared report and contract DTOs                                                           |
+| `transport`                                                                         | HID and Windows proxy discovery modes                                                     |
+
+Packages under `internal` contain runtime implementation details and are not a
+public API.
+
+## Safety and usage notes
+
+- Always close `Authenticator` when it is no longer needed.
+- Treat authenticator state as changeable between commands.
+- Do not log or store PINs, PIN/UV tokens, credential secrets, or large-blob
+  payloads.
+- PIN fields in public configuration operation DTOs are omitted during JSON
+  encoding.
+- Runtime-owned PIN/UV token buffers are wiped when they are released.
+- A dry run is a preview, not authorization to run a mutation.
+- Credential deletion, large-blob deletion, and factory reset need clear
+  confirmation in the consuming application.
+- Many displayless authenticators require factory reset soon after power-up.
+  Ask for confirmation before reconnecting or power-cycling the device.
+- One opened authenticator runs its own workflows one at a time. It does not
+  create a process-wide or device-wide lock.
+
+More lifecycle details are available in
+[`docs/current-runtime-flows.md`](docs/current-runtime-flows.md).
+
+## Development
 
 Run the default checks with:
 
-```powershell
+```sh
 go test ./... -count=1
 go vet ./...
 ```
 
-For authenticator lifecycle, interaction, or synchronization changes, also run:
+For authenticator lifecycle, interaction, token, or synchronization changes,
+also run:
 
-```powershell
+```sh
 go test -race ./... -count=1
 ```
+
+Hardware-dependent behavior must not be required by the default test suite.
+
+## References
+
+- [`go-ctap/ctap`](https://github.com/go-ctap/ctap)
+- [`go-ctap/hid`](https://github.com/go-ctap/hid)
+- [`go-ctap/windows-proxy`](https://github.com/go-ctap/windows-proxy)
+- [Client to Authenticator Protocol 2.0](https://fidoalliance.org/specs/fido-v2.0-ps-20190130/fido-client-to-authenticator-protocol-v2.0-ps-20190130.html)
+- [Client to Authenticator Protocol 2.1](https://fidoalliance.org/specs/fido-v2.1-ps-20220621/ctap-2.1-spec-plus-errata-v2.1-ps-20220621.html)
+- [Client to Authenticator Protocol 2.2](https://fidoalliance.org/specs/fido-v2.2-ps-20250714/fido-client-to-authenticator-protocol-v2.2-ps-20250714.html)
+- [Client to Authenticator Protocol 2.3](https://fidoalliance.org/specs/fido-v2.3-ps-20260226/fido-client-to-authenticator-protocol-v2.3-ps-20260226.html)
+- [Web Authentication Level 3](https://www.w3.org/TR/webauthn-3/)

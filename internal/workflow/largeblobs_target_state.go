@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-ctap/ctap/crypto"
 	"github.com/go-ctap/ctap/protocol"
+	rtcredentials "github.com/go-ctap/kit/internal/credentials"
 	"github.com/go-ctap/kit/internal/secret"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
@@ -29,7 +30,7 @@ func (r Runner) loadTargetBlobState(
 	inventory appcredentials.InventoryReport,
 	credentialIDHex string,
 ) (targetBlobState, error) {
-	target, err := appcredentials.FindCredentialByHexID(inventory, credentialIDHex)
+	target, err := rtcredentials.FindByHexID(inventory, credentialIDHex)
 	if err != nil {
 		return targetBlobState{}, err
 	}

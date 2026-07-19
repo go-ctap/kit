@@ -1,3 +1,2 @@
-// Package model contains shared public runtime events, interactions, logging,
-// verification settings, and operation identifiers.
+// Package model contains shared public runtime DTOs.
 package model

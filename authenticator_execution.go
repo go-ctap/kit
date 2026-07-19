@@ -64,7 +64,12 @@ func executeSerializedOperation[T any](
 
 	events := rtruntime.NewEventDispatcher(config.events)
 	interactions := rtruntime.NewInteractionBroker(events, config.handler)
-	tokens := rtruntime.NewTokenService(a.tokens, a.device, interactions, config.verificationFlow)
+	tokens := rtruntime.NewTokenService(
+		a.tokens,
+		a.device,
+		interactions,
+		rtruntime.VerificationFlow(config.verificationFlow),
+	)
 	runner := workflow.NewRunner(workflow.Environment{
 		Selected:     a.selected,
 		Events:       events,

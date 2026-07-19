@@ -678,7 +678,7 @@ func TestLargeBlobWritePINVerificationFlowSkipsUVForUVCapableAuthenticator(t *te
 			CredentialIDHex: "c05e",
 			Payload:         []byte("test"),
 		},
-		session.operationOptions(WithVerificationFlow(model.VerificationFlowPIN), WithInteractionHandler(handler))...,
+		session.operationOptions(WithVerificationFlow(VerificationFlowPIN), WithInteractionHandler(handler))...,
 	)
 	if err != nil {
 		t.Fatalf("WriteLargeBlob: %v", err)

@@ -6,7 +6,9 @@ import (
 
 	"github.com/go-ctap/ctap/crypto"
 	"github.com/go-ctap/ctap/protocol"
+	rtcredentials "github.com/go-ctap/kit/internal/credentials"
 	"github.com/go-ctap/kit/internal/errornorm"
+	rtlargeblobs "github.com/go-ctap/kit/internal/largeblobs"
 	"github.com/go-ctap/kit/internal/secret"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
@@ -37,7 +39,7 @@ func (r Runner) readLargeBlobFromInventory(
 		return applargeblobs.ReadReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseValidation))
 	}
 
-	target, err := appcredentials.FindCredentialByHexID(inventory, req.CredentialIDHex)
+	target, err := rtcredentials.FindByHexID(inventory, req.CredentialIDHex)
 	if err != nil {
 		return applargeblobs.ReadReport{}, err
 	}
@@ -57,7 +59,7 @@ func (r Runner) readLargeBlobFromInventory(
 	if len(target.Record.LargeBlobKey) == 0 {
 		result.LargeBlobKeyState = applargeblobs.LargeBlobKeyMissing
 		result.Array = applargeblobs.ArrayState{BlobState: applargeblobs.BlobStateUnknownKeyMissing}
-		result.Decode = applargeblobs.DecodeLargeBlob(nil, false, req.DecodeMode)
+		result.Decode = rtlargeblobs.Decode(nil, false, req.DecodeMode)
 
 		return result, nil
 	}
@@ -65,7 +67,7 @@ func (r Runner) readLargeBlobFromInventory(
 	result.LargeBlobKeyState = applargeblobs.LargeBlobKeyAvailable
 
 	if !support.LargeBlobs {
-		result.Decode = applargeblobs.DecodeLargeBlob(nil, false, req.DecodeMode)
+		result.Decode = rtlargeblobs.Decode(nil, false, req.DecodeMode)
 
 		return result, nil
 	}
@@ -97,12 +99,12 @@ func (r Runner) readLargeBlobFromInventory(
 		result.Array.BlobPresent = true
 		result.Array.BlobState = applargeblobs.BlobStatePresent
 		result.Array.BlobSize = len(raw)
-		result.Decode = applargeblobs.DecodeLargeBlob(raw, true, req.DecodeMode)
+		result.Decode = rtlargeblobs.Decode(raw, true, req.DecodeMode)
 
 		return result, nil
 	}
 
-	result.Decode = applargeblobs.DecodeLargeBlob(nil, false, req.DecodeMode)
+	result.Decode = rtlargeblobs.Decode(nil, false, req.DecodeMode)
 
 	return result, nil
 }

@@ -7,33 +7,34 @@ import (
 
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
+	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/samber/lo"
 )
 
-func BuildStatusReport(device report.DeviceReport, info protocol.AuthenticatorGetInfoResponse) StatusReport {
-	r := StatusReport{
+func BuildStatusReport(device report.DeviceReport, info protocol.AuthenticatorGetInfoResponse) appconfig.StatusReport {
+	r := appconfig.StatusReport{
 		Device: device,
-		PIN: PINStatus{
-			State:   StateUnknown,
-			Retries: RetryState{State: StateUnknown},
+		PIN: appconfig.PINStatus{
+			State:   appconfig.StateUnknown,
+			Retries: appconfig.RetryState{State: appconfig.StateUnknown},
 		},
-		UV: UVStatus{
-			State:   StateUnknown,
-			Retries: RetryState{State: StateUnknown},
+		UV: appconfig.UVStatus{
+			State:   appconfig.StateUnknown,
+			Retries: appconfig.RetryState{State: appconfig.StateUnknown},
 		},
-		Bio: BioStatus{
-			State:       StateUnknown,
-			UVBioEnroll: CapabilityState{State: StateUnknown},
+		Bio: appconfig.BioStatus{
+			State:       appconfig.StateUnknown,
+			UVBioEnroll: appconfig.CapabilityState{State: appconfig.StateUnknown},
 		},
-		AuthenticatorConfig: AuthenticatorConfigStatus{
-			State:             StateUnknown,
-			UVAcfg:            CapabilityState{State: StateUnknown},
-			AlwaysUV:          CapabilityState{State: StateUnknown},
-			SetMinPINLength:   CapabilityState{State: StateUnknown},
-			LongTouchForReset: CapabilityState{State: StateUnknown},
+		AuthenticatorConfig: appconfig.AuthenticatorConfigStatus{
+			State:             appconfig.StateUnknown,
+			UVAcfg:            appconfig.CapabilityState{State: appconfig.StateUnknown},
+			AlwaysUV:          appconfig.CapabilityState{State: appconfig.StateUnknown},
+			SetMinPINLength:   appconfig.CapabilityState{State: appconfig.StateUnknown},
+			LongTouchForReset: appconfig.CapabilityState{State: appconfig.StateUnknown},
 		},
-		ResetHints: ResetHints{LongTouchForReset: StateUnknown},
+		ResetHints: appconfig.ResetHints{LongTouchForReset: appconfig.StateUnknown},
 	}
 
 	r.PIN = buildPINStatus(info)
@@ -89,10 +90,10 @@ func formatUVModalityLabel[T uvModalityStringer](modality T) string {
 	return strings.Join(labels, ", ")
 }
 
-func buildPINStatus(info protocol.AuthenticatorGetInfoResponse) PINStatus {
-	status := PINStatus{
-		State:   StateUnknown,
-		Retries: RetryState{State: StateUnknown},
+func buildPINStatus(info protocol.AuthenticatorGetInfoResponse) appconfig.PINStatus {
+	status := appconfig.PINStatus{
+		State:   appconfig.StateUnknown,
+		Retries: appconfig.RetryState{State: appconfig.StateUnknown},
 	}
 	status.ProtocolSupported = len(info.PinUvAuthProtocols) > 0
 	status.ForcePINChange = info.ForcePINChange
@@ -103,7 +104,7 @@ func buildPINStatus(info protocol.AuthenticatorGetInfoResponse) PINStatus {
 
 	value, ok := info.Options[protocol.OptionClientPIN]
 	if !ok {
-		status.State = StateUnsupported
+		status.State = appconfig.StateUnsupported
 
 		return status
 	}
@@ -111,57 +112,57 @@ func buildPINStatus(info protocol.AuthenticatorGetInfoResponse) PINStatus {
 	status.Supported = true
 	status.Configured = new(value)
 	if value {
-		status.State = StateConfigured
+		status.State = appconfig.StateConfigured
 	} else {
-		status.State = StateNotConfigured
+		status.State = appconfig.StateNotConfigured
 	}
 
 	return status
 }
 
-func configuredOptionCapability(info protocol.AuthenticatorGetInfoResponse, option protocol.Option, previewOnly bool) CapabilityState {
+func configuredOptionCapability(info protocol.AuthenticatorGetInfoResponse, option protocol.Option, previewOnly bool) appconfig.CapabilityState {
 	value, ok := info.Options[option]
 	if !ok {
-		return CapabilityState{State: StateUnsupported}
+		return appconfig.CapabilityState{State: appconfig.StateUnsupported}
 	}
 
-	state := CapabilityState{
+	state := appconfig.CapabilityState{
 		Supported:   true,
 		Configured:  new(value),
 		PreviewOnly: previewOnly,
 	}
 
 	if previewOnly {
-		state.State = StatePreviewOnly
+		state.State = appconfig.StatePreviewOnly
 	} else if value {
-		state.State = StateConfigured
+		state.State = appconfig.StateConfigured
 	} else {
-		state.State = StateNotConfigured
+		state.State = appconfig.StateNotConfigured
 	}
 
 	return state
 }
 
-func requiredOptionCapability(info protocol.AuthenticatorGetInfoResponse, option protocol.Option, previewOnly bool) CapabilityState {
+func requiredOptionCapability(info protocol.AuthenticatorGetInfoResponse, option protocol.Option, previewOnly bool) appconfig.CapabilityState {
 	value, ok := info.Options[option]
 	if !ok || !value {
-		return CapabilityState{State: StateUnsupported}
+		return appconfig.CapabilityState{State: appconfig.StateUnsupported}
 	}
 
-	state := CapabilityState{
-		State:       StateSupported,
+	state := appconfig.CapabilityState{
+		State:       appconfig.StateSupported,
 		Supported:   true,
 		PreviewOnly: previewOnly,
 	}
 
 	if previewOnly {
-		state.State = StatePreviewOnly
+		state.State = appconfig.StatePreviewOnly
 	}
 
 	return state
 }
 
-func bioCapability(info protocol.AuthenticatorGetInfoResponse) CapabilityState {
+func bioCapability(info protocol.AuthenticatorGetInfoResponse) appconfig.CapabilityState {
 	if info.Versions.IsPreviewOnly() {
 		return configuredOptionCapability(info, protocol.OptionUserVerificationMgmtPreview, true)
 	}
@@ -169,66 +170,66 @@ func bioCapability(info protocol.AuthenticatorGetInfoResponse) CapabilityState {
 	return configuredOptionCapability(info, protocol.OptionBioEnroll, false)
 }
 
-func buildUVStatus(capability CapabilityState) UVStatus {
-	return UVStatus{
+func buildUVStatus(capability appconfig.CapabilityState) appconfig.UVStatus {
+	return appconfig.UVStatus{
 		State:       capability.State,
 		Supported:   capability.Supported,
 		Configured:  capability.Configured,
 		PreviewOnly: capability.PreviewOnly,
-		Retries:     RetryState{State: StateUnknown},
+		Retries:     appconfig.RetryState{State: appconfig.StateUnknown},
 	}
 }
 
-func buildBioStatus(capability CapabilityState) BioStatus {
-	return BioStatus{
+func buildBioStatus(capability appconfig.CapabilityState) appconfig.BioStatus {
+	return appconfig.BioStatus{
 		State:       capability.State,
 		Supported:   capability.Supported,
 		Configured:  capability.Configured,
 		PreviewOnly: capability.PreviewOnly,
-		UVBioEnroll: CapabilityState{State: StateUnknown},
+		UVBioEnroll: appconfig.CapabilityState{State: appconfig.StateUnknown},
 	}
 }
 
-func buildAuthenticatorConfigStatus(capability CapabilityState) AuthenticatorConfigStatus {
-	return AuthenticatorConfigStatus{
+func buildAuthenticatorConfigStatus(capability appconfig.CapabilityState) appconfig.AuthenticatorConfigStatus {
+	return appconfig.AuthenticatorConfigStatus{
 		State:             capability.State,
 		Supported:         capability.Supported,
 		Configured:        capability.Configured,
 		PreviewOnly:       capability.PreviewOnly,
-		UVAcfg:            CapabilityState{State: StateUnknown},
-		AlwaysUV:          CapabilityState{State: StateUnknown},
-		SetMinPINLength:   CapabilityState{State: StateUnknown},
-		LongTouchForReset: CapabilityState{State: StateUnknown},
+		UVAcfg:            appconfig.CapabilityState{State: appconfig.StateUnknown},
+		AlwaysUV:          appconfig.CapabilityState{State: appconfig.StateUnknown},
+		SetMinPINLength:   appconfig.CapabilityState{State: appconfig.StateUnknown},
+		LongTouchForReset: appconfig.CapabilityState{State: appconfig.StateUnknown},
 	}
 }
 
-func longTouchCapability(info protocol.AuthenticatorGetInfoResponse) CapabilityState {
+func longTouchCapability(info protocol.AuthenticatorGetInfoResponse) appconfig.CapabilityState {
 	if info.LongTouchForReset == nil ||
 		!slices.Contains(info.AuthenticatorConfigCommands, protocol.ConfigSubCommandEnableLongTouchForReset) {
-		return CapabilityState{State: StateUnsupported}
+		return appconfig.CapabilityState{State: appconfig.StateUnsupported}
 	}
 
-	return CapabilityState{
+	return appconfig.CapabilityState{
 		State:      boolConfiguredState(info.LongTouchForReset),
 		Supported:  true,
 		Configured: info.LongTouchForReset,
 	}
 }
 
-func boolConfiguredState(value *bool) StateValue {
+func boolConfiguredState(value *bool) appconfig.StateValue {
 	if value == nil {
-		return StateUnknown
+		return appconfig.StateUnknown
 	}
 
 	if *value {
-		return StateConfigured
+		return appconfig.StateConfigured
 	}
 
-	return StateNotConfigured
+	return appconfig.StateNotConfigured
 }
 
-func buildLimitsStatus(info protocol.AuthenticatorGetInfoResponse) LimitsStatus {
-	return LimitsStatus{
+func buildLimitsStatus(info protocol.AuthenticatorGetInfoResponse) appconfig.LimitsStatus {
+	return appconfig.LimitsStatus{
 		MinPINLength:                info.EffectiveMinPINLength(),
 		MaxPINLength:                info.EffectiveMaxPINLength(),
 		MaxRPIDsForSetMinPINLength:  info.MaxRPIDsForSetMinPINLength,

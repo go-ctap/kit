@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/go-ctap/ctap/protocol"
+	rtconfig "github.com/go-ctap/kit/internal/config"
 	"github.com/go-ctap/kit/internal/errornorm"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
@@ -17,14 +18,14 @@ func (r Runner) SetPIN(
 ) (appconfig.PINOutput, error) {
 	var output appconfig.PINOutput
 
-	status := appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
 
 	mode := safety.PreviewModeDryRun
 	if !req.DryRun {
 		mode = safety.PreviewModeExecute
 	}
 
-	preview, err := appconfig.BuildSetPINPreview(status, mode)
+	preview, err := rtconfig.BuildSetPINPreview(status, mode)
 	if err != nil {
 		return output, err
 	}
@@ -45,7 +46,7 @@ func (r Runner) SetPIN(
 		))
 	}
 
-	output.Result = new(appconfig.PINSetResult(r.env.Selected.Fingerprint))
+	output.Result = new(rtconfig.PINSetResult(r.env.Selected.Fingerprint))
 	return output, nil
 }
 
@@ -56,14 +57,14 @@ func (r Runner) ChangePIN(
 ) (appconfig.PINOutput, error) {
 	var output appconfig.PINOutput
 
-	status := appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
 
 	mode := safety.PreviewModeDryRun
 	if !req.DryRun {
 		mode = safety.PreviewModeExecute
 	}
 
-	preview, err := appconfig.BuildChangePINPreview(status, mode)
+	preview, err := rtconfig.BuildChangePINPreview(status, mode)
 	if err != nil {
 		return output, err
 	}
@@ -84,6 +85,6 @@ func (r Runner) ChangePIN(
 		))
 	}
 
-	output.Result = new(appconfig.PINChangeResult(r.env.Selected.Fingerprint))
+	output.Result = new(rtconfig.PINChangeResult(r.env.Selected.Fingerprint))
 	return output, nil
 }

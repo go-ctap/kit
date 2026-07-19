@@ -3,15 +3,16 @@ package credentials
 import (
 	"testing"
 
+	. "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/model/safety"
 )
 
-func TestFindCredentialByHexID(t *testing.T) {
-	target, err := FindCredentialByHexID(sampleInventoryReport(), "deadbeef")
+func TestFindByHexID(t *testing.T) {
+	target, err := FindByHexID(sampleInventoryReport(), "deadbeef")
 	if err != nil {
-		t.Fatalf("FindCredentialByHexID: %v", err)
+		t.Fatalf("FindByHexID: %v", err)
 	}
 
 	if target.RP.ID != "example.com" {
@@ -47,8 +48,8 @@ func TestBuildDeletePreview(t *testing.T) {
 		t.Fatalf("first warning code = %q, want credential.delete.destructive", preview.Warnings[0].Code)
 	}
 
-	if preview.Warnings[1].Code != "credential.delete.irreversible" {
-		t.Fatalf("second warning code = %q, want credential.delete.irreversible", preview.Warnings[1].Code)
+	if preview.Warnings[1].Code != "credential.delete.associated_large_blob" {
+		t.Fatalf("second warning code = %q, want credential.delete.associated_large_blob", preview.Warnings[1].Code)
 	}
 }
 
@@ -64,9 +65,9 @@ func TestBuildDeletePreviewMissingCredential(t *testing.T) {
 }
 
 func TestBuildUpdateUserPreviewRejectsInvalidUserIDHex(t *testing.T) {
-	target, err := FindCredentialByHexID(sampleInventoryReport(), "deadbeef")
+	target, err := FindByHexID(sampleInventoryReport(), "deadbeef")
 	if err != nil {
-		t.Fatalf("FindCredentialByHexID: %v", err)
+		t.Fatalf("FindByHexID: %v", err)
 	}
 
 	for _, userIDHex := range []string{"zz", "abc"} {
@@ -97,35 +98,15 @@ func TestBuildUpdateUserPreviewRequiresTargetAndChange(t *testing.T) {
 	}
 }
 
-func TestBuildUpdateUserPreviewNormalizesUserIDHex(t *testing.T) {
-	target, err := FindCredentialByHexID(sampleInventoryReport(), "deadbeef")
+func TestBuildUpdateUserPreviewAcceptsUnchangedUserID(t *testing.T) {
+	target, err := FindByHexID(sampleInventoryReport(), "deadbeef")
 	if err != nil {
-		t.Fatalf("FindCredentialByHexID: %v", err)
+		t.Fatalf("FindByHexID: %v", err)
 	}
 
 	preview, err := BuildUpdateUserPreview(UpdateUserOperation{
 		Target:         target,
-		UserIDHex:      "0A0B",
-		UserIDProvided: true,
-	})
-	if err != nil {
-		t.Fatalf("BuildUpdateUserPreview: %v", err)
-	}
-
-	if preview.Proposed.UserIDHex != "0a0b" {
-		t.Fatalf("Proposed.UserIDHex = %q, want normalized lower-case hex", preview.Proposed.UserIDHex)
-	}
-}
-
-func TestBuildUpdateUserPreviewEmptyProvidedUserIDFallsBack(t *testing.T) {
-	target, err := FindCredentialByHexID(sampleInventoryReport(), "deadbeef")
-	if err != nil {
-		t.Fatalf("FindCredentialByHexID: %v", err)
-	}
-
-	preview, err := BuildUpdateUserPreview(UpdateUserOperation{
-		Target:         target,
-		UserIDHex:      " ",
+		UserIDHex:      "0102",
 		UserIDProvided: true,
 		Name:           "alice-new@example.com",
 		NameProvided:   true,
@@ -135,7 +116,25 @@ func TestBuildUpdateUserPreviewEmptyProvidedUserIDFallsBack(t *testing.T) {
 	}
 
 	if preview.Proposed.UserIDHex != "0102" {
-		t.Fatalf("Proposed.UserIDHex = %q, want fallback to current user ID", preview.Proposed.UserIDHex)
+		t.Fatalf("Proposed.UserIDHex = %q, want unchanged user ID", preview.Proposed.UserIDHex)
+	}
+}
+
+func TestBuildUpdateUserPreviewRejectsChangedUserID(t *testing.T) {
+	target, err := FindByHexID(sampleInventoryReport(), "deadbeef")
+	if err != nil {
+		t.Fatalf("FindByHexID: %v", err)
+	}
+
+	_, err = BuildUpdateUserPreview(UpdateUserOperation{
+		Target:         target,
+		UserIDHex:      "0a0b",
+		UserIDProvided: true,
+		Name:           "alice-new@example.com",
+		NameProvided:   true,
+	})
+	if !failure.IsCode(err, failure.CodeCTAPParameterInvalid) {
+		t.Fatalf("BuildUpdateUserPreview(changed user ID) error = %v, want %s", err, failure.CodeCTAPParameterInvalid)
 	}
 }
 

@@ -3,6 +3,7 @@ package config
 import (
 	"testing"
 
+	. "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/safety"
 )

@@ -1,3 +1,4 @@
+// Package webauthn owns runtime WebAuthn preflight and validation behavior.
 package webauthn
 
 import (
@@ -24,7 +25,7 @@ func makeCredentialExtensionWarnings(
 	warnings := make([]safety.Warning, 0, 7)
 	appendMissing := func(included bool, identifier extension.ExtensionIdentifier, code, label string) {
 		if included && !slices.Contains(info.Extensions, identifier) {
-			warnings = append(warnings, unsupportedExtensionWarning(code, label))
+			warnings = append(warnings, unsupportedExtensionWarning(code, label, string(identifier)))
 		}
 	}
 	appendMissing(input.CreateCredentialProtectionInputs != nil, extension.ExtensionIdentifierCredentialProtection,
@@ -62,37 +63,37 @@ func getAssertionExtensionWarnings(
 	warnings := make([]safety.Warning, 0, 3)
 	if input.GetCredentialBlobInputs != nil && !slices.Contains(info.Extensions, extension.ExtensionIdentifierCredentialBlob) {
 		warnings = append(warnings, unsupportedExtensionWarning(
-			"webauthn.extension.cred_blob.not_advertised", "credBlob"))
+			"webauthn.extension.cred_blob.not_advertised", "credBlob", "credBlob"))
 	}
 
 	if input.GetHMACSecretInputs != nil && !slices.Contains(info.Extensions, extension.ExtensionIdentifierHMACSecret) {
 		warnings = append(warnings, unsupportedExtensionWarning(
-			"webauthn.extension.hmac_secret.not_advertised", "hmac-secret"))
+			"webauthn.extension.hmac_secret.not_advertised", "hmac-secret", "hmac-secret"))
 	}
 
 	if hasPRFEvaluation(input.PRFInputs) && !slices.Contains(info.Extensions, extension.ExtensionIdentifierHMACSecret) {
 		warnings = append(warnings, unsupportedExtensionWarning(
-			"webauthn.extension.prf.not_advertised", "prf"))
+			"webauthn.extension.prf.not_advertised", "prf", "hmac-secret"))
 	}
 
 	if input.LargeBlobInputs != nil && !slices.Contains(info.Extensions, extension.ExtensionIdentifierLargeBlobKey) {
 		warnings = append(warnings, unsupportedExtensionWarning(
-			"webauthn.extension.large_blob.not_advertised", "largeBlob"))
+			"webauthn.extension.large_blob.not_advertised", "largeBlob", "largeBlobKey"))
 	}
 
 	if input.PaymentInputs != nil && input.Payment.IsPayment &&
 		!slices.Contains(info.Extensions, extension.ExtensionIdentifierThirdPartyPayment) {
 		warnings = append(warnings, unsupportedExtensionWarning(
-			"webauthn.extension.third_party_payment.not_advertised", "thirdPartyPayment"))
+			"webauthn.extension.third_party_payment.not_advertised", "thirdPartyPayment", "thirdPartyPayment"))
 	}
 
 	return warnings
 }
 
-func unsupportedExtensionWarning(code, label string) safety.Warning {
+func unsupportedExtensionWarning(code, requested, advertised string) safety.Warning {
 	return safety.Warning{
 		Severity: safety.SeverityWarning,
 		Code:     code,
-		Message:  label + " is not advertised by this authenticator; execution is still allowed.",
+		Message:  requested + " was requested, but this authenticator does not advertise " + advertised + "; CTAP requires it to ignore unsupported extension inputs.",
 	}
 }

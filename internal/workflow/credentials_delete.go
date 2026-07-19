@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/authenticator"
+	rtcredentials "github.com/go-ctap/kit/internal/credentials"
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
@@ -36,7 +37,7 @@ func (r Runner) DeleteCredential(
 	}
 	defer zeroCredentialInventoryReport(&report)
 
-	preview, err := appcredentials.BuildDeletePreview(report, req.CredentialIDHex)
+	preview, err := rtcredentials.BuildDeletePreview(report, req.CredentialIDHex)
 	if err != nil {
 		return output, err
 	}
@@ -47,7 +48,7 @@ func (r Runner) DeleteCredential(
 		return output, nil
 	}
 
-	publicTarget, err := appcredentials.FindCredentialByHexID(report, req.CredentialIDHex)
+	publicTarget, err := rtcredentials.FindByHexID(report, req.CredentialIDHex)
 	if err != nil {
 		return output, err
 	}

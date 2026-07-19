@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/go-ctap/ctap/protocol"
+	rtconfig "github.com/go-ctap/kit/internal/config"
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	appconfig "github.com/go-ctap/kit/model/config"
@@ -18,14 +19,14 @@ func (r Runner) BioRename(
 ) (appconfig.BioMutationOutput, error) {
 	var output appconfig.BioMutationOutput
 
-	status := appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
 
 	mode := safety.PreviewModeExecute
 	if req.DryRun {
 		mode = safety.PreviewModeDryRun
 	}
 
-	preview, err := appconfig.BuildBioRenamePreview(status, req.TemplateIDHex, req.FriendlyName, mode)
+	preview, err := rtconfig.BuildBioRenamePreview(status, req.TemplateIDHex, req.FriendlyName, mode)
 	if err != nil {
 		return output, err
 	}
@@ -36,7 +37,7 @@ func (r Runner) BioRename(
 		return output, nil
 	}
 
-	templateID, err := appconfig.DecodeTemplateID(req.TemplateIDHex)
+	templateID, err := rtconfig.DecodeTemplateID(req.TemplateIDHex)
 	if err != nil {
 		return output, err
 	}
@@ -73,14 +74,14 @@ func (r Runner) BioRemove(
 ) (appconfig.BioMutationOutput, error) {
 	var output appconfig.BioMutationOutput
 
-	status := appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
 
 	mode := safety.PreviewModeExecute
 	if req.DryRun {
 		mode = safety.PreviewModeDryRun
 	}
 
-	preview, err := appconfig.BuildBioRemovePreview(status, req.TemplateIDHex, mode)
+	preview, err := rtconfig.BuildBioRemovePreview(status, req.TemplateIDHex, mode)
 	if err != nil {
 		return output, err
 	}
@@ -91,7 +92,7 @@ func (r Runner) BioRemove(
 		return output, nil
 	}
 
-	templateID, err := appconfig.DecodeTemplateID(req.TemplateIDHex)
+	templateID, err := rtconfig.DecodeTemplateID(req.TemplateIDHex)
 	if err != nil {
 		return output, err
 	}

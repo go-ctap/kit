@@ -8,6 +8,7 @@ import (
 	"github.com/go-ctap/ctap/attestation"
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/kit/model/failure"
+	. "github.com/go-ctap/kit/model/webauthn"
 )
 
 func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {

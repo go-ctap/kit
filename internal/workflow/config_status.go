@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/go-ctap/ctap/protocol"
+	rtconfig "github.com/go-ctap/kit/internal/config"
 	"github.com/go-ctap/kit/internal/errornorm"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
@@ -21,7 +22,7 @@ func (r Runner) statusWithRetries(
 		return appconfig.StatusReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseAuthenticatorCommand))
 	}
 
-	rep := appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	rep := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
 	if rep.PIN.Supported {
 		retries, powerCycle, err := device.GetPINRetries(ctx)
 		rep.PIN.Retries = retryState(

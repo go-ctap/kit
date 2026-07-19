@@ -23,7 +23,7 @@ func TestTokenServiceCachesByPermissionAndRPID(t *testing.T) {
 		cache,
 		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{}),
-		model.VerificationFlowDefault,
+		VerificationFlowDefault,
 	)
 
 	acquireTokenForTest(t, tokens, authenticator, protocol.PermissionCredentialManagement, "")
@@ -48,7 +48,7 @@ func TestTokenServiceCompositeGrantCoversPermissionSubsets(t *testing.T) {
 		&testTokenCache{},
 		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{}),
-		model.VerificationFlowDefault,
+		VerificationFlowDefault,
 	)
 	permissions := protocol.PermissionCredentialManagement |
 		protocol.PermissionLargeBlobWrite
@@ -104,7 +104,7 @@ func TestTokenServiceDefaultFlowRequestsUVInteractionBeforeUVCommand(t *testing.
 		cache,
 		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{}),
-		model.VerificationFlowDefault,
+		VerificationFlowDefault,
 	)
 
 	acquireTokenForTest(t, tokens, authenticator, protocol.PermissionCredentialManagement, "")
@@ -128,10 +128,10 @@ func TestTokenServiceDefaultFlowCanceledUVInteractionSkipsUVCommand(t *testing.T
 	tokens := NewTokenService(
 		cache,
 		authenticator,
-		NewInteractionBroker(model.NoopEventSink{}, interactionHandlerFunc(func(model.InteractionRequest) (model.InteractionResponse, error) {
+		NewInteractionBroker(noopEventSink{}, interactionHandlerFunc(func(model.InteractionRequest) (model.InteractionResponse, error) {
 			return model.InteractionResponse{Canceled: true}, nil
 		})),
-		model.VerificationFlowDefault,
+		VerificationFlowDefault,
 	)
 
 	token, err := tokens.acquire(
@@ -164,7 +164,7 @@ func TestTokenServiceDefaultFlowFallsBackToPINAfterUVFallbackError(t *testing.T)
 		cache,
 		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{PIN: []byte("1234")}),
-		model.VerificationFlowDefault,
+		VerificationFlowDefault,
 	)
 
 	acquireTokenForTest(t, tokens, authenticator, protocol.PermissionCredentialManagement, "")
@@ -195,7 +195,7 @@ func TestTokenServicePINFlowSkipsUVInteractionAndCommand(t *testing.T) {
 		cache,
 		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{PIN: []byte("1234")}),
-		model.VerificationFlowPIN,
+		VerificationFlowPIN,
 	)
 
 	acquireTokenForTest(t, tokens, authenticator, protocol.PermissionCredentialManagement, "")
@@ -226,7 +226,7 @@ func TestTokenServicePINInvalidRequestsAnotherPINWithRetryState(t *testing.T) {
 		powerCycleState: &powerCycleState,
 	}
 	interactions := NewInteractionBroker(
-		model.NoopEventSink{},
+		noopEventSink{},
 		interactionHandlerFunc(func(req model.InteractionRequest) (model.InteractionResponse, error) {
 			requests = append(requests, req)
 			pin := []byte("1234")
@@ -235,7 +235,7 @@ func TestTokenServicePINInvalidRequestsAnotherPINWithRetryState(t *testing.T) {
 			return model.InteractionResponse{PIN: pin}, nil
 		}),
 	)
-	tokens := NewTokenService(&testTokenCache{}, authenticator, interactions, model.VerificationFlowPIN)
+	tokens := NewTokenService(&testTokenCache{}, authenticator, interactions, VerificationFlowPIN)
 
 	acquireTokenForTest(t, tokens, authenticator, protocol.PermissionCredentialManagement, "")
 
@@ -313,7 +313,7 @@ func TestTokenServicePINBlockedDoesNotRequestAnotherPIN(t *testing.T) {
 		&testTokenCache{},
 		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{PIN: []byte("1234")}),
-		model.VerificationFlowPIN,
+		VerificationFlowPIN,
 	)
 
 	token, err := tokens.acquire(context.Background(), protocol.PermissionCredentialManagement, "")
@@ -356,7 +356,7 @@ func TestTokenServicePINRetriesFailureStopsRetryFlow(t *testing.T) {
 		&testTokenCache{},
 		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{PIN: []byte("1234")}),
-		model.VerificationFlowPIN,
+		VerificationFlowPIN,
 	)
 
 	token, err := tokens.acquire(context.Background(), protocol.PermissionCredentialManagement, "")
@@ -398,7 +398,7 @@ func TestTokenServiceDelegatesPINValidationToAuthenticator(t *testing.T) {
 		&testTokenCache{},
 		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{PIN: []byte("123")}),
-		model.VerificationFlowPIN,
+		VerificationFlowPIN,
 	)
 
 	token, err := tokens.acquire(context.Background(), protocol.PermissionCredentialManagement, "")
@@ -426,7 +426,7 @@ func TestTokenServiceCachedPINFlowPerformsNoInteraction(t *testing.T) {
 		cache,
 		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{PIN: []byte("1234")}),
-		model.VerificationFlowPIN,
+		VerificationFlowPIN,
 	)
 
 	acquireTokenForTest(t, tokens, authenticator, protocol.PermissionCredentialManagement, "")
@@ -447,7 +447,7 @@ func TestTokenServiceUseReacquiresRejectedTokenOnce(t *testing.T) {
 		&testTokenCache{},
 		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{}),
-		model.VerificationFlowDefault,
+		VerificationFlowDefault,
 	)
 
 	var usedTokens [][]byte
@@ -497,7 +497,7 @@ func TestTokenServiceUseInvalidatesRejectedTokenWithoutReplayingUnsafeConsumer(t
 	key := TokenKey{Permission: protocol.PermissionCredentialManagement}
 	cache.SetToken(key, secret.New([]byte("cached-token")))
 	authenticator := &recordingTokenDevice{info: uvTokenInfo()}
-	tokens := NewTokenService(cache, authenticator, nil, model.VerificationFlowDefault)
+	tokens := NewTokenService(cache, authenticator, nil, VerificationFlowDefault)
 	consumerErr := &ctaptransport.CTAPError{
 		Command:    protocol.AuthenticatorCredentialManagement,
 		StatusCode: ctaptransport.CTAP2_ERR_PIN_AUTH_INVALID,
@@ -539,7 +539,7 @@ func TestTokenServiceUseOptionalAcquiresOnlyWhenRequired(t *testing.T) {
 		&testTokenCache{},
 		authenticator,
 		recordingInteractionHandler(&requests, model.InteractionResponse{}),
-		model.VerificationFlowDefault,
+		VerificationFlowDefault,
 	)
 
 	var usedTokens [][]byte
@@ -589,7 +589,7 @@ func TestTokenServiceUseOptionalTriesWithoutTokenBeforeCachedToken(t *testing.T)
 	key := TokenKey{Permission: protocol.PermissionMakeCredential, RPID: "example.com"}
 	cache.SetToken(key, secret.New([]byte("cached-token")))
 	authenticator := &recordingTokenDevice{info: uvTokenInfo()}
-	tokens := NewTokenService(cache, authenticator, nil, model.VerificationFlowDefault)
+	tokens := NewTokenService(cache, authenticator, nil, VerificationFlowDefault)
 
 	uses := 0
 	err := tokens.Use(
@@ -630,7 +630,7 @@ func TestTokenServiceUseOptionalDoesNotReplayRejectedToken(t *testing.T) {
 	key := TokenKey{Permission: protocol.PermissionMakeCredential, RPID: "example.com"}
 	cache.SetToken(key, secret.New([]byte("cached-token")))
 	authenticator := &recordingTokenDevice{info: uvTokenInfo()}
-	tokens := NewTokenService(cache, authenticator, nil, model.VerificationFlowDefault)
+	tokens := NewTokenService(cache, authenticator, nil, VerificationFlowDefault)
 	consumerErr := &ctaptransport.CTAPError{
 		Command:    protocol.AuthenticatorMakeCredential,
 		StatusCode: ctaptransport.CTAP2_ERR_PIN_AUTH_INVALID,
@@ -699,7 +699,7 @@ func TestTokenServiceUseKeepsTokenAfterOtherConsumerFailures(t *testing.T) {
 			key := TokenKey{Permission: protocol.PermissionCredentialManagement}
 			cache.SetToken(key, secret.New([]byte("cached-token")))
 			authenticator := &recordingTokenDevice{info: uvTokenInfo()}
-			tokens := NewTokenService(cache, authenticator, nil, model.VerificationFlowDefault)
+			tokens := NewTokenService(cache, authenticator, nil, VerificationFlowDefault)
 			consumerErr := &ctaptransport.CTAPError{
 				Command:    protocol.AuthenticatorCredentialManagement,
 				StatusCode: tt.status,
@@ -736,8 +736,8 @@ func TestTokenServiceMissingHandlerForUVReturnsInvalidStateBeforeUVCommand(t *te
 	tokens := NewTokenService(
 		cache,
 		authenticator,
-		NewInteractionBroker(model.NoopEventSink{}, nil),
-		model.VerificationFlowDefault,
+		NewInteractionBroker(noopEventSink{}, nil),
+		VerificationFlowDefault,
 	)
 
 	token, err := tokens.acquire(
@@ -763,7 +763,7 @@ func recordingInteractionHandler(
 	requests *[]model.InteractionRequest,
 	response model.InteractionResponse,
 ) *InteractionBroker {
-	return NewInteractionBroker(model.NoopEventSink{}, interactionHandlerFunc(func(req model.InteractionRequest) (model.InteractionResponse, error) {
+	return NewInteractionBroker(noopEventSink{}, interactionHandlerFunc(func(req model.InteractionRequest) (model.InteractionResponse, error) {
 		*requests = append(*requests, req)
 
 		out := response

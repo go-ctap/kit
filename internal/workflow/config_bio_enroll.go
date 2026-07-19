@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-ctap/ctap/protocol"
+	rtconfig "github.com/go-ctap/kit/internal/config"
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/model"
@@ -23,14 +24,14 @@ func (r Runner) BioEnroll(
 ) (appconfig.BioEnrollOutput, error) {
 	var output appconfig.BioEnrollOutput
 
-	status := appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
 
 	mode := safety.PreviewModeExecute
 	if req.DryRun {
 		mode = safety.PreviewModeDryRun
 	}
 
-	preview, err := appconfig.BuildBioEnrollPreview(status, req.TimeoutMilliseconds, mode)
+	preview, err := rtconfig.BuildBioEnrollPreview(status, req.TimeoutMilliseconds, mode)
 	if err != nil {
 		return output, err
 	}
@@ -61,7 +62,7 @@ func (r Runner) BioEnroll(
 	return output, err
 }
 
-func (r Runner) bioEnrollmentProgress(ctx context.Context) appconfig.BioEnrollProgress {
+func (r Runner) bioEnrollmentProgress(ctx context.Context) rtconfig.BioEnrollProgress {
 	var completed uint64
 
 	return func(sample appconfig.BioEnrollSample) error {
@@ -135,7 +136,7 @@ func (r Runner) runBioEnrollment(
 	if err != nil {
 		return appconfig.BioEnrollResult{}, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 			failure.PhaseAuthenticatorCommand,
-			bioEnrollmentCommand(appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())),
+			bioEnrollmentCommand(rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())),
 			protocol.BioEnrollmentSubCommandEnrollBegin,
 		))
 	}
@@ -148,7 +149,7 @@ func (r Runner) runBioEnrollment(
 		if err := ctx.Err(); err != nil {
 			return cancelAfterFailure(errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 				failure.PhaseAuthenticatorCommand,
-				bioEnrollmentCommand(appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())),
+				bioEnrollmentCommand(rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())),
 				protocol.BioEnrollmentSubCommandEnrollCaptureNextSample,
 			)))
 		}
@@ -157,7 +158,7 @@ func (r Runner) runBioEnrollment(
 		if err != nil {
 			return cancelAfterFailure(errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 				failure.PhaseAuthenticatorCommand,
-				bioEnrollmentCommand(appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())),
+				bioEnrollmentCommand(rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())),
 				protocol.BioEnrollmentSubCommandEnrollCaptureNextSample,
 			)))
 		}

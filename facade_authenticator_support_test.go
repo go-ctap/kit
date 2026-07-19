@@ -65,7 +65,7 @@ func TestOpenAuthenticatorMakesJournalAvailableWhileOpeningAuthenticator(t *test
 
 type contractAuthenticatorHandle struct {
 	*Authenticator
-	events model.EventSink
+	events EventSink
 }
 
 func (a *contractAuthenticatorHandle) operationOptions(opts ...OperationOption) []OperationOption {
@@ -76,13 +76,13 @@ func (a *contractAuthenticatorHandle) operationOptions(opts ...OperationOption) 
 	return opts
 }
 
-func openContractAuthenticator(t *testing.T, events model.EventSink, open authenticatorOpenFunc) *contractAuthenticatorHandle {
+func openContractAuthenticator(t *testing.T, events EventSink, open authenticatorOpenFunc) *contractAuthenticatorHandle {
 	return openContractAuthenticatorWithOptions(t, events, open)
 }
 
 func openContractAuthenticatorWithOptions(
 	t *testing.T,
-	events model.EventSink,
+	events EventSink,
 	open authenticatorOpenFunc,
 	opts ...AuthenticatorOption,
 ) *contractAuthenticatorHandle {

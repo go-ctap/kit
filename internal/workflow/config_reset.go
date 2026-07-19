@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/go-ctap/ctap/protocol"
+	rtconfig "github.com/go-ctap/kit/internal/config"
 	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
@@ -18,8 +19,8 @@ func (r Runner) ResetFactory(
 ) (appconfig.ResetFactoryOutput, error) {
 	var output appconfig.ResetFactoryOutput
 
-	status := appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
-	preview := appconfig.BuildResetFactoryPreview(status)
+	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	preview := rtconfig.BuildResetFactoryPreview(status)
 
 	output.Preview = preview
 
@@ -49,6 +50,6 @@ func (r Runner) ResetFactory(
 		))
 	}
 
-	output.Result = new(appconfig.ResetResultForDevice(r.env.Selected.Fingerprint))
+	output.Result = new(rtconfig.ResetResultForDevice(r.env.Selected.Fingerprint))
 	return output, nil
 }

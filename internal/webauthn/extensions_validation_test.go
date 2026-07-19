@@ -3,6 +3,7 @@ package webauthn
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/go-ctap/ctap/credential"
@@ -10,6 +11,7 @@ import (
 	"github.com/go-ctap/ctap/protocol"
 	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
 	"github.com/go-ctap/kit/model/report"
+	. "github.com/go-ctap/kit/model/webauthn"
 )
 
 func TestWebAuthnExtensionJSONUsesLevel3Shapes(t *testing.T) {
@@ -52,6 +54,10 @@ func TestBuildWebAuthnPreviewsKeepRawWarningsAndPRFSemantics(t *testing.T) {
 	if len(makePreview.Warnings) != 4 || makePreview.Warnings[3].Code != "webauthn.extension.prf.not_advertised" {
 		t.Fatalf("Make warnings = %#v, want mutation plus raw and PRF warnings", makePreview.Warnings)
 	}
+	if got := makePreview.Warnings[3].Message; !strings.Contains(got, "does not advertise hmac-secret") ||
+		!strings.Contains(got, "ignore unsupported extension inputs") {
+		t.Fatalf("PRF warning = %q", got)
+	}
 	supportedPreview, err := BuildMakeCredentialPreview(device, protocol.AuthenticatorGetInfoResponse{
 		Extensions: []extension.ExtensionIdentifier{extension.ExtensionIdentifierHMACSecret},
 	}, validMakeCredentialInput(makeExtensions))
@@ -76,6 +82,28 @@ func TestBuildWebAuthnPreviewsKeepRawWarningsAndPRFSemantics(t *testing.T) {
 
 	if len(getPreview.Warnings) != 0 {
 		t.Fatalf("Get warnings = %#v, want no warning for an empty PRF request", getPreview.Warnings)
+	}
+}
+
+func TestBuildMakeCredentialPreviewWarnsAboutDiscoverableOverwrite(t *testing.T) {
+	input := validMakeCredentialInput(nil)
+	input.Options.ResidentKey = new(true)
+
+	preview, err := BuildMakeCredentialPreview(
+		report.DeviceReport{},
+		protocol.AuthenticatorGetInfoResponse{},
+		input,
+	)
+	if err != nil {
+		t.Fatalf("BuildMakeCredentialPreview: %v", err)
+	}
+
+	if len(preview.Warnings) != 2 {
+		t.Fatalf("Warnings = %#v, want mutation and overwrite warnings", preview.Warnings)
+	}
+	if got := preview.Warnings[1]; got.Code != "webauthn.make_credential.discoverable_overwrite" ||
+		got.Severity != "destructive" || !strings.Contains(got.Message, "old credential ID stops resolving") {
+		t.Fatalf("overwrite warning = %#v", got)
 	}
 }
 

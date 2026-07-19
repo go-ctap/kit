@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/go-ctap/ctap/protocol"
+	rtconfig "github.com/go-ctap/kit/internal/config"
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	appconfig "github.com/go-ctap/kit/model/config"
@@ -18,14 +19,14 @@ func (r Runner) SetAlwaysUV(
 ) (appconfig.AuthenticatorConfigOutput, error) {
 	var output appconfig.AuthenticatorConfigOutput
 
-	status := appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
 
 	mode := safety.PreviewModeDryRun
 	if !req.DryRun {
 		mode = safety.PreviewModeExecute
 	}
 
-	preview, err := appconfig.BuildAlwaysUVPreview(status, req.Target, mode)
+	preview, err := rtconfig.BuildAlwaysUVPreview(status, req.Target, mode)
 	if err != nil {
 		return output, err
 	}
@@ -49,7 +50,7 @@ func (r Runner) SetAlwaysUV(
 		))
 	}
 
-	output.Result = new(appconfig.AlwaysUVResult(
+	output.Result = new(rtconfig.AlwaysUVResult(
 		r.env.Selected.Fingerprint,
 		req.Target,
 		preview.RequestedAlwaysUV,
@@ -64,13 +65,13 @@ func (r Runner) SetMinPINLength(
 ) (appconfig.AuthenticatorConfigOutput, error) {
 	var output appconfig.AuthenticatorConfigOutput
 
-	status := appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
 	mode := safety.PreviewModeDryRun
 	if !req.DryRun {
 		mode = safety.PreviewModeExecute
 	}
 
-	preview, err := appconfig.BuildMinPINLengthPreview(status, req, mode)
+	preview, err := rtconfig.BuildMinPINLengthPreview(status, req, mode)
 	if err != nil {
 		return output, err
 	}
@@ -99,6 +100,6 @@ func (r Runner) SetMinPINLength(
 		))
 	}
 
-	output.Result = new(appconfig.MinPINLengthResult(r.env.Selected.Fingerprint, req))
+	output.Result = new(rtconfig.MinPINLengthResult(r.env.Selected.Fingerprint, req))
 	return output, nil
 }

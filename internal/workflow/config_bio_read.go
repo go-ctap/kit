@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 
 	"github.com/go-ctap/ctap/protocol"
+	rtconfig "github.com/go-ctap/kit/internal/config"
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	appconfig "github.com/go-ctap/kit/model/config"
@@ -37,7 +38,7 @@ func (r Runner) BioSensorInfo(ctx context.Context, device BioDevice) (appconfig.
 		return appconfig.BioSensorReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseDiscovery))
 	}
 
-	status := appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
 	if !status.Bio.Supported {
 		return appconfig.BioSensorReport{}, failure.New(failure.CodeBioUnsupported,
 			failure.WithPhase(failure.PhaseDiscovery),

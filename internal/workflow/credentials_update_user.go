@@ -7,6 +7,7 @@ import (
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/authenticator"
+	rtcredentials "github.com/go-ctap/kit/internal/credentials"
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
@@ -20,7 +21,7 @@ func (r Runner) UpdateCredentialUser(
 ) (appcredentials.UpdateUserOutput, error) {
 	var output appcredentials.UpdateUserOutput
 
-	preview, err := appcredentials.BuildUpdateUserPreview(req)
+	preview, err := rtcredentials.BuildUpdateUserPreview(req)
 	if err != nil {
 		return output, err
 	}

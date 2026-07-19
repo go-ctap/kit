@@ -7,6 +7,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/go-ctap/kit/model/failure"
+	. "github.com/go-ctap/kit/model/largeblobs"
 )
 
 func TestDecodeLargeBlob(t *testing.T) {
@@ -36,7 +37,7 @@ func TestDecodeLargeBlob(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			status := DecodeLargeBlob(tt.raw, tt.present, tt.mode)
+			status := Decode(tt.raw, tt.present, tt.mode)
 			if status.Requested != tt.wantRequest {
 				t.Fatalf("Requested = %v, want %v", status.Requested, tt.wantRequest)
 			}
@@ -63,7 +64,7 @@ func TestDecodeLargeBlob(t *testing.T) {
 }
 
 func TestDecodeMissingBlobIsState(t *testing.T) {
-	status := DecodeLargeBlob(nil, false, DecodeModeJSON)
+	status := Decode(nil, false, DecodeModeJSON)
 	if !status.Requested {
 		t.Fatal("Requested = false, want true")
 	}

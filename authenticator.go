@@ -20,19 +20,39 @@ type authenticatorConfig struct {
 
 type OperationOption func(*operationConfig)
 
-type operationConfig struct {
-	verificationFlow model.VerificationFlow
-	events           model.EventSink
-	handler          model.InteractionHandler
+// EventSink receives progress events from one operation.
+type EventSink interface {
+	Emit(context.Context, model.OperationEvent)
 }
 
-func WithEventSink(events model.EventSink) OperationOption {
+// InteractionHandler answers user-interaction requests from one operation.
+type InteractionHandler interface {
+	RequestInteraction(context.Context, model.InteractionRequest) (model.InteractionResponse, error)
+}
+
+// VerificationFlow selects the preferred PIN or user-verification flow.
+type VerificationFlow string
+
+const (
+	// VerificationFlowDefault prefers built-in user verification with PIN fallback.
+	VerificationFlowDefault VerificationFlow = ""
+	// VerificationFlowPIN requests PIN verification first.
+	VerificationFlowPIN VerificationFlow = "pin"
+)
+
+type operationConfig struct {
+	verificationFlow VerificationFlow
+	events           EventSink
+	handler          InteractionHandler
+}
+
+func WithEventSink(events EventSink) OperationOption {
 	return func(config *operationConfig) {
 		config.events = events
 	}
 }
 
-func WithInteractionHandler(handler model.InteractionHandler) OperationOption {
+func WithInteractionHandler(handler InteractionHandler) OperationOption {
 	return func(config *operationConfig) {
 		config.handler = handler
 	}
@@ -44,7 +64,7 @@ func WithLogJournal(journal *LogJournal) AuthenticatorOption {
 	}
 }
 
-func WithVerificationFlow(flow model.VerificationFlow) OperationOption {
+func WithVerificationFlow(flow VerificationFlow) OperationOption {
 	return func(config *operationConfig) {
 		config.verificationFlow = flow
 	}
@@ -178,7 +198,7 @@ func newOperationConfig(opts ...OperationOption) (operationConfig, error) {
 	}
 
 	switch config.verificationFlow {
-	case model.VerificationFlowDefault, model.VerificationFlowPIN:
+	case VerificationFlowDefault, VerificationFlowPIN:
 		return config, nil
 	default:
 		return operationConfig{}, failure.New(failure.CodeVerificationFlowUnsupported,

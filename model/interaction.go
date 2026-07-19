@@ -1,14 +1,8 @@
 package model
 
 import (
-	"context"
-
 	"github.com/go-ctap/kit/model/failure"
 )
-
-type InteractionHandler interface {
-	RequestInteraction(context.Context, InteractionRequest) (InteractionResponse, error)
-}
 
 type InteractionKind string
 

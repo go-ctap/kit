@@ -1,3 +1,3 @@
-// Package largeblobs contains large-blob operations, reports, previews,
-// mutation results, and decode helpers.
+// Package largeblobs contains large-blob operation, report, preview, result,
+// and decode-status DTOs.
 package largeblobs

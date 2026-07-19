@@ -6,7 +6,7 @@ import (
 	"github.com/go-ctap/kit/model/safety"
 )
 
-const sharedArrayRewriteWarning = "This operation rewrites the authenticator's shared serialized large-blob array."
+const sharedArrayRewriteWarning = "CTAP updates one credential's blob by rewriting the authenticator's entire shared serialized large-blob array."
 
 func buildWritePreviewFromState(state targetBlobState, payload []byte) (applargeblobs.MutationPreview, error) {
 	operation := applargeblobs.MutationCreate
@@ -98,13 +98,13 @@ func buildMutationPreview(
 		warnings = append(warnings, safety.Warning{
 			Severity: safety.SeverityWarning,
 			Code:     "large_blob.replace_existing",
-			Message:  "Existing large-blob bytes for this credential will be replaced.",
+			Message:  "The first large-blob entry decryptable with this credential's largeBlobKey will be replaced; any additional matching entries remain unchanged.",
 		})
 	case applargeblobs.MutationDelete:
 		warnings = append(warnings, safety.Warning{
 			Severity: safety.SeverityDestructive,
 			Code:     "large_blob.delete_existing",
-			Message:  "Existing large-blob bytes for this credential will be deleted.",
+			Message:  "The first large-blob entry decryptable with this credential's largeBlobKey will be deleted; any additional matching entries remain unchanged.",
 		})
 	case applargeblobs.MutationNoBlob:
 		warnings = append(warnings, safety.Warning{

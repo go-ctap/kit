@@ -1,7 +1,5 @@
 package model
 
-import "context"
-
 type OperationStage string
 
 const (
@@ -19,11 +17,3 @@ type OperationEvent struct {
 	Total        *uint64         `json:"total,omitempty"`
 	SampleStatus string          `json:"sampleStatus,omitempty"`
 }
-
-type EventSink interface {
-	Emit(context.Context, OperationEvent)
-}
-
-type NoopEventSink struct{}
-
-func (NoopEventSink) Emit(context.Context, OperationEvent) {}

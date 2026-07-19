@@ -1,3 +1,3 @@
-// Package config contains authenticator configuration operations, reports,
-// previews, and mutation results.
+// Package config contains authenticator configuration operation, report,
+// preview, and result DTOs.
 package config

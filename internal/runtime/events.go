@@ -7,12 +7,20 @@ import (
 )
 
 type EventDispatcher struct {
-	sink model.EventSink
+	sink EventSink
 }
 
-func NewEventDispatcher(sink model.EventSink) *EventDispatcher {
+type EventSink interface {
+	Emit(context.Context, model.OperationEvent)
+}
+
+type noopEventSink struct{}
+
+func (noopEventSink) Emit(context.Context, model.OperationEvent) {}
+
+func NewEventDispatcher(sink EventSink) *EventDispatcher {
 	if sink == nil {
-		sink = model.NoopEventSink{}
+		sink = noopEventSink{}
 	}
 
 	return &EventDispatcher{sink: sink}

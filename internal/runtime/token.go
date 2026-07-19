@@ -14,6 +14,13 @@ import (
 	"github.com/go-ctap/kit/model/failure"
 )
 
+type VerificationFlow string
+
+const (
+	VerificationFlowDefault VerificationFlow = ""
+	VerificationFlowPIN     VerificationFlow = "pin"
+)
+
 type TokenKey struct {
 	Permission protocol.Permission
 	RPID       string
@@ -59,7 +66,7 @@ func (s *TokenService) InvalidateUnlessPermission(permission protocol.Permission
 type TokenService struct {
 	authenticator    authenticator.TokenProvider
 	cache            TokenCache
-	verificationFlow model.VerificationFlow
+	verificationFlow VerificationFlow
 	interactions     interface {
 		RequestInteraction(context.Context, model.InteractionRequest) (model.InteractionResponse, error)
 	}
@@ -71,7 +78,7 @@ func NewTokenService(
 	interactions interface {
 		RequestInteraction(context.Context, model.InteractionRequest) (model.InteractionResponse, error)
 	},
-	verificationFlow model.VerificationFlow,
+	verificationFlow VerificationFlow,
 ) *TokenService {
 	return &TokenService{
 		authenticator:    authenticator,
@@ -149,7 +156,7 @@ func (s *TokenService) acquire(
 		err   error
 	)
 
-	if s.verificationFlow != model.VerificationFlowPIN &&
+	if s.verificationFlow != VerificationFlowPIN &&
 		supportsUserVerificationForPermission(s.authenticator.GetInfo(), permission) {
 		_, err = s.interactions.RequestInteraction(ctx, model.InteractionRequest{
 			Kind:       model.InteractionKindUserVerification,
