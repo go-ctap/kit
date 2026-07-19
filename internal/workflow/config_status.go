@@ -9,14 +9,21 @@ import (
 	"github.com/go-ctap/kit/model/failure"
 )
 
-func (r Runner) statusWithRetries(ctx context.Context) (appconfig.StatusReport, error) {
+func (r Runner) ConfigStatus(ctx context.Context, device ConfigStatusDevice) (appconfig.StatusReport, error) {
+	return r.statusWithRetries(ctx, device)
+}
+
+func (r Runner) statusWithRetries(
+	ctx context.Context,
+	device ConfigStatusDevice,
+) (appconfig.StatusReport, error) {
 	if err := ctx.Err(); err != nil {
 		return appconfig.StatusReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseAuthenticatorCommand))
 	}
 
-	rep := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
+	rep := appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
 	if rep.PIN.Supported {
-		retries, powerCycle, err := r.env.Authenticator.GetPINRetries(ctx)
+		retries, powerCycle, err := device.GetPINRetries(ctx)
 		rep.PIN.Retries = retryState(
 			retries,
 			powerCycle,
@@ -28,7 +35,7 @@ func (r Runner) statusWithRetries(ctx context.Context) (appconfig.StatusReport, 
 	if rep.UV.Supported &&
 		rep.UV.Configured != nil &&
 		*rep.UV.Configured {
-		retries, err := r.env.Authenticator.GetUVRetries(ctx)
+		retries, err := device.GetUVRetries(ctx)
 		rep.UV.Retries = retryState(
 			retries,
 			nil,

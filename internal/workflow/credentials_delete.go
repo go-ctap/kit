@@ -4,17 +4,22 @@ import (
 	"context"
 
 	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
-	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
 )
 
-func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredentialOperation) (model.CredentialDeleteOutput, error) {
-	var output model.CredentialDeleteOutput
+func (r Runner) DeleteCredential(
+	ctx context.Context,
+	device authenticator.CredentialManager,
+	req appcredentials.DeleteOperation,
+) (appcredentials.DeleteOutput, error) {
+	var output appcredentials.DeleteOutput
 
 	inventoryPermission, mutationPermission, err := r.inventoryMutationPermissions(
+		device,
 		protocol.PermissionCredentialManagement,
 	)
 	if err != nil {
@@ -23,6 +28,7 @@ func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredential
 
 	report, err := r.credentialInventoryReport(
 		ctx,
+		device,
 		inventoryPermission,
 	)
 	if err != nil {
@@ -54,12 +60,12 @@ func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredential
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
 		Permission: mutationPermission,
 	}, func(token []byte) error {
-		return r.env.Authenticator.DeleteCredential(ctx, token, descriptor)
+		return device.DeleteCredential(ctx, token, descriptor)
 	})
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 			failure.PhaseAuthenticatorCommand,
-			credentialManagementCommand(r.env.Authenticator.GetInfo()),
+			credentialManagementCommand(device.GetInfo()),
 			protocol.CredentialManagementSubCommandDeleteCredential,
 		))
 	}

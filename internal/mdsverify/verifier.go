@@ -58,7 +58,7 @@ func (v *Verifier) Verify(ctx context.Context, raw []byte) (*Blob, error) {
 	parser := jwt.NewParser(jwt.WithValidMethods([]string{
 		jwt.SigningMethodRS256.Alg(),
 		jwt.SigningMethodES256.Alg(),
-	}))
+	}), jwt.WithTimeFunc(v.now))
 
 	token, err := parser.ParseWithClaims(string(raw), &claims, func(token *jwt.Token) (any, error) {
 		return v.signingKey(ctx, token)

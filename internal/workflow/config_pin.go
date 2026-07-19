@@ -5,16 +5,19 @@ import (
 
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/errornorm"
-	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/safety"
 )
 
-func (r Runner) setPIN(ctx context.Context, req model.SetPINOperation) (model.PINOutput, error) {
-	var output model.PINOutput
+func (r Runner) SetPIN(
+	ctx context.Context,
+	device ConfigDevice,
+	req appconfig.SetPINOperation,
+) (appconfig.PINOutput, error) {
+	var output appconfig.PINOutput
 
-	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
+	status := appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
 
 	mode := safety.PreviewModeDryRun
 	if !req.DryRun {
@@ -32,7 +35,7 @@ func (r Runner) setPIN(ctx context.Context, req model.SetPINOperation) (model.PI
 		return output, nil
 	}
 
-	err = r.env.Authenticator.SetPIN(ctx, req.NewPIN)
+	err = device.SetPIN(ctx, req.NewPIN)
 	r.env.Tokens.Invalidate()
 
 	if err != nil {
@@ -46,10 +49,14 @@ func (r Runner) setPIN(ctx context.Context, req model.SetPINOperation) (model.PI
 	return output, nil
 }
 
-func (r Runner) changePIN(ctx context.Context, req model.ChangePINOperation) (model.PINOutput, error) {
-	var output model.PINOutput
+func (r Runner) ChangePIN(
+	ctx context.Context,
+	device ConfigDevice,
+	req appconfig.ChangePINOperation,
+) (appconfig.PINOutput, error) {
+	var output appconfig.PINOutput
 
-	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
+	status := appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
 
 	mode := safety.PreviewModeDryRun
 	if !req.DryRun {
@@ -67,7 +74,7 @@ func (r Runner) changePIN(ctx context.Context, req model.ChangePINOperation) (mo
 		return output, nil
 	}
 
-	err = r.env.Authenticator.ChangePIN(ctx, req.CurrentPIN, req.NewPIN)
+	err = device.ChangePIN(ctx, req.CurrentPIN, req.NewPIN)
 	r.env.Tokens.Invalidate()
 
 	if err != nil {

@@ -18,7 +18,6 @@ import (
 	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/ctap/webauthn"
 	"github.com/go-ctap/kit/internal/authenticator"
-	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
 	appwebauthn "github.com/go-ctap/kit/model/webauthn"
 	"github.com/go-ctap/kit/transport"
@@ -36,7 +35,6 @@ func TestMakeCredentialDryRunDoesNotConfirmAcquireTokenOrMutate(t *testing.T) {
 	result, err := session.MakeCredential(
 		context.Background(),
 		sampleMakeCredentialOperation(true),
-		nil,
 		session.operationOptions()...,
 	)
 	if err != nil {
@@ -67,13 +65,13 @@ func TestGetAssertionDryRunDoesNotAcquireTokenOrCallAuthenticator(t *testing.T) 
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.GetAssertion(context.Background(), model.GetAssertionOperation{
+	result, err := session.GetAssertion(context.Background(), appwebauthn.GetAssertionOperation{
 		GetAssertionInput: appwebauthn.GetAssertionInput{
 			RPID:           "example.com",
 			ClientDataJSON: []byte(`{"type":"webauthn.get"}`),
 		},
 		DryRun: true,
-	}, nil, session.operationOptions()...)
+	}, session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("GetAssertion: %v", err)
 	}
@@ -102,7 +100,7 @@ func TestGetAssertionLargeBlobWriteExecutesWithoutRuntimeConfirmation(t *testing
 	})
 	defer func() { _ = session.Close() }()
 
-	op := model.GetAssertionOperation{GetAssertionInput: appwebauthn.GetAssertionInput{
+	op := appwebauthn.GetAssertionOperation{GetAssertionInput: appwebauthn.GetAssertionInput{
 		RPID:           "example.com",
 		ClientDataJSON: []byte(`{"type":"webauthn.get"}`),
 		Extensions: &webauthn.GetAuthenticationExtensionsClientInputs{
@@ -112,7 +110,7 @@ func TestGetAssertionLargeBlobWriteExecutesWithoutRuntimeConfirmation(t *testing
 		},
 	}}
 
-	if _, err := session.GetAssertion(context.Background(), op, nil, session.operationOptions()...); err != nil {
+	if _, err := session.GetAssertion(context.Background(), op, session.operationOptions()...); err != nil {
 		t.Fatalf("GetAssertion: %v", err)
 	}
 
@@ -148,8 +146,7 @@ func TestMakeCredentialMapsRequestAndUsesRawClientDataJSON(t *testing.T) {
 	_, err := session.MakeCredential(
 		context.Background(),
 		op,
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	)
 	if err != nil {
 		t.Fatalf("MakeCredential: %v", err)
@@ -208,8 +205,7 @@ func TestMakeCredentialAcquiresScopedTokenWhenCTAPRequiresIt(t *testing.T) {
 	if _, err := session.MakeCredential(
 		context.Background(),
 		op,
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	); err != nil {
 		t.Fatalf("MakeCredential: %v", err)
 	}
@@ -241,20 +237,19 @@ func TestMakeCredentialKeepsPartialResultAndInvalidatesInventoryOnRefreshFailure
 
 	inventory, err := session.ListCredentials(
 		context.Background(),
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	)
 	if err != nil {
 		t.Fatalf("prime credentials: %v", err)
 	}
 
-	record := inventory.Report.Groups[0].Credentials[0]
+	record := inventory.Groups[0].Credentials[0]
 	if record.CredProtect != 0 ||
 		record.ThirdPartyPayment == nil || *record.ThirdPartyPayment {
 		t.Fatalf("optional inventory fields = %#v", record)
 	}
 	op := sampleMakeCredentialOperation(false)
-	result, err := session.MakeCredential(context.Background(), op, nil, session.operationOptions()...)
+	result, err := session.MakeCredential(context.Background(), op, session.operationOptions()...)
 	if !errors.Is(err, refreshErr) {
 		t.Fatalf("MakeCredential error = %v, want refresh error", err)
 	}
@@ -266,8 +261,7 @@ func TestMakeCredentialKeepsPartialResultAndInvalidatesInventoryOnRefreshFailure
 	a.makeCredentialErr = nil
 	if _, err := session.ListCredentials(
 		context.Background(),
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	); err != nil {
 		t.Fatalf("credentials after partial mutation: %v", err)
 	}
@@ -285,7 +279,7 @@ func TestMakeCredentialSkipsTokenWhenAuthenticatorDoesNotRequireIt(t *testing.T)
 	defer func() { _ = session.Close() }()
 
 	op := sampleMakeCredentialOperation(false)
-	if _, err := session.MakeCredential(context.Background(), op, nil, session.operationOptions()...); err != nil {
+	if _, err := session.MakeCredential(context.Background(), op, session.operationOptions()...); err != nil {
 		t.Fatalf("MakeCredential: %v", err)
 	}
 
@@ -307,16 +301,14 @@ func TestCredentialInventoryAlwaysReadsFreshStateAroundMakeCredential(t *testing
 
 	if _, err := session.ListCredentials(
 		context.Background(),
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	); err != nil {
 		t.Fatalf("first ListCredentials: %v", err)
 	}
 
 	if _, err := session.ListCredentials(
 		context.Background(),
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	); err != nil {
 		t.Fatalf("cached ListCredentials: %v", err)
 	}
@@ -326,14 +318,13 @@ func TestCredentialInventoryAlwaysReadsFreshStateAroundMakeCredential(t *testing
 	}
 
 	op := sampleMakeCredentialOperation(false)
-	if _, err := session.MakeCredential(context.Background(), op, nil, session.operationOptions()...); err != nil {
+	if _, err := session.MakeCredential(context.Background(), op, session.operationOptions()...); err != nil {
 		t.Fatalf("MakeCredential: %v", err)
 	}
 
 	if _, err := session.ListCredentials(
 		context.Background(),
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	); err != nil {
 		t.Fatalf("post-mutation ListCredentials: %v", err)
 	}
@@ -350,7 +341,7 @@ func TestGetAssertionReturnsAllAssertionsInOrder(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	output, err := session.GetAssertion(context.Background(), model.GetAssertionOperation{
+	output, err := session.GetAssertion(context.Background(), appwebauthn.GetAssertionOperation{
 		GetAssertionInput: appwebauthn.GetAssertionInput{
 			RPID:           "example.com",
 			ClientDataJSON: []byte(`{"type":"webauthn.get"}`),
@@ -358,7 +349,7 @@ func TestGetAssertionReturnsAllAssertionsInOrder(t *testing.T) {
 				{ID: []byte{0xc0, 0x5e}},
 			},
 		},
-	}, nil, session.operationOptions()...)
+	}, session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("GetAssertion: %v", err)
 	}
@@ -403,7 +394,7 @@ func TestGetAssertionUsesBuiltInUVWhenRequested(t *testing.T) {
 	defer func() { _ = session.Close() }()
 
 	uv := true
-	_, err := session.GetAssertion(context.Background(), model.GetAssertionOperation{
+	_, err := session.GetAssertion(context.Background(), appwebauthn.GetAssertionOperation{
 		GetAssertionInput: appwebauthn.GetAssertionInput{
 			RPID:           "example.com",
 			ClientDataJSON: []byte("client-data"),
@@ -411,7 +402,7 @@ func TestGetAssertionUsesBuiltInUVWhenRequested(t *testing.T) {
 				UserVerification: &uv,
 			},
 		},
-	}, userVerificationHandler(t), session.operationOptions()...)
+	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...)
 	if err != nil {
 		t.Fatalf("GetAssertion: %v", err)
 	}
@@ -436,12 +427,12 @@ func TestGetAssertionAcquiresScopedTokenWhenCTAPRequiresIt(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	_, err := session.GetAssertion(context.Background(), model.GetAssertionOperation{
+	_, err := session.GetAssertion(context.Background(), appwebauthn.GetAssertionOperation{
 		GetAssertionInput: appwebauthn.GetAssertionInput{
 			RPID:           "example.com",
 			ClientDataJSON: []byte("client-data"),
 		},
-	}, userVerificationHandler(t), session.operationOptions()...)
+	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...)
 	if err != nil {
 		t.Fatalf("GetAssertion: %v", err)
 	}
@@ -466,12 +457,12 @@ func TestGetAssertionAcquiresScopedTokenWhenCTAPRequiresBuiltInUV(t *testing.T) 
 	})
 	defer func() { _ = session.Close() }()
 
-	_, err := session.GetAssertion(context.Background(), model.GetAssertionOperation{
+	_, err := session.GetAssertion(context.Background(), appwebauthn.GetAssertionOperation{
 		GetAssertionInput: appwebauthn.GetAssertionInput{
 			RPID:           "example.com",
 			ClientDataJSON: []byte("client-data"),
 		},
-	}, userVerificationHandler(t), session.operationOptions()...)
+	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...)
 	if err != nil {
 		t.Fatalf("GetAssertion: %v", err)
 	}
@@ -502,7 +493,6 @@ func TestWebAuthnDelegatesPRFRoutingToCTAP(t *testing.T) {
 	if _, err := session.MakeCredential(
 		context.Background(),
 		makeOperation,
-		nil,
 		session.operationOptions()...,
 	); err != nil {
 		t.Fatalf("MakeCredential: %v", err)
@@ -513,7 +503,7 @@ func TestWebAuthnDelegatesPRFRoutingToCTAP(t *testing.T) {
 		t.Fatalf("MakeCredential extensions = %#v, want unmodified PRF input", a.makeCredentialExtensions)
 	}
 
-	getOperation := model.GetAssertionOperation{GetAssertionInput: appwebauthn.GetAssertionInput{
+	getOperation := appwebauthn.GetAssertionOperation{GetAssertionInput: appwebauthn.GetAssertionInput{
 		RPID:           "example.com",
 		ClientDataJSON: []byte("client-data"),
 		Extensions: &webauthn.GetAuthenticationExtensionsClientInputs{
@@ -525,7 +515,6 @@ func TestWebAuthnDelegatesPRFRoutingToCTAP(t *testing.T) {
 	if _, err := session.GetAssertion(
 		context.Background(),
 		getOperation,
-		nil,
 		session.operationOptions()...,
 	); err != nil {
 		t.Fatalf("GetAssertion: %v", err)
@@ -549,10 +538,9 @@ func TestWebAuthnCTAPStatusMapsCodes(t *testing.T) {
 			invoke: func(ctx context.Context, session *contractAuthenticatorHandle) error {
 				_, err := session.MakeCredential(
 					ctx,
-					model.MakeCredentialOperation{
+					appwebauthn.MakeCredentialOperation{
 						MakeCredentialInput: sampleMakeCredentialOperation(false).MakeCredentialInput,
 					},
-					nil,
 					session.operationOptions()...,
 				)
 
@@ -571,13 +559,12 @@ func TestWebAuthnCTAPStatusMapsCodes(t *testing.T) {
 			invoke: func(ctx context.Context, session *contractAuthenticatorHandle) error {
 				_, err := session.GetAssertion(
 					ctx,
-					model.GetAssertionOperation{
+					appwebauthn.GetAssertionOperation{
 						GetAssertionInput: appwebauthn.GetAssertionInput{
 							RPID:           "example.com",
 							ClientDataJSON: []byte("client-data"),
 						},
 					},
-					nil,
 					session.operationOptions()...,
 				)
 
@@ -609,7 +596,7 @@ func TestWebAuthnCTAPStatusMapsCodes(t *testing.T) {
 }
 
 func TestWebAuthnOutputsDoNotMarshalTokens(t *testing.T) {
-	output := model.GetAssertionOutput{
+	output := appwebauthn.GetAssertionOutput{
 		Result: &appwebauthn.GetAssertionResult{
 			Assertions: []appwebauthn.Assertion{
 				{SignatureHex: "746f6b656e"},
@@ -627,8 +614,8 @@ func TestWebAuthnOutputsDoNotMarshalTokens(t *testing.T) {
 	}
 }
 
-func sampleMakeCredentialOperation(dryRun bool) model.MakeCredentialOperation {
-	return model.MakeCredentialOperation{
+func sampleMakeCredentialOperation(dryRun bool) appwebauthn.MakeCredentialOperation {
+	return appwebauthn.MakeCredentialOperation{
 		MakeCredentialInput: appwebauthn.MakeCredentialInput{
 			RP: credential.PublicKeyCredentialRpEntity{
 				ID:   "example.com",

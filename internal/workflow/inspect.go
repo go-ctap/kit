@@ -3,16 +3,17 @@ package workflow
 import (
 	"context"
 
+	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/vendorinfo"
-	"github.com/go-ctap/kit/model"
+	appinspect "github.com/go-ctap/kit/model/inspect"
 )
 
-func (r Runner) inspect(ctx context.Context) (model.InspectResult, error) {
+func (r Runner) Inspect(ctx context.Context, device authenticator.InfoProvider) (appinspect.Result, error) {
 	selected := r.env.Selected
-	metadata, _ := vendorinfo.EnrichOpen(ctx, selected, r.env.Authenticator)
+	metadata, _ := vendorinfo.EnrichOpen(ctx, selected, device)
 	if metadata != nil {
 		selected.Metadata = metadata
 	}
 
-	return model.NewInspectResult(selected, r.env.Authenticator.GetInfo()), nil
+	return appinspect.NewResult(selected, device.GetInfo()), nil
 }

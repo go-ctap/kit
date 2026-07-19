@@ -23,11 +23,18 @@ type OperationOption func(*operationConfig)
 type operationConfig struct {
 	verificationFlow model.VerificationFlow
 	events           model.EventSink
+	handler          model.InteractionHandler
 }
 
 func WithEventSink(events model.EventSink) OperationOption {
 	return func(config *operationConfig) {
 		config.events = events
+	}
+}
+
+func WithInteractionHandler(handler model.InteractionHandler) OperationOption {
+	return func(config *operationConfig) {
+		config.handler = handler
 	}
 }
 

@@ -8,12 +8,14 @@ import (
 
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
+	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
+	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/transport"
 )
 
 func TestTypedOperationDoesNotMarshalSecrets(t *testing.T) {
-	req := model.ChangePINOperation{
+	req := appconfig.ChangePINOperation{
 		CurrentPIN: "1234",
 		NewPIN:     "5678",
 	}
@@ -43,10 +45,10 @@ func TestPINInteractionRejectsEmptyPINAtSessionRun(t *testing.T) {
 		return model.InteractionResponse{}, nil
 	})
 
-	_, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
+	_, err := session.WriteLargeBlob(context.Background(), applargeblobs.WriteOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-	}, handler, session.operationOptions()...)
+	}, session.operationOptions(WithInteractionHandler(handler))...)
 	requireFailureCode(t, err, failure.CodePINRequired)
 
 	if got := a.pinCalls.Load(); got != 0 {
@@ -64,10 +66,10 @@ func TestPINInteractionWithoutHandlerReturnsInvalidState(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	_, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
+	_, err := session.WriteLargeBlob(context.Background(), applargeblobs.WriteOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-	}, nil, session.operationOptions()...)
+	}, session.operationOptions()...)
 	requireFailureCode(t, err, failure.CodeInteractionHandlerRequired)
 
 	if !hasStage(events.Events(), model.OperationStageInteractionRequired) {
@@ -76,6 +78,44 @@ func TestPINInteractionWithoutHandlerReturnsInvalidState(t *testing.T) {
 
 	if got := a.pinCalls.Load(); got != 0 {
 		t.Fatalf("PIN token calls = %d, want 0", got)
+	}
+}
+
+func TestLastInteractionHandlerOptionWins(t *testing.T) {
+	a := &pinOnlyLargeBlobWriteEventAuthenticator{
+		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
+	}
+	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+		return a, nil
+	})
+	defer func() { _ = session.Close() }()
+
+	firstCalls := 0
+	secondCalls := 0
+	first := interactionHandlerFunc(func(model.InteractionRequest) (model.InteractionResponse, error) {
+		firstCalls++
+
+		return model.InteractionResponse{Canceled: true}, nil
+	})
+	second := interactionHandlerFunc(func(model.InteractionRequest) (model.InteractionResponse, error) {
+		secondCalls++
+
+		return model.InteractionResponse{PIN: []byte("1234")}, nil
+	})
+
+	_, err := session.WriteLargeBlob(context.Background(), applargeblobs.WriteOperation{
+		CredentialIDHex: "c05e",
+		Payload:         []byte("test"),
+	}, session.operationOptions(
+		WithInteractionHandler(first),
+		WithInteractionHandler(second),
+	)...)
+	if err != nil {
+		t.Fatalf("WriteLargeBlob: %v", err)
+	}
+
+	if firstCalls != 0 || secondCalls != 1 {
+		t.Fatalf("handler calls = (%d, %d), want (0, 1)", firstCalls, secondCalls)
 	}
 }
 
@@ -96,10 +136,10 @@ func TestCanceledContextDuringInteractionReturnsCanceledFailure(t *testing.T) {
 		return model.InteractionResponse{}, context.Canceled
 	})
 
-	_, err := session.WriteLargeBlob(ctx, model.WriteLargeBlobOperation{
+	_, err := session.WriteLargeBlob(ctx, applargeblobs.WriteOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-	}, handler, session.operationOptions()...)
+	}, session.operationOptions(WithInteractionHandler(handler))...)
 	requireFailureCode(t, err, failure.CodeOperationCanceled)
 
 	if got := a.pinCalls.Load(); got != 0 {
@@ -114,9 +154,9 @@ func TestSetPINExecutesWithoutConfirmationInteraction(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	_, err := session.SetPIN(context.Background(), model.SetPINOperation{
+	_, err := session.SetPIN(context.Background(), appconfig.SetPINOperation{
 		NewPIN: "1234",
-	}, nil, session.operationOptions()...)
+	}, session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -148,9 +188,8 @@ func TestResetTouchInteractionCanceledReturnsCanceledFailure(t *testing.T) {
 
 	_, err := session.ResetFactory(
 		context.Background(),
-		model.ResetFactoryOperation{},
-		handler,
-		session.operationOptions()...,
+		appconfig.ResetFactoryOperation{},
+		session.operationOptions(WithInteractionHandler(handler))...,
 	)
 	requireFailureCode(t, err, failure.CodeInteractionCanceled)
 
@@ -185,10 +224,10 @@ func TestPINInteractionHandlerReceivesRequestAndValidPINContinues(t *testing.T) 
 		}, nil
 	})
 
-	result, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
+	result, err := session.WriteLargeBlob(context.Background(), applargeblobs.WriteOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-	}, handler, session.operationOptions()...)
+	}, session.operationOptions(WithInteractionHandler(handler))...)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}

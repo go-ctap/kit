@@ -102,7 +102,7 @@ func TestMinPINLengthDecreaseFailureKeepsApprovedParams(t *testing.T) {
 		},
 	}
 
-	_, err := BuildMinPINLengthPreview(status, MinPINLengthRequest{NewMinPINLength: new(uint(4))}, safety.PreviewModeDryRun)
+	_, err := BuildMinPINLengthPreview(status, SetMinPINLengthOperation{NewMinPINLength: new(uint(4))}, safety.PreviewModeDryRun)
 	if !failure.IsCode(err, failure.CodeMinPINLengthDecreaseNotAllowed) {
 		t.Fatalf("BuildMinPINLengthPreview error = %v, want %s", err, failure.CodeMinPINLengthDecreaseNotAllowed)
 	}
@@ -125,25 +125,25 @@ func TestMinPINLengthPreviewUsesZeroValuesAsAbsent(t *testing.T) {
 			SetMinPINLength: CapabilityState{Supported: true},
 		},
 	}
-	request := MinPINLengthRequest{
+	operation := SetMinPINLengthOperation{
 		NewMinPINLength: new(uint(0)),
 	}
 
-	preview, err := BuildMinPINLengthPreview(status, request, safety.PreviewModeDryRun)
+	preview, err := BuildMinPINLengthPreview(status, operation, safety.PreviewModeDryRun)
 	if !failure.IsCode(err, failure.CodeMinPINLengthDecreaseNotAllowed) {
 		t.Fatalf("zero minimum error = %v, want decrease rejection", err)
 	}
 
-	request.NewMinPINLength = nil
-	preview, err = BuildMinPINLengthPreview(status, request, safety.PreviewModeDryRun)
+	operation.NewMinPINLength = nil
+	preview, err = BuildMinPINLengthPreview(status, operation, safety.PreviewModeDryRun)
 	if !failure.IsCode(err, failure.CodeCTAPParameterMissing) {
 		t.Fatalf("zero-value request error = %v, want parameter missing", err)
 	}
 
-	request.MinPINLengthRPIDs = []string{"example.com"}
-	request.ForceChangePIN = true
-	request.PINComplexityPolicy = true
-	preview, err = BuildMinPINLengthPreview(status, request, safety.PreviewModeDryRun)
+	operation.MinPINLengthRPIDs = []string{"example.com"}
+	operation.ForceChangePIN = true
+	operation.PINComplexityPolicy = true
+	preview, err = BuildMinPINLengthPreview(status, operation, safety.PreviewModeDryRun)
 	if err != nil {
 		t.Fatalf("BuildMinPINLengthPreview: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestMinPINLengthPreviewUsesZeroValuesAsAbsent(t *testing.T) {
 		t.Fatalf("preview = %#v", preview)
 	}
 
-	result := MinPINLengthResult("device", request)
+	result := MinPINLengthResult("device", operation)
 	if len(result.MinPINLengthRPIDs) != 1 || !result.ForceChangePIN || !result.PINComplexityPolicy {
 		t.Fatalf("result = %#v", result)
 	}

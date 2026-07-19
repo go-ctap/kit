@@ -7,7 +7,10 @@ Public runtime failures use `model/failure`. Go callers receive a
 ## Go API
 
 ```go
-result, err := authenticator.ListCredentials(ctx, handler)
+result, err := authenticator.ListCredentials(
+	ctx,
+	ctapkit.WithInteractionHandler(handler),
+)
 if err != nil {
 	if failure.IsCode(err, failure.CodeCredentialNotFound) {
 		// Choose recovery or localized UI by the stable code.

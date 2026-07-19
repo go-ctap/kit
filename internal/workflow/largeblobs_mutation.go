@@ -6,14 +6,19 @@ import (
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
-	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
+	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 )
 
-func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOperation) (model.LargeBlobMutationOutput, error) {
-	var output model.LargeBlobMutationOutput
+func (r Runner) WriteLargeBlob(
+	ctx context.Context,
+	device LargeBlobDevice,
+	req applargeblobs.WriteOperation,
+) (applargeblobs.MutationOutput, error) {
+	var output applargeblobs.MutationOutput
 
 	inventoryPermission, mutationPermission, err := r.inventoryMutationPermissions(
+		device,
 		protocol.PermissionLargeBlobWrite,
 	)
 	if err != nil {
@@ -22,6 +27,7 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 
 	inventory, err := r.credentialInventoryReport(
 		ctx,
+		device,
 		inventoryPermission,
 	)
 	if err != nil {
@@ -29,7 +35,7 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 	}
 	defer zeroCredentialInventoryReport(&inventory)
 
-	state, err := r.loadTargetBlobState(ctx, inventory, req.CredentialIDHex)
+	state, err := r.loadTargetBlobState(ctx, device, inventory, req.CredentialIDHex)
 	if err != nil {
 		return output, err
 	}
@@ -59,7 +65,7 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
 		Permission: mutationPermission,
 	}, func(token []byte) error {
-		return r.env.Authenticator.SetLargeBlobs(ctx, token, replacement)
+		return device.SetLargeBlobs(ctx, token, replacement)
 	})
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
@@ -73,10 +79,15 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 	return output, nil
 }
 
-func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOperation) (model.LargeBlobMutationOutput, error) {
-	var output model.LargeBlobMutationOutput
+func (r Runner) DeleteLargeBlob(
+	ctx context.Context,
+	device LargeBlobDevice,
+	req applargeblobs.DeleteOperation,
+) (applargeblobs.MutationOutput, error) {
+	var output applargeblobs.MutationOutput
 
 	inventoryPermission, mutationPermission, err := r.inventoryMutationPermissions(
+		device,
 		protocol.PermissionLargeBlobWrite,
 	)
 	if err != nil {
@@ -85,6 +96,7 @@ func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOp
 
 	inventory, err := r.credentialInventoryReport(
 		ctx,
+		device,
 		inventoryPermission,
 	)
 	if err != nil {
@@ -92,7 +104,7 @@ func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOp
 	}
 	defer zeroCredentialInventoryReport(&inventory)
 
-	state, err := r.loadTargetBlobState(ctx, inventory, req.CredentialIDHex)
+	state, err := r.loadTargetBlobState(ctx, device, inventory, req.CredentialIDHex)
 	if err != nil {
 		return output, err
 	}
@@ -124,7 +136,7 @@ func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOp
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
 		Permission: mutationPermission,
 	}, func(token []byte) error {
-		return r.env.Authenticator.SetLargeBlobs(ctx, token, replacement)
+		return device.SetLargeBlobs(ctx, token, replacement)
 	})
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCommand(

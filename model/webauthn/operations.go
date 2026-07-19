@@ -1,13 +1,11 @@
-package model
-
-import "github.com/go-ctap/kit/model/webauthn"
+package webauthn
 
 type MakeCredentialOperation struct {
-	webauthn.MakeCredentialInput
+	MakeCredentialInput
 	DryRun bool `json:"dryRun,omitempty"`
 }
 
 type GetAssertionOperation struct {
-	webauthn.GetAssertionInput
+	GetAssertionInput
 	DryRun bool `json:"dryRun,omitempty"`
 }

@@ -4,18 +4,16 @@ import (
 	"context"
 
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/authenticator"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/report"
 )
 
 type Environment struct {
-	Selected      report.DeviceReport
-	Authenticator authenticator.Device
-	Events        EventEmitter
-	Interactions  InteractionRequester
-	Tokens        TokenService
+	Selected     report.DeviceReport
+	Events       EventEmitter
+	Interactions InteractionRequester
+	Tokens       TokenService
 }
 
 type EventEmitter interface {

@@ -47,17 +47,17 @@ func TestBioSensorInfoReportsSpecNamedEnums(t *testing.T) {
 			})
 			defer func() { _ = session.Close() }()
 
-			output, err := session.BioSensorInfo(context.Background(), nil, session.operationOptions()...)
+			output, err := session.BioSensorInfo(context.Background(), session.operationOptions()...)
 			if err != nil {
 				t.Fatalf("Run: %v", err)
 			}
 
-			if output.Report.Modality != appconfig.BioModalityFingerprint {
-				t.Fatalf("modality = %#v, want fingerprint", output.Report.Modality)
+			if output.Modality != appconfig.BioModalityFingerprint {
+				t.Fatalf("modality = %#v, want fingerprint", output.Modality)
 			}
 
-			if output.Report.FingerprintKind != tt.want {
-				t.Fatalf("fingerprintKind = %#v, want %s", output.Report.FingerprintKind, tt.want)
+			if output.FingerprintKind != tt.want {
+				t.Fatalf("fingerprintKind = %#v, want %s", output.FingerprintKind, tt.want)
 			}
 
 			raw, err := json.Marshal(output)
@@ -104,17 +104,17 @@ func TestBioSensorInfoOmitsUnknownSpecValues(t *testing.T) {
 			})
 			defer func() { _ = session.Close() }()
 
-			output, err := session.BioSensorInfo(context.Background(), nil, session.operationOptions()...)
+			output, err := session.BioSensorInfo(context.Background(), session.operationOptions()...)
 			if err != nil {
 				t.Fatalf("Run: %v", err)
 			}
 
-			if output.Report.Modality != "" {
-				t.Fatalf("modality = %#v, want empty", output.Report.Modality)
+			if output.Modality != "" {
+				t.Fatalf("modality = %#v, want empty", output.Modality)
 			}
 
-			if output.Report.FingerprintKind != "" {
-				t.Fatalf("fingerprintKind = %#v, want empty", output.Report.FingerprintKind)
+			if output.FingerprintKind != "" {
+				t.Fatalf("fingerprintKind = %#v, want empty", output.FingerprintKind)
 			}
 
 			raw, err := json.Marshal(output)
@@ -148,9 +148,8 @@ func TestResetRequestsTouchInteractionBeforeReset(t *testing.T) {
 
 	_, err := session.ResetFactory(
 		context.Background(),
-		model.ResetFactoryOperation{},
-		handler,
-		session.operationOptions()...,
+		appconfig.ResetFactoryOperation{},
+		session.operationOptions(WithInteractionHandler(handler))...,
 	)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -228,8 +227,8 @@ func TestRunContextReachesTokenAndAuthenticatorCommand(t *testing.T) {
 	ctx := context.WithValue(context.Background(), contextKey{}, marker)
 	if _, err := session.SetAlwaysUV(
 		ctx,
-		model.SetAlwaysUVOperation{Target: appconfig.AlwaysUVTargetEnable},
-		userVerificationHandler(t),
+		appconfig.SetAlwaysUVOperation{Target: appconfig.AlwaysUVTargetEnable},
+		WithInteractionHandler(userVerificationHandler(t)),
 	); err != nil {
 		t.Fatalf("SetAlwaysUV: %v", err)
 	}
@@ -261,9 +260,8 @@ func TestBioEnrollmentCleanupUsesBoundedIndependentContext(t *testing.T) {
 
 	result, err := session.BioEnroll(
 		ctx,
-		model.BioEnrollOperation{},
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		appconfig.BioEnrollOperation{},
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	)
 	if !errors.Is(err, operationErr) {
 		t.Fatalf("Run error = %v, want original capture error", err)
@@ -306,9 +304,8 @@ func TestBioEnrollmentSuccessfulCleanupIsReported(t *testing.T) {
 
 	result, err := session.BioEnroll(
 		context.Background(),
-		model.BioEnrollOperation{},
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		appconfig.BioEnrollOperation{},
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	)
 	if !errors.Is(err, operationErr) {
 		t.Fatalf("Run error = %v, want original capture error", err)
@@ -345,9 +342,8 @@ func runConfirmedResetWithErrorAndEvents(t *testing.T, events *recordingEventSin
 
 	_, err := session.ResetFactory(
 		context.Background(),
-		model.ResetFactoryOperation{},
-		handler,
-		session.operationOptions()...,
+		appconfig.ResetFactoryOperation{},
+		session.operationOptions(WithInteractionHandler(handler))...,
 	)
 	if err == nil {
 		t.Fatal("Run error = nil, want error")
@@ -464,17 +460,16 @@ func TestPINMutationsRejectEmptyPINAtSessionRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		configured bool
-		invoke     func(*contractAuthenticatorHandle) (*model.PINOutput, error)
+		invoke     func(*contractAuthenticatorHandle) (*appconfig.PINOutput, error)
 		wantSet    int32
 		wantChange int32
 	}{
 		{
 			name: "set empty new PIN",
-			invoke: func(session *contractAuthenticatorHandle) (*model.PINOutput, error) {
+			invoke: func(session *contractAuthenticatorHandle) (*appconfig.PINOutput, error) {
 				return session.SetPIN(
 					context.Background(),
-					model.SetPINOperation{},
-					nil,
+					appconfig.SetPINOperation{},
 					session.operationOptions()...,
 				)
 			},
@@ -482,11 +477,10 @@ func TestPINMutationsRejectEmptyPINAtSessionRun(t *testing.T) {
 		{
 			name:       "change empty current PIN",
 			configured: true,
-			invoke: func(session *contractAuthenticatorHandle) (*model.PINOutput, error) {
+			invoke: func(session *contractAuthenticatorHandle) (*appconfig.PINOutput, error) {
 				return session.ChangePIN(
 					context.Background(),
-					model.ChangePINOperation{NewPIN: "5678"},
-					nil,
+					appconfig.ChangePINOperation{NewPIN: "5678"},
 					session.operationOptions()...,
 				)
 			},
@@ -494,11 +488,10 @@ func TestPINMutationsRejectEmptyPINAtSessionRun(t *testing.T) {
 		{
 			name:       "change empty new PIN",
 			configured: true,
-			invoke: func(session *contractAuthenticatorHandle) (*model.PINOutput, error) {
+			invoke: func(session *contractAuthenticatorHandle) (*appconfig.PINOutput, error) {
 				return session.ChangePIN(
 					context.Background(),
-					model.ChangePINOperation{CurrentPIN: "1234"},
-					nil,
+					appconfig.ChangePINOperation{CurrentPIN: "1234"},
 					session.operationOptions()...,
 				)
 			},
@@ -547,9 +540,9 @@ func TestUVTokenAcquisitionRequestsUserVerificationInteraction(t *testing.T) {
 		return model.InteractionResponse{}, nil
 	})
 
-	result, err := session.SetAlwaysUV(context.Background(), model.SetAlwaysUVOperation{
+	result, err := session.SetAlwaysUV(context.Background(), appconfig.SetAlwaysUVOperation{
 		Target: appconfig.AlwaysUVTargetEnable,
-	}, handler, session.operationOptions()...)
+	}, session.operationOptions(WithInteractionHandler(handler))...)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}

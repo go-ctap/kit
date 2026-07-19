@@ -143,12 +143,24 @@ func (c *Client) blob(ctx context.Context, source string, opts LookupOptions) (*
 		return local, true, nil
 	}
 
-	remote, raw, notModified, err := c.fetchAndVerify(ctx, source, local)
-	if err != nil {
-		if local != nil && opts.AllowStaleOnFetchError {
-			return local, true, nil
+	refreshed, cached, err := c.cache().Refresh(ctx, cacheKey, func() (*Blob, bool, error) {
+		current := c.loadLocal(ctx, source, cacheKey)
+		if current != nil && !opts.Refresh && !c.shouldRefresh(current, opts) {
+			return current, true, nil
 		}
 
+		return c.refreshBlob(ctx, source, cacheKey, current)
+	})
+	if err != nil && local != nil && opts.AllowStaleOnFetchError {
+		return local, true, nil
+	}
+
+	return refreshed, cached, err
+}
+
+func (c *Client) refreshBlob(ctx context.Context, source, cacheKey string, local *Blob) (*Blob, bool, error) {
+	remote, raw, notModified, err := c.fetchAndVerify(ctx, source, local)
+	if err != nil {
 		return nil, false, err
 	}
 
@@ -182,15 +194,16 @@ func (c *Client) blob(ctx context.Context, source string, opts LookupOptions) (*
 }
 
 func (c *Client) markLocalFresh(source, cacheKey string, local *Blob) *Blob {
-	local.CachedAt = c.now()
-	c.cache().Set(cacheKey, local)
+	refreshed := *local
+	refreshed.CachedAt = c.now()
+	c.cache().Set(cacheKey, &refreshed)
 
 	path, err := c.diskCachePath(source)
 	if err == nil {
-		_ = os.Chtimes(path, local.CachedAt, local.CachedAt)
+		_ = os.Chtimes(path, refreshed.CachedAt, refreshed.CachedAt)
 	}
 
-	return local
+	return &refreshed
 }
 
 func (c *Client) loadLocal(ctx context.Context, source, cacheKey string) *Blob {

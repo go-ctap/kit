@@ -7,23 +7,27 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/go-ctap/ctap/protocol"
 	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
+	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
-	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
 	appwebauthn "github.com/go-ctap/kit/model/webauthn"
 	"github.com/samber/lo"
 )
 
-func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOperation) (model.MakeCredentialOutput, error) {
-	var output model.MakeCredentialOutput
+func (r Runner) MakeCredential(
+	ctx context.Context,
+	device authenticator.WebAuthnManager,
+	req appwebauthn.MakeCredentialOperation,
+) (appwebauthn.MakeCredentialOutput, error) {
+	var output appwebauthn.MakeCredentialOutput
 
 	input, err := appwebauthn.NormalizeMakeCredentialInput(req.MakeCredentialInput)
 	if err != nil {
 		return output, err
 	}
 
-	preview, err := appwebauthn.BuildMakeCredentialPreview(r.env.Selected, r.env.Authenticator.GetInfo(), input)
+	preview, err := appwebauthn.BuildMakeCredentialPreview(r.env.Selected, device.GetInfo(), input)
 	if err != nil {
 		return output, err
 	}
@@ -40,7 +44,7 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 		Optional:   true,
 	}, func(token []byte) error {
 		var err error
-		response, err = r.callMakeCredential(ctx, token, input)
+		response, err = r.callMakeCredential(ctx, device, token, input)
 
 		return err
 	})
@@ -65,15 +69,19 @@ func (r Runner) makeCredential(ctx context.Context, req model.MakeCredentialOper
 	return output, nil
 }
 
-func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperation) (model.GetAssertionOutput, error) {
-	var output model.GetAssertionOutput
+func (r Runner) GetAssertion(
+	ctx context.Context,
+	device authenticator.WebAuthnManager,
+	req appwebauthn.GetAssertionOperation,
+) (appwebauthn.GetAssertionOutput, error) {
+	var output appwebauthn.GetAssertionOutput
 
 	input, err := appwebauthn.NormalizeGetAssertionInput(req.GetAssertionInput)
 	if err != nil {
 		return output, err
 	}
 
-	preview, err := appwebauthn.BuildGetAssertionPreview(r.env.Selected, r.env.Authenticator.GetInfo(), input)
+	preview, err := appwebauthn.BuildGetAssertionPreview(r.env.Selected, device.GetInfo(), input)
 	if err != nil {
 		return output, err
 	}
@@ -90,7 +98,7 @@ func (r Runner) getAssertion(ctx context.Context, req model.GetAssertionOperatio
 
 	readAssertions := func(token []byte) error {
 		var index uint
-		for response, err := range r.env.Authenticator.GetAssertion(
+		for response, err := range device.GetAssertion(
 			ctx,
 			token,
 			input.RPID,
@@ -138,10 +146,11 @@ func (r Runner) afterUserPresence(present bool) {
 
 func (r Runner) callMakeCredential(
 	ctx context.Context,
+	device authenticator.WebAuthnManager,
 	token []byte,
 	input appwebauthn.MakeCredentialInput,
 ) (protocol.AuthenticatorMakeCredentialResponse, error) {
-	return r.env.Authenticator.MakeCredential(
+	return device.MakeCredential(
 		ctx,
 		token,
 		input.ClientDataJSON,

@@ -25,8 +25,7 @@ func TestCredentialInventoryDoesNotMarshalLargeBlobKey(t *testing.T) {
 
 	output, err := session.ListCredentials(
 		context.Background(),
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	)
 	if err != nil {
 		t.Fatalf("ListCredentials: %v", err)
@@ -56,10 +55,10 @@ func TestLargeBlobWriteEventsFollowInteractionAndInventoryOrder(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
+	result, err := session.WriteLargeBlob(context.Background(), applargeblobs.WriteOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-	}, userVerificationHandler(t), session.operationOptions()...)
+	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -101,10 +100,10 @@ func TestLargeBlobWriteUsesSeparateGrantForReadOnlyInventory(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	_, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
+	_, err := session.WriteLargeBlob(context.Background(), applargeblobs.WriteOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-	}, userVerificationHandler(t), session.operationOptions()...)
+	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...)
 	if err != nil {
 		t.Fatalf("WriteLargeBlob: %v", err)
 	}
@@ -129,11 +128,11 @@ func TestLargeBlobWriteCapacityErrorKeepsPreview(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	output, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
+	output, err := session.WriteLargeBlob(context.Background(), applargeblobs.WriteOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
 		DryRun:          true,
-	}, userVerificationHandler(t), session.operationOptions()...)
+	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...)
 	requireFailureCode(t, err, failure.CodeLargeBlobArrayTooLarge)
 
 	if output.Preview.SerializedLargeBlobArrayLimit != 16 {
@@ -155,11 +154,11 @@ func TestLargeBlobWriteZeroCapacityMeansUnknownLimit(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	output, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
+	output, err := session.WriteLargeBlob(context.Background(), applargeblobs.WriteOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
 		DryRun:          true,
-	}, userVerificationHandler(t), session.operationOptions()...)
+	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...)
 	if err != nil {
 		t.Fatalf("WriteLargeBlob dry run: %v", err)
 	}
@@ -176,17 +175,17 @@ func TestLargeBlobReadAndPreviewReadFreshAuthenticatorState(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	if _, err := session.ReadLargeBlob(context.Background(), model.ReadLargeBlobOperation{
+	if _, err := session.ReadLargeBlob(context.Background(), applargeblobs.ReadOperation{
 		CredentialIDHex: "c05e",
-	}, userVerificationHandler(t), session.operationOptions()...); err != nil {
+	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...); err != nil {
 		t.Fatalf("read large blob: %v", err)
 	}
 
-	if _, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
+	if _, err := session.WriteLargeBlob(context.Background(), applargeblobs.WriteOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
 		DryRun:          true,
-	}, userVerificationHandler(t), session.operationOptions()...); err != nil {
+	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...); err != nil {
 		t.Fatalf("preview write large blob: %v", err)
 	}
 
@@ -210,11 +209,11 @@ func TestLargeBlobListReadsFreshReport(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	if _, err := session.ListLargeBlobs(context.Background(), userVerificationHandler(t), session.operationOptions()...); err != nil {
+	if _, err := session.ListLargeBlobs(context.Background(), session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...); err != nil {
 		t.Fatalf("list large blobs: %v", err)
 	}
 
-	if _, err := session.ListLargeBlobs(context.Background(), userVerificationHandler(t), session.operationOptions()...); err != nil {
+	if _, err := session.ListLargeBlobs(context.Background(), session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...); err != nil {
 		t.Fatalf("list large blobs again: %v", err)
 	}
 
@@ -238,7 +237,7 @@ func TestLargeBlobListAlwaysObservesCurrentAuthenticatorState(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	if _, err := session.ListLargeBlobs(context.Background(), userVerificationHandler(t), session.operationOptions()...); err != nil {
+	if _, err := session.ListLargeBlobs(context.Background(), session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...); err != nil {
 		t.Fatalf("first ListLargeBlobs: %v", err)
 	}
 
@@ -248,21 +247,21 @@ func TestLargeBlobListAlwaysObservesCurrentAuthenticatorState(t *testing.T) {
 	}
 	a.largeBlobs = []protocol.LargeBlob{added}
 
-	output, err := session.ListLargeBlobs(context.Background(), userVerificationHandler(t), session.operationOptions()...)
+	output, err := session.ListLargeBlobs(context.Background(), session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...)
 	if err != nil {
 		t.Fatalf("refreshed ListLargeBlobs: %v", err)
 	}
 
-	if len(output.Report.Credentials) != 1 || !output.Report.Credentials[0].BlobPresent {
+	if len(output.Credentials) != 1 || !output.Credentials[0].BlobPresent {
 		t.Fatalf("refreshed large blob output = %#v, want one present credential blob", output)
 	}
 
-	cachedOutput, err := session.ListLargeBlobs(context.Background(), userVerificationHandler(t), session.operationOptions()...)
+	cachedOutput, err := session.ListLargeBlobs(context.Background(), session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...)
 	if err != nil {
 		t.Fatalf("cached ListLargeBlobs after refresh: %v", err)
 	}
 
-	if len(cachedOutput.Report.Credentials) != 1 || !cachedOutput.Report.Credentials[0].BlobPresent {
+	if len(cachedOutput.Credentials) != 1 || !cachedOutput.Credentials[0].BlobPresent {
 		t.Fatalf("cached large blob output = %#v, want refreshed report", cachedOutput)
 	}
 
@@ -297,9 +296,9 @@ func TestLargeBlobDeleteLastBlobWritesEmptyArray(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	output, err := session.DeleteLargeBlob(context.Background(), model.DeleteLargeBlobOperation{
+	output, err := session.DeleteLargeBlob(context.Background(), applargeblobs.DeleteOperation{
 		CredentialIDHex: "c05e",
-	}, userVerificationHandler(t), session.operationOptions()...)
+	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...)
 	if err != nil {
 		t.Fatalf("delete large blob: %v", err)
 	}
@@ -359,9 +358,8 @@ func TestLargeBlobGarbageCollectNoopDoesNotWrite(t *testing.T) {
 
 	output, err := session.GarbageCollectLargeBlobs(
 		context.Background(),
-		model.GarbageCollectLargeBlobsOperation{},
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		applargeblobs.GarbageCollectOperation{},
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	)
 	if err != nil {
 		t.Fatalf("garbage collect large blobs: %v", err)
@@ -408,9 +406,8 @@ func TestLargeBlobGarbageCollectSkipsNonConformingEntries(t *testing.T) {
 
 	output, err := session.GarbageCollectLargeBlobs(
 		context.Background(),
-		model.GarbageCollectLargeBlobsOperation{},
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		applargeblobs.GarbageCollectOperation{},
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	)
 	if err != nil {
 		t.Fatalf("garbage collect large blobs: %v", err)
@@ -457,9 +454,8 @@ func TestLargeBlobGarbageCollectRemovesOnlyUnmatchedEntries(t *testing.T) {
 
 	output, err := session.GarbageCollectLargeBlobs(
 		context.Background(),
-		model.GarbageCollectLargeBlobsOperation{},
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		applargeblobs.GarbageCollectOperation{},
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	)
 	if err != nil {
 		t.Fatalf("garbage collect large blobs: %v", err)
@@ -514,9 +510,8 @@ func TestLargeBlobGarbageCollectAllUnmatchedWritesEmptyArray(t *testing.T) {
 
 	output, err := session.GarbageCollectLargeBlobs(
 		context.Background(),
-		model.GarbageCollectLargeBlobsOperation{},
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		applargeblobs.GarbageCollectOperation{},
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	)
 	if err != nil {
 		t.Fatalf("garbage collect large blobs: %v", err)
@@ -567,10 +562,10 @@ func TestLargeBlobWritePINOnlyFlowDoesNotRequestUserVerification(t *testing.T) {
 		}, nil
 	})
 
-	result, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
+	result, err := session.WriteLargeBlob(context.Background(), applargeblobs.WriteOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-	}, handler, session.operationOptions()...)
+	}, session.operationOptions(WithInteractionHandler(handler))...)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -631,18 +626,17 @@ func TestLargeBlobWritePreparedRefreshRequestsPINOnce(t *testing.T) {
 		return model.InteractionResponse{PIN: []byte("1234")}, nil
 	})
 
-	_, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
+	_, err := session.WriteLargeBlob(context.Background(), applargeblobs.WriteOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-	}, handler, session.operationOptions()...)
+	}, session.operationOptions(WithInteractionHandler(handler))...)
 	if err != nil {
 		t.Fatalf("WriteLargeBlob: %v", err)
 	}
 
 	if _, err := session.ListLargeBlobs(
 		context.Background(),
-		handler,
-		session.operationOptions()...,
+		session.operationOptions(WithInteractionHandler(handler))...,
 	); err != nil {
 		t.Fatalf("ListLargeBlobs refresh: %v", err)
 	}
@@ -680,12 +674,11 @@ func TestLargeBlobWritePINVerificationFlowSkipsUVForUVCapableAuthenticator(t *te
 
 	result, err := session.WriteLargeBlob(
 		context.Background(),
-		model.WriteLargeBlobOperation{
+		applargeblobs.WriteOperation{
 			CredentialIDHex: "c05e",
 			Payload:         []byte("test"),
 		},
-		handler,
-		session.operationOptions(WithVerificationFlow(model.VerificationFlowPIN))...,
+		session.operationOptions(WithVerificationFlow(model.VerificationFlowPIN), WithInteractionHandler(handler))...,
 	)
 	if err != nil {
 		t.Fatalf("WriteLargeBlob: %v", err)

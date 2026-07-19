@@ -8,28 +8,29 @@ import (
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
-	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 )
 
-func (r Runner) readLargeBlob(ctx context.Context, req model.ReadLargeBlobOperation) (applargeblobs.ReadReport, error) {
-	report, err := r.credentialInventoryReport(ctx, protocol.PermissionNone)
+func (r Runner) ReadLargeBlob(
+	ctx context.Context,
+	device LargeBlobDevice,
+	req applargeblobs.ReadOperation,
+) (applargeblobs.ReadReport, error) {
+	report, err := r.credentialInventoryReport(ctx, device, protocol.PermissionNone)
 	if err != nil {
 		return applargeblobs.ReadReport{}, err
 	}
 	defer zeroCredentialInventoryReport(&report)
 
-	return r.readLargeBlobFromInventory(ctx, applargeblobs.ReadRequest{
-		CredentialIDHex: req.CredentialIDHex,
-		DecodeMode:      req.DecodeMode,
-	}, report)
+	return r.readLargeBlobFromInventory(ctx, device, req, report)
 }
 
 func (r Runner) readLargeBlobFromInventory(
 	ctx context.Context,
-	req applargeblobs.ReadRequest,
+	device LargeBlobDevice,
+	req applargeblobs.ReadOperation,
 	inventory appcredentials.InventoryReport,
 ) (applargeblobs.ReadReport, error) {
 	if err := ctx.Err(); err != nil {
@@ -41,7 +42,7 @@ func (r Runner) readLargeBlobFromInventory(
 		return applargeblobs.ReadReport{}, err
 	}
 
-	support := buildLargeBlobSupportReport(r.env.Authenticator.GetInfo())
+	support := buildLargeBlobSupportReport(device.GetInfo())
 	result := applargeblobs.ReadReport{
 		Device:  r.env.Selected,
 		Support: support,
@@ -72,7 +73,7 @@ func (r Runner) readLargeBlobFromInventory(
 	key := target.Record.LargeBlobKey
 	defer secret.Zero(key)
 
-	blobs, err := r.readLargeBlobArray(ctx)
+	blobs, err := r.readLargeBlobArray(ctx, device)
 	if err != nil {
 		return applargeblobs.ReadReport{}, err
 	}

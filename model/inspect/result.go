@@ -1,4 +1,5 @@
-package model
+// Package inspect contains public authenticator inspection results.
+package inspect
 
 import (
 	"github.com/go-ctap/ctap/protocol"
@@ -6,25 +7,21 @@ import (
 	"github.com/go-ctap/kit/model/report"
 )
 
-type InspectInfo struct {
+type Info struct {
 	protocol.AuthenticatorGetInfoResponse
 	UVModalityLabel string             `json:"uvModalityLabel,omitempty"`
 	Conformance     conformance.Report `json:"conformance"`
 }
 
-type InspectResult struct {
+type Result struct {
 	Device report.DeviceReport `json:"device"`
-	Info   InspectInfo         `json:"info"`
+	Info   Info                `json:"info"`
 }
 
-type InspectOutput struct {
-	Result InspectResult `json:"result"`
-}
-
-func NewInspectResult(device report.DeviceReport, info protocol.AuthenticatorGetInfoResponse) InspectResult {
-	result := InspectResult{
+func NewResult(device report.DeviceReport, info protocol.AuthenticatorGetInfoResponse) Result {
+	result := Result{
 		Device: device,
-		Info: InspectInfo{
+		Info: Info{
 			AuthenticatorGetInfoResponse: info,
 			Conformance:                  conformance.EvaluateGetInfo(info),
 		},

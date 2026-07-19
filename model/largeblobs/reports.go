@@ -50,10 +50,3 @@ type ListCredential struct {
 	BlobState         BlobState                `json:"blobState"`
 	BlobByteCount     int                      `json:"blobByteCount"`
 }
-
-type ReadRequest struct {
-	CredentialIDHex string     `json:"-"`
-	DecodeMode      DecodeMode `json:"-"`
-}
-
-type ListRequest struct{}

@@ -8,7 +8,6 @@ import (
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/internal/secret"
-	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
@@ -25,10 +24,15 @@ type garbageCollectState struct {
 	sizeAfter      int
 }
 
-func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageCollectLargeBlobsOperation) (model.LargeBlobMutationOutput, error) {
-	var output model.LargeBlobMutationOutput
+func (r Runner) GarbageCollectLargeBlobs(
+	ctx context.Context,
+	device LargeBlobDevice,
+	req applargeblobs.GarbageCollectOperation,
+) (applargeblobs.MutationOutput, error) {
+	var output applargeblobs.MutationOutput
 
 	inventoryPermission, mutationPermission, err := r.inventoryMutationPermissions(
+		device,
 		protocol.PermissionLargeBlobWrite,
 	)
 	if err != nil {
@@ -37,6 +41,7 @@ func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageC
 
 	state, err := r.loadGarbageCollectState(
 		ctx,
+		device,
 		inventoryPermission,
 	)
 	if err != nil {
@@ -60,7 +65,7 @@ func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageC
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
 		Permission: mutationPermission,
 	}, func(token []byte) error {
-		return r.env.Authenticator.SetLargeBlobs(ctx, token, state.replacement)
+		return device.SetLargeBlobs(ctx, token, state.replacement)
 	})
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
@@ -76,22 +81,23 @@ func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageC
 
 func (r Runner) loadGarbageCollectState(
 	ctx context.Context,
+	device LargeBlobDevice,
 	grantPermission protocol.Permission,
 ) (garbageCollectState, error) {
-	inventory, err := r.credentialInventoryReport(ctx, grantPermission)
+	inventory, err := r.credentialInventoryReport(ctx, device, grantPermission)
 	if err != nil {
 		return garbageCollectState{}, err
 	}
 	defer zeroCredentialInventoryReport(&inventory)
 
-	support := buildLargeBlobSupportReport(r.env.Authenticator.GetInfo())
+	support := buildLargeBlobSupportReport(device.GetInfo())
 	if !support.LargeBlobs {
 		return garbageCollectState{}, failure.New(failure.CodeLargeBlobUnsupported,
 			failure.WithPhase(failure.PhaseDiscovery),
 		)
 	}
 
-	blobs, err := r.readLargeBlobArray(ctx)
+	blobs, err := r.readLargeBlobArray(ctx, device)
 	if err != nil {
 		return garbageCollectState{}, err
 	}

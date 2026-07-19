@@ -16,12 +16,12 @@ func TestInspectEmitsNoEventsWithoutProgressOrStateChanges(t *testing.T) {
 	session := openContractAuthenticator(t, events, nil)
 	defer func() { _ = session.Close() }()
 
-	output, err := session.Inspect(context.Background(), nil)
+	output, err := session.Inspect(context.Background(), WithInteractionHandler(nil))
 	if err != nil {
 		t.Fatalf("Inspect: %v", err)
 	}
 
-	if output.Result.Device.Fingerprint == "" {
+	if output.Device.Fingerprint == "" {
 		t.Fatalf("unexpected output: %#v", output)
 	}
 
@@ -45,12 +45,12 @@ func TestInspectNormalizesYubicoMetadata(t *testing.T) {
 	session := openYubicoContractAuthenticator(t, auth)
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Inspect(context.Background(), nil)
+	result, err := session.Inspect(context.Background(), WithInteractionHandler(nil))
 	if err != nil {
 		t.Fatalf("Inspect: %v", err)
 	}
 
-	metadata := result.Result.Device.Metadata
+	metadata := result.Device.Metadata
 	if metadata == nil || metadata.Model != "YubiKey 5C NFC" || metadata.Serial != "12345678" || metadata.Firmware != "5.7.1" {
 		t.Fatalf("metadata = %#v", metadata)
 	}
@@ -61,12 +61,12 @@ func TestInspectKeepsBaseResultWhenYubicoMetadataFails(t *testing.T) {
 	session := openYubicoContractAuthenticator(t, auth)
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Inspect(context.Background(), nil)
+	result, err := session.Inspect(context.Background(), WithInteractionHandler(nil))
 	if err != nil {
 		t.Fatalf("Inspect: %v", err)
 	}
 
-	device := result.Result.Device
+	device := result.Device
 	if device.Vendor != report.VendorYubico || device.Metadata != nil {
 		t.Fatalf("device = %#v", device)
 	}

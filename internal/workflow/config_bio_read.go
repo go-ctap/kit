@@ -12,8 +12,8 @@ import (
 	"github.com/samber/lo"
 )
 
-func (r Runner) bioList(ctx context.Context) (appconfig.BioListReport, error) {
-	status, err := r.statusWithRetries(ctx)
+func (r Runner) BioList(ctx context.Context, device BioDevice) (appconfig.BioListReport, error) {
+	status, err := r.statusWithRetries(ctx, device)
 	if err != nil {
 		return appconfig.BioListReport{}, err
 	}
@@ -24,7 +24,7 @@ func (r Runner) bioList(ctx context.Context) (appconfig.BioListReport, error) {
 		ReplaySafe: true,
 	}, func(token []byte) error {
 		var err error
-		report, err = r.bioListReport(ctx, status, token)
+		report, err = r.bioListReport(ctx, device, status, token)
 
 		return err
 	})
@@ -32,19 +32,19 @@ func (r Runner) bioList(ctx context.Context) (appconfig.BioListReport, error) {
 	return report, err
 }
 
-func (r Runner) bioSensorReport(ctx context.Context) (appconfig.BioSensorReport, error) {
+func (r Runner) BioSensorInfo(ctx context.Context, device BioDevice) (appconfig.BioSensorReport, error) {
 	if err := ctx.Err(); err != nil {
 		return appconfig.BioSensorReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseDiscovery))
 	}
 
-	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
+	status := appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
 	if !status.Bio.Supported {
 		return appconfig.BioSensorReport{}, failure.New(failure.CodeBioUnsupported,
 			failure.WithPhase(failure.PhaseDiscovery),
 		)
 	}
 
-	modality, err := r.env.Authenticator.GetBioModality(ctx)
+	modality, err := device.GetBioModality(ctx)
 	if err != nil {
 		return appconfig.BioSensorReport{}, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseDiscovery,
@@ -52,7 +52,7 @@ func (r Runner) bioSensorReport(ctx context.Context) (appconfig.BioSensorReport,
 		))
 	}
 
-	sensor, err := r.env.Authenticator.GetFingerprintSensorInfo(ctx)
+	sensor, err := device.GetFingerprintSensorInfo(ctx)
 	if err != nil {
 		return appconfig.BioSensorReport{}, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 			failure.PhaseDiscovery,
@@ -100,7 +100,12 @@ func fingerprintKind(value uint) appconfig.FingerprintKind {
 	}
 }
 
-func (r Runner) bioListReport(ctx context.Context, status appconfig.StatusReport, token []byte) (appconfig.BioListReport, error) {
+func (r Runner) bioListReport(
+	ctx context.Context,
+	device BioDevice,
+	status appconfig.StatusReport,
+	token []byte,
+) (appconfig.BioListReport, error) {
 	if err := ctx.Err(); err != nil {
 		return appconfig.BioListReport{}, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 			failure.PhaseDiscovery,
@@ -115,7 +120,7 @@ func (r Runner) bioListReport(ctx context.Context, status appconfig.StatusReport
 		)
 	}
 
-	resp, err := r.env.Authenticator.EnumerateEnrollments(ctx, token)
+	resp, err := device.EnumerateEnrollments(ctx, token)
 	if err != nil {
 		return appconfig.BioListReport{}, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 			failure.PhaseDiscovery,

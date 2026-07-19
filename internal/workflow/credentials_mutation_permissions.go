@@ -5,14 +5,16 @@ import (
 
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/kit/internal/authenticator"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
 )
 
 func (r Runner) inventoryMutationPermissions(
+	device authenticator.CredentialInventoryReader,
 	required protocol.Permission,
 ) (protocol.Permission, protocol.Permission, error) {
-	inventory, err := inventoryPermission(r.env.Authenticator.GetInfo())
+	inventory, err := inventoryPermission(device.GetInfo())
 	if err != nil {
 		return protocol.PermissionNone, protocol.PermissionNone, err
 	}

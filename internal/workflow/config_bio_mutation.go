@@ -6,16 +6,19 @@ import (
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
-	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/safety"
 )
 
-func (r Runner) renameBio(ctx context.Context, req model.BioRenameOperation) (model.BioMutationOutput, error) {
-	var output model.BioMutationOutput
+func (r Runner) BioRename(
+	ctx context.Context,
+	device BioDevice,
+	req appconfig.BioRenameOperation,
+) (appconfig.BioMutationOutput, error) {
+	var output appconfig.BioMutationOutput
 
-	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
+	status := appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
 
 	mode := safety.PreviewModeExecute
 	if req.DryRun {
@@ -41,7 +44,7 @@ func (r Runner) renameBio(ctx context.Context, req model.BioRenameOperation) (mo
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
 		Permission: protocol.PermissionBioEnrollment,
 	}, func(token []byte) error {
-		return r.env.Authenticator.SetFriendlyName(ctx, token, templateID, req.FriendlyName)
+		return device.SetFriendlyName(ctx, token, templateID, req.FriendlyName)
 	})
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
@@ -63,10 +66,14 @@ func (r Runner) renameBio(ctx context.Context, req model.BioRenameOperation) (mo
 	return output, nil
 }
 
-func (r Runner) removeBio(ctx context.Context, req model.BioRemoveOperation) (model.BioMutationOutput, error) {
-	var output model.BioMutationOutput
+func (r Runner) BioRemove(
+	ctx context.Context,
+	device BioDevice,
+	req appconfig.BioRemoveOperation,
+) (appconfig.BioMutationOutput, error) {
+	var output appconfig.BioMutationOutput
 
-	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
+	status := appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
 
 	mode := safety.PreviewModeExecute
 	if req.DryRun {
@@ -92,7 +99,7 @@ func (r Runner) removeBio(ctx context.Context, req model.BioRemoveOperation) (mo
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
 		Permission: protocol.PermissionBioEnrollment,
 	}, func(token []byte) error {
-		return r.env.Authenticator.RemoveEnrollment(ctx, token, templateID)
+		return device.RemoveEnrollment(ctx, token, templateID)
 	})
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(

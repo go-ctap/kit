@@ -6,26 +6,21 @@ import (
 
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
-	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
 )
 
-func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCredentialUserOperation) (model.CredentialUpdateOutput, error) {
-	var output model.CredentialUpdateOutput
+func (r Runner) UpdateCredentialUser(
+	ctx context.Context,
+	device authenticator.CredentialManager,
+	req appcredentials.UpdateUserOperation,
+) (appcredentials.UpdateUserOutput, error) {
+	var output appcredentials.UpdateUserOutput
 
-	updateReq := appcredentials.UpdateUserRequest{
-		UserIDHex:       req.UserIDHex,
-		Name:            req.Name,
-		DisplayName:     req.DisplayName,
-		UserIDProvided:  req.UserIDProvided,
-		NameProvided:    req.NameProvided,
-		DisplayProvided: req.DisplayProvided,
-	}
-
-	preview, err := appcredentials.BuildUpdateUserPreview(req.Target, updateReq)
+	preview, err := appcredentials.BuildUpdateUserPreview(req)
 	if err != nil {
 		return output, err
 	}
@@ -37,6 +32,7 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 	}
 
 	_, mutationPermission, err := r.inventoryMutationPermissions(
+		device,
 		protocol.PermissionCredentialManagement,
 	)
 	if err != nil {
@@ -62,12 +58,12 @@ func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCreden
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
 		Permission: mutationPermission,
 	}, func(token []byte) error {
-		return r.env.Authenticator.UpdateUserInformation(ctx, token, descriptor, updatedUser)
+		return device.UpdateUserInformation(ctx, token, descriptor, updatedUser)
 	})
 	if err != nil {
 		return output, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 			failure.PhaseAuthenticatorCommand,
-			credentialManagementCommand(r.env.Authenticator.GetInfo()),
+			credentialManagementCommand(device.GetInfo()),
 			protocol.CredentialManagementSubCommandUpdateUserInformation,
 		))
 	}

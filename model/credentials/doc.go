@@ -1,2 +1,3 @@
-// Package credentials contains credential inventory and mutation DTOs.
+// Package credentials contains credential operations, inventory reports,
+// previews, and mutation results.
 package credentials

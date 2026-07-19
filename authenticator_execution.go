@@ -1,0 +1,75 @@
+package ctapkit
+
+import (
+	"context"
+	"errors"
+
+	ctaptransport "github.com/go-ctap/ctap/transport"
+	rtruntime "github.com/go-ctap/kit/internal/runtime"
+	"github.com/go-ctap/kit/internal/workflow"
+	"github.com/go-ctap/kit/model"
+)
+
+type workflowCall[T any] func(workflow.Runner, context.Context) (T, error)
+
+func executeOperation[T any](
+	a *Authenticator,
+	ctx context.Context,
+	kind model.OperationKind,
+	call workflowCall[T],
+	opts ...OperationOption,
+) (*T, error) {
+	config, err := newOperationConfig(opts...)
+	if err != nil {
+		return nil, normalizeRunError(err, string(kind))
+	}
+
+	result, err := executeSerializedOperation(a, ctx, config, call)
+	if err != nil {
+		if _, invalidated := errors.AsType[*ctaptransport.DeviceInvalidatedError](err); invalidated {
+			_ = a.Close()
+		}
+
+		return result, normalizeRunError(err, string(kind))
+	}
+
+	return result, nil
+}
+
+func executeSerializedOperation[T any](
+	a *Authenticator,
+	ctx context.Context,
+	config operationConfig,
+	call workflowCall[T],
+) (*T, error) {
+	// Invalidated-device cleanup stays in executeOperation: Close also takes
+	// runMu, so it must run only after this locked section has returned.
+	a.runMu.Lock()
+	defer a.runMu.Unlock()
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	childCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	if err := a.start(cancel); err != nil {
+		return nil, err
+	}
+	defer a.finish()
+
+	events := rtruntime.NewEventDispatcher(config.events)
+	interactions := rtruntime.NewInteractionBroker(events, config.handler)
+	tokens := rtruntime.NewTokenService(a.tokens, a.device, interactions, config.verificationFlow)
+	runner := workflow.NewRunner(workflow.Environment{
+		Selected:     a.selected,
+		Events:       events,
+		Interactions: interactions,
+		Tokens:       tokens,
+	})
+
+	result, err := call(runner, childCtx)
+
+	return &result, err
+}

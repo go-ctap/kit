@@ -13,14 +13,14 @@ import (
 	"github.com/go-ctap/kit/model/report"
 )
 
-func (r Runner) listLargeBlobs(ctx context.Context) (applargeblobs.ListReport, error) {
-	inventory, err := r.credentialInventoryReport(ctx, protocol.PermissionNone)
+func (r Runner) ListLargeBlobs(ctx context.Context, device LargeBlobDevice) (applargeblobs.ListReport, error) {
+	inventory, err := r.credentialInventoryReport(ctx, device, protocol.PermissionNone)
 	if err != nil {
 		return applargeblobs.ListReport{}, err
 	}
 	defer zeroCredentialInventoryReport(&inventory)
 
-	rep, err := r.listLargeBlobsFromInventory(ctx, applargeblobs.ListRequest{}, inventory)
+	rep, err := r.listLargeBlobsFromInventory(ctx, device, inventory)
 	if err != nil {
 		return applargeblobs.ListReport{}, err
 	}
@@ -44,14 +44,14 @@ type listBuildContext struct {
 
 func (r Runner) listLargeBlobsFromInventory(
 	ctx context.Context,
-	_ applargeblobs.ListRequest,
+	device LargeBlobDevice,
 	inventory appcredentials.InventoryReport,
 ) (applargeblobs.ListReport, error) {
 	if err := ctx.Err(); err != nil {
 		return applargeblobs.ListReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseDiscovery))
 	}
 
-	support := buildLargeBlobSupportReport(r.env.Authenticator.GetInfo())
+	support := buildLargeBlobSupportReport(device.GetInfo())
 	report := applargeblobs.ListReport{
 		Device:  r.env.Selected,
 		Support: support,
@@ -63,7 +63,7 @@ func (r Runner) listLargeBlobsFromInventory(
 	)
 
 	if support.LargeBlobs {
-		blobs, err = r.readLargeBlobArray(ctx)
+		blobs, err = r.readLargeBlobArray(ctx, device)
 		if err != nil {
 			return applargeblobs.ListReport{}, err
 		}

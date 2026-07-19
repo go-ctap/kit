@@ -25,6 +25,7 @@ type targetBlobState struct {
 
 func (r Runner) loadTargetBlobState(
 	ctx context.Context,
+	device LargeBlobDevice,
 	inventory appcredentials.InventoryReport,
 	credentialIDHex string,
 ) (targetBlobState, error) {
@@ -33,7 +34,7 @@ func (r Runner) loadTargetBlobState(
 		return targetBlobState{}, err
 	}
 
-	support := buildLargeBlobSupportReport(r.env.Authenticator.GetInfo())
+	support := buildLargeBlobSupportReport(device.GetInfo())
 	if !support.LargeBlobs {
 		return targetBlobState{}, failure.New(failure.CodeLargeBlobUnsupported,
 			failure.WithPhase(failure.PhaseDiscovery),
@@ -48,7 +49,7 @@ func (r Runner) loadTargetBlobState(
 
 	key := target.Record.LargeBlobKey
 
-	blobs, err := r.readLargeBlobArray(ctx)
+	blobs, err := r.readLargeBlobArray(ctx, device)
 	if err != nil {
 		return targetBlobState{}, err
 	}

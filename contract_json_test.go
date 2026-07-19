@@ -12,6 +12,7 @@ import (
 	"github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
+	appinspect "github.com/go-ctap/kit/model/inspect"
 	"github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/report"
 	webauthn2 "github.com/go-ctap/kit/model/webauthn"
@@ -236,26 +237,23 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 	}{
 		{
 			name: "inspect mirrors authenticator get info",
-			value: model.InspectOutput{
-				Result: model.NewInspectResult(report.DeviceReport{}, protocol.AuthenticatorGetInfoResponse{
-					ForcePINChange:                true,
-					MinPINLength:                  4,
-					MaxCredentialIdLength:         32,
-					MaxRPIDsForSetMinPINLength:    new(uint(3)),
-					Algorithms:                    []credential.PublicKeyCredentialParameters{{Type: credential.PublicKeyCredentialTypePublicKey, Algorithm: -7}},
-					Transports:                    []credential.AuthenticatorTransport{credential.AuthenticatorTransportUSB},
-					AttestationFormats:            []attestation.AttestationStatementFormatIdentifier{attestation.AttestationStatementFormatIdentifierPacked},
-					VendorPrototypeConfigCommands: []protocol.VendorCommandID{0x1_0000_0000},
-					PinComplexityPolicy:           new(true),
-					PinComplexityPolicyURL:        []byte("https://policy.example"),
-					MaxPINLength:                  64,
-					EncCredStoreState:             []byte("encrypted-store-state"),
-					AuthenticatorConfigCommands:   []protocol.ConfigSubCommand{1, 4},
-					UvModality:                    new(protocol.UserVerifyFingerprintInternal),
-				}),
-			},
+			value: appinspect.NewResult(report.DeviceReport{}, protocol.AuthenticatorGetInfoResponse{
+				ForcePINChange:                true,
+				MinPINLength:                  4,
+				MaxCredentialIdLength:         32,
+				MaxRPIDsForSetMinPINLength:    new(uint(3)),
+				Algorithms:                    []credential.PublicKeyCredentialParameters{{Type: credential.PublicKeyCredentialTypePublicKey, Algorithm: -7}},
+				Transports:                    []credential.AuthenticatorTransport{credential.AuthenticatorTransportUSB},
+				AttestationFormats:            []attestation.AttestationStatementFormatIdentifier{attestation.AttestationStatementFormatIdentifierPacked},
+				VendorPrototypeConfigCommands: []protocol.VendorCommandID{0x1_0000_0000},
+				PinComplexityPolicy:           new(true),
+				PinComplexityPolicyURL:        []byte("https://policy.example"),
+				MaxPINLength:                  64,
+				EncCredStoreState:             []byte("encrypted-store-state"),
+				AuthenticatorConfigCommands:   []protocol.ConfigSubCommand{1, 4},
+				UvModality:                    new(protocol.UserVerifyFingerprintInternal),
+			}),
 			want: []string{
-				`"result"`,
 				`"forcePINChange":true`,
 				`"minPINLength":4`,
 				`"maxCredentialIdLength":32`,
@@ -273,6 +271,7 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 				`"conformance"`,
 			},
 			reject: []string{
+				`"result"`,
 				`"Result"`,
 				`"conformanceFindings"`,
 				`"forcePinChange"`,
@@ -287,26 +286,23 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 		},
 		{
 			name: "credential inventory uses WebAuthn acronym spellings",
-			value: model.CredentialsOutput{
-				Report: credentials.InventoryReport{
-					Summary: credentials.InventorySummary{TotalRPs: 1},
-					Groups: []credentials.CredentialGroup{
-						{
-							RPID:        "example.com",
-							RPIDHashHex: "abcd",
-							Credentials: []credentials.CredentialRecord{
-								{
-									CredentialIDHex:   "beef",
-									UserIDHex:         "0102",
-									LargeBlobKeyState: "available",
-								},
+			value: credentials.InventoryReport{
+				Summary: credentials.InventorySummary{TotalRPs: 1},
+				Groups: []credentials.CredentialGroup{
+					{
+						RPID:        "example.com",
+						RPIDHashHex: "abcd",
+						Credentials: []credentials.CredentialRecord{
+							{
+								CredentialIDHex:   "beef",
+								UserIDHex:         "0102",
+								LargeBlobKeyState: "available",
 							},
 						},
 					},
 				},
 			},
 			want: []string{
-				`"report"`,
 				`"totalRPs":1`,
 				`"rpID":"example.com"`,
 				`"rpIDHashHex":"abcd"`,
@@ -315,6 +311,7 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 				`"largeBlobKeyState":"available"`,
 			},
 			reject: []string{
+				`"report"`,
 				`"Report"`,
 				`"totalRps"`,
 				`"rpId"`,
@@ -324,8 +321,32 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 			},
 		},
 		{
+			name: "credential operation inputs use ID spellings",
+			value: credentials.UpdateUserOperation{
+				Target:         credentials.CredentialTarget{},
+				UserIDHex:      "0102",
+				UserIDProvided: true,
+			},
+			want: []string{
+				`"userIDHex":"0102"`,
+				`"userIDProvided":true`,
+			},
+			reject: []string{
+				`"userIdHex"`,
+				`"userIdProvided"`,
+			},
+		},
+		{
+			name:  "credential delete input uses ID spelling",
+			value: credentials.DeleteOperation{CredentialIDHex: "beef"},
+			want:  []string{`"credentialIDHex":"beef"`},
+			reject: []string{
+				`"credentialIdHex"`,
+			},
+		},
+		{
 			name: "credential mutation outputs use lower-case wrappers",
-			value: model.CredentialDeleteOutput{
+			value: credentials.DeleteOutput{
 				Preview: credentials.DeletePreview{
 					CredentialIDHex: "beef",
 					RPID:            "example.com",
@@ -357,7 +378,7 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 		},
 		{
 			name: "credential update outputs preserve previous and current identities",
-			value: model.CredentialUpdateOutput{
+			value: credentials.UpdateUserOutput{
 				Preview: credentials.UpdateUserPreview{
 					CredentialIDHex: "beef",
 					RPID:            "example.com",
@@ -387,7 +408,7 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 		},
 		{
 			name: "WebAuthn operation kinds and inputs use acronym spellings",
-			value: model.MakeCredentialOperation{
+			value: webauthn2.MakeCredentialOperation{
 				MakeCredentialInput: webauthn2.MakeCredentialInput{
 					RP:             credential.PublicKeyCredentialRpEntity{ID: "example.com"},
 					User:           credential.PublicKeyCredentialUserEntity{ID: []byte{0x01, 0x02}},
@@ -417,7 +438,7 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 		},
 		{
 			name: "WebAuthn outputs include CTAP artifact spellings",
-			value: model.MakeCredentialOutput{
+			value: webauthn2.MakeCredentialOutput{
 				Result: &webauthn2.MakeCredentialResult{
 					DeviceFingerprint:        "fingerprint-1",
 					RPID:                     "example.com",
@@ -447,38 +468,35 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 		},
 		{
 			name: "config status uses CTAP get info spellings",
-			value: model.ConfigStatusOutput{
-				Report: config.StatusReport{
-					PIN: config.PINStatus{
-						State:               config.StateConfigured,
-						Supported:           true,
-						Configured:          new(true),
-						MinPINLength:        4,
-						MaxPINLength:        64,
-						ForcePINChange:      true,
-						PinComplexityURL:    "https://policy.example",
-						PinComplexityPolicy: new(true),
-						Retries: config.RetryState{
-							State:           config.StateSupported,
-							Remaining:       new(uint(5)),
-							PowerCycleState: new(true),
-						},
+			value: config.StatusReport{
+				PIN: config.PINStatus{
+					State:               config.StateConfigured,
+					Supported:           true,
+					Configured:          new(true),
+					MinPINLength:        4,
+					MaxPINLength:        64,
+					ForcePINChange:      true,
+					PinComplexityURL:    "https://policy.example",
+					PinComplexityPolicy: new(true),
+					Retries: config.RetryState{
+						State:           config.StateSupported,
+						Remaining:       new(uint(5)),
+						PowerCycleState: new(true),
 					},
-					Bio: config.BioStatus{
-						UVBioEnroll:     config.CapabilityState{Supported: true},
-						UVModality:      new(uint(2)),
-						UVModalityLabel: "fingerprint_internal",
-					},
-					AuthenticatorConfig: config.AuthenticatorConfigStatus{
-						UVAcfg: config.CapabilityState{Supported: true},
-					},
-					Limits: config.LimitsStatus{
-						MaxRPIDsForSetMinPINLength: new(uint(3)),
-					},
+				},
+				Bio: config.BioStatus{
+					UVBioEnroll:     config.CapabilityState{Supported: true},
+					UVModality:      new(uint(2)),
+					UVModalityLabel: "fingerprint_internal",
+				},
+				AuthenticatorConfig: config.AuthenticatorConfigStatus{
+					UVAcfg: config.CapabilityState{Supported: true},
+				},
+				Limits: config.LimitsStatus{
+					MaxRPIDsForSetMinPINLength: new(uint(3)),
 				},
 			},
 			want: []string{
-				`"report"`,
 				`"minPINLength":4`,
 				`"maxPINLength":64`,
 				`"forcePINChange":true`,
@@ -491,6 +509,7 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 				`"powerCycleState":true`,
 			},
 			reject: []string{
+				`"report"`,
 				`"Report"`,
 				`"feature"`,
 				`"uvBinding"`,
@@ -506,17 +525,14 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 		},
 		{
 			name: "bio sensor output uses spec-named string enums",
-			value: model.BioSensorOutput{
-				Report: config.BioSensorReport{
-					Supported:                          true,
-					Modality:                           config.BioModalityFingerprint,
-					FingerprintKind:                    config.FingerprintKindTouch,
-					MaxCaptureSamplesRequiredForEnroll: new(uint(4)),
-					MaxTemplateFriendlyName:            new(uint(64)),
-				},
+			value: config.BioSensorReport{
+				Supported:                          true,
+				Modality:                           config.BioModalityFingerprint,
+				FingerprintKind:                    config.FingerprintKindTouch,
+				MaxCaptureSamplesRequiredForEnroll: new(uint(4)),
+				MaxTemplateFriendlyName:            new(uint(64)),
 			},
 			want: []string{
-				`"report"`,
 				`"supported":true`,
 				`"modality":"fingerprint"`,
 				`"fingerprintKind":"touch"`,
@@ -524,6 +540,7 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 				`"maxTemplateFriendlyName":64`,
 			},
 			reject: []string{
+				`"report"`,
 				`"Report"`,
 				`"modality":1`,
 				`"fingerprintKind":1`,
@@ -533,7 +550,7 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 		},
 		{
 			name: "authenticator config output names set min PIN length result",
-			value: model.AuthenticatorConfigOutput{
+			value: config.AuthenticatorConfigOutput{
 				Preview: config.AuthenticatorConfigPreview{
 					Operation:           config.AuthenticatorConfigMinPINLength,
 					CurrentMinPINLength: 4,
@@ -573,7 +590,7 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 		},
 		{
 			name: "set min PIN length operation uses CTAP subcommand parameter names",
-			value: model.SetMinPINLengthOperation{
+			value: config.SetMinPINLengthOperation{
 				NewMinPINLength:     new(uint(8)),
 				MinPINLengthRPIDs:   []string{"example.com"},
 				ForceChangePIN:      true,
@@ -592,28 +609,22 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 			},
 		},
 		{
-			name: "set min PIN length request uses CTAP subcommand parameter names",
-			value: config.MinPINLengthRequest{
-				NewMinPINLength:     new(uint(8)),
-				MinPINLengthRPIDs:   []string{"example.com"},
-				ForceChangePIN:      true,
-				PINComplexityPolicy: true,
+			name: "bio operation input uses template ID spelling",
+			value: []any{
+				config.BioRenameOperation{TemplateIDHex: "abcd"},
+				config.BioRemoveOperation{TemplateIDHex: "dcba"},
 			},
 			want: []string{
-				`"newMinPINLength":8`,
-				`"minPinLengthRPIDs":["example.com"]`,
-				`"forceChangePin":true`,
-				`"pinComplexityPolicy":true`,
+				`"templateIDHex":"abcd"`,
+				`"templateIDHex":"dcba"`,
 			},
 			reject: []string{
-				`"length"`,
-				`"rpIds"`,
-				`"rpIDs"`,
+				`"templateIdHex"`,
 			},
 		},
 		{
 			name: "bio outputs use template ID and enrollment sample names",
-			value: model.BioEnrollOutput{
+			value: config.BioEnrollOutput{
 				Result: &config.BioEnrollResult{
 					TemplateIDHex:          "abcd",
 					LastEnrollSampleStatus: "good",
@@ -630,11 +641,9 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 		},
 		{
 			name: "bio list records use template ID spelling",
-			value: model.BioListOutput{
-				Report: config.BioListReport{
-					Enrollments: []config.BioEnrollmentRecord{
-						{TemplateIDHex: "abcd"},
-					},
+			value: config.BioListReport{
+				Enrollments: []config.BioEnrollmentRecord{
+					{TemplateIDHex: "abcd"},
 				},
 			},
 			want: []string{
@@ -646,14 +655,12 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 		},
 		{
 			name: "large blob read output uses credential target spellings",
-			value: model.LargeBlobReadOutput{
-				Report: largeblobs.ReadReport{
-					LargeBlobKeyState: largeblobs.LargeBlobKeyAvailable,
-					Target: largeblobs.BlobTarget{
-						CredentialIDHex: "beef",
-						RP:              credentials.RelyingParty{ID: "example.com", IDHashHex: "abcd"},
-						User:            credentials.UserIdentity{UserIDHex: "0102"},
-					},
+			value: largeblobs.ReadReport{
+				LargeBlobKeyState: largeblobs.LargeBlobKeyAvailable,
+				Target: largeblobs.BlobTarget{
+					CredentialIDHex: "beef",
+					RP:              credentials.RelyingParty{ID: "example.com", IDHashHex: "abcd"},
+					User:            credentials.UserIdentity{UserIDHex: "0102"},
 				},
 			},
 			want: []string{
@@ -667,15 +674,29 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 			},
 		},
 		{
+			name: "large blob operation input uses credential ID spelling",
+			value: []any{
+				largeblobs.ReadOperation{CredentialIDHex: "beef"},
+				largeblobs.WriteOperation{CredentialIDHex: "cafe"},
+				largeblobs.DeleteOperation{CredentialIDHex: "fade"},
+			},
+			want: []string{
+				`"credentialIDHex":"beef"`,
+				`"credentialIDHex":"cafe"`,
+				`"credentialIDHex":"fade"`,
+			},
+			reject: []string{
+				`"credentialIdHex"`,
+			},
+		},
+		{
 			name: "large blob list output uses credential ID spelling",
-			value: model.LargeBlobListOutput{
-				Report: largeblobs.ListReport{
-					Credentials: []largeblobs.ListCredential{
-						{
-							CredentialIDHex:   "beef",
-							LargeBlobKeyState: largeblobs.LargeBlobKeyAvailable,
-							User:              credentials.UserIdentity{UserIDHex: "0102"},
-						},
+			value: largeblobs.ListReport{
+				Credentials: []largeblobs.ListCredential{
+					{
+						CredentialIDHex:   "beef",
+						LargeBlobKeyState: largeblobs.LargeBlobKeyAvailable,
+						User:              credentials.UserIdentity{UserIDHex: "0102"},
 					},
 				},
 			},
@@ -690,7 +711,7 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 		},
 		{
 			name: "large blob mutation output names serialized array size",
-			value: model.LargeBlobMutationOutput{
+			value: largeblobs.MutationOutput{
 				Preview: largeblobs.MutationPreview{
 					Target:                             largeblobs.BlobTarget{CredentialIDHex: "beef"},
 					LargeBlobKeyState:                  largeblobs.LargeBlobKeyAvailable,
@@ -794,7 +815,7 @@ func TestDeviceReportVendorMetadataJSON(t *testing.T) {
 }
 
 func TestCTAP23JSONPresenceContracts(t *testing.T) {
-	operation := model.SetMinPINLengthOperation{
+	operation := config.SetMinPINLengthOperation{
 		NewMinPINLength: new(uint(0)),
 	}
 
@@ -807,7 +828,7 @@ func TestCTAP23JSONPresenceContracts(t *testing.T) {
 		t.Fatalf("operation JSON = %s", raw)
 	}
 
-	absent, err := json.Marshal(model.SetMinPINLengthOperation{})
+	absent, err := json.Marshal(config.SetMinPINLengthOperation{})
 	if err != nil {
 		t.Fatalf("Marshal absent operation: %v", err)
 	}

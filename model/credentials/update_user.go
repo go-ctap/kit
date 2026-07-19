@@ -8,15 +8,6 @@ import (
 	"github.com/go-ctap/kit/model/safety"
 )
 
-type UpdateUserRequest struct {
-	UserIDHex       string `json:"userIDHex,omitempty"`
-	Name            string `json:"name,omitempty"`
-	DisplayName     string `json:"displayName,omitempty"`
-	UserIDProvided  bool   `json:"-"`
-	NameProvided    bool   `json:"-"`
-	DisplayProvided bool   `json:"-"`
-}
-
 type UpdateUserPreview struct {
 	CredentialIDHex string           `json:"credentialIDHex"`
 	RPID            string           `json:"rpID"`
@@ -35,7 +26,9 @@ type UpdateUserResult struct {
 	Current           UserIdentity `json:"current"`
 }
 
-func BuildUpdateUserPreview(target CredentialTarget, req UpdateUserRequest) (UpdateUserPreview, error) {
+func BuildUpdateUserPreview(operation UpdateUserOperation) (UpdateUserPreview, error) {
+	target := operation.Target
+
 	if strings.TrimSpace(target.Record.CredentialIDHex) == "" {
 		return UpdateUserPreview{}, failure.New(failure.CodeCredentialIDRequired, failure.WithPhase(failure.PhaseValidation))
 	}
@@ -44,7 +37,7 @@ func BuildUpdateUserPreview(target CredentialTarget, req UpdateUserRequest) (Upd
 		return UpdateUserPreview{}, failure.New(failure.CodeRelyingPartyIDRequired, failure.WithPhase(failure.PhaseValidation))
 	}
 
-	proposed, err := ResolveUpdatedUser(target, req)
+	proposed, err := ResolveUpdatedUser(operation)
 	if err != nil {
 		return UpdateUserPreview{}, err
 	}
@@ -70,15 +63,16 @@ func BuildUpdateUserPreview(target CredentialTarget, req UpdateUserRequest) (Upd
 	}, nil
 }
 
-func ResolveUpdatedUser(target CredentialTarget, req UpdateUserRequest) (UserIdentity, error) {
-	if !req.UserIDProvided && !req.NameProvided && !req.DisplayProvided {
+func ResolveUpdatedUser(operation UpdateUserOperation) (UserIdentity, error) {
+	if !operation.UserIDProvided && !operation.NameProvided && !operation.DisplayProvided {
 		return UserIdentity{}, failure.New(failure.CodeCredentialChangesRequired, failure.WithPhase(failure.PhaseValidation))
 	}
 
+	target := operation.Target
 	proposed := target.User
 
-	if req.UserIDProvided {
-		trimmed := strings.TrimSpace(req.UserIDHex)
+	if operation.UserIDProvided {
+		trimmed := strings.TrimSpace(operation.UserIDHex)
 		if trimmed == "" {
 			proposed.UserIDHex = ""
 		} else {
@@ -91,12 +85,12 @@ func ResolveUpdatedUser(target CredentialTarget, req UpdateUserRequest) (UserIde
 		}
 	}
 
-	if req.NameProvided {
-		proposed.Name = strings.TrimSpace(req.Name)
+	if operation.NameProvided {
+		proposed.Name = strings.TrimSpace(operation.Name)
 	}
 
-	if req.DisplayProvided {
-		proposed.DisplayName = strings.TrimSpace(req.DisplayName)
+	if operation.DisplayProvided {
+		proposed.DisplayName = strings.TrimSpace(operation.DisplayName)
 	}
 
 	if proposed.UserIDHex == "" {

@@ -20,13 +20,6 @@ const (
 	AlwaysUVTargetDisable AlwaysUVTarget = "disable"
 )
 
-type MinPINLengthRequest struct {
-	NewMinPINLength     *uint    `json:"newMinPINLength,omitempty"`
-	MinPINLengthRPIDs   []string `json:"minPinLengthRPIDs,omitempty"`
-	ForceChangePIN      bool     `json:"forceChangePin,omitempty"`
-	PINComplexityPolicy bool     `json:"pinComplexityPolicy,omitempty"`
-}
-
 type AuthenticatorConfigPreview struct {
 	Operation           AuthenticatorConfigOperation `json:"operation"`
 	Device              report.DeviceReport          `json:"device"`

@@ -11,10 +11,14 @@ import (
 	"github.com/go-ctap/kit/model/safety"
 )
 
-func (r Runner) resetFactory(ctx context.Context, req model.ResetFactoryOperation) (model.ResetFactoryOutput, error) {
-	var output model.ResetFactoryOutput
+func (r Runner) ResetFactory(
+	ctx context.Context,
+	device ConfigDevice,
+	req appconfig.ResetFactoryOperation,
+) (appconfig.ResetFactoryOutput, error) {
+	var output appconfig.ResetFactoryOutput
 
-	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
+	status := appconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
 	preview := appconfig.BuildResetFactoryPreview(status)
 
 	output.Preview = preview
@@ -35,7 +39,7 @@ func (r Runner) resetFactory(ctx context.Context, req model.ResetFactoryOperatio
 		return output, err
 	}
 
-	err := r.env.Authenticator.Reset(ctx)
+	err := device.Reset(ctx)
 	r.env.Tokens.Invalidate()
 
 	if err != nil {

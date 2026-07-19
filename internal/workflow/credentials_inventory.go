@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/internal/secret"
@@ -17,11 +18,16 @@ import (
 	"github.com/samber/lo"
 )
 
+func (r Runner) ListCredentials(ctx context.Context, device authenticator.CredentialInventoryReader) (appcredentials.InventoryReport, error) {
+	return r.credentialInventoryReport(ctx, device, protocol.PermissionNone)
+}
+
 func (r Runner) credentialInventoryReport(
 	ctx context.Context,
+	device authenticator.CredentialInventoryReader,
 	grantPermission protocol.Permission,
 ) (appcredentials.InventoryReport, error) {
-	permission, err := inventoryPermission(r.env.Authenticator.GetInfo())
+	permission, err := inventoryPermission(device.GetInfo())
 	if err != nil {
 		return appcredentials.InventoryReport{}, err
 	}
@@ -42,7 +48,7 @@ func (r Runner) credentialInventoryReport(
 		Permission: grantPermission,
 		ReplaySafe: true,
 	}, func(token []byte) error {
-		current, err := r.buildCredentialInventoryReport(ctx, token, permission)
+		current, err := r.buildCredentialInventoryReport(ctx, device, token, permission)
 		if err != nil {
 			return err
 		}
@@ -78,6 +84,7 @@ func grantCoversInventoryPermission(
 
 func (r Runner) buildCredentialInventoryReport(
 	ctx context.Context,
+	device authenticator.CredentialInventoryReader,
 	token []byte,
 	permission protocol.Permission,
 ) (appcredentials.InventoryReport, error) {
@@ -85,10 +92,9 @@ func (r Runner) buildCredentialInventoryReport(
 		return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseMetadata))
 	}
 
-	authenticator := r.env.Authenticator
-	info := authenticator.GetInfo()
+	info := device.GetInfo()
 
-	metadata, err := authenticator.GetCredsMetadata(ctx, token)
+	metadata, err := device.GetCredsMetadata(ctx, token)
 	if err != nil {
 		return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 			failure.PhaseMetadata,
@@ -141,7 +147,7 @@ func (r Runner) buildCredentialInventoryReport(
 	rpResponses := make([]protocol.AuthenticatorCredentialManagementResponse, 0)
 	var rpTotal uint64
 
-	for rpResponse, err := range authenticator.EnumerateRPs(ctx, token) {
+	for rpResponse, err := range device.EnumerateRPs(ctx, token) {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			err = ctxErr
 		}
@@ -191,7 +197,7 @@ func (r Runner) buildCredentialInventoryReport(
 		})
 		group := &report.Groups[len(report.Groups)-1]
 
-		for credentialResponse, err := range authenticator.EnumerateCredentials(ctx, token, rpResponse.RPIDHash) {
+		for credentialResponse, err := range device.EnumerateCredentials(ctx, token, rpResponse.RPIDHash) {
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				err = ctxErr
 			}

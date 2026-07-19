@@ -4,8 +4,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"os"
+	"runtime"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -180,5 +185,127 @@ func TestLookupKeepsDiskCacheWhenVerificationFails(t *testing.T) {
 
 	if !bytes.Equal(retained, cached) {
 		t.Fatalf("retained disk cache = %q, want %q", retained, cached)
+	}
+}
+
+func TestLookupCoordinatesRefreshByCacheKey(t *testing.T) {
+	const callers = 8
+
+	cache := NewCache().(*simpleCache)
+	source := "https://mds.example.test/concurrent"
+	release := make(chan struct{})
+	started := make(chan struct{})
+	var startOnce sync.Once
+	var fetches atomic.Int64
+	client := &Client{
+		Source:   source,
+		Cache:    cache,
+		CacheDir: t.TempDir(),
+		HTTPClient: &http.Client{Transport: roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+			fetches.Add(1)
+			startOnce.Do(func() { close(started) })
+			<-release
+
+			return &http.Response{
+				StatusCode: http.StatusServiceUnavailable,
+				Header:     make(http.Header),
+				Body:       http.NoBody,
+				Request:    request,
+			}, nil
+		})},
+	}
+
+	begin := make(chan struct{})
+	errs := make(chan error, callers)
+	var ready sync.WaitGroup
+	ready.Add(callers)
+	for range callers {
+		go func() {
+			ready.Done()
+			<-begin
+			_, err := client.Lookup(t.Context(), uuid.New(), LookupOptions{})
+			errs <- err
+		}()
+	}
+
+	ready.Wait()
+	close(begin)
+	<-started
+	waitForRefreshWaiters(t, cache, client.cacheKey(source), callers)
+	close(release)
+
+	for range callers {
+		if err := <-errs; !errors.Is(err, ErrFetch) {
+			t.Fatalf("Lookup error = %v, want %v", err, ErrFetch)
+		}
+	}
+	if got := fetches.Load(); got != 1 {
+		t.Fatalf("fetches = %d, want 1", got)
+	}
+}
+
+func waitForRefreshWaiters(t *testing.T, cache *simpleCache, key string, want int) {
+	t.Helper()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		cache.mu.RLock()
+		call := cache.refresh[key]
+		got := 0
+		if call != nil {
+			got = call.waiters
+		}
+		cache.mu.RUnlock()
+
+		if got == want {
+			return
+		}
+		runtime.Gosched()
+	}
+
+	t.Fatalf("refresh waiters did not reach %d", want)
+}
+
+func TestBlobFetchRejectsRedirectAndOversizeResponse(t *testing.T) {
+	tests := []struct {
+		name       string
+		status     int
+		body       string
+		maxBytes   int64
+		wantStatus int
+		wantText   string
+	}{
+		{name: "redirect", status: http.StatusFound, wantStatus: http.StatusFound},
+		{name: "oversize", status: http.StatusOK, body: "1234", maxBytes: 3, wantText: "object exceeds 3 bytes"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := &Client{
+				Source:       "https://mds.example.test/blob",
+				MaxBlobBytes: test.maxBytes,
+				HTTPClient: &http.Client{Transport: roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: test.status,
+						Header:     http.Header{"Location": {"https://mds.example.test/redirected"}},
+						Body:       io.NopCloser(strings.NewReader(test.body)),
+						Request:    request,
+					}, nil
+				})},
+			}
+
+			_, _, _, err := client.fetchAndVerify(t.Context(), client.Source, nil)
+			if test.wantStatus != 0 {
+				var statusErr *HTTPStatusError
+				if !errors.As(err, &statusErr) || statusErr.StatusCode != test.wantStatus {
+					t.Fatalf("fetchAndVerify error = %v, want HTTP status %d", err, test.wantStatus)
+				}
+				return
+			}
+
+			if err == nil || !strings.Contains(err.Error(), test.wantText) {
+				t.Fatalf("fetchAndVerify error = %v, want %q", err, test.wantText)
+			}
+		})
 	}
 }

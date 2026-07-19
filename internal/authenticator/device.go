@@ -26,11 +26,15 @@ type TokenProvider interface {
 	GetPINRetries(ctx context.Context) (uint, *bool, error)
 }
 
-type CredentialManager interface {
+type CredentialInventoryReader interface {
 	InfoProvider
 	GetCredsMetadata(ctx context.Context, pinUvAuthToken []byte) (protocol.AuthenticatorCredentialManagementResponse, error)
 	EnumerateRPs(ctx context.Context, pinUvAuthToken []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error]
 	EnumerateCredentials(ctx context.Context, pinUvAuthToken []byte, rpIDHash []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error]
+}
+
+type CredentialManager interface {
+	CredentialInventoryReader
 	GetPersistentCredentialStoreState(ctx context.Context, pinUvAuthToken []byte) (ctapauthenticator.PersistentCredentialStoreState, error)
 	DeleteCredential(ctx context.Context, pinUvAuthToken []byte, credentialID credential.PublicKeyCredentialDescriptor) error
 	UpdateUserInformation(ctx context.Context, pinUvAuthToken []byte, credentialID credential.PublicKeyCredentialDescriptor, user credential.PublicKeyCredentialUserEntity) error
@@ -68,9 +72,13 @@ type LargeBlobManager interface {
 	SetLargeBlobs(ctx context.Context, pinUvAuthToken []byte, blobs []protocol.LargeBlob) error
 }
 
-type ConfigManager interface {
+type RetryProvider interface {
 	GetPINRetries(ctx context.Context) (uint, *bool, error)
 	GetUVRetries(ctx context.Context) (uint, error)
+}
+
+type ConfigManager interface {
+	RetryProvider
 	SetPIN(ctx context.Context, pin string) error
 	ChangePIN(ctx context.Context, currentPin, newPin string) error
 	Reset(ctx context.Context) error

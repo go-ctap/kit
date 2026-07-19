@@ -40,13 +40,13 @@ This repository does not own terminal UX, command parsing, output rendering, MDS
 - `transport`: HID and Windows proxy transport boundary.
 - `internal/device`: runtime attachment fingerprints derived from transport descriptors.
 - `internal/runtime`: event, interaction, and token policies.
-- `internal/workflow`: typed domain workflow bodies over an explicit execution environment.
+- `internal/workflow`: typed domain workflow bodies over a shared execution environment and narrow per-domain authenticator capabilities.
 
 ## Authenticator Flow
 
 A consumer should generally do this:
 
-1. Convert UI or CLI input into the typed `model` input for the operation.
+1. Convert application input into the typed domain-model input for the operation.
 2. Discover devices with `ctapkit.DiscoverDevices`.
 3. Pick one returned `ctapkit.Device` handle and open it with `ctapkit.OpenAuthenticator`.
 4. Call the corresponding typed `Authenticator` method synchronously.
@@ -54,7 +54,7 @@ A consumer should generally do this:
 
 `Authenticator` is the single long-lived runtime entity for an opened transport channel. It owns close/cancel behavior, whole-operation serialization, and one reusable `pinUvAuthToken`. It does not cache credential inventories, configuration reports, or large-blob reports; those values are read from the authenticator for every operation because device state can be changed by another channel between commands.
 
-Each operation method returns a pointer to its concrete output type. A nil output means execution stopped before a workflow result existed; a non-nil output can carry a partial preview or result together with an error. For example, `Authenticator.ListCredentials` returns `*model.CredentialsOutput`, while `Authenticator.DeleteCredential` accepts `model.DeleteCredentialOperation` and returns `*model.CredentialDeleteOutput`. Consumers that need non-blocking UI can call these methods from their own goroutine or task. Progress and UI updates are delivered through the `model.EventSink` attached with `ctapkit.WithEventSink`; PIN, user-verification, and touch participation is delivered through `model.InteractionHandler`.
+Each operation method returns a pointer to its concrete domain type. Read-only methods return reports directly; for example, `Authenticator.ListCredentials` returns `*credentials.InventoryReport`. Mutations and WebAuthn operations return `{preview, result}` outputs; `Authenticator.DeleteCredential` accepts `credentials.DeleteOperation` and returns `*credentials.DeleteOutput`. A nil pointer means execution stopped before the workflow started, while a non-nil value can contain partial state together with an error. Consumers that need non-blocking UI can call these methods from their own goroutine or task. Attach progress with `ctapkit.WithEventSink` and PIN, user-verification, or touch participation with `ctapkit.WithInteractionHandler`.
 Interaction requests and operation events contain only their prompt or event payload; consumers should correlate work through the `*ctapkit.Authenticator` handle and their own event sink ownership.
 
 Public failures use stable codes, optional safe interpolation parameters, and
@@ -68,7 +68,12 @@ Core operations are intentionally UI-neutral. PIN prompts, user verification mes
 MDS lookup is exposed as a root facade helper rather than an authenticator operation:
 
 ```go
-metadata, err := ctapkit.LookupMDS(ctx, inspect.Result.Info.AAGUID)
+inspection, err := authenticator.Inspect(ctx)
+if err != nil {
+	return err
+}
+
+metadata, err := ctapkit.LookupMDS(ctx, inspection.Info.AAGUID)
 ```
 
 The runtime fetches and verifies the FIDO MDS3 blob, indexes entries by AAGUID,
@@ -79,15 +84,15 @@ verified is retained for a later retry but is never returned as verified data.
 
 ## CTAP 2.3 Runtime Surface
 
-- `model.InspectResult.Info` embeds `protocol.AuthenticatorGetInfoResponse`, so
+- `inspect.Result.Info` embeds `protocol.AuthenticatorGetInfoResponse`, so
   get-info fields and types track `ctap` directly; the kit only adds the UV
   modality label and conformance report.
 - `Authenticator.CredentialStoreState` reads the persistent credential-store
   identifiers with a standalone `pcmr` token. The result contains lowercase
   hexadecimal identifiers and must be treated as sensitive.
-- `model.EnableLongTouchForResetOperation` supports preview and dry-run before
+- `config.EnableLongTouchForResetOperation` supports preview and dry-run before
   enabling the reset gesture requirement. The consumer owns confirmation UX.
-- `model.SetMinPINLengthOperation` mirrors the upstream config parameters:
+- `config.SetMinPINLengthOperation` mirrors the upstream config parameters:
   `NewMinPINLength` is optional, while RP-ID and boolean fields use their zero
   values when omitted.
 - WebAuthn make-credential and get-assertion operations delegate direct and
@@ -102,7 +107,7 @@ verified is retained for a later retry but is never returned as verified data.
 
 - Per-authenticator workflow serialization prevents multi-step flows on the same opened channel from interleaving.
 - CTAPHID channel isolation and per-command serialization allow independent clients to share an authenticator; external state changes remain possible between commands and must be handled as normal runtime errors.
-- `pinUvAuthToken` values and other runtime-owned secrets are never exposed through public results. Root `model` PIN operations omit PINs during JSON encoding; consumer-owned transport DTOs own secret decoding and must redact those fields without logging or persistence.
+- `pinUvAuthToken` values and other runtime-owned secrets are never exposed through public results. PIN operations in `model/config` omit PINs during JSON encoding; consumer-owned transport DTOs own secret decoding and must redact those fields without logging or persistence.
 - Mutating operations expose previews and dry-run behavior where useful. The runtime never treats a product confirmation flag as authorization.
 - Consumers own warnings and explicit confirmation for destructive flows such as reset, credential deletion, and large-blob deletion.
 - Factory reset must be executed shortly after authenticator power-up on many authenticators; consumers should collect strong confirmation before reconnecting and then invoke reset promptly.

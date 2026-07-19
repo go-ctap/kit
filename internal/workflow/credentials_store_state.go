@@ -6,13 +6,17 @@ import (
 
 	ctapauthenticator "github.com/go-ctap/ctap/authenticator"
 	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
 )
 
-func (r Runner) credentialStoreState(ctx context.Context) (appcredentials.StoreStateResult, error) {
+func (r Runner) CredentialStoreState(
+	ctx context.Context,
+	device authenticator.CredentialManager,
+) (appcredentials.StoreStateResult, error) {
 	r.env.Tokens.InvalidateUnlessPermission(protocol.PermissionPersistentCredentialManagementReadOnly)
 
 	var state ctapauthenticator.PersistentCredentialStoreState
@@ -24,7 +28,7 @@ func (r Runner) credentialStoreState(ctx context.Context) (appcredentials.StoreS
 		},
 		func(token []byte) error {
 			var err error
-			state, err = r.env.Authenticator.GetPersistentCredentialStoreState(ctx, token)
+			state, err = device.GetPersistentCredentialStoreState(ctx, token)
 
 			return err
 		},

@@ -82,7 +82,7 @@ func BuildEnableLongTouchForResetPreview(status StatusReport, mode safety.Previe
 	}, nil
 }
 
-func BuildMinPINLengthPreview(status StatusReport, req MinPINLengthRequest, mode safety.PreviewMode) (AuthenticatorConfigPreview, error) {
+func BuildMinPINLengthPreview(status StatusReport, operation SetMinPINLengthOperation, mode safety.PreviewMode) (AuthenticatorConfigPreview, error) {
 	if !status.AuthenticatorConfig.Supported {
 		return AuthenticatorConfigPreview{}, failure.New(failure.CodeAuthenticatorConfigUnsupported, failure.WithPhase(failure.PhaseValidation))
 	}
@@ -91,21 +91,21 @@ func BuildMinPINLengthPreview(status StatusReport, req MinPINLengthRequest, mode
 		return AuthenticatorConfigPreview{}, failure.New(failure.CodeMinPINLengthUnsupported, failure.WithPhase(failure.PhaseValidation))
 	}
 
-	if req.NewMinPINLength == nil && len(req.MinPINLengthRPIDs) == 0 && !req.ForceChangePIN && !req.PINComplexityPolicy {
+	if operation.NewMinPINLength == nil && len(operation.MinPINLengthRPIDs) == 0 && !operation.ForceChangePIN && !operation.PINComplexityPolicy {
 		return AuthenticatorConfigPreview{}, failure.New(failure.CodeCTAPParameterMissing, failure.WithPhase(failure.PhaseValidation))
 	}
 
-	if req.NewMinPINLength != nil && *req.NewMinPINLength < status.PIN.MinPINLength {
+	if operation.NewMinPINLength != nil && *operation.NewMinPINLength < status.PIN.MinPINLength {
 		return AuthenticatorConfigPreview{}, failure.New(failure.CodeMinPINLengthDecreaseNotAllowed,
 			failure.WithParams(map[string]string{
-				"requested": strconv.FormatUint(uint64(*req.NewMinPINLength), 10),
+				"requested": strconv.FormatUint(uint64(*operation.NewMinPINLength), 10),
 				"current":   strconv.FormatUint(uint64(status.PIN.MinPINLength), 10),
 			}),
 			failure.WithPhase(failure.PhaseValidation),
 		)
 	}
 
-	if req.NewMinPINLength != nil && *req.NewMinPINLength > status.PIN.MaxPINLength {
+	if operation.NewMinPINLength != nil && *operation.NewMinPINLength > status.PIN.MaxPINLength {
 		return AuthenticatorConfigPreview{}, failure.New(failure.CodeCTAPParameterInvalid, failure.WithPhase(failure.PhaseValidation))
 	}
 
@@ -122,7 +122,7 @@ func BuildMinPINLengthPreview(status StatusReport, req MinPINLengthRequest, mode
 		},
 	}
 
-	if len(req.MinPINLengthRPIDs) > 0 {
+	if len(operation.MinPINLengthRPIDs) > 0 {
 		warnings = append(warnings, safety.Warning{
 			Severity: safety.SeverityWarning,
 			Code:     warningMinPINLengthEnterpriseOverlap,
@@ -135,11 +135,11 @@ func BuildMinPINLengthPreview(status StatusReport, req MinPINLengthRequest, mode
 		Device:              status.Device,
 		Authenticator:       status.AuthenticatorConfig,
 		CurrentMinPINLength: status.PIN.MinPINLength,
-		NewMinPINLength:     req.NewMinPINLength,
+		NewMinPINLength:     operation.NewMinPINLength,
 		MaxPINLength:        status.PIN.MaxPINLength,
-		MinPINLengthRPIDs:   req.MinPINLengthRPIDs,
-		ForceChangePIN:      req.ForceChangePIN,
-		PINComplexityPolicy: req.PINComplexityPolicy,
+		MinPINLengthRPIDs:   operation.MinPINLengthRPIDs,
+		ForceChangePIN:      operation.ForceChangePIN,
+		PINComplexityPolicy: operation.PINComplexityPolicy,
 		Mode:                mode,
 		Warnings:            warnings,
 	}, nil

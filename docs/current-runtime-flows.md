@@ -12,9 +12,9 @@ The root `ctapkit` package exposes two device concepts:
   while the application has that device selected.
 
 `Authenticator` directly owns the opened device, selected discovery report,
-event dispatcher, token store, operation mutex, active-operation cancel
-function, and close state. There is no public session facade and no separate
-internal session core.
+token store, operation mutex, active-operation cancel function, and close
+state. There is no public session facade and no separate internal session
+core.
 
 ## Application Lifecycle
 
@@ -60,8 +60,8 @@ flowchart TD
   B --> C["Lock whole-operation mutex"]
   C --> D["Reject if authenticator is closed"]
   D --> E["Track cancelable operation context"]
-  E --> F["Create per-run interaction and token services"]
-  F --> G["Dispatch typed workflow"]
+  E --> F["Create shared per-run environment from options"]
+  F --> G["Pass only the required device capabilities to the typed workflow"]
   G --> H["Return typed result or normalized failure"]
   H --> I["Clear active cancel and unlock"]
 ```
@@ -70,9 +70,17 @@ The operation mutex prevents multi-command workflows on the same opened
 channel from interleaving. It is not a device-wide lease. Other authenticators
 and background probes use separate CTAPHID channels and can run concurrently.
 
-The interaction broker is operation-scoped because its handler and cancel
-context belong to one UI request. The token service is also operation-scoped,
-but it uses the token store owned by `Authenticator`.
+The interaction broker is operation-scoped because the handler supplied with
+`WithInteractionHandler` and its cancel context belong to one application
+request. The token service is also operation-scoped, but it uses the token
+store owned by `Authenticator`.
+
+The full opened `authenticator.Device` remains private to `Authenticator` for
+lifecycle and token acquisition. It is not stored in the workflow environment.
+Each workflow receives only its static capability contract: inspection,
+credentials, large blobs, configuration, biometrics, or WebAuthn. Large-blob
+workflows intentionally combine credential and large-blob capabilities because
+they obtain each credential's `largeBlobKey` from credential inventory.
 
 ## Runtime State
 

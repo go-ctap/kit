@@ -13,6 +13,7 @@ import (
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
+	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/transport"
 )
 
@@ -20,12 +21,12 @@ func TestAuthenticatorTypedOperationContract(t *testing.T) {
 	opened := openContractAuthenticator(t, nil, nil)
 	defer func() { _ = opened.Close() }()
 
-	output, err := opened.ConfigStatus(context.Background(), nil)
+	output, err := opened.ConfigStatus(context.Background(), WithInteractionHandler(nil))
 	if err != nil {
 		t.Fatalf("ConfigStatus: %v", err)
 	}
 
-	if output.Report.Device.Fingerprint == "" {
+	if output.Device.Fingerprint == "" {
 		t.Fatalf("unexpected output: %#v", output)
 	}
 }
@@ -124,10 +125,10 @@ func TestAuthenticatorCloseCancelsActiveRunAndClosesAuthenticatorOnce(t *testing
 	})
 
 	go func() {
-		_, err := opened.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
+		_, err := opened.WriteLargeBlob(context.Background(), applargeblobs.WriteOperation{
 			CredentialIDHex: "c05e",
 			Payload:         []byte("test"),
-		}, handler, opened.operationOptions()...)
+		}, opened.operationOptions(WithInteractionHandler(handler))...)
 		runDone <- err
 	}()
 
@@ -194,10 +195,10 @@ func TestAuthenticatorCloseCancelsContextAwareInteractionHandler(t *testing.T) {
 	})
 
 	go func() {
-		_, err := opened.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
+		_, err := opened.WriteLargeBlob(context.Background(), applargeblobs.WriteOperation{
 			CredentialIDHex: "c05e",
 			Payload:         []byte("test"),
-		}, handler, opened.operationOptions()...)
+		}, opened.operationOptions(WithInteractionHandler(handler))...)
 		runDone <- err
 	}()
 
@@ -243,9 +244,8 @@ func TestAuthenticatorCloseCancelsBlockedAuthenticatorCommand(t *testing.T) {
 	go func() {
 		_, err := opened.SetAlwaysUV(
 			context.Background(),
-			model.SetAlwaysUVOperation{Target: appconfig.AlwaysUVTargetEnable},
-			userVerificationHandler(t),
-			opened.operationOptions()...,
+			appconfig.SetAlwaysUVOperation{Target: appconfig.AlwaysUVTargetEnable},
+			opened.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 		)
 		runDone <- err
 	}()
@@ -275,7 +275,7 @@ func TestRunAfterAuthenticatorCloseIsRejected(t *testing.T) {
 		t.Fatalf("Close: %v", err)
 	}
 
-	result, err := opened.ConfigStatus(context.Background(), nil, opened.operationOptions()...)
+	result, err := opened.ConfigStatus(context.Background(), opened.operationOptions()...)
 	requireFailureCode(t, err, failure.CodeAuthenticatorClosed)
 
 	if result != nil {
@@ -300,9 +300,9 @@ func TestTransportConnectionFailureClosesAuthenticator(t *testing.T) {
 				return a, nil
 			})
 
-			_, err := opened.SetPIN(context.Background(), model.SetPINOperation{
+			_, err := opened.SetPIN(context.Background(), appconfig.SetPINOperation{
 				NewPIN: "1234",
-			}, nil, opened.operationOptions()...)
+			}, opened.operationOptions()...)
 			requireFailureCode(t, err, failure.CodeTransportFailure)
 
 			if !opened.Closed() {
@@ -313,7 +313,7 @@ func TestTransportConnectionFailureClosesAuthenticator(t *testing.T) {
 				t.Fatalf("authenticator close count = %d, want 1", got)
 			}
 
-			_, err = opened.ConfigStatus(context.Background(), nil, opened.operationOptions()...)
+			_, err = opened.ConfigStatus(context.Background(), opened.operationOptions()...)
 			requireFailureCode(t, err, failure.CodeAuthenticatorClosed)
 
 			if err := opened.Close(); err != nil {
@@ -341,9 +341,9 @@ func TestTransportFailureWithoutDeviceInvalidationKeepsAuthenticatorOpen(t *test
 				return a, nil
 			})
 
-			_, err := opened.SetPIN(context.Background(), model.SetPINOperation{
+			_, err := opened.SetPIN(context.Background(), appconfig.SetPINOperation{
 				NewPIN: "1234",
-			}, nil, opened.operationOptions()...)
+			}, opened.operationOptions()...)
 			requireFailureCode(t, err, failure.CodeTransportFailure)
 
 			if opened.Closed() {
@@ -375,9 +375,9 @@ func TestCanceledTransmitWithoutDeviceInvalidationKeepsAuthenticatorOpen(t *test
 	})
 	defer func() { _ = opened.Close() }()
 
-	_, err := opened.SetPIN(context.Background(), model.SetPINOperation{
+	_, err := opened.SetPIN(context.Background(), appconfig.SetPINOperation{
 		NewPIN: "1234",
-	}, nil, opened.operationOptions()...)
+	}, opened.operationOptions()...)
 	requireFailureCode(t, err, failure.CodeOperationCanceled)
 
 	if opened.Closed() {
@@ -439,7 +439,7 @@ func TestAuthenticatorEventSinksAreScopedToRun(t *testing.T) {
 
 	if _, err := opened.Authenticator.ListCredentials(
 		context.Background(),
-		userVerificationHandler(t),
+		WithInteractionHandler(userVerificationHandler(t)),
 		WithEventSink(firstEvents),
 	); err != nil {
 		t.Fatalf("first Run: %v", err)
@@ -456,7 +456,7 @@ func TestAuthenticatorEventSinksAreScopedToRun(t *testing.T) {
 
 	if _, err := opened.Authenticator.ListCredentials(
 		context.Background(),
-		userVerificationHandler(t),
+		WithInteractionHandler(userVerificationHandler(t)),
 		WithEventSink(secondEvents),
 	); err != nil {
 		t.Fatalf("second Run: %v", err)

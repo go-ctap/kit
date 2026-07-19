@@ -71,12 +71,12 @@ func TestCredentialInventoryReturnsEmptyReportWithoutEnumeratingRPs(t *testing.T
 	defer func() { _ = session.Close() }()
 
 	output := runCredentialList(t, session)
-	if output.Report.Summary.ExistingResidentCredentialsCount != 0 {
-		t.Fatalf("existing credential count = %d, want 0", output.Report.Summary.ExistingResidentCredentialsCount)
+	if output.Summary.ExistingResidentCredentialsCount != 0 {
+		t.Fatalf("existing credential count = %d, want 0", output.Summary.ExistingResidentCredentialsCount)
 	}
 
-	if output.Report.Summary.TotalCredentials != 0 || len(output.Report.Groups) != 0 {
-		t.Fatalf("empty inventory = %#v, want no groups or credentials", output.Report)
+	if output.Summary.TotalCredentials != 0 || len(output.Groups) != 0 {
+		t.Fatalf("empty inventory = %#v, want no groups or credentials", output)
 	}
 
 	if got := a.rpEnumerations.Load(); got != 0 {
@@ -92,8 +92,8 @@ func TestCredentialInventoryReacquiresRejectedTokenOnce(t *testing.T) {
 	defer func() { _ = session.Close() }()
 
 	output := runCredentialList(t, session)
-	if output.Report.Summary.ExistingResidentCredentialsCount != 0 {
-		t.Fatalf("existing credential count = %d, want 0", output.Report.Summary.ExistingResidentCredentialsCount)
+	if output.Summary.ExistingResidentCredentialsCount != 0 {
+		t.Fatalf("existing credential count = %d, want 0", output.Summary.ExistingResidentCredentialsCount)
 	}
 
 	if got := a.tokenCalls.Load(); got != 2 {
@@ -118,8 +118,7 @@ func TestCredentialInventoryStopsAfterSecondRejectedToken(t *testing.T) {
 
 	_, err := session.ListCredentials(
 		context.Background(),
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	)
 	if !failure.IsCode(err, failure.CodePINUVAuthInvalid) {
 		t.Fatalf("ListCredentials error = %v, want %s", err, failure.CodePINUVAuthInvalid)
@@ -148,9 +147,9 @@ func TestCredentialMutationUsesInventoryFromSuccessfulRefresh(t *testing.T) {
 		t.Fatalf("refreshed credential ID = %q, want 02", got)
 	}
 
-	if _, err := session.DeleteCredential(context.Background(), model.DeleteCredentialOperation{
+	if _, err := session.DeleteCredential(context.Background(), appcredentials.DeleteOperation{
 		CredentialIDHex: "02",
-	}, userVerificationHandler(t), session.operationOptions()...); err != nil {
+	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...); err != nil {
 		t.Fatalf("DeleteCredential: %v", err)
 	}
 
@@ -168,8 +167,7 @@ func TestCredentialInventoryProgressEventsIncludeCounts(t *testing.T) {
 
 	if _, err := session.ListCredentials(
 		context.Background(),
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -192,9 +190,9 @@ func TestCredentialDeleteReusesUnscopedInventoryGrant(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	_, err := session.DeleteCredential(context.Background(), model.DeleteCredentialOperation{
+	_, err := session.DeleteCredential(context.Background(), appcredentials.DeleteOperation{
 		CredentialIDHex: "c05e",
-	}, userVerificationHandler(t), session.operationOptions()...)
+	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -209,11 +207,11 @@ func TestCredentialUpdateUserUsesTargetWithoutInventory(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	_, err := session.UpdateCredentialUser(context.Background(), model.UpdateCredentialUserOperation{
+	_, err := session.UpdateCredentialUser(context.Background(), appcredentials.UpdateUserOperation{
 		Target:       credentialMutationTarget(),
 		Name:         "updated",
 		NameProvided: true,
-	}, userVerificationHandler(t), session.operationOptions()...)
+	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -231,12 +229,12 @@ func TestCredentialUpdateUserDryRunUsesTargetWithoutAuthenticatorCommands(t *tes
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.UpdateCredentialUser(context.Background(), model.UpdateCredentialUserOperation{
+	result, err := session.UpdateCredentialUser(context.Background(), appcredentials.UpdateUserOperation{
 		Target:       credentialMutationTarget(),
 		Name:         "updated",
 		NameProvided: true,
 		DryRun:       true,
-	}, nil, session.operationOptions()...)
+	}, session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -433,15 +431,16 @@ func (a *refreshCredentialAuthenticator) EnumerateCredentials(
 	}
 }
 
-func runCredentialList(t *testing.T, session *contractAuthenticatorHandle) model.CredentialsOutput {
+func runCredentialList(t *testing.T, session *contractAuthenticatorHandle) appcredentials.InventoryReport {
 	t.Helper()
 
 	var opts []OperationOption
 	if session.events != nil {
 		opts = append(opts, WithEventSink(session.events))
 	}
+	opts = append(opts, WithInteractionHandler(userVerificationHandler(t)))
 
-	output, err := session.ListCredentials(context.Background(), userVerificationHandler(t), opts...)
+	output, err := session.ListCredentials(context.Background(), opts...)
 	if err != nil {
 		t.Fatalf("ListCredentials: %v", err)
 	}
@@ -449,14 +448,14 @@ func runCredentialList(t *testing.T, session *contractAuthenticatorHandle) model
 	return *output
 }
 
-func credentialIDFromInventory(t *testing.T, output model.CredentialsOutput) string {
+func credentialIDFromInventory(t *testing.T, output appcredentials.InventoryReport) string {
 	t.Helper()
 
-	if len(output.Report.Groups) != 1 || len(output.Report.Groups[0].Credentials) != 1 {
-		t.Fatalf("credential inventory = %#v, want one credential", output.Report)
+	if len(output.Groups) != 1 || len(output.Groups[0].Credentials) != 1 {
+		t.Fatalf("credential inventory = %#v, want one credential", output)
 	}
 
-	return output.Report.Groups[0].Credentials[0].CredentialIDHex
+	return output.Groups[0].Credentials[0].CredentialIDHex
 }
 
 func (a *progressCredentialAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {

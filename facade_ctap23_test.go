@@ -12,7 +12,7 @@ import (
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/authenticator"
-	"github.com/go-ctap/kit/model"
+	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/transport"
 )
@@ -26,8 +26,7 @@ func TestCredentialStoreStateUsesStandalonePCMRToken(t *testing.T) {
 
 	if _, err := session.ListCredentials(
 		context.Background(),
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	); err != nil {
 		t.Fatalf("ListCredentials: %v", err)
 	}
@@ -35,16 +34,15 @@ func TestCredentialStoreStateUsesStandalonePCMRToken(t *testing.T) {
 
 	result, err := session.CredentialStoreState(
 		context.Background(),
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	)
 	if err != nil {
 		t.Fatalf("CredentialStoreState: %v", err)
 	}
 
-	if result.Result.AuthenticatorIdentifierHex != "000102030405060708090a0b0c0d0e0f" ||
-		result.Result.CredentialStoreStateHex != "101112131415161718191a1b1c1d1e1f" {
-		t.Fatalf("store state = %#v", result.Result)
+	if result.AuthenticatorIdentifierHex != "000102030405060708090a0b0c0d0e0f" ||
+		result.CredentialStoreStateHex != "101112131415161718191a1b1c1d1e1f" {
+		t.Fatalf("store state = %#v", result)
 	}
 	wantPermissions := []protocol.Permission{
 		protocol.PermissionCredentialManagement,
@@ -69,8 +67,7 @@ func TestCredentialInventoryRejectsMissingMandatoryMetadataTotals(t *testing.T) 
 
 	_, err := session.ListCredentials(
 		context.Background(),
-		userVerificationHandler(t),
-		session.operationOptions()...,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	)
 	if !failure.IsCode(err, failure.CodeCTAPSpecViolation) {
 		t.Fatalf("ListCredentials error = %v, want spec violation", err)
@@ -85,13 +82,12 @@ func TestEnableLongTouchForResetDryRunAndRefreshFailureCacheEffects(t *testing.T
 	})
 	defer func() { _ = session.Close() }()
 
-	if _, err := session.ConfigStatus(context.Background(), nil, session.operationOptions()...); err != nil {
+	if _, err := session.ConfigStatus(context.Background(), session.operationOptions()...); err != nil {
 		t.Fatalf("prime ConfigStatus: %v", err)
 	}
 	dryRun, err := session.EnableLongTouchForReset(
 		context.Background(),
-		model.EnableLongTouchForResetOperation{DryRun: true},
-		nil,
+		appconfig.EnableLongTouchForResetOperation{DryRun: true},
 		session.operationOptions()...,
 	)
 	if err != nil {
@@ -104,8 +100,7 @@ func TestEnableLongTouchForResetDryRunAndRefreshFailureCacheEffects(t *testing.T
 
 	result, err := session.EnableLongTouchForReset(
 		context.Background(),
-		model.EnableLongTouchForResetOperation{},
-		nil,
+		appconfig.EnableLongTouchForResetOperation{},
 		session.operationOptions()...,
 	)
 	if !failure.IsCode(err, failure.CodeInternalError) || !errors.Is(err, refreshErr) {
@@ -116,12 +111,12 @@ func TestEnableLongTouchForResetDryRunAndRefreshFailureCacheEffects(t *testing.T
 		t.Fatalf("execute result/calls = %#v/%d", result, a.enableCalls.Load())
 	}
 
-	status, err := session.ConfigStatus(context.Background(), nil, session.operationOptions()...)
+	status, err := session.ConfigStatus(context.Background(), session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("ConfigStatus after refresh failure: %v", err)
 	}
 
-	if got := status.Report.ResetHints.LongTouchForReset; got != "configured" {
+	if got := status.ResetHints.LongTouchForReset; got != "configured" {
 		t.Fatalf("long touch status = %s, want configured", got)
 	}
 
@@ -139,8 +134,7 @@ func TestEnableLongTouchForResetSuccess(t *testing.T) {
 
 	result, err := session.EnableLongTouchForReset(
 		context.Background(),
-		model.EnableLongTouchForResetOperation{},
-		nil,
+		appconfig.EnableLongTouchForResetOperation{},
 		session.operationOptions()...,
 	)
 	if err != nil {
@@ -159,11 +153,11 @@ func TestSetMinPINLengthPassesParametersWithoutDefaults(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.SetMinPINLength(context.Background(), model.SetMinPINLengthOperation{
+	result, err := session.SetMinPINLength(context.Background(), appconfig.SetMinPINLengthOperation{
 		MinPINLengthRPIDs:   []string{"example.com"},
 		ForceChangePIN:      true,
 		PINComplexityPolicy: true,
-	}, nil, session.operationOptions()...)
+	}, session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("SetMinPINLength: %v", err)
 	}
