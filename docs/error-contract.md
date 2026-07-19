@@ -1,13 +1,13 @@
 # Machine-Readable Error Contract
 
 Public runtime failures use `model/failure`. Go callers receive a
-`*failure.Error`; service DTOs expose the same data as `*failure.Failure` under
-their `error` or `failure` field.
+`*failure.Error`; consumer-owned transport DTOs can expose the same data as
+`*failure.Failure` under their `error` or `failure` field.
 
 ## Go API
 
 ```go
-result, err := authenticator.Run(ctx, operation, handler)
+result, err := authenticator.ListCredentials(ctx, handler)
 if err != nil {
 	if failure.IsCode(err, failure.CodeCredentialNotFound) {
 		// Choose recovery or localized UI by the stable code.
@@ -64,9 +64,9 @@ Only `code` and `category` are always present.
 | `ctap` | Exact authenticator command and status provenance. |
 
 `failure.Failure` is an ordinary typed struct. It does not implement custom
-JSON marshaling, so Wails can generate a typed binding. Runtime code constructs
-errors through `New` or `Wrap` and service DTOs use `Snapshot`; those boundaries
-apply the registry without cloning the stored failure.
+JSON marshaling, so binding generators can expose it directly. Runtime code
+constructs errors through `New` or `Wrap`; consumer transport DTOs use
+`Snapshot` to apply the registry without cloning the stored failure.
 
 ## Stable Registry
 
@@ -224,7 +224,7 @@ engineering view of the exchange, not a byte-exact capture. The raw bytes and
 secret-bearing typed fields never enter the journal.
 
 Other runtime journal entries contain metadata and normalized failures only;
-service request and response DTOs are not serialized into log payloads.
+application request and response DTOs are not serialized into log payloads.
 
 Completed journal entries include the bounded retained cause of transport
 failures as a log-only `errorMessage`:

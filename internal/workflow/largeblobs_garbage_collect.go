@@ -25,7 +25,7 @@ type garbageCollectState struct {
 	sizeAfter      int
 }
 
-func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageCollectLargeBlobsOperation) (model.OperationResult, error) {
+func (r Runner) garbageCollectLargeBlobs(ctx context.Context, req model.GarbageCollectLargeBlobsOperation) (model.LargeBlobMutationOutput, error) {
 	var output model.LargeBlobMutationOutput
 
 	inventoryPermission, mutationPermission, err := r.inventoryMutationPermissions(

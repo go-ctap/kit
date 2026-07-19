@@ -23,13 +23,13 @@ func TestCredentialInventoryDoesNotMarshalLargeBlobKey(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	output, err := session.Run(
+	output, err := session.ListCredentials(
 		context.Background(),
-		model.ListCredentialsOperation{},
 		userVerificationHandler(t),
+		session.operationOptions()...,
 	)
 	if err != nil {
-		t.Fatalf("Run: %v", err)
+		t.Fatalf("ListCredentials: %v", err)
 	}
 
 	raw, err := json.Marshal(output)
@@ -56,10 +56,10 @@ func TestLargeBlobWriteEventsFollowInteractionAndInventoryOrder(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
+	result, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-	}, userVerificationHandler(t))
+	}, userVerificationHandler(t), session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -101,10 +101,10 @@ func TestLargeBlobWriteUsesSeparateGrantForReadOnlyInventory(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	_, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
+	_, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-	}, userVerificationHandler(t))
+	}, userVerificationHandler(t), session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("WriteLargeBlob: %v", err)
 	}
@@ -129,17 +129,12 @@ func TestLargeBlobWriteCapacityErrorKeepsPreview(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
+	output, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
 		DryRun:          true,
-	}, userVerificationHandler(t))
+	}, userVerificationHandler(t), session.operationOptions()...)
 	requireFailureCode(t, err, failure.CodeLargeBlobArrayTooLarge)
-
-	output, ok := result.(model.LargeBlobMutationOutput)
-	if !ok {
-		t.Fatalf("result = %T, want LargeBlobMutationOutput", result)
-	}
 
 	if output.Preview.SerializedLargeBlobArrayLimit != 16 {
 		t.Fatalf("preview limit = %#v, want 16", output.Preview.SerializedLargeBlobArrayLimit)
@@ -160,18 +155,13 @@ func TestLargeBlobWriteZeroCapacityMeansUnknownLimit(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
+	output, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
 		DryRun:          true,
-	}, userVerificationHandler(t))
+	}, userVerificationHandler(t), session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("WriteLargeBlob dry run: %v", err)
-	}
-
-	output, ok := result.(model.LargeBlobMutationOutput)
-	if !ok {
-		t.Fatalf("result = %T, want LargeBlobMutationOutput", result)
 	}
 
 	if output.Preview.SerializedLargeBlobArrayLimit != 0 {
@@ -186,17 +176,17 @@ func TestLargeBlobReadAndPreviewReadFreshAuthenticatorState(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	if _, err := session.Run(context.Background(), model.ReadLargeBlobOperation{
+	if _, err := session.ReadLargeBlob(context.Background(), model.ReadLargeBlobOperation{
 		CredentialIDHex: "c05e",
-	}, userVerificationHandler(t)); err != nil {
+	}, userVerificationHandler(t), session.operationOptions()...); err != nil {
 		t.Fatalf("read large blob: %v", err)
 	}
 
-	if _, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
+	if _, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
 		DryRun:          true,
-	}, userVerificationHandler(t)); err != nil {
+	}, userVerificationHandler(t), session.operationOptions()...); err != nil {
 		t.Fatalf("preview write large blob: %v", err)
 	}
 
@@ -220,11 +210,11 @@ func TestLargeBlobListReadsFreshReport(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	if _, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t)); err != nil {
+	if _, err := session.ListLargeBlobs(context.Background(), userVerificationHandler(t), session.operationOptions()...); err != nil {
 		t.Fatalf("list large blobs: %v", err)
 	}
 
-	if _, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t)); err != nil {
+	if _, err := session.ListLargeBlobs(context.Background(), userVerificationHandler(t), session.operationOptions()...); err != nil {
 		t.Fatalf("list large blobs again: %v", err)
 	}
 
@@ -248,7 +238,7 @@ func TestLargeBlobListAlwaysObservesCurrentAuthenticatorState(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	if _, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t)); err != nil {
+	if _, err := session.ListLargeBlobs(context.Background(), userVerificationHandler(t), session.operationOptions()...); err != nil {
 		t.Fatalf("first ListLargeBlobs: %v", err)
 	}
 
@@ -258,24 +248,22 @@ func TestLargeBlobListAlwaysObservesCurrentAuthenticatorState(t *testing.T) {
 	}
 	a.largeBlobs = []protocol.LargeBlob{added}
 
-	result, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t))
+	output, err := session.ListLargeBlobs(context.Background(), userVerificationHandler(t), session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("refreshed ListLargeBlobs: %v", err)
 	}
 
-	output, ok := result.(model.LargeBlobListOutput)
-	if !ok || len(output.Report.Credentials) != 1 || !output.Report.Credentials[0].BlobPresent {
-		t.Fatalf("refreshed large blob output = %#v, want one present credential blob", result)
+	if len(output.Report.Credentials) != 1 || !output.Report.Credentials[0].BlobPresent {
+		t.Fatalf("refreshed large blob output = %#v, want one present credential blob", output)
 	}
 
-	cached, err := session.Run(context.Background(), model.ListLargeBlobsOperation{}, userVerificationHandler(t))
+	cachedOutput, err := session.ListLargeBlobs(context.Background(), userVerificationHandler(t), session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("cached ListLargeBlobs after refresh: %v", err)
 	}
 
-	cachedOutput, ok := cached.(model.LargeBlobListOutput)
-	if !ok || len(cachedOutput.Report.Credentials) != 1 || !cachedOutput.Report.Credentials[0].BlobPresent {
-		t.Fatalf("cached large blob output = %#v, want refreshed report", cached)
+	if len(cachedOutput.Report.Credentials) != 1 || !cachedOutput.Report.Credentials[0].BlobPresent {
+		t.Fatalf("cached large blob output = %#v, want refreshed report", cachedOutput)
 	}
 
 	if got := a.rpEnumerations.Load(); got != 3 {
@@ -309,16 +297,11 @@ func TestLargeBlobDeleteLastBlobWritesEmptyArray(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Run(context.Background(), model.DeleteLargeBlobOperation{
+	output, err := session.DeleteLargeBlob(context.Background(), model.DeleteLargeBlobOperation{
 		CredentialIDHex: "c05e",
-	}, userVerificationHandler(t))
+	}, userVerificationHandler(t), session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("delete large blob: %v", err)
-	}
-
-	output, ok := result.(model.LargeBlobMutationOutput)
-	if !ok {
-		t.Fatalf("result = %T, want LargeBlobMutationOutput", result)
 	}
 
 	if output.Result == nil {
@@ -374,14 +357,14 @@ func TestLargeBlobGarbageCollectNoopDoesNotWrite(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Run(context.Background(), model.GarbageCollectLargeBlobsOperation{}, userVerificationHandler(t))
+	output, err := session.GarbageCollectLargeBlobs(
+		context.Background(),
+		model.GarbageCollectLargeBlobsOperation{},
+		userVerificationHandler(t),
+		session.operationOptions()...,
+	)
 	if err != nil {
 		t.Fatalf("garbage collect large blobs: %v", err)
-	}
-
-	output, ok := result.(model.LargeBlobMutationOutput)
-	if !ok {
-		t.Fatalf("result = %T, want LargeBlobMutationOutput", result)
 	}
 
 	if output.Result == nil {
@@ -423,14 +406,14 @@ func TestLargeBlobGarbageCollectSkipsNonConformingEntries(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Run(context.Background(), model.GarbageCollectLargeBlobsOperation{}, userVerificationHandler(t))
+	output, err := session.GarbageCollectLargeBlobs(
+		context.Background(),
+		model.GarbageCollectLargeBlobsOperation{},
+		userVerificationHandler(t),
+		session.operationOptions()...,
+	)
 	if err != nil {
 		t.Fatalf("garbage collect large blobs: %v", err)
-	}
-
-	output, ok := result.(model.LargeBlobMutationOutput)
-	if !ok {
-		t.Fatalf("result = %T, want LargeBlobMutationOutput", result)
 	}
 
 	if output.Result == nil {
@@ -472,14 +455,14 @@ func TestLargeBlobGarbageCollectRemovesOnlyUnmatchedEntries(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Run(context.Background(), model.GarbageCollectLargeBlobsOperation{}, userVerificationHandler(t))
+	output, err := session.GarbageCollectLargeBlobs(
+		context.Background(),
+		model.GarbageCollectLargeBlobsOperation{},
+		userVerificationHandler(t),
+		session.operationOptions()...,
+	)
 	if err != nil {
 		t.Fatalf("garbage collect large blobs: %v", err)
-	}
-
-	output, ok := result.(model.LargeBlobMutationOutput)
-	if !ok {
-		t.Fatalf("result = %T, want LargeBlobMutationOutput", result)
 	}
 
 	if output.Result == nil {
@@ -529,14 +512,14 @@ func TestLargeBlobGarbageCollectAllUnmatchedWritesEmptyArray(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Run(context.Background(), model.GarbageCollectLargeBlobsOperation{}, userVerificationHandler(t))
+	output, err := session.GarbageCollectLargeBlobs(
+		context.Background(),
+		model.GarbageCollectLargeBlobsOperation{},
+		userVerificationHandler(t),
+		session.operationOptions()...,
+	)
 	if err != nil {
 		t.Fatalf("garbage collect large blobs: %v", err)
-	}
-
-	output, ok := result.(model.LargeBlobMutationOutput)
-	if !ok {
-		t.Fatalf("result = %T, want LargeBlobMutationOutput", result)
 	}
 
 	if output.Result == nil {
@@ -584,10 +567,10 @@ func TestLargeBlobWritePINOnlyFlowDoesNotRequestUserVerification(t *testing.T) {
 		}, nil
 	})
 
-	result, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
+	result, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-	}, handler)
+	}, handler, session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -648,18 +631,18 @@ func TestLargeBlobWritePreparedRefreshRequestsPINOnce(t *testing.T) {
 		return model.InteractionResponse{PIN: []byte("1234")}, nil
 	})
 
-	_, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
+	_, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-	}, handler)
+	}, handler, session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("WriteLargeBlob: %v", err)
 	}
 
-	if _, err := session.Run(
+	if _, err := session.ListLargeBlobs(
 		context.Background(),
-		model.ListLargeBlobsOperation{},
 		handler,
+		session.operationOptions()...,
 	); err != nil {
 		t.Fatalf("ListLargeBlobs refresh: %v", err)
 	}
@@ -695,21 +678,21 @@ func TestLargeBlobWritePINVerificationFlowSkipsUVForUVCapableAuthenticator(t *te
 		return model.InteractionResponse{PIN: []byte("1234")}, nil
 	})
 
-	result, err := session.Run(
+	result, err := session.WriteLargeBlob(
 		context.Background(),
 		model.WriteLargeBlobOperation{
 			CredentialIDHex: "c05e",
 			Payload:         []byte("test"),
 		},
 		handler,
-		WithVerificationFlow(model.VerificationFlowPIN),
+		session.operationOptions(WithVerificationFlow(model.VerificationFlowPIN))...,
 	)
 	if err != nil {
-		t.Fatalf("Run: %v", err)
+		t.Fatalf("WriteLargeBlob: %v", err)
 	}
 
-	if result == nil {
-		t.Fatal("result = nil, want output")
+	if result.Result == nil {
+		t.Fatal("mutation result = nil, want output")
 	}
 
 	if got := a.pinCalls.Load(); got != 1 {

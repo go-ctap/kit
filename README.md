@@ -46,22 +46,22 @@ This repository does not own terminal UX, command parsing, output rendering, MDS
 
 A consumer should generally do this:
 
-1. Convert UI or CLI input into a typed `model.Operation`.
+1. Convert UI or CLI input into the typed `model` input for the operation.
 2. Discover devices with `ctapkit.DiscoverDevices`.
 3. Pick one returned `ctapkit.Device` handle and open it with `ctapkit.OpenAuthenticator`.
-4. Run typed operations synchronously with `Authenticator.Run`.
+4. Call the corresponding typed `Authenticator` method synchronously.
 5. Close the authenticator when the selected device changes or the application exits.
 
 `Authenticator` is the single long-lived runtime entity for an opened transport channel. It owns close/cancel behavior, whole-operation serialization, and one reusable `pinUvAuthToken`. It does not cache credential inventories, configuration reports, or large-blob reports; those values are read from the authenticator for every operation because device state can be changed by another channel between commands.
 
-`Authenticator.Run` returns the typed `model.OperationResult` directly. Consumers that need non-blocking UI can call it from their own goroutine or task. Progress and UI updates are delivered through the `model.EventSink` attached with `ctapkit.WithEventSink`; PIN, user-verification, touch, and confirm participation is delivered through `model.InteractionHandler`.
+Each operation method returns a pointer to its concrete output type. A nil output means execution stopped before a workflow result existed; a non-nil output can carry a partial preview or result together with an error. For example, `Authenticator.ListCredentials` returns `*model.CredentialsOutput`, while `Authenticator.DeleteCredential` accepts `model.DeleteCredentialOperation` and returns `*model.CredentialDeleteOutput`. Consumers that need non-blocking UI can call these methods from their own goroutine or task. Progress and UI updates are delivered through the `model.EventSink` attached with `ctapkit.WithEventSink`; PIN, user-verification, touch, and confirm participation is delivered through `model.InteractionHandler`.
 Interaction requests and operation events contain only their prompt or event payload; consumers should correlate work through the `*ctapkit.Authenticator` handle and their own event sink ownership.
 
 Public failures use stable codes, optional safe interpolation parameters, and
 exact CTAP provenance. See the [machine-readable error
 contract](docs/error-contract.md).
 
-Verification defaults to UV when the authenticator supports it, with PIN fallback when CTAP reports a fallback condition. A consumer that wants to offer "use PIN" before starting work can pass `ctapkit.WithVerificationFlow(model.VerificationFlowPIN)` to `Authenticator.Run`. User-verification interactions are pre-command prompt and cancel points; the authenticator remains authoritative for whether UV actually succeeds.
+Verification defaults to UV when the authenticator supports it, with PIN fallback when CTAP reports a fallback condition. A consumer that wants to offer "use PIN" before starting work can pass `ctapkit.WithVerificationFlow(model.VerificationFlowPIN)` to the typed operation method. User-verification interactions are pre-command prompt and cancel points; the authenticator remains authoritative for whether UV actually succeeds.
 
 Core operations are intentionally UI-neutral. PIN prompts, user verification messages, spinners, progress bars, tables, JSON/YAML formatting, and GUI/TUI event presentation belong to the consumer.
 
@@ -102,7 +102,7 @@ verified is retained for a later retry but is never returned as verified data.
 
 - Per-authenticator workflow serialization prevents multi-step flows on the same opened channel from interleaving.
 - CTAPHID channel isolation and per-command serialization allow independent clients to share an authenticator; external state changes remain possible between commands and must be handled as normal runtime errors.
-- `pinUvAuthToken` values and other runtime-owned secrets are never exposed through public results. Root `model` PIN operations omit PINs when marshaled; the Wails-oriented `service` request DTOs keep typed PIN fields in JSON, so adapters and clients must redact them and must not log or persist serialized requests.
+- `pinUvAuthToken` values and other runtime-owned secrets are never exposed through public results. Root `model` PIN operations omit PINs when marshaled; consumer-owned transport DTOs may expose typed PIN fields and must redact them without logging or persistence.
 - Mutating operations preserve dry-run and confirmation semantics.
 - Destructive flows such as reset, credential deletion, and large-blob deletion require explicit confirmation.
 - Factory reset must be executed shortly after authenticator power-up on many authenticators; consumers should collect any strong UI confirmation before reconnecting and then run a confirmed reset promptly.
@@ -124,8 +124,9 @@ CBOR body; the command byte is reported separately as `commandCode`.
 
 Non-CTAP runtime entries are metadata-only: they retain event kind, outcome,
 correlation IDs, small non-secret parameters, and normalized failures, but do
-not copy service request or response DTOs into the journal. This keeps secret
-handling out of the logging layer and avoids duplicating application state.
+not copy application request or response DTOs into the journal. This keeps
+secret handling out of the logging layer and avoids duplicating application
+state.
 
 ## Verification
 

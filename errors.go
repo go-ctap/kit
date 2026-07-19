@@ -12,8 +12,17 @@ func normalizeRunError(err error, operation string) error {
 	), operation)
 }
 
-func normalizeBoundaryError(err error, phase failure.Phase) error {
+// NormalizeError maps a boundary error to the stable public failure contract.
+func NormalizeError(err error, phase failure.Phase) error {
+	if err == nil {
+		return nil
+	}
+
 	return errornorm.Normalize(errornorm.Annotate(err, errornorm.WithPhase(phase)), "")
+}
+
+func normalizeBoundaryError(err error, phase failure.Phase) error {
+	return NormalizeError(err, phase)
 }
 
 func runtimePINRequiredError(field string) error {

@@ -20,13 +20,12 @@ func TestAuthenticatorTypedOperationContract(t *testing.T) {
 	opened := openContractAuthenticator(t, nil, nil)
 	defer func() { _ = opened.Close() }()
 
-	output, err := opened.Run(context.Background(), model.ConfigStatusOperation{}, nil)
+	output, err := opened.ConfigStatus(context.Background(), nil)
 	if err != nil {
-		t.Fatalf("Run: %v", err)
+		t.Fatalf("ConfigStatus: %v", err)
 	}
 
-	typed, ok := output.(model.ConfigStatusOutput)
-	if !ok || typed.Report.Device.Fingerprint == "" {
+	if output.Report.Device.Fingerprint == "" {
 		t.Fatalf("unexpected output: %#v", output)
 	}
 }
@@ -52,7 +51,7 @@ func TestAuthenticatorPreCompletedContextHasAuthenticatorPhase(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := opened.Run(tt.ctx, model.ConfigStatusOperation{}, nil)
+			_, err := opened.ConfigStatus(tt.ctx, nil)
 			requireFailureCode(t, err, tt.code)
 
 			snapshot := failure.Snapshot(err)
@@ -125,10 +124,10 @@ func TestAuthenticatorCloseCancelsActiveRunAndClosesAuthenticatorOnce(t *testing
 	})
 
 	go func() {
-		_, err := opened.Run(context.Background(), model.WriteLargeBlobOperation{
+		_, err := opened.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
 			CredentialIDHex: "c05e",
 			Payload:         []byte("test"),
-		}, handler)
+		}, handler, opened.operationOptions()...)
 		runDone <- err
 	}()
 
@@ -195,10 +194,10 @@ func TestAuthenticatorCloseCancelsContextAwareInteractionHandler(t *testing.T) {
 	})
 
 	go func() {
-		_, err := opened.Run(context.Background(), model.WriteLargeBlobOperation{
+		_, err := opened.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
 			CredentialIDHex: "c05e",
 			Payload:         []byte("test"),
-		}, handler)
+		}, handler, opened.operationOptions()...)
 		runDone <- err
 	}()
 
@@ -242,10 +241,11 @@ func TestAuthenticatorCloseCancelsBlockedAuthenticatorCommand(t *testing.T) {
 
 	runDone := make(chan error, 1)
 	go func() {
-		_, err := opened.Run(
+		_, err := opened.SetAlwaysUV(
 			context.Background(),
 			model.SetAlwaysUVOperation{Target: appconfig.AlwaysUVTargetEnable},
 			userVerificationHandler(t),
+			opened.operationOptions()...,
 		)
 		runDone <- err
 	}()
@@ -275,7 +275,7 @@ func TestRunAfterAuthenticatorCloseIsRejected(t *testing.T) {
 		t.Fatalf("Close: %v", err)
 	}
 
-	result, err := opened.Run(context.Background(), model.ConfigStatusOperation{}, nil)
+	result, err := opened.ConfigStatus(context.Background(), nil, opened.operationOptions()...)
 	requireFailureCode(t, err, failure.CodeAuthenticatorClosed)
 
 	if result != nil {
@@ -300,9 +300,9 @@ func TestTransportConnectionFailureClosesAuthenticator(t *testing.T) {
 				return a, nil
 			})
 
-			_, err := opened.Run(context.Background(), model.SetPINOperation{
+			_, err := opened.SetPIN(context.Background(), model.SetPINOperation{
 				NewPIN: "1234",
-			}, nil)
+			}, nil, opened.operationOptions()...)
 			requireFailureCode(t, err, failure.CodeTransportFailure)
 
 			if !opened.Closed() {
@@ -313,7 +313,7 @@ func TestTransportConnectionFailureClosesAuthenticator(t *testing.T) {
 				t.Fatalf("authenticator close count = %d, want 1", got)
 			}
 
-			_, err = opened.Run(context.Background(), model.ConfigStatusOperation{}, nil)
+			_, err = opened.ConfigStatus(context.Background(), nil, opened.operationOptions()...)
 			requireFailureCode(t, err, failure.CodeAuthenticatorClosed)
 
 			if err := opened.Close(); err != nil {
@@ -341,9 +341,9 @@ func TestTransportFailureWithoutDeviceInvalidationKeepsAuthenticatorOpen(t *test
 				return a, nil
 			})
 
-			_, err := opened.Run(context.Background(), model.SetPINOperation{
+			_, err := opened.SetPIN(context.Background(), model.SetPINOperation{
 				NewPIN: "1234",
-			}, nil)
+			}, nil, opened.operationOptions()...)
 			requireFailureCode(t, err, failure.CodeTransportFailure)
 
 			if opened.Closed() {
@@ -375,9 +375,9 @@ func TestCanceledTransmitWithoutDeviceInvalidationKeepsAuthenticatorOpen(t *test
 	})
 	defer func() { _ = opened.Close() }()
 
-	_, err := opened.Run(context.Background(), model.SetPINOperation{
+	_, err := opened.SetPIN(context.Background(), model.SetPINOperation{
 		NewPIN: "1234",
-	}, nil)
+	}, nil, opened.operationOptions()...)
 	requireFailureCode(t, err, failure.CodeOperationCanceled)
 
 	if opened.Closed() {
@@ -437,9 +437,8 @@ func TestAuthenticatorEventSinksAreScopedToRun(t *testing.T) {
 	})
 	defer func() { _ = opened.Close() }()
 
-	if _, err := opened.Authenticator.Run(
+	if _, err := opened.Authenticator.ListCredentials(
 		context.Background(),
-		model.ListCredentialsOperation{},
 		userVerificationHandler(t),
 		WithEventSink(firstEvents),
 	); err != nil {
@@ -455,9 +454,8 @@ func TestAuthenticatorEventSinksAreScopedToRun(t *testing.T) {
 		t.Fatalf("second sink events before second run = %d, want 0", got)
 	}
 
-	if _, err := opened.Authenticator.Run(
+	if _, err := opened.Authenticator.ListCredentials(
 		context.Background(),
-		model.ListCredentialsOperation{},
 		userVerificationHandler(t),
 		WithEventSink(secondEvents),
 	); err != nil {

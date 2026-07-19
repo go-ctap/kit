@@ -24,20 +24,27 @@ func TestCredentialStoreStateUsesStandalonePCMRToken(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	if _, err := session.Run(context.Background(), model.ListCredentialsOperation{}, userVerificationHandler(t)); err != nil {
+	if _, err := session.ListCredentials(
+		context.Background(),
+		userVerificationHandler(t),
+		session.operationOptions()...,
+	); err != nil {
 		t.Fatalf("ListCredentials: %v", err)
 	}
 	a.readOnly.Store(true)
 
-	result, err := session.Run(context.Background(), model.CredentialStoreStateOperation{}, userVerificationHandler(t))
+	result, err := session.CredentialStoreState(
+		context.Background(),
+		userVerificationHandler(t),
+		session.operationOptions()...,
+	)
 	if err != nil {
 		t.Fatalf("CredentialStoreState: %v", err)
 	}
 
-	output := result.(model.CredentialStoreStateOutput)
-	if output.Result.AuthenticatorIdentifierHex != "000102030405060708090a0b0c0d0e0f" ||
-		output.Result.CredentialStoreStateHex != "101112131415161718191a1b1c1d1e1f" {
-		t.Fatalf("store state = %#v", output.Result)
+	if result.Result.AuthenticatorIdentifierHex != "000102030405060708090a0b0c0d0e0f" ||
+		result.Result.CredentialStoreStateHex != "101112131415161718191a1b1c1d1e1f" {
+		t.Fatalf("store state = %#v", result.Result)
 	}
 	wantPermissions := []protocol.Permission{
 		protocol.PermissionCredentialManagement,
@@ -60,7 +67,11 @@ func TestCredentialInventoryRejectsMissingMandatoryMetadataTotals(t *testing.T) 
 	})
 	defer func() { _ = session.Close() }()
 
-	_, err := session.Run(context.Background(), model.ListCredentialsOperation{}, userVerificationHandler(t))
+	_, err := session.ListCredentials(
+		context.Background(),
+		userVerificationHandler(t),
+		session.operationOptions()...,
+	)
 	if !failure.IsCode(err, failure.CodeCTAPSpecViolation) {
 		t.Fatalf("ListCredentials error = %v, want spec violation", err)
 	}
@@ -74,33 +85,43 @@ func TestEnableLongTouchForResetDryRunAndRefreshFailureCacheEffects(t *testing.T
 	})
 	defer func() { _ = session.Close() }()
 
-	if _, err := session.Run(context.Background(), model.ConfigStatusOperation{}, nil); err != nil {
+	if _, err := session.ConfigStatus(context.Background(), nil, session.operationOptions()...); err != nil {
 		t.Fatalf("prime ConfigStatus: %v", err)
 	}
-	dryRun, err := session.Run(context.Background(), model.EnableLongTouchForResetOperation{DryRun: true}, nil)
+	dryRun, err := session.EnableLongTouchForReset(
+		context.Background(),
+		model.EnableLongTouchForResetOperation{DryRun: true},
+		nil,
+		session.operationOptions()...,
+	)
 	if err != nil {
 		t.Fatalf("dry run: %v", err)
 	}
 
-	if dryRun.(model.AuthenticatorConfigOutput).Result != nil || a.enableCalls.Load() != 0 {
+	if dryRun.Result != nil || a.enableCalls.Load() != 0 {
 		t.Fatalf("dry run result/calls = %#v/%d", dryRun, a.enableCalls.Load())
 	}
 
-	result, err := session.Run(context.Background(), model.EnableLongTouchForResetOperation{}, nil)
+	result, err := session.EnableLongTouchForReset(
+		context.Background(),
+		model.EnableLongTouchForResetOperation{},
+		nil,
+		session.operationOptions()...,
+	)
 	if !failure.IsCode(err, failure.CodeInternalError) || !errors.Is(err, refreshErr) {
 		t.Fatalf("execute error = %v, want refresh failure", err)
 	}
 
-	if result.(model.AuthenticatorConfigOutput).Result != nil || a.enableCalls.Load() != 1 {
+	if result.Result != nil || a.enableCalls.Load() != 1 {
 		t.Fatalf("execute result/calls = %#v/%d", result, a.enableCalls.Load())
 	}
 
-	status, err := session.Run(context.Background(), model.ConfigStatusOperation{}, nil)
+	status, err := session.ConfigStatus(context.Background(), nil, session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("ConfigStatus after refresh failure: %v", err)
 	}
 
-	if got := status.(model.ConfigStatusOutput).Report.ResetHints.LongTouchForReset; got != "configured" {
+	if got := status.Report.ResetHints.LongTouchForReset; got != "configured" {
 		t.Fatalf("long touch status = %s, want configured", got)
 	}
 
@@ -116,14 +137,18 @@ func TestEnableLongTouchForResetSuccess(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Run(context.Background(), model.EnableLongTouchForResetOperation{}, nil)
+	result, err := session.EnableLongTouchForReset(
+		context.Background(),
+		model.EnableLongTouchForResetOperation{},
+		nil,
+		session.operationOptions()...,
+	)
 	if err != nil {
 		t.Fatalf("EnableLongTouchForReset: %v", err)
 	}
 
-	output := result.(model.AuthenticatorConfigOutput)
-	if output.Result == nil || output.Result.State != "configured" || a.enableCalls.Load() != 1 {
-		t.Fatalf("output/calls = %#v/%d", output, a.enableCalls.Load())
+	if result.Result == nil || result.Result.State != "configured" || a.enableCalls.Load() != 1 {
+		t.Fatalf("output/calls = %#v/%d", result, a.enableCalls.Load())
 	}
 }
 
@@ -134,11 +159,11 @@ func TestSetMinPINLengthPassesParametersWithoutDefaults(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Run(context.Background(), model.SetMinPINLengthOperation{
+	result, err := session.SetMinPINLength(context.Background(), model.SetMinPINLengthOperation{
 		MinPINLengthRPIDs:   []string{"example.com"},
 		ForceChangePIN:      true,
 		PINComplexityPolicy: true,
-	}, nil)
+	}, nil, session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("SetMinPINLength: %v", err)
 	}
@@ -148,10 +173,9 @@ func TestSetMinPINLengthPassesParametersWithoutDefaults(t *testing.T) {
 		t.Fatalf("upstream params = %#v", a.params)
 	}
 
-	output := result.(model.AuthenticatorConfigOutput)
-	if output.Result == nil || len(output.Result.MinPINLengthRPIDs) != 1 ||
-		!output.Result.ForceChangePIN || !output.Result.PINComplexityPolicy {
-		t.Fatalf("result = %#v", output.Result)
+	if result.Result == nil || len(result.Result.MinPINLengthRPIDs) != 1 ||
+		!result.Result.ForceChangePIN || !result.Result.PINComplexityPolicy {
+		t.Fatalf("result = %#v", result.Result)
 	}
 }
 

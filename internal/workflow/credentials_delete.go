@@ -11,7 +11,7 @@ import (
 	"github.com/go-ctap/kit/model/failure"
 )
 
-func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredentialOperation) (model.OperationResult, error) {
+func (r Runner) deleteCredential(ctx context.Context, req model.DeleteCredentialOperation) (model.CredentialDeleteOutput, error) {
 	var output model.CredentialDeleteOutput
 
 	inventoryPermission, mutationPermission, err := r.inventoryMutationPermissions(

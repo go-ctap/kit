@@ -13,7 +13,7 @@ import (
 	"github.com/go-ctap/kit/model/failure"
 )
 
-func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCredentialUserOperation) (model.OperationResult, error) {
+func (r Runner) updateCredentialUser(ctx context.Context, req model.UpdateCredentialUserOperation) (model.CredentialUpdateOutput, error) {
 	var output model.CredentialUpdateOutput
 
 	updateReq := appcredentials.UpdateUserRequest{

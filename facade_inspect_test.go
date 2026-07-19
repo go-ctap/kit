@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-ctap/ctap/yubico"
 	"github.com/go-ctap/kit/internal/authenticator"
-	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 )
@@ -17,12 +16,12 @@ func TestInspectEmitsNoEventsWithoutProgressOrStateChanges(t *testing.T) {
 	session := openContractAuthenticator(t, events, nil)
 	defer func() { _ = session.Close() }()
 
-	output, err := session.Run(context.Background(), model.InspectOperation{}, nil)
+	output, err := session.Inspect(context.Background(), nil)
 	if err != nil {
-		t.Fatalf("Run: %v", err)
+		t.Fatalf("Inspect: %v", err)
 	}
 
-	if _, ok := output.(model.InspectOutput); !ok {
+	if output.Result.Device.Fingerprint == "" {
 		t.Fatalf("unexpected output: %#v", output)
 	}
 
@@ -46,12 +45,12 @@ func TestInspectNormalizesYubicoMetadata(t *testing.T) {
 	session := openYubicoContractAuthenticator(t, auth)
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Run(context.Background(), model.InspectOperation{}, nil)
+	result, err := session.Inspect(context.Background(), nil)
 	if err != nil {
-		t.Fatalf("Run: %v", err)
+		t.Fatalf("Inspect: %v", err)
 	}
 
-	metadata := result.(model.InspectOutput).Result.Device.Metadata
+	metadata := result.Result.Device.Metadata
 	if metadata == nil || metadata.Model != "YubiKey 5C NFC" || metadata.Serial != "12345678" || metadata.Firmware != "5.7.1" {
 		t.Fatalf("metadata = %#v", metadata)
 	}
@@ -62,12 +61,12 @@ func TestInspectKeepsBaseResultWhenYubicoMetadataFails(t *testing.T) {
 	session := openYubicoContractAuthenticator(t, auth)
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Run(context.Background(), model.InspectOperation{}, nil)
+	result, err := session.Inspect(context.Background(), nil)
 	if err != nil {
-		t.Fatalf("Run: %v", err)
+		t.Fatalf("Inspect: %v", err)
 	}
 
-	device := result.(model.InspectOutput).Result.Device
+	device := result.Result.Device
 	if device.Vendor != report.VendorYubico || device.Metadata != nil {
 		t.Fatalf("device = %#v", device)
 	}

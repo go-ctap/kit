@@ -42,10 +42,10 @@ func TestPINInteractionRejectsEmptyPINAtSessionRun(t *testing.T) {
 		return model.InteractionResponse{}, nil
 	})
 
-	_, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
+	_, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-	}, handler)
+	}, handler, session.operationOptions()...)
 	requireFailureCode(t, err, failure.CodePINRequired)
 
 	if got := a.pinCalls.Load(); got != 0 {
@@ -63,10 +63,10 @@ func TestPINInteractionWithoutHandlerReturnsInvalidState(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	_, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
+	_, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-	}, nil)
+	}, nil, session.operationOptions()...)
 	requireFailureCode(t, err, failure.CodeInteractionHandlerRequired)
 
 	if !hasStage(events.Events(), model.OperationStageInteractionRequired) {
@@ -95,10 +95,10 @@ func TestCanceledContextDuringInteractionReturnsCanceledFailure(t *testing.T) {
 		return model.InteractionResponse{}, context.Canceled
 	})
 
-	_, err := session.Run(ctx, model.WriteLargeBlobOperation{
+	_, err := session.WriteLargeBlob(ctx, model.WriteLargeBlobOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-	}, handler)
+	}, handler, session.operationOptions()...)
 	requireFailureCode(t, err, failure.CodeOperationCanceled)
 
 	if got := a.pinCalls.Load(); got != 0 {
@@ -113,9 +113,9 @@ func TestSetPINExecutesWithoutConfirmationInteraction(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	_, err := session.Run(context.Background(), model.SetPINOperation{
+	_, err := session.SetPIN(context.Background(), model.SetPINOperation{
 		NewPIN: "1234",
-	}, nil)
+	}, nil, session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -145,7 +145,12 @@ func TestResetTouchInteractionCanceledReturnsCanceledFailure(t *testing.T) {
 		return model.InteractionResponse{Canceled: true}, nil
 	})
 
-	_, err := session.Run(context.Background(), model.ResetFactoryOperation{}, handler)
+	_, err := session.ResetFactory(
+		context.Background(),
+		model.ResetFactoryOperation{},
+		handler,
+		session.operationOptions()...,
+	)
 	requireFailureCode(t, err, failure.CodeInteractionCanceled)
 
 	if got := a.resetCount.Load(); got != 0 {
@@ -179,16 +184,16 @@ func TestPINInteractionHandlerReceivesRequestAndValidPINContinues(t *testing.T) 
 		}, nil
 	})
 
-	result, err := session.Run(context.Background(), model.WriteLargeBlobOperation{
+	result, err := session.WriteLargeBlob(context.Background(), model.WriteLargeBlobOperation{
 		CredentialIDHex: "c05e",
 		Payload:         []byte("test"),
-	}, handler)
+	}, handler, session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
-	if _, ok := result.(model.LargeBlobMutationOutput); !ok {
-		t.Fatalf("result = %#v, want large blob mutation output", result)
+	if result == nil {
+		t.Fatal("result = nil, want large blob mutation output")
 	}
 
 	if len(requests) != 1 {

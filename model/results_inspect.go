@@ -21,8 +21,6 @@ type InspectOutput struct {
 	Result InspectResult `json:"result"`
 }
 
-func (InspectOutput) ctapkitResult() {}
-
 func NewInspectResult(device report.DeviceReport, info protocol.AuthenticatorGetInfoResponse) InspectResult {
 	result := InspectResult{
 		Device: device,

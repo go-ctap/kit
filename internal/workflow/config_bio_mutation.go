@@ -12,7 +12,7 @@ import (
 	"github.com/go-ctap/kit/model/safety"
 )
 
-func (r Runner) renameBio(ctx context.Context, req model.BioRenameOperation) (model.OperationResult, error) {
+func (r Runner) renameBio(ctx context.Context, req model.BioRenameOperation) (model.BioMutationOutput, error) {
 	var output model.BioMutationOutput
 
 	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
@@ -63,7 +63,7 @@ func (r Runner) renameBio(ctx context.Context, req model.BioRenameOperation) (mo
 	return output, nil
 }
 
-func (r Runner) removeBio(ctx context.Context, req model.BioRemoveOperation) (model.OperationResult, error) {
+func (r Runner) removeBio(ctx context.Context, req model.BioRemoveOperation) (model.BioMutationOutput, error) {
 	var output model.BioMutationOutput
 
 	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())

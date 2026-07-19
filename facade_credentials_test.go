@@ -27,8 +27,8 @@ func TestCredentialInventoryReadsFreshStateAndReusesToken(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	first := runCredentialList(t, session, model.ListCredentialsOperation{})
-	second := runCredentialList(t, session, model.ListCredentialsOperation{})
+	first := runCredentialList(t, session)
+	second := runCredentialList(t, session)
 	if got := credentialIDFromInventory(t, first); got != "01" {
 		t.Fatalf("first credential ID = %q, want 01", got)
 	}
@@ -38,7 +38,7 @@ func TestCredentialInventoryReadsFreshStateAndReusesToken(t *testing.T) {
 	}
 
 	a.revision = 2
-	refreshed := runCredentialList(t, session, model.ListCredentialsOperation{})
+	refreshed := runCredentialList(t, session)
 	if got := credentialIDFromInventory(t, refreshed); got != "02" {
 		t.Fatalf("refreshed credential ID = %q, want 02", got)
 	}
@@ -70,7 +70,7 @@ func TestCredentialInventoryReturnsEmptyReportWithoutEnumeratingRPs(t *testing.T
 	})
 	defer func() { _ = session.Close() }()
 
-	output := runCredentialList(t, session, model.ListCredentialsOperation{})
+	output := runCredentialList(t, session)
 	if output.Report.Summary.ExistingResidentCredentialsCount != 0 {
 		t.Fatalf("existing credential count = %d, want 0", output.Report.Summary.ExistingResidentCredentialsCount)
 	}
@@ -91,7 +91,7 @@ func TestCredentialInventoryReacquiresRejectedTokenOnce(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	output := runCredentialList(t, session, model.ListCredentialsOperation{})
+	output := runCredentialList(t, session)
 	if output.Report.Summary.ExistingResidentCredentialsCount != 0 {
 		t.Fatalf("existing credential count = %d, want 0", output.Report.Summary.ExistingResidentCredentialsCount)
 	}
@@ -116,10 +116,10 @@ func TestCredentialInventoryStopsAfterSecondRejectedToken(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	_, err := session.Run(
+	_, err := session.ListCredentials(
 		context.Background(),
-		model.ListCredentialsOperation{},
 		userVerificationHandler(t),
+		session.operationOptions()...,
 	)
 	if !failure.IsCode(err, failure.CodePINUVAuthInvalid) {
 		t.Fatalf("ListCredentials error = %v, want %s", err, failure.CodePINUVAuthInvalid)
@@ -141,16 +141,16 @@ func TestCredentialMutationUsesInventoryFromSuccessfulRefresh(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	_ = runCredentialList(t, session, model.ListCredentialsOperation{})
+	_ = runCredentialList(t, session)
 	a.revision = 2
-	refreshed := runCredentialList(t, session, model.ListCredentialsOperation{})
+	refreshed := runCredentialList(t, session)
 	if got := credentialIDFromInventory(t, refreshed); got != "02" {
 		t.Fatalf("refreshed credential ID = %q, want 02", got)
 	}
 
-	if _, err := session.Run(context.Background(), model.DeleteCredentialOperation{
+	if _, err := session.DeleteCredential(context.Background(), model.DeleteCredentialOperation{
 		CredentialIDHex: "02",
-	}, userVerificationHandler(t)); err != nil {
+	}, userVerificationHandler(t), session.operationOptions()...); err != nil {
 		t.Fatalf("DeleteCredential: %v", err)
 	}
 
@@ -166,10 +166,10 @@ func TestCredentialInventoryProgressEventsIncludeCounts(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	if _, err := session.Run(
+	if _, err := session.ListCredentials(
 		context.Background(),
-		model.ListCredentialsOperation{},
 		userVerificationHandler(t),
+		session.operationOptions()...,
 	); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -192,9 +192,9 @@ func TestCredentialDeleteReusesUnscopedInventoryGrant(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	_, err := session.Run(context.Background(), model.DeleteCredentialOperation{
+	_, err := session.DeleteCredential(context.Background(), model.DeleteCredentialOperation{
 		CredentialIDHex: "c05e",
-	}, userVerificationHandler(t))
+	}, userVerificationHandler(t), session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -209,11 +209,11 @@ func TestCredentialUpdateUserUsesTargetWithoutInventory(t *testing.T) {
 	})
 	defer func() { _ = session.Close() }()
 
-	_, err := session.Run(context.Background(), model.UpdateCredentialUserOperation{
+	_, err := session.UpdateCredentialUser(context.Background(), model.UpdateCredentialUserOperation{
 		Target:       credentialMutationTarget(),
 		Name:         "updated",
 		NameProvided: true,
-	}, userVerificationHandler(t))
+	}, userVerificationHandler(t), session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -231,19 +231,18 @@ func TestCredentialUpdateUserDryRunUsesTargetWithoutAuthenticatorCommands(t *tes
 	})
 	defer func() { _ = session.Close() }()
 
-	result, err := session.Run(context.Background(), model.UpdateCredentialUserOperation{
+	result, err := session.UpdateCredentialUser(context.Background(), model.UpdateCredentialUserOperation{
 		Target:       credentialMutationTarget(),
 		Name:         "updated",
 		NameProvided: true,
 		DryRun:       true,
-	}, nil)
+	}, nil, session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
-	output := result.(model.CredentialUpdateOutput)
-	if output.Preview.Proposed.Name != "updated" {
-		t.Fatalf("proposed name = %q, want updated", output.Preview.Proposed.Name)
+	if result.Preview.Proposed.Name != "updated" {
+		t.Fatalf("proposed name = %q, want updated", result.Preview.Proposed.Name)
 	}
 
 	if got := a.metadataCalls.Load(); got != 0 {
@@ -434,20 +433,20 @@ func (a *refreshCredentialAuthenticator) EnumerateCredentials(
 	}
 }
 
-func runCredentialList(t *testing.T, session *contractAuthenticatorHandle, operation model.ListCredentialsOperation) model.CredentialsOutput {
+func runCredentialList(t *testing.T, session *contractAuthenticatorHandle) model.CredentialsOutput {
 	t.Helper()
 
-	result, err := session.Run(context.Background(), operation, userVerificationHandler(t))
+	var opts []OperationOption
+	if session.events != nil {
+		opts = append(opts, WithEventSink(session.events))
+	}
+
+	output, err := session.ListCredentials(context.Background(), userVerificationHandler(t), opts...)
 	if err != nil {
 		t.Fatalf("ListCredentials: %v", err)
 	}
 
-	output, ok := result.(model.CredentialsOutput)
-	if !ok {
-		t.Fatalf("ListCredentials output = %T, want CredentialsOutput", result)
-	}
-
-	return output
+	return *output
 }
 
 func credentialIDFromInventory(t *testing.T, output model.CredentialsOutput) string {

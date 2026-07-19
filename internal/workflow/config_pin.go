@@ -11,7 +11,7 @@ import (
 	"github.com/go-ctap/kit/model/safety"
 )
 
-func (r Runner) setPIN(ctx context.Context, req model.SetPINOperation) (model.OperationResult, error) {
+func (r Runner) setPIN(ctx context.Context, req model.SetPINOperation) (model.PINOutput, error) {
 	var output model.PINOutput
 
 	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
@@ -46,7 +46,7 @@ func (r Runner) setPIN(ctx context.Context, req model.SetPINOperation) (model.Op
 	return output, nil
 }
 
-func (r Runner) changePIN(ctx context.Context, req model.ChangePINOperation) (model.OperationResult, error) {
+func (r Runner) changePIN(ctx context.Context, req model.ChangePINOperation) (model.PINOutput, error) {
 	var output model.PINOutput
 
 	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())

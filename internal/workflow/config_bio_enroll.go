@@ -16,7 +16,7 @@ import (
 
 const bioEnrollmentCancelTimeout = 2 * time.Second
 
-func (r Runner) enrollBio(ctx context.Context, req model.BioEnrollOperation) (model.OperationResult, error) {
+func (r Runner) enrollBio(ctx context.Context, req model.BioEnrollOperation) (model.BioEnrollOutput, error) {
 	var output model.BioEnrollOutput
 
 	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())

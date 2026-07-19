@@ -5,122 +5,175 @@ import (
 
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/model"
-	"github.com/go-ctap/kit/model/failure"
 )
 
 type Runner struct {
 	env Environment
 }
 
-func Run(
-	ctx context.Context,
-	env Environment,
-	operation model.Operation,
-) (model.OperationResult, error) {
-	return (Runner{env: env}).runOperationBody(ctx, operation)
+func NewRunner(env Environment) Runner {
+	return Runner{env: env}
 }
 
-func (r Runner) runOperationBody(ctx context.Context, operation model.Operation) (model.OperationResult, error) {
-	switch req := operation.(type) {
-	case model.InspectOperation:
-		result, err := r.inspect(ctx)
+func (r Runner) Inspect(ctx context.Context) (model.InspectOutput, error) {
+	result, err := r.inspect(ctx)
 
-		return model.InspectOutput{Result: result}, err
-	case model.ListCredentialsOperation:
-		result, err := r.credentialInventoryReport(ctx, protocol.PermissionNone)
+	return model.InspectOutput{Result: result}, err
+}
 
-		return model.CredentialsOutput{Report: result}, err
-	case model.CredentialStoreStateOperation:
-		result, err := r.credentialStoreState(ctx)
+func (r Runner) ListCredentials(ctx context.Context) (model.CredentialsOutput, error) {
+	result, err := r.credentialInventoryReport(ctx, protocol.PermissionNone)
 
-		return model.CredentialStoreStateOutput{Result: result}, err
-	case model.ReadLargeBlobOperation:
-		result, err := r.readLargeBlob(ctx, req)
+	return model.CredentialsOutput{Report: result}, err
+}
 
-		return model.LargeBlobReadOutput{Report: result}, err
-	case model.ListLargeBlobsOperation:
-		result, err := r.listLargeBlobs(ctx, req)
+func (r Runner) CredentialStoreState(ctx context.Context) (model.CredentialStoreStateOutput, error) {
+	result, err := r.credentialStoreState(ctx)
 
-		return model.LargeBlobListOutput{Report: result}, err
-	case model.ConfigStatusOperation:
-		result, err := r.statusWithRetries(ctx)
+	return model.CredentialStoreStateOutput{Result: result}, err
+}
 
-		return model.ConfigStatusOutput{Report: result}, err
-	case model.BioSensorInfoOperation:
-		result, err := r.bioSensorReport(ctx)
+func (r Runner) DeleteCredential(
+	ctx context.Context,
+	operation model.DeleteCredentialOperation,
+) (model.CredentialDeleteOutput, error) {
+	return r.deleteCredential(ctx, operation)
+}
 
-		return model.BioSensorOutput{Report: result}, err
-	case model.BioListOperation:
-		result, err := r.bioList(ctx)
+func (r Runner) UpdateCredentialUser(
+	ctx context.Context,
+	operation model.UpdateCredentialUserOperation,
+) (model.CredentialUpdateOutput, error) {
+	return r.updateCredentialUser(ctx, operation)
+}
 
-		return model.BioListOutput{Report: result}, err
-	case model.DeleteCredentialOperation:
-		result, err := r.deleteCredential(ctx, req)
+func (r Runner) ReadLargeBlob(
+	ctx context.Context,
+	operation model.ReadLargeBlobOperation,
+) (model.LargeBlobReadOutput, error) {
+	result, err := r.readLargeBlob(ctx, operation)
 
-		return result, err
-	case model.UpdateCredentialUserOperation:
-		result, err := r.updateCredentialUser(ctx, req)
+	return model.LargeBlobReadOutput{Report: result}, err
+}
 
-		return result, err
-	case model.MakeCredentialOperation:
-		result, err := r.makeCredential(ctx, req)
+func (r Runner) ListLargeBlobs(ctx context.Context) (model.LargeBlobListOutput, error) {
+	result, err := r.listLargeBlobs(ctx, model.ListLargeBlobsOperation{})
 
-		return result, err
-	case model.GetAssertionOperation:
-		result, err := r.getAssertion(ctx, req)
+	return model.LargeBlobListOutput{Report: result}, err
+}
 
-		return result, err
-	case model.WriteLargeBlobOperation:
-		result, err := r.writeLargeBlob(ctx, req)
+func (r Runner) WriteLargeBlob(
+	ctx context.Context,
+	operation model.WriteLargeBlobOperation,
+) (model.LargeBlobMutationOutput, error) {
+	return r.writeLargeBlob(ctx, operation)
+}
 
-		return result, err
-	case model.DeleteLargeBlobOperation:
-		result, err := r.deleteLargeBlob(ctx, req)
+func (r Runner) DeleteLargeBlob(
+	ctx context.Context,
+	operation model.DeleteLargeBlobOperation,
+) (model.LargeBlobMutationOutput, error) {
+	return r.deleteLargeBlob(ctx, operation)
+}
 
-		return result, err
-	case model.GarbageCollectLargeBlobsOperation:
-		result, err := r.garbageCollectLargeBlobs(ctx, req)
+func (r Runner) GarbageCollectLargeBlobs(
+	ctx context.Context,
+	operation model.GarbageCollectLargeBlobsOperation,
+) (model.LargeBlobMutationOutput, error) {
+	return r.garbageCollectLargeBlobs(ctx, operation)
+}
 
-		return result, err
-	case model.ResetFactoryOperation:
-		result, err := r.resetFactory(ctx, req)
+func (r Runner) ConfigStatus(ctx context.Context) (model.ConfigStatusOutput, error) {
+	result, err := r.statusWithRetries(ctx)
 
-		return result, err
-	case model.SetPINOperation:
-		result, err := r.setPIN(ctx, req)
+	return model.ConfigStatusOutput{Report: result}, err
+}
 
-		return result, err
-	case model.ChangePINOperation:
-		result, err := r.changePIN(ctx, req)
+func (r Runner) SetPIN(
+	ctx context.Context,
+	operation model.SetPINOperation,
+) (model.PINOutput, error) {
+	return r.setPIN(ctx, operation)
+}
 
-		return result, err
-	case model.BioEnrollOperation:
-		result, err := r.enrollBio(ctx, req)
+func (r Runner) ChangePIN(
+	ctx context.Context,
+	operation model.ChangePINOperation,
+) (model.PINOutput, error) {
+	return r.changePIN(ctx, operation)
+}
 
-		return result, err
-	case model.BioRenameOperation:
-		result, err := r.renameBio(ctx, req)
+func (r Runner) SetAlwaysUV(
+	ctx context.Context,
+	operation model.SetAlwaysUVOperation,
+) (model.AuthenticatorConfigOutput, error) {
+	return r.setAlwaysUV(ctx, operation)
+}
 
-		return result, err
-	case model.BioRemoveOperation:
-		result, err := r.removeBio(ctx, req)
+func (r Runner) SetMinPINLength(
+	ctx context.Context,
+	operation model.SetMinPINLengthOperation,
+) (model.AuthenticatorConfigOutput, error) {
+	return r.setMinPINLength(ctx, operation)
+}
 
-		return result, err
-	case model.SetAlwaysUVOperation:
-		result, err := r.setAlwaysUV(ctx, req)
+func (r Runner) EnableLongTouchForReset(
+	ctx context.Context,
+	operation model.EnableLongTouchForResetOperation,
+) (model.AuthenticatorConfigOutput, error) {
+	return r.enableLongTouchForReset(ctx, operation)
+}
 
-		return result, err
-	case model.SetMinPINLengthOperation:
-		result, err := r.setMinPINLength(ctx, req)
+func (r Runner) BioSensorInfo(ctx context.Context) (model.BioSensorOutput, error) {
+	result, err := r.bioSensorReport(ctx)
 
-		return result, err
-	case model.EnableLongTouchForResetOperation:
-		result, err := r.enableLongTouchForReset(ctx, req)
+	return model.BioSensorOutput{Report: result}, err
+}
 
-		return result, err
-	default:
-		return nil, failure.New(failure.CodeOperationUnsupported,
-			failure.WithPhase(failure.PhaseValidation),
-		)
-	}
+func (r Runner) BioList(ctx context.Context) (model.BioListOutput, error) {
+	result, err := r.bioList(ctx)
+
+	return model.BioListOutput{Report: result}, err
+}
+
+func (r Runner) BioEnroll(
+	ctx context.Context,
+	operation model.BioEnrollOperation,
+) (model.BioEnrollOutput, error) {
+	return r.enrollBio(ctx, operation)
+}
+
+func (r Runner) BioRename(
+	ctx context.Context,
+	operation model.BioRenameOperation,
+) (model.BioMutationOutput, error) {
+	return r.renameBio(ctx, operation)
+}
+
+func (r Runner) BioRemove(
+	ctx context.Context,
+	operation model.BioRemoveOperation,
+) (model.BioMutationOutput, error) {
+	return r.removeBio(ctx, operation)
+}
+
+func (r Runner) ResetFactory(
+	ctx context.Context,
+	operation model.ResetFactoryOperation,
+) (model.ResetFactoryOutput, error) {
+	return r.resetFactory(ctx, operation)
+}
+
+func (r Runner) MakeCredential(
+	ctx context.Context,
+	operation model.MakeCredentialOperation,
+) (model.MakeCredentialOutput, error) {
+	return r.makeCredential(ctx, operation)
+}
+
+func (r Runner) GetAssertion(
+	ctx context.Context,
+	operation model.GetAssertionOperation,
+) (model.GetAssertionOutput, error) {
+	return r.getAssertion(ctx, operation)
 }

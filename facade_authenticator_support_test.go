@@ -68,17 +68,12 @@ type contractAuthenticatorHandle struct {
 	events model.EventSink
 }
 
-func (a *contractAuthenticatorHandle) Run(
-	ctx context.Context,
-	operation model.Operation,
-	handler model.InteractionHandler,
-	opts ...OperationOption,
-) (model.OperationResult, error) {
+func (a *contractAuthenticatorHandle) operationOptions(opts ...OperationOption) []OperationOption {
 	if a.events != nil {
 		opts = append(opts, WithEventSink(a.events))
 	}
 
-	return a.Authenticator.Run(ctx, operation, handler, opts...)
+	return opts
 }
 
 func openContractAuthenticator(t *testing.T, events model.EventSink, open authenticatorOpenFunc) *contractAuthenticatorHandle {

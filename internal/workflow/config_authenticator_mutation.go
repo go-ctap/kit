@@ -12,7 +12,7 @@ import (
 	"github.com/go-ctap/kit/model/safety"
 )
 
-func (r Runner) setAlwaysUV(ctx context.Context, req model.SetAlwaysUVOperation) (model.OperationResult, error) {
+func (r Runner) setAlwaysUV(ctx context.Context, req model.SetAlwaysUVOperation) (model.AuthenticatorConfigOutput, error) {
 	var output model.AuthenticatorConfigOutput
 
 	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())
@@ -54,7 +54,7 @@ func (r Runner) setAlwaysUV(ctx context.Context, req model.SetAlwaysUVOperation)
 	return output, nil
 }
 
-func (r Runner) setMinPINLength(ctx context.Context, req model.SetMinPINLengthOperation) (model.OperationResult, error) {
+func (r Runner) setMinPINLength(ctx context.Context, req model.SetMinPINLengthOperation) (model.AuthenticatorConfigOutput, error) {
 	var output model.AuthenticatorConfigOutput
 
 	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())

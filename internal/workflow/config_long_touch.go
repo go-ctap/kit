@@ -12,7 +12,7 @@ import (
 	"github.com/go-ctap/kit/model/safety"
 )
 
-func (r Runner) enableLongTouchForReset(ctx context.Context, req model.EnableLongTouchForResetOperation) (model.OperationResult, error) {
+func (r Runner) enableLongTouchForReset(ctx context.Context, req model.EnableLongTouchForResetOperation) (model.AuthenticatorConfigOutput, error) {
 	var output model.AuthenticatorConfigOutput
 
 	mode := safety.PreviewModeDryRun

@@ -2,14 +2,11 @@ package ctapkit
 
 import (
 	"context"
-	"errors"
 	"sync"
 
-	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/logging"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
-	"github.com/go-ctap/kit/internal/workflow"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
@@ -106,72 +103,6 @@ func openAuthenticatorHandle(
 	}, nil
 }
 
-func (a *Authenticator) Run(
-	ctx context.Context,
-	operation model.Operation,
-	handler model.InteractionHandler,
-	opts ...OperationOption,
-) (model.OperationResult, error) {
-	operationKind := ""
-	if operation != nil {
-		operationKind = string(operation.Kind())
-	}
-
-	if err := validateAuthenticatorOperationInput(operation); err != nil {
-		return nil, normalizeRunError(err, operationKind)
-	}
-
-	config, err := newOperationConfig(opts...)
-	if err != nil {
-		return nil, normalizeRunError(err, operationKind)
-	}
-
-	result, err := a.run(ctx, operation, handler, config)
-	if err != nil {
-		if _, invalidated := errors.AsType[*ctaptransport.DeviceInvalidatedError](err); invalidated {
-			_ = a.Close()
-		}
-
-		return result, normalizeRunError(err, operationKind)
-	}
-
-	return result, nil
-}
-
-func (a *Authenticator) run(
-	ctx context.Context,
-	operation model.Operation,
-	handler model.InteractionHandler,
-	config operationConfig,
-) (model.OperationResult, error) {
-	a.runMu.Lock()
-	defer a.runMu.Unlock()
-
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-
-	childCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	if err := a.start(cancel); err != nil {
-		return nil, err
-	}
-	defer a.finish()
-
-	events := rtruntime.NewEventDispatcher(config.events)
-	interactions := rtruntime.NewInteractionBroker(events, handler)
-	tokens := rtruntime.NewTokenService(a.tokens, a.device, interactions, config.verificationFlow)
-
-	return workflow.Run(childCtx, workflow.Environment{
-		Selected:      a.selected,
-		Authenticator: a.device,
-		Events:        events,
-		Interactions:  interactions,
-		Tokens:        tokens,
-	}, operation)
-}
-
 func (a *Authenticator) Close() error {
 	a.stateMu.Lock()
 	a.closed = true
@@ -247,29 +178,4 @@ func newOperationConfig(opts ...OperationOption) (operationConfig, error) {
 			failure.WithPhase(failure.PhaseValidation),
 		)
 	}
-}
-
-func validateAuthenticatorOperationInput(operation model.Operation) error {
-	if operation == nil {
-		return failure.New(failure.CodeOperationRequired,
-			failure.WithPhase(failure.PhaseValidation),
-		)
-	}
-
-	switch req := operation.(type) {
-	case model.SetPINOperation:
-		if req.NewPIN == "" {
-			return runtimePINRequiredError("newPIN")
-		}
-	case model.ChangePINOperation:
-		if req.CurrentPIN == "" {
-			return runtimePINRequiredError("currentPIN")
-		}
-
-		if req.NewPIN == "" {
-			return runtimePINRequiredError("newPIN")
-		}
-	}
-
-	return nil
 }

@@ -1,6 +1,9 @@
 package ctapkit
 
 import (
+	"context"
+	"time"
+
 	"github.com/go-ctap/kit/internal/logging"
 	"github.com/go-ctap/kit/model"
 )
@@ -37,4 +40,26 @@ func (j *LogJournal) Cursor() uint64 {
 
 func (j *LogJournal) Changes() <-chan struct{} {
 	return j.journal.Changes()
+}
+
+// WithLogCorrelation attaches consumer-owned selection and operation identity
+// to runtime and CTAP log entries emitted while ctx is active.
+func WithLogCorrelation(
+	ctx context.Context,
+	selectionID string,
+	operationID string,
+	operationKind model.OperationKind,
+) context.Context {
+	return logging.WithCorrelation(ctx, selectionID, operationID, operationKind)
+}
+
+// FinishLogEntry records duration, outcome, and a safe failure snapshot.
+func FinishLogEntry(entry model.LogEntry, started time.Time, err error) model.LogEntry {
+	return logging.Finish(entry, started, err)
+}
+
+// TransportErrorMessage returns a bounded transport diagnostic for log output.
+// It is empty for non-transport failures.
+func TransportErrorMessage(err error) string {
+	return logging.TransportErrorMessage(err)
 }

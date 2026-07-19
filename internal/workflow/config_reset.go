@@ -11,7 +11,7 @@ import (
 	"github.com/go-ctap/kit/model/safety"
 )
 
-func (r Runner) resetFactory(ctx context.Context, req model.ResetFactoryOperation) (model.OperationResult, error) {
+func (r Runner) resetFactory(ctx context.Context, req model.ResetFactoryOperation) (model.ResetFactoryOutput, error) {
 	var output model.ResetFactoryOutput
 
 	status := appconfig.BuildStatusReport(r.env.Selected, r.env.Authenticator.GetInfo())

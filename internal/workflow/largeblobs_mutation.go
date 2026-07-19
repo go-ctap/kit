@@ -10,7 +10,7 @@ import (
 	"github.com/go-ctap/kit/model/failure"
 )
 
-func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOperation) (model.OperationResult, error) {
+func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOperation) (model.LargeBlobMutationOutput, error) {
 	var output model.LargeBlobMutationOutput
 
 	inventoryPermission, mutationPermission, err := r.inventoryMutationPermissions(
@@ -73,7 +73,7 @@ func (r Runner) writeLargeBlob(ctx context.Context, req model.WriteLargeBlobOper
 	return output, nil
 }
 
-func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOperation) (model.OperationResult, error) {
+func (r Runner) deleteLargeBlob(ctx context.Context, req model.DeleteLargeBlobOperation) (model.LargeBlobMutationOutput, error) {
 	var output model.LargeBlobMutationOutput
 
 	inventoryPermission, mutationPermission, err := r.inventoryMutationPermissions(

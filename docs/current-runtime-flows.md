@@ -31,9 +31,9 @@ opens its own short-lived CTAPHID channel, reads vendor information, and closes
 that channel. CTAPHID channel isolation allows this probe to coexist with the
 channel owned by the selected `Authenticator`.
 
-The service layer may use a selection ID to correlate UI requests, events, and
-interactions. That ID is application coordination state; it is not another
-runtime session object.
+The consuming application may use a selection ID to correlate UI requests,
+events, and interactions. That ID is application coordination state; it is not
+another runtime session object.
 
 ## Open Authenticator
 
@@ -56,7 +56,7 @@ authenticator. Event sinks belong to individual operations.
 
 ```mermaid
 flowchart TD
-  A["Authenticator.Run(ctx, operation, handler, options)"] --> B["Validate operation and options"]
+  A["Authenticator typed operation method"] --> B["Validate operation and options"]
   B --> C["Lock whole-operation mutex"]
   C --> D["Reject if authenticator is closed"]
   D --> E["Track cancelable operation context"]
@@ -108,15 +108,15 @@ flowchart TD
 
 `Close` is safe to call concurrently or repeatedly. It cancels an active
 workflow before waiting for the operation mutex, so a pending interaction or
-cancel-aware transport command can unwind. A subsequent `Run` returns
-`AUTHENTICATOR_CLOSED`.
+cancel-aware transport command can unwind. A subsequent typed operation method
+returns `AUTHENTICATOR_CLOSED`.
 
 ## Background Metadata Enrichment
 
-The service maintains an in-memory metadata cache for the current discovery
-topology and a small persistent cache under the user cache directory at
-`ctapkit/devices/{fingerprint}/info.json`. Vendor probes are short-lived and
-independent from the selected authenticator:
+A consuming application may maintain an in-memory metadata cache for the
+current discovery topology and a small persistent cache keyed by attachment
+fingerprint. Vendor probes are short-lived and independent from the selected
+authenticator:
 
 ```mermaid
 flowchart LR
