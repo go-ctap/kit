@@ -17,8 +17,14 @@ import (
 
 type contractAuthenticator struct{}
 
-func (a *contractAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
-	return protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{}}
+func (a *contractAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
+	return protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{}}, true
+}
+
+func (a *contractAuthenticator) GetInfo(context.Context) (protocol.AuthenticatorGetInfoResponse, error) {
+	info, _ := a.GetInfoCached()
+
+	return info, nil
 }
 
 func (a *contractAuthenticator) Close() error { return nil }
@@ -110,10 +116,6 @@ func (a *contractAuthenticator) EnableLongTouchForReset(context.Context, []byte)
 	return errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) GetPersistentCredentialStoreState(context.Context, []byte) (ctapdevice.PersistentCredentialStoreState, error) {
-	return ctapdevice.PersistentCredentialStoreState{}, errors.New("not implemented")
-}
-
 func (a *contractAuthenticator) GetBioModality(context.Context) (protocol.AuthenticatorBioEnrollmentResponse, error) {
 	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
 }
@@ -179,12 +181,12 @@ type pinMutationCountingAuthenticator struct {
 	changeCalls atomic.Int32
 }
 
-func (a *pinMutationCountingAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *pinMutationCountingAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{
 		Options: map[protocol.Option]bool{
 			protocol.OptionClientPIN: a.configured,
 		},
-	}
+	}, true
 }
 
 func (a *pinMutationCountingAuthenticator) SetPIN(context.Context, string) error {
@@ -223,7 +225,7 @@ type uvTokenAuthenticator struct {
 	userVerificationSeen atomic.Bool
 }
 
-func (a *uvTokenAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *uvTokenAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{
 		Options: map[protocol.Option]bool{
 			protocol.OptionPinUvAuthToken:      true,
@@ -232,7 +234,7 @@ func (a *uvTokenAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
 			protocol.OptionUvAcfg:              true,
 			protocol.OptionAlwaysUv:            false,
 		},
-	}
+	}, true
 }
 
 func (a *uvTokenAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
@@ -277,7 +279,7 @@ type largeBlobWriteEventAuthenticator struct {
 	largeBlobWrites              atomic.Int32
 }
 
-func (a *largeBlobWriteEventAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *largeBlobWriteEventAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	options := map[protocol.Option]bool{
 		protocol.OptionCredentialManagement: true,
 		protocol.OptionLargeBlobs:           true,
@@ -286,13 +288,13 @@ func (a *largeBlobWriteEventAuthenticator) GetInfo() protocol.AuthenticatorGetIn
 	}
 
 	if a.credentialManagementReadOnly {
-		options[protocol.OptionCredentialManagementReadOnly] = true
+		options[protocol.OptionPersistentCredentialManagementReadOnly] = true
 	}
 
 	return protocol.AuthenticatorGetInfoResponse{
 		Options:                     options,
 		MaxSerializedLargeBlobArray: a.maxSerializedLargeBlobArray,
-	}
+	}, true
 }
 
 func (a *largeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingUV(
@@ -380,7 +382,7 @@ type pinOnlyLargeBlobWriteEventAuthenticator struct {
 	pinErr   error
 }
 
-func (a *pinOnlyLargeBlobWriteEventAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *pinOnlyLargeBlobWriteEventAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{
 		Options: map[protocol.Option]bool{
 			protocol.OptionCredentialManagement: true,
@@ -388,7 +390,7 @@ func (a *pinOnlyLargeBlobWriteEventAuthenticator) GetInfo() protocol.Authenticat
 			protocol.OptionClientPIN:            true,
 			protocol.OptionPinUvAuthToken:       true,
 		},
-	}
+	}, true
 }
 
 func (a *pinOnlyLargeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingPIN(
@@ -454,14 +456,14 @@ type blockingConfigAuthenticator struct {
 	commandEntered chan struct{}
 }
 
-func (a *blockingConfigAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *blockingConfigAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{
 		protocol.OptionAuthenticatorConfig: true,
 		protocol.OptionPinUvAuthToken:      true,
 		protocol.OptionUserVerification:    true,
 		protocol.OptionUvAcfg:              true,
 		protocol.OptionAlwaysUv:            false,
-	}}
+	}}, true
 }
 
 func (a *blockingConfigAuthenticator) GetPinUvAuthTokenUsingUV(

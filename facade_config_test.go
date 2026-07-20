@@ -358,14 +358,14 @@ type contextRecordingConfigAuthenticator struct {
 	commandCtx context.Context
 }
 
-func (a *contextRecordingConfigAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *contextRecordingConfigAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{
 		protocol.OptionAuthenticatorConfig: true,
 		protocol.OptionPinUvAuthToken:      true,
 		protocol.OptionUserVerification:    true,
 		protocol.OptionUvAcfg:              true,
 		protocol.OptionAlwaysUv:            false,
-	}}
+	}}, true
 }
 
 func (a *contextRecordingConfigAuthenticator) GetPinUvAuthTokenUsingUV(
@@ -397,13 +397,13 @@ type bioCleanupAuthenticator struct {
 	cleanupContextErr error
 }
 
-func (a *bioCleanupAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *bioCleanupAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{
 		protocol.OptionBioEnroll:        true,
 		protocol.OptionUvBioEnroll:      true,
 		protocol.OptionPinUvAuthToken:   true,
 		protocol.OptionUserVerification: true,
-	}}
+	}}, true
 }
 
 func (a *bioCleanupAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
@@ -440,12 +440,12 @@ type bioSensorAuthenticator struct {
 	fingerprintKind uint
 }
 
-func (a *bioSensorAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *bioSensorAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{
 		Options: map[protocol.Option]bool{
 			protocol.OptionBioEnroll: true,
 		},
-	}
+	}, true
 }
 
 func (a *bioSensorAuthenticator) GetBioModality(context.Context) (protocol.AuthenticatorBioEnrollmentResponse, error) {

@@ -280,14 +280,14 @@ type rejectedCredentialTokenAuthenticator struct {
 	metadataTokens   [][]byte
 }
 
-func (a *rejectedCredentialTokenAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *rejectedCredentialTokenAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{
 		Options: map[protocol.Option]bool{
 			protocol.OptionCredentialManagement: true,
 			protocol.OptionPinUvAuthToken:       true,
 			protocol.OptionUserVerification:     true,
 		},
-	}
+	}, true
 }
 
 func (a *rejectedCredentialTokenAuthenticator) GetPinUvAuthTokenUsingUV(
@@ -318,14 +318,14 @@ func (a *rejectedCredentialTokenAuthenticator) GetCredsMetadata(
 	}, nil
 }
 
-func (a *emptyCredentialAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *emptyCredentialAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{
 		Options: map[protocol.Option]bool{
 			protocol.OptionCredentialManagement: true,
 			protocol.OptionPinUvAuthToken:       true,
 			protocol.OptionUserVerification:     true,
 		},
-	}
+	}, true
 }
 
 func (a *emptyCredentialAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
@@ -359,14 +359,14 @@ type refreshCredentialAuthenticator struct {
 	metadataCalls        atomic.Int32
 }
 
-func (a *refreshCredentialAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *refreshCredentialAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{
 		Options: map[protocol.Option]bool{
 			protocol.OptionCredentialManagement: true,
 			protocol.OptionPinUvAuthToken:       true,
 			protocol.OptionUserVerification:     true,
 		},
-	}
+	}, true
 }
 
 func (a *refreshCredentialAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
@@ -458,14 +458,14 @@ func credentialIDFromInventory(t *testing.T, output appcredentials.InventoryRepo
 	return output.Groups[0].Credentials[0].CredentialIDHex
 }
 
-func (a *progressCredentialAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *progressCredentialAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{
 		Options: map[protocol.Option]bool{
 			protocol.OptionCredentialManagement: true,
 			protocol.OptionPinUvAuthToken:       true,
 			protocol.OptionUserVerification:     true,
 		},
-	}
+	}, true
 }
 
 func (a *progressCredentialAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
@@ -547,7 +547,7 @@ type credentialMutationTokenAuthenticator struct {
 	updateErr                    error
 }
 
-func (a *credentialMutationTokenAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *credentialMutationTokenAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	options := map[protocol.Option]bool{
 		protocol.OptionCredentialManagement: true,
 		protocol.OptionPinUvAuthToken:       true,
@@ -555,12 +555,12 @@ func (a *credentialMutationTokenAuthenticator) GetInfo() protocol.AuthenticatorG
 	}
 
 	if a.credentialManagementReadOnly {
-		options[protocol.OptionCredentialManagementReadOnly] = true
+		options[protocol.OptionPersistentCredentialManagementReadOnly] = true
 	}
 
 	return protocol.AuthenticatorGetInfoResponse{
 		Options: options,
-	}
+	}, true
 }
 
 func (a *credentialMutationTokenAuthenticator) GetPinUvAuthTokenUsingUV(

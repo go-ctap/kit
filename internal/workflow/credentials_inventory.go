@@ -27,7 +27,11 @@ func (r Runner) credentialInventoryReport(
 	device authenticator.CredentialInventoryReader,
 	grantPermission protocol.Permission,
 ) (appcredentials.InventoryReport, error) {
-	permission, err := inventoryPermission(device.GetInfo())
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return appcredentials.InventoryReport{}, err
+	}
+	permission, err := inventoryPermission(info)
 	if err != nil {
 		return appcredentials.InventoryReport{}, err
 	}
@@ -92,7 +96,10 @@ func (r Runner) buildCredentialInventoryReport(
 		return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseMetadata))
 	}
 
-	info := device.GetInfo()
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return appcredentials.InventoryReport{}, err
+	}
 
 	metadata, err := device.GetCredsMetadata(ctx, token)
 	if err != nil {
@@ -276,7 +283,7 @@ func inventoryPermission(info protocol.AuthenticatorGetInfoResponse) (protocol.P
 		)
 	}
 
-	if info.Options[protocol.OptionCredentialManagementReadOnly] {
+	if info.Options[protocol.OptionPersistentCredentialManagementReadOnly] {
 		return protocol.PermissionPersistentCredentialManagementReadOnly, nil
 	}
 

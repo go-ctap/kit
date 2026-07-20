@@ -18,7 +18,11 @@ func (r Runner) SetPIN(
 ) (appconfig.PINOutput, error) {
 	var output appconfig.PINOutput
 
-	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return output, err
+	}
+	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 
 	mode := safety.PreviewModeDryRun
 	if !req.DryRun {
@@ -45,7 +49,6 @@ func (r Runner) SetPIN(
 			protocol.ClientPINSubCommandSetPIN,
 		))
 	}
-
 	output.Result = new(rtconfig.PINSetResult(r.env.Selected.Fingerprint))
 	return output, nil
 }
@@ -57,7 +60,11 @@ func (r Runner) ChangePIN(
 ) (appconfig.PINOutput, error) {
 	var output appconfig.PINOutput
 
-	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return output, err
+	}
+	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 
 	mode := safety.PreviewModeDryRun
 	if !req.DryRun {
@@ -84,7 +91,6 @@ func (r Runner) ChangePIN(
 			protocol.ClientPINSubCommandChangePIN,
 		))
 	}
-
 	output.Result = new(rtconfig.PINChangeResult(r.env.Selected.Fingerprint))
 	return output, nil
 }

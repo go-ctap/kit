@@ -19,7 +19,11 @@ func (r Runner) ResetFactory(
 ) (appconfig.ResetFactoryOutput, error) {
 	var output appconfig.ResetFactoryOutput
 
-	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return output, err
+	}
+	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 	preview := rtconfig.BuildResetFactoryPreview(status)
 
 	output.Preview = preview
@@ -40,7 +44,7 @@ func (r Runner) ResetFactory(
 		return output, err
 	}
 
-	err := device.Reset(ctx)
+	err = device.Reset(ctx)
 	r.env.Tokens.Invalidate()
 
 	if err != nil {
@@ -49,7 +53,6 @@ func (r Runner) ResetFactory(
 			protocol.AuthenticatorReset,
 		))
 	}
-
 	output.Result = new(rtconfig.ResetResultForDevice(r.env.Selected.Fingerprint))
 	return output, nil
 }

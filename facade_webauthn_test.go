@@ -669,7 +669,7 @@ type webauthnTestAuthenticator struct {
 	metadataCalls int
 }
 
-func (a *webauthnTestAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *webauthnTestAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{
 		Options: map[protocol.Option]bool{
 			protocol.OptionCredentialManagement:        true,
@@ -678,7 +678,7 @@ func (a *webauthnTestAuthenticator) GetInfo() protocol.AuthenticatorGetInfoRespo
 			protocol.OptionMakeCredentialUvNotRequired: a.makeCredentialUvNotRequired,
 			protocol.OptionAlwaysUv:                    a.alwaysUV,
 		},
-	}
+	}, true
 }
 
 func (a *webauthnTestAuthenticator) GetPinUvAuthTokenUsingUV(

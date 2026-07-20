@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -12,8 +13,12 @@ type inspectDeviceStub struct {
 	info protocol.AuthenticatorGetInfoResponse
 }
 
-func (s inspectDeviceStub) GetInfo() protocol.AuthenticatorGetInfoResponse {
-	return s.info
+func (s inspectDeviceStub) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
+	return s.info, true
+}
+
+func (s inspectDeviceStub) GetInfo(context.Context) (protocol.AuthenticatorGetInfoResponse, error) {
+	return s.info, nil
 }
 
 func TestWorkflowEnvironmentContainsOnlySharedServices(t *testing.T) {

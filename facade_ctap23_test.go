@@ -2,13 +2,16 @@ package ctapkit
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/hmac"
+	"crypto/sha256"
 	"errors"
 	"iter"
 	"slices"
 	"sync/atomic"
 	"testing"
 
-	ctapdevice "github.com/go-ctap/ctap/authenticator"
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/authenticator"
@@ -18,7 +21,7 @@ import (
 )
 
 func TestCredentialStoreStateUsesStandalonePCMRToken(t *testing.T) {
-	a := &storeStateAuthenticator{}
+	a := newStoreStateAuthenticator()
 	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
 		return a, nil
 	})
@@ -55,6 +58,9 @@ func TestCredentialStoreStateUsesStandalonePCMRToken(t *testing.T) {
 
 	if a.stateTokenPermission != protocol.PermissionPersistentCredentialManagementReadOnly {
 		t.Fatalf("state token permission = %s, want standalone pcmr", a.stateTokenPermission)
+	}
+	if a.freshInfoCalls.Load() != 1 {
+		t.Fatalf("fresh GetInfo calls = %d, want 1", a.freshInfoCalls.Load())
 	}
 }
 
@@ -177,11 +183,32 @@ type storeStateAuthenticator struct {
 	contractAuthenticator
 	readOnly             atomic.Bool
 	permissions          []protocol.Permission
-	tokenPermissions     map[string]protocol.Permission
 	stateTokenPermission protocol.Permission
+	freshInfoCalls       atomic.Int32
+	encIdentifier        []byte
+	encCredStoreState    []byte
 }
 
-func (a *storeStateAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func newStoreStateAuthenticator() *storeStateAuthenticator {
+	token := []byte{byte(protocol.PermissionPersistentCredentialManagementReadOnly)}
+	identifier := make([]byte, aes.BlockSize)
+	state := make([]byte, aes.BlockSize)
+	for index := range identifier {
+		identifier[index] = byte(index)
+		state[index] = byte(index + aes.BlockSize)
+	}
+
+	return &storeStateAuthenticator{
+		encIdentifier:     encryptGetInfoMember(token, identifier, "encIdentifier"),
+		encCredStoreState: encryptGetInfoMember(token, state, "encCredStoreState"),
+	}
+}
+
+func (a *storeStateAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
+	return protocol.AuthenticatorGetInfoResponse{Options: a.infoOptions()}, true
+}
+
+func (a *storeStateAuthenticator) infoOptions() map[protocol.Option]bool {
 	options := map[protocol.Option]bool{
 		protocol.OptionCredentialManagement: true,
 		protocol.OptionPinUvAuthToken:       true,
@@ -189,10 +216,20 @@ func (a *storeStateAuthenticator) GetInfo() protocol.AuthenticatorGetInfoRespons
 	}
 
 	if a.readOnly.Load() {
-		options[protocol.OptionCredentialManagementReadOnly] = true
+		options[protocol.OptionPersistentCredentialManagementReadOnly] = true
 	}
 
-	return protocol.AuthenticatorGetInfoResponse{Options: options}
+	return options
+}
+
+func (a *storeStateAuthenticator) GetInfo(context.Context) (protocol.AuthenticatorGetInfoResponse, error) {
+	a.freshInfoCalls.Add(1)
+
+	return protocol.AuthenticatorGetInfoResponse{
+		Options:           a.infoOptions(),
+		EncIdentifier:     a.encIdentifier,
+		EncCredStoreState: a.encCredStoreState,
+	}, nil
 }
 
 func (a *storeStateAuthenticator) GetPinUvAuthTokenUsingUV(
@@ -202,11 +239,8 @@ func (a *storeStateAuthenticator) GetPinUvAuthTokenUsingUV(
 ) ([]byte, error) {
 	a.permissions = append(a.permissions, permission)
 
-	if a.tokenPermissions == nil {
-		a.tokenPermissions = make(map[string]protocol.Permission)
-	}
 	token := []byte{byte(permission)}
-	a.tokenPermissions[string(token)] = permission
+	a.stateTokenPermission = permission
 
 	return token, nil
 }
@@ -218,18 +252,23 @@ func (a *storeStateAuthenticator) GetCredsMetadata(context.Context, []byte) (pro
 	}, nil
 }
 
-func (a *storeStateAuthenticator) GetPersistentCredentialStoreState(
-	_ context.Context,
-	token []byte,
-) (ctapdevice.PersistentCredentialStoreState, error) {
-	a.stateTokenPermission = a.tokenPermissions[string(token)]
-	var state ctapdevice.PersistentCredentialStoreState
-	for index := range state.AuthenticatorIdentifier {
-		state.AuthenticatorIdentifier[index] = byte(index)
-		state.CredentialStoreState[index] = byte(index + 16)
-	}
+func encryptGetInfoMember(token, plaintext []byte, label string) []byte {
+	extract := hmac.New(sha256.New, make([]byte, sha256.Size))
+	_, _ = extract.Write(token)
+	expand := hmac.New(sha256.New, extract.Sum(nil))
+	_, _ = expand.Write([]byte(label))
+	_, _ = expand.Write([]byte{1})
+	key := expand.Sum(nil)[:aes.BlockSize]
 
-	return state, nil
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		panic(err)
+	}
+	iv := make([]byte, aes.BlockSize)
+	ciphertext := make([]byte, aes.BlockSize)
+	cipher.NewCBCEncrypter(block, iv).CryptBlocks(ciphertext, plaintext)
+
+	return append(iv, ciphertext...)
 }
 
 type longTouchAuthenticator struct {
@@ -250,7 +289,7 @@ type setMinPINLengthAuthenticator struct {
 	params protocol.SetMinPINLengthConfigSubCommandParams
 }
 
-func (a *setMinPINLengthAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *setMinPINLengthAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{
 		Options: map[protocol.Option]bool{
 			protocol.OptionAuthenticatorConfig: true,
@@ -259,7 +298,7 @@ func (a *setMinPINLengthAuthenticator) GetInfo() protocol.AuthenticatorGetInfoRe
 		MinPINLength:                4,
 		MaxPINLength:                63,
 		AuthenticatorConfigCommands: []protocol.ConfigSubCommand{protocol.ConfigSubCommandSetMinPINLength},
-	}
+	}, true
 }
 
 func (a *setMinPINLengthAuthenticator) SetMinPINLength(
@@ -272,12 +311,12 @@ func (a *setMinPINLengthAuthenticator) SetMinPINLength(
 	return nil
 }
 
-func (a *missingTotalsAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *missingTotalsAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{
 		protocol.OptionCredentialManagement: true,
 		protocol.OptionPinUvAuthToken:       true,
 		protocol.OptionUserVerification:     true,
-	}}
+	}}, true
 }
 
 func (a *missingTotalsAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
@@ -320,7 +359,7 @@ func (a *missingTotalsAuthenticator) EnumerateCredentials(context.Context, []byt
 	}
 }
 
-func (a *longTouchAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *longTouchAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	a.infoCalls.Add(1)
 
 	return protocol.AuthenticatorGetInfoResponse{
@@ -329,7 +368,7 @@ func (a *longTouchAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse
 		},
 		LongTouchForReset:           new(a.enabled.Load()),
 		AuthenticatorConfigCommands: []protocol.ConfigSubCommand{protocol.ConfigSubCommandEnableLongTouchForReset},
-	}
+	}, true
 }
 
 func (a *longTouchAuthenticator) EnableLongTouchForReset(context.Context, []byte) error {

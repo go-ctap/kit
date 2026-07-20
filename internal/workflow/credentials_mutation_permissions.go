@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"context"
 	"encoding/hex"
 
 	"github.com/go-ctap/ctap/credential"
@@ -11,10 +12,15 @@ import (
 )
 
 func (r Runner) inventoryMutationPermissions(
+	ctx context.Context,
 	device authenticator.CredentialInventoryReader,
 	required protocol.Permission,
 ) (protocol.Permission, protocol.Permission, error) {
-	inventory, err := inventoryPermission(device.GetInfo())
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return protocol.PermissionNone, protocol.PermissionNone, err
+	}
+	inventory, err := inventoryPermission(info)
 	if err != nil {
 		return protocol.PermissionNone, protocol.PermissionNone, err
 	}

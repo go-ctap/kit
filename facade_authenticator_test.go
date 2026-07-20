@@ -398,12 +398,12 @@ type transportFailureAuthenticator struct {
 	closeCount  atomic.Int32
 }
 
-func (a *transportFailureAuthenticator) GetInfo() protocol.AuthenticatorGetInfoResponse {
+func (a *transportFailureAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{
 		Options: map[protocol.Option]bool{
 			protocol.OptionClientPIN: false,
 		},
-	}
+	}, true
 }
 
 func (a *transportFailureAuthenticator) SetPIN(context.Context, string) error {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 
-	ctapauthenticator "github.com/go-ctap/ctap/authenticator"
+	ctapcrypto "github.com/go-ctap/ctap/crypto"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/errornorm"
@@ -19,16 +19,47 @@ func (r Runner) CredentialStoreState(
 ) (appcredentials.StoreStateResult, error) {
 	r.env.Tokens.InvalidateUnlessPermission(protocol.PermissionPersistentCredentialManagementReadOnly)
 
-	var state ctapauthenticator.PersistentCredentialStoreState
-	err := r.env.Tokens.Use(
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return appcredentials.StoreStateResult{}, err
+	}
+	if !info.Options[protocol.OptionPersistentCredentialManagementReadOnly] {
+		return appcredentials.StoreStateResult{}, failure.New(
+			failure.CodeCredentialManagementUnsupported,
+			failure.WithPhase(failure.PhaseDiscovery),
+		)
+	}
+
+	var identifier, state [16]byte
+	err = r.env.Tokens.Use(
 		ctx,
 		rtruntime.TokenUse{
 			Permission: protocol.PermissionPersistentCredentialManagementReadOnly,
 			ReplaySafe: true,
 		},
 		func(token []byte) error {
-			var err error
-			state, err = device.GetPersistentCredentialStoreState(ctx, token)
+			info, err := device.GetInfo(ctx)
+			if err != nil {
+				return err
+			}
+			if len(info.EncIdentifier) == 0 || len(info.EncCredStoreState) == 0 {
+				return failure.New(
+					failure.CodeGetInfoUnsupported,
+					failure.WithPhase(failure.PhaseAuthenticatorCommand),
+				)
+			}
+			if len(info.EncIdentifier) != 32 || len(info.EncCredStoreState) != 32 {
+				return failure.New(
+					failure.CodeCTAPSpecViolation,
+					failure.WithPhase(failure.PhaseAuthenticatorCommand),
+				)
+			}
+
+			identifier, err = ctapcrypto.DecryptDeviceIdentifier(token, info.EncIdentifier)
+			if err != nil {
+				return err
+			}
+			state, err = ctapcrypto.DecryptCredentialStoreState(token, info.EncCredStoreState)
 
 			return err
 		},
@@ -41,7 +72,7 @@ func (r Runner) CredentialStoreState(
 	}
 
 	return appcredentials.StoreStateResult{
-		AuthenticatorIdentifierHex: hex.EncodeToString(state.AuthenticatorIdentifier[:]),
-		CredentialStoreStateHex:    hex.EncodeToString(state.CredentialStoreState[:]),
+		AuthenticatorIdentifierHex: hex.EncodeToString(identifier[:]),
+		CredentialStoreStateHex:    hex.EncodeToString(state[:]),
 	}, nil
 }

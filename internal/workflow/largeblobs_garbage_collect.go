@@ -33,6 +33,7 @@ func (r Runner) GarbageCollectLargeBlobs(
 	var output applargeblobs.MutationOutput
 
 	inventoryPermission, mutationPermission, err := r.inventoryMutationPermissions(
+		ctx,
 		device,
 		protocol.PermissionLargeBlobWrite,
 	)
@@ -95,7 +96,11 @@ func (r Runner) loadGarbageCollectState(
 		return garbageCollectState{}, err
 	}
 
-	support := buildLargeBlobSupportReport(device.GetInfo())
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return garbageCollectState{}, err
+	}
+	support := buildLargeBlobSupportReport(info)
 	if !support.LargeBlobs {
 		return garbageCollectState{}, failure.New(failure.CodeLargeBlobUnsupported,
 			failure.WithPhase(failure.PhaseDiscovery),

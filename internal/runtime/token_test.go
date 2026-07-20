@@ -882,8 +882,12 @@ type recordingTokenDevice struct {
 	uvSawInteraction bool
 }
 
-func (d *recordingTokenDevice) GetInfo() protocol.AuthenticatorGetInfoResponse {
-	return d.info
+func (d *recordingTokenDevice) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
+	return d.info, true
+}
+
+func (d *recordingTokenDevice) GetInfo(context.Context) (protocol.AuthenticatorGetInfoResponse, error) {
+	return d.info, nil
 }
 
 func (d *recordingTokenDevice) GetPinUvAuthTokenUsingPIN(

@@ -39,7 +39,11 @@ func (r Runner) loadTargetBlobState(
 		return targetBlobState{}, err
 	}
 
-	support := buildLargeBlobSupportReport(device.GetInfo())
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return targetBlobState{}, err
+	}
+	support := buildLargeBlobSupportReport(info)
 	if !support.LargeBlobs {
 		return targetBlobState{}, failure.New(failure.CodeLargeBlobUnsupported,
 			failure.WithPhase(failure.PhaseDiscovery),

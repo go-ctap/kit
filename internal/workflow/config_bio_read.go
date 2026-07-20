@@ -38,7 +38,11 @@ func (r Runner) BioSensorInfo(ctx context.Context, device BioDevice) (appconfig.
 		return appconfig.BioSensorReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseDiscovery))
 	}
 
-	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return appconfig.BioSensorReport{}, err
+	}
+	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 	if !status.Bio.Supported {
 		return appconfig.BioSensorReport{}, failure.New(failure.CodeBioUnsupported,
 			failure.WithPhase(failure.PhaseDiscovery),

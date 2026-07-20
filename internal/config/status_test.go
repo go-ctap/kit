@@ -2,11 +2,14 @@ package config
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/kit/internal/getinfo"
 	. "github.com/go-ctap/kit/model/config"
+	appinspect "github.com/go-ctap/kit/model/inspect"
 	"github.com/go-ctap/kit/model/report"
 )
 
@@ -23,6 +26,9 @@ func TestBuildStatusReportMatchesCtaphidOptionSemantics(t *testing.T) {
 			protocol.OptionSetMinPINLength:     false,
 		},
 		LongTouchForReset: new(false),
+		AuthenticatorConfigCommands: []protocol.ConfigSubCommand{
+			protocol.ConfigSubCommandEnableLongTouchForReset,
+		},
 	}
 
 	r := BuildStatusReport(nilDevice(), info)
@@ -195,6 +201,92 @@ func TestBuildStatusReportUsesEffectivePINLimitsAndOmitsOtherAbsentNullableLimit
 
 	if !strings.Contains(text, `"minPINLength":4`) {
 		t.Fatalf("JSON omitted effective minimum PIN length: %s", text)
+	}
+}
+
+func TestBuildStatusReportUsesResolvedGetInfoFacts(t *testing.T) {
+	info := protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionClientPIN:           false,
+			protocol.OptionUserVerification:    true,
+			protocol.OptionBioEnroll:           false,
+			protocol.OptionUvBioEnroll:         true,
+			protocol.OptionAuthenticatorConfig: true,
+			protocol.OptionUvAcfg:              true,
+			protocol.OptionAlwaysUv:            false,
+			protocol.OptionSetMinPINLength:     true,
+		},
+		MinPINLength:      8,
+		MaxPINLength:      64,
+		LongTouchForReset: new(false),
+		AuthenticatorConfigCommands: []protocol.ConfigSubCommand{
+			protocol.ConfigSubCommandEnableLongTouchForReset,
+		},
+	}
+
+	assessment := getinfo.Resolve(info)
+	status := BuildStatusReport(nilDevice(), info)
+
+	assertCapabilityMatchesFact(t, status.PIN.State, status.PIN.Supported, status.PIN.Configured, assessment, appinspect.FactIDClientPIN)
+	assertCapabilityMatchesFact(t, status.UV.State, status.UV.Supported, status.UV.Configured, assessment, appinspect.FactIDUserVerification)
+	assertCapabilityMatchesFact(t, status.Bio.State, status.Bio.Supported, status.Bio.Configured, assessment, appinspect.FactIDBioEnrollment)
+	assertCapabilityMatchesFact(t, status.Bio.UVBioEnroll.State, status.Bio.UVBioEnroll.Supported, status.Bio.UVBioEnroll.Configured, assessment, appinspect.FactIDUvBioEnroll)
+	assertCapabilityMatchesFact(t, status.AuthenticatorConfig.State, status.AuthenticatorConfig.Supported, status.AuthenticatorConfig.Configured, assessment, appinspect.FactIDAuthenticatorConfig)
+	assertCapabilityMatchesFact(t, status.AuthenticatorConfig.UVAcfg.State, status.AuthenticatorConfig.UVAcfg.Supported, status.AuthenticatorConfig.UVAcfg.Configured, assessment, appinspect.FactIDUvAuthenticatorConfig)
+	assertCapabilityMatchesFact(t, status.AuthenticatorConfig.AlwaysUV.State, status.AuthenticatorConfig.AlwaysUV.Supported, status.AuthenticatorConfig.AlwaysUV.Configured, assessment, appinspect.FactIDAlwaysUV)
+	assertCapabilityMatchesFact(t, status.AuthenticatorConfig.SetMinPINLength.State, status.AuthenticatorConfig.SetMinPINLength.Supported, status.AuthenticatorConfig.SetMinPINLength.Configured, assessment, appinspect.FactIDSetMinPINLength)
+	assertCapabilityMatchesFact(t, status.AuthenticatorConfig.LongTouchForReset.State, status.AuthenticatorConfig.LongTouchForReset.Supported, status.AuthenticatorConfig.LongTouchForReset.Configured, assessment, appinspect.FactIDLongTouchForReset)
+	if status.ResetHints.LongTouchForReset != status.AuthenticatorConfig.LongTouchForReset.State {
+		t.Fatalf("reset hint long-touch state = %s, authenticator config state = %s", status.ResetHints.LongTouchForReset, status.AuthenticatorConfig.LongTouchForReset.State)
+	}
+
+	if status.Limits.MinPINLength != 8 || status.Limits.MaxPINLength != 64 {
+		t.Fatalf("effective limits = %#v, want 8/64", status.Limits)
+	}
+}
+
+func TestBuildStatusReportKeepsCapabilitiesUnknownWhenOptionsAreAbsent(t *testing.T) {
+	status := BuildStatusReport(nilDevice(), protocol.AuthenticatorGetInfoResponse{})
+
+	for name, state := range map[string]StateValue{
+		"PIN":                  status.PIN.State,
+		"UV":                   status.UV.State,
+		"bio":                  status.Bio.State,
+		"authenticator config": status.AuthenticatorConfig.State,
+		"always UV":            status.AuthenticatorConfig.AlwaysUV.State,
+	} {
+		if state != StateUnknown {
+			t.Fatalf("%s state = %s, want unknown", name, state)
+		}
+	}
+}
+
+func assertCapabilityMatchesFact(t *testing.T, state StateValue, supported bool, configured *bool, assessment appinspect.Assessment, id appinspect.FactID) {
+	t.Helper()
+
+	fact, ok := getinfo.Find(assessment, id)
+	if !ok {
+		t.Fatalf("fact %q not found", id)
+	}
+
+	wantState := StateUnknown
+	var wantConfigured *bool
+	switch fact.State {
+	case appinspect.FactStateSupported:
+		wantState = StateSupported
+	case appinspect.FactStateUnsupported:
+		wantState = StateUnsupported
+	case appinspect.FactStateConfigured, appinspect.FactStateEnabled:
+		wantState = StateConfigured
+		wantConfigured = new(true)
+	case appinspect.FactStateNotConfigured, appinspect.FactStateDisabled:
+		wantState = StateNotConfigured
+		wantConfigured = new(false)
+	}
+	wantSupported := wantState == StateSupported || wantState == StateConfigured || wantState == StateNotConfigured
+
+	if state != wantState || supported != wantSupported || !reflect.DeepEqual(configured, wantConfigured) {
+		t.Fatalf("status for %q = state %s supported %t configured %#v; fact = %#v", id, state, supported, configured, fact)
 	}
 }
 

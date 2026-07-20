@@ -19,7 +19,11 @@ func (r Runner) BioRename(
 ) (appconfig.BioMutationOutput, error) {
 	var output appconfig.BioMutationOutput
 
-	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return output, err
+	}
+	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 
 	mode := safety.PreviewModeExecute
 	if req.DryRun {
@@ -74,7 +78,11 @@ func (r Runner) BioRemove(
 ) (appconfig.BioMutationOutput, error) {
 	var output appconfig.BioMutationOutput
 
-	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return output, err
+	}
+	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 
 	mode := safety.PreviewModeExecute
 	if req.DryRun {
@@ -109,7 +117,6 @@ func (r Runner) BioRemove(
 			protocol.BioEnrollmentSubCommandRemoveEnrollment,
 		))
 	}
-
 	result := appconfig.BioMutationResult{
 		Operation:         appconfig.BioMutationRemove,
 		DeviceFingerprint: r.env.Selected.Fingerprint,

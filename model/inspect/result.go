@@ -10,6 +10,7 @@ import (
 type Info struct {
 	protocol.AuthenticatorGetInfoResponse
 	UVModalityLabel string             `json:"uvModalityLabel,omitempty"`
+	Assessment      Assessment         `json:"assessment"`
 	Conformance     conformance.Report `json:"conformance"`
 }
 

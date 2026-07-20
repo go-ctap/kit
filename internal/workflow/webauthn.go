@@ -28,7 +28,11 @@ func (r Runner) MakeCredential(
 		return output, err
 	}
 
-	preview, err := rtwebauthn.BuildMakeCredentialPreview(r.env.Selected, device.GetInfo(), input)
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return output, err
+	}
+	preview, err := rtwebauthn.BuildMakeCredentialPreview(r.env.Selected, info, input)
 	if err != nil {
 		return output, err
 	}
@@ -59,7 +63,6 @@ func (r Runner) MakeCredential(
 
 		return output, annotateMakeCredentialError(err)
 	}
-
 	result, err := makeCredentialResult(r.env.Selected.Fingerprint, input.RP.ID, input.Extensions, response)
 	if err != nil {
 		return output, err
@@ -82,7 +85,11 @@ func (r Runner) GetAssertion(
 		return output, err
 	}
 
-	preview, err := rtwebauthn.BuildGetAssertionPreview(r.env.Selected, device.GetInfo(), input)
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return output, err
+	}
+	preview, err := rtwebauthn.BuildGetAssertionPreview(r.env.Selected, info, input)
 	if err != nil {
 		return output, err
 	}

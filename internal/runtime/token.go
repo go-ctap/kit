@@ -156,7 +156,13 @@ func (s *TokenService) acquire(
 		err   error
 	)
 
-	info := s.authenticator.GetInfo()
+	info, err := authenticator.ResolveInfo(ctx, s.authenticator)
+	if err != nil {
+		return nil, errornorm.Annotate(err, errornorm.WithCommand(
+			failure.PhaseTokenAcquisition,
+			protocol.AuthenticatorGetInfo,
+		))
+	}
 	if s.verificationFlow != VerificationFlowPIN &&
 		supportsUserVerificationForPermission(info, permission) {
 		_, err = s.interactions.RequestInteraction(ctx, model.InteractionRequest{

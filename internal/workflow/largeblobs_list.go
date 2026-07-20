@@ -54,7 +54,11 @@ func (r Runner) listLargeBlobsFromInventory(
 		return applargeblobs.ListReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseDiscovery))
 	}
 
-	support := buildLargeBlobSupportReport(device.GetInfo())
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return applargeblobs.ListReport{}, err
+	}
+	support := buildLargeBlobSupportReport(info)
 	report := applargeblobs.ListReport{
 		Device:  r.env.Selected,
 		Support: support,

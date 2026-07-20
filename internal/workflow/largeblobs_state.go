@@ -54,7 +54,12 @@ func (r Runner) refreshLargeBlobInventory(
 	}
 
 	inventory := &largeBlobInventory{credentials: credentials}
-	support := buildLargeBlobSupportReport(device.GetInfo())
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		inventory.clear()
+		return nil, err
+	}
+	support := buildLargeBlobSupportReport(info)
 	if support.LargeBlobs {
 		inventory.blobs, err = r.readLargeBlobArray(ctx, device)
 		if err != nil {

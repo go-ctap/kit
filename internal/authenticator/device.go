@@ -5,7 +5,6 @@ import (
 	"iter"
 
 	"github.com/go-ctap/ctap/attestation"
-	ctapauthenticator "github.com/go-ctap/ctap/authenticator"
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/ctap/webauthn"
@@ -16,7 +15,8 @@ type Lifecycle interface {
 }
 
 type InfoProvider interface {
-	GetInfo() protocol.AuthenticatorGetInfoResponse
+	GetInfo(context.Context) (protocol.AuthenticatorGetInfoResponse, error)
+	GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool)
 }
 
 type TokenProvider interface {
@@ -35,7 +35,6 @@ type CredentialInventoryReader interface {
 
 type CredentialManager interface {
 	CredentialInventoryReader
-	GetPersistentCredentialStoreState(ctx context.Context, pinUvAuthToken []byte) (ctapauthenticator.PersistentCredentialStoreState, error)
 	DeleteCredential(ctx context.Context, pinUvAuthToken []byte, credentialID credential.PublicKeyCredentialDescriptor) error
 	UpdateUserInformation(ctx context.Context, pinUvAuthToken []byte, credentialID credential.PublicKeyCredentialDescriptor, user credential.PublicKeyCredentialUserEntity) error
 }

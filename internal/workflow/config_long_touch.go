@@ -24,7 +24,11 @@ func (r Runner) EnableLongTouchForReset(
 		mode = safety.PreviewModeExecute
 	}
 
-	preview, err := rtconfig.BuildEnableLongTouchForResetPreview(rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo()), mode)
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return output, err
+	}
+	preview, err := rtconfig.BuildEnableLongTouchForResetPreview(rtconfig.BuildStatusReport(r.env.Selected, info), mode)
 	if err != nil {
 		return output, err
 	}
@@ -46,7 +50,6 @@ func (r Runner) EnableLongTouchForReset(
 			protocol.ConfigSubCommandEnableLongTouchForReset,
 		))
 	}
-
 	output.Result = new(rtconfig.LongTouchForResetResult(r.env.Selected.Fingerprint))
 
 	return output, nil

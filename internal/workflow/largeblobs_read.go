@@ -42,7 +42,11 @@ func (r Runner) readLargeBlobFromInventory(
 		return applargeblobs.ReadReport{}, err
 	}
 
-	support := buildLargeBlobSupportReport(device.GetInfo())
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return applargeblobs.ReadReport{}, err
+	}
+	support := buildLargeBlobSupportReport(info)
 	result := applargeblobs.ReadReport{
 		Device:  r.env.Selected,
 		Support: support,

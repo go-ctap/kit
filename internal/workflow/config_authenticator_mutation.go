@@ -19,7 +19,11 @@ func (r Runner) SetAlwaysUV(
 ) (appconfig.AuthenticatorConfigOutput, error) {
 	var output appconfig.AuthenticatorConfigOutput
 
-	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return output, err
+	}
+	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 
 	mode := safety.PreviewModeDryRun
 	if !req.DryRun {
@@ -49,7 +53,6 @@ func (r Runner) SetAlwaysUV(
 			protocol.ConfigSubCommandToggleAlwaysUv,
 		))
 	}
-
 	output.Result = new(rtconfig.AlwaysUVResult(
 		r.env.Selected.Fingerprint,
 		req.Target,
@@ -65,7 +68,11 @@ func (r Runner) SetMinPINLength(
 ) (appconfig.AuthenticatorConfigOutput, error) {
 	var output appconfig.AuthenticatorConfigOutput
 
-	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return output, err
+	}
+	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 	mode := safety.PreviewModeDryRun
 	if !req.DryRun {
 		mode = safety.PreviewModeExecute
@@ -99,7 +106,6 @@ func (r Runner) SetMinPINLength(
 			protocol.ConfigSubCommandSetMinPINLength,
 		))
 	}
-
 	output.Result = new(rtconfig.MinPINLengthResult(r.env.Selected.Fingerprint, req))
 	return output, nil
 }

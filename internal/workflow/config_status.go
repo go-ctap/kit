@@ -22,7 +22,11 @@ func (r Runner) statusWithRetries(
 		return appconfig.StatusReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseAuthenticatorCommand))
 	}
 
-	rep := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return appconfig.StatusReport{}, err
+	}
+	rep := rtconfig.BuildStatusReport(r.env.Selected, info)
 	if rep.PIN.Supported {
 		retries, powerCycle, err := device.GetPINRetries(ctx)
 		rep.PIN.Retries = retryState(

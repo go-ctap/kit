@@ -24,7 +24,11 @@ func (r Runner) BioEnroll(
 ) (appconfig.BioEnrollOutput, error) {
 	var output appconfig.BioEnrollOutput
 
-	status := rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())
+	info, err := r.getAuthenticatorInfo(ctx, device)
+	if err != nil {
+		return output, err
+	}
+	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 
 	mode := safety.PreviewModeExecute
 	if req.DryRun {
@@ -52,13 +56,13 @@ func (r Runner) BioEnroll(
 				TimeoutMilliseconds: req.TimeoutMilliseconds,
 			},
 			preview,
+			bioEnrollmentCommand(status),
 			token,
 		)
 		output.Result = &result
 
 		return err
 	})
-
 	return output, err
 }
 
@@ -88,6 +92,7 @@ func (r Runner) runBioEnrollment(
 	device BioDevice,
 	req appconfig.BioEnrollRequest,
 	preview appconfig.BioEnrollPreview,
+	command protocol.Command,
 	token []byte,
 ) (appconfig.BioEnrollResult, error) {
 	progress := r.bioEnrollmentProgress(ctx)
@@ -136,7 +141,7 @@ func (r Runner) runBioEnrollment(
 	if err != nil {
 		return appconfig.BioEnrollResult{}, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 			failure.PhaseAuthenticatorCommand,
-			bioEnrollmentCommand(rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())),
+			command,
 			protocol.BioEnrollmentSubCommandEnrollBegin,
 		))
 	}
@@ -149,7 +154,7 @@ func (r Runner) runBioEnrollment(
 		if err := ctx.Err(); err != nil {
 			return cancelAfterFailure(errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 				failure.PhaseAuthenticatorCommand,
-				bioEnrollmentCommand(rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())),
+				command,
 				protocol.BioEnrollmentSubCommandEnrollCaptureNextSample,
 			)))
 		}
@@ -158,7 +163,7 @@ func (r Runner) runBioEnrollment(
 		if err != nil {
 			return cancelAfterFailure(errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 				failure.PhaseAuthenticatorCommand,
-				bioEnrollmentCommand(rtconfig.BuildStatusReport(r.env.Selected, device.GetInfo())),
+				command,
 				protocol.BioEnrollmentSubCommandEnrollCaptureNextSample,
 			)))
 		}
