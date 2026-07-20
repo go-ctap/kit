@@ -33,6 +33,35 @@ func TestToken2PCSCCandidatePropagatesContext(t *testing.T) {
 	}
 }
 
+func TestProbeToken2WaitsForCompositeInterfaces(t *testing.T) {
+	want := &report.DeviceMetadata{
+		Model:  "Token2 Bio3 Dual A+C PIN+",
+		Serial: "72103654095303",
+	}
+	calls := 0
+	metadata, err := probeToken2WhenReady(
+		context.Background(),
+		report.DeviceReport{},
+		true,
+		0,
+		func(context.Context, report.DeviceReport, bool) (*report.DeviceMetadata, error) {
+			calls++
+			if calls < token2ProbeAttempts {
+				return nil, nil
+			}
+
+			return want, nil
+		},
+	)
+
+	if err != nil || metadata != want {
+		t.Fatalf("metadata = %#v, error = %v", metadata, err)
+	}
+	if calls != token2ProbeAttempts {
+		t.Fatalf("probe calls = %d, want %d", calls, token2ProbeAttempts)
+	}
+}
+
 type recordingToken2PCSCDevice struct {
 	serial    string
 	serialCtx context.Context

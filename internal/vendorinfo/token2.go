@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"strings"
+	"time"
 
 	ghid "github.com/go-ctap/hid"
 	"github.com/go-ctap/kit/model/report"
@@ -16,9 +17,17 @@ import (
 )
 
 const (
-	fidoUsagePage uint16 = 0xf1d0
-	fidoUsage     uint16 = 0x01
+	fidoUsagePage         uint16 = 0xf1d0
+	fidoUsage             uint16 = 0x01
+	token2ProbeAttempts          = 3
+	token2ProbeRetryDelay        = 200 * time.Millisecond
 )
+
+type token2ProbeAttempt func(
+	context.Context,
+	report.DeviceReport,
+	bool,
+) (*report.DeviceMetadata, error)
 
 type token2Candidate struct {
 	metadata report.DeviceMetadata
@@ -30,6 +39,60 @@ type token2PCSCDevice interface {
 }
 
 func probeToken2(
+	ctx context.Context,
+	device report.DeviceReport,
+	allowCTAPHID bool,
+) (*report.DeviceMetadata, error) {
+	return probeToken2WhenReady(
+		ctx,
+		device,
+		allowCTAPHID,
+		token2ProbeRetryDelay,
+		probeToken2Once,
+	)
+}
+
+func probeToken2WhenReady(
+	ctx context.Context,
+	device report.DeviceReport,
+	allowCTAPHID bool,
+	retryDelay time.Duration,
+	probe token2ProbeAttempt,
+) (*report.DeviceMetadata, error) {
+	var metadata *report.DeviceMetadata
+	var err error
+	for attempt := 0; attempt < token2ProbeAttempts; attempt++ {
+		metadata, err = probe(ctx, device, allowCTAPHID)
+		if err == nil && metadata != nil {
+			return metadata, nil
+		}
+		if attempt == token2ProbeAttempts-1 {
+			break
+		}
+		if waitErr := waitForToken2Probe(ctx, retryDelay); waitErr != nil {
+			return nil, waitErr
+		}
+	}
+
+	return metadata, err
+}
+
+func waitForToken2Probe(ctx context.Context, delay time.Duration) error {
+	if err := ctx.Err(); err != nil || delay <= 0 {
+		return err
+	}
+
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func probeToken2Once(
 	ctx context.Context,
 	device report.DeviceReport,
 	allowCTAPHID bool,
