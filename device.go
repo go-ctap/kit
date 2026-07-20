@@ -83,7 +83,7 @@ func discoverDevices(ctx context.Context, discover discoverTransportFunc, mode t
 func newDevice(index int, mode transport.Mode, descriptor transport.Descriptor) Device {
 	return Device{
 		report: report.DeviceReport{
-			Fingerprint:  rtdevice.Fingerprint(mode, descriptor.Path),
+			Fingerprint:  rtdevice.Fingerprint(mode, descriptor),
 			OrdinalAlias: strconv.Itoa(index + 1),
 			Transport:    mode,
 			Path:         descriptor.Path,

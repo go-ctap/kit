@@ -1,2 +1,2 @@
-// Package device owns runtime attachment fingerprints.
+// Package device owns runtime authenticator fingerprints.
 package device

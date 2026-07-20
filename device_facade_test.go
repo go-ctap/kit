@@ -62,17 +62,17 @@ func TestDiscoverDevicesReturnsOpaqueDevicesWithReports(t *testing.T) {
 	}
 }
 
-func TestDiscoverDevicesFingerprintTracksTransportAttachment(t *testing.T) {
+func TestDiscoverDevicesFingerprintTracksDeviceIdentity(t *testing.T) {
 	descriptors := []transport.Descriptor{
 		{
 			Path:      "hid://one",
-			Serial:    "duplicate",
+			Serial:    "first",
 			VendorID:  0x1050,
 			ProductID: 0x0407,
 		},
 		{
 			Path:      "hid://two",
-			Serial:    "duplicate",
+			Serial:    "second",
 			VendorID:  0x1050,
 			ProductID: 0x0407,
 		},
@@ -84,7 +84,7 @@ func TestDiscoverDevicesFingerprintTracksTransportAttachment(t *testing.T) {
 	}
 
 	if first, second := devices[0].Report().Fingerprint, devices[1].Report().Fingerprint; first == second {
-		t.Fatalf("fingerprints for different transport paths collide: %q", first)
+		t.Fatalf("fingerprints for different device serials collide: %q", first)
 	}
 
 	descriptors[0].Path = "hid://renumbered"
@@ -93,8 +93,8 @@ func TestDiscoverDevicesFingerprintTracksTransportAttachment(t *testing.T) {
 		t.Fatalf("DiscoverDevices after path change: %v", err)
 	}
 
-	if got, previous := repeated[0].Report().Fingerprint, devices[0].Report().Fingerprint; got == previous {
-		t.Fatalf("fingerprint did not change with transport path: %q", got)
+	if got, previous := repeated[0].Report().Fingerprint, devices[0].Report().Fingerprint; got != previous {
+		t.Fatalf("fingerprint changed with transport path: %q != %q", got, previous)
 	}
 }
 

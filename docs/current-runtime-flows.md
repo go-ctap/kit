@@ -122,14 +122,14 @@ returns `AUTHENTICATOR_CLOSED`.
 ## Background Metadata Enrichment
 
 A consuming application may maintain an in-memory metadata cache for the
-current discovery topology and a small persistent cache keyed by attachment
+current discovery topology and a small persistent cache keyed by device
 fingerprint. A vendor probe accepts the opaque `Device` handle from the same
 discovery snapshot; caller-constructed reports cannot be used to open a probe
 channel. Probes are short-lived and independent from the selected authenticator:
 
 ```mermaid
 flowchart LR
-  A["Discovery snapshot"] --> B["Load metadata by attachment fingerprint"]
+  A["Discovery snapshot"] --> B["Load metadata by device fingerprint"]
   B -->|cache miss| C["Choose unprobed known vendor"]
   C --> D["Open independent probe channel"]
   D --> E["Read vendor model / serial / firmware"]
@@ -137,11 +137,12 @@ flowchart LR
   F --> G["Persist, merge, and emit discovery-changed"]
 ```
 
-The current attachment fingerprint is a hash of transport mode and path. A
-device moved to another port may therefore create another tiny cache entry.
-That duplication is accepted: a hit avoids the much more expensive HID/PCSC
-probe, while a miss remains safe and simply refreshes metadata in the
-background.
+When discovery reports a serial, the fingerprint is derived from vendor ID,
+product ID, and serial, so it follows the device between ports. Devices that do
+not expose a serial fall back to a hash of transport mode and path; moving one
+of those devices may therefore create another tiny cache entry. That
+duplication is accepted: a hit avoids the much more expensive HID/PCSC probe,
+while a miss remains safe and simply refreshes metadata in the background.
 
 ## Safety Properties
 
