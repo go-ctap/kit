@@ -87,12 +87,19 @@ they obtain each credential's `largeBlobKey` from credential inventory.
 The authenticator retains only state that belongs to the opened channel:
 
 - one `pinUvAuthToken` and its permission/RP-ID scope;
+- one private large-blob snapshot containing the credential keys and blob
+  array used by large-blob workflows;
 - closed state and the active operation cancel function;
 - immutable open options and the selected discovery report.
 
-Credential inventories, config reports, and large-blob reports are not cached.
-Every operation reads current authenticator state. This avoids stale report
-semantics and removes public `refresh` and `prepareInventoryRefresh` controls.
+Credential inventories and config reports are not cached. Large-blob workflows
+are the deliberate exception: `ListLargeBlobs` refreshes the private snapshot,
+while read, preview, and mutation operations reuse it. Successful large-blob
+mutations synchronize the retained blob array. Credential mutations, WebAuthn
+large-blob writes, and reset record state effects that invalidate the snapshot;
+the next large-blob operation reloads both credential keys and blobs. An
+uncertain mutating-command failure also invalidates it, while dry runs and
+no-ops do not.
 
 The token store is intentionally different from a report cache. Reusing a
 valid token avoids repeated PIN/UV prompts. Every token consumer goes through
@@ -154,4 +161,7 @@ while a miss remains safe and simply refreshes metadata in the background.
   to invoke destructive operations.
 - Transport command serialization remains owned by `go-ctaphid`; the kit only
   serializes complete workflows on one opened authenticator.
-- Authenticator state is treated as externally mutable between commands.
+- Concurrent mutations by another application are outside the supported usage
+  model. State effects keep retained runtime state consistent with mutations
+  performed through this runtime; an explicit `ListLargeBlobs` remains the
+  caller-controlled refresh point for external changes.

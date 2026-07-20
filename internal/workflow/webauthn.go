@@ -48,6 +48,8 @@ func (r Runner) MakeCredential(
 		RPID:       input.RP.ID,
 		Optional:   true,
 	}, func(token []byte) error {
+		r.recordStateEffect(rtruntime.StateEffectCredentialInventoryChanged)
+
 		var err error
 		response, err = r.callMakeCredential(ctx, device, token, input)
 
@@ -105,6 +107,10 @@ func (r Runner) GetAssertion(
 	}
 
 	readAssertions := func(token []byte) error {
+		if writesLargeBlob(input.Extensions) {
+			r.recordStateEffect(rtruntime.StateEffectLargeBlobArrayChanged)
+		}
+
 		var index uint
 		for response, err := range device.GetAssertion(
 			ctx,
@@ -144,6 +150,10 @@ func (r Runner) GetAssertion(
 	}
 
 	return output, nil
+}
+
+func writesLargeBlob(input *ctapwebauthn.GetAuthenticationExtensionsClientInputs) bool {
+	return input != nil && input.LargeBlobInputs != nil && input.LargeBlob.Write != nil
 }
 
 func (r Runner) afterUserPresence(present bool) {

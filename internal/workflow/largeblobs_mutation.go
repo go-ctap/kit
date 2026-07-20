@@ -67,11 +67,11 @@ func (r Runner) WriteLargeBlob(
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
 		Permission: mutationPermission,
 	}, func(token []byte) error {
+		r.recordStateEffect(rtruntime.StateEffectLargeBlobArrayChanged)
+
 		return device.SetLargeBlobs(ctx, token, replacement)
 	})
 	if err != nil {
-		largeBlobState.Clear()
-
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.AuthenticatorLargeBlobs,
@@ -79,6 +79,7 @@ func (r Runner) WriteLargeBlob(
 	}
 
 	largeBlobState.replaceBlobs(replacement)
+	r.recordStateEffect(rtruntime.StateEffectLargeBlobSnapshotSynchronized)
 	output.Result = &result
 
 	return output, nil
@@ -143,11 +144,11 @@ func (r Runner) DeleteLargeBlob(
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
 		Permission: mutationPermission,
 	}, func(token []byte) error {
+		r.recordStateEffect(rtruntime.StateEffectLargeBlobArrayChanged)
+
 		return device.SetLargeBlobs(ctx, token, replacement)
 	})
 	if err != nil {
-		largeBlobState.Clear()
-
 		return output, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.AuthenticatorLargeBlobs,
@@ -155,6 +156,7 @@ func (r Runner) DeleteLargeBlob(
 	}
 
 	largeBlobState.replaceBlobs(replacement)
+	r.recordStateEffect(rtruntime.StateEffectLargeBlobSnapshotSynchronized)
 	output.Result = &result
 
 	return output, nil

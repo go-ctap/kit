@@ -14,6 +14,7 @@ type Environment struct {
 	Events       EventEmitter
 	Interactions InteractionRequester
 	Tokens       TokenService
+	Effects      *rtruntime.StateEffects
 }
 
 type EventEmitter interface {

@@ -12,7 +12,8 @@ import (
 
 // LargeBlobState owns the inventory loaded for the selected authenticator.
 // Authenticator operations are serialized, so every large-blob operation uses
-// this state directly until the next list or authenticator close.
+// this state directly until an operation effect invalidates it, an explicit
+// list refreshes it, or the authenticator closes.
 type LargeBlobState struct {
 	current *largeBlobInventory
 }

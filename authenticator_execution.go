@@ -64,6 +64,7 @@ func executeSerializedOperation[T any](
 
 	events := rtruntime.NewEventDispatcher(config.events)
 	interactions := rtruntime.NewInteractionBroker(events, config.handler)
+	effects := rtruntime.NewStateEffects()
 	tokens := rtruntime.NewTokenService(
 		a.tokens,
 		a.device,
@@ -75,9 +76,13 @@ func executeSerializedOperation[T any](
 		Events:       events,
 		Interactions: interactions,
 		Tokens:       tokens,
+		Effects:      effects,
 	})
 
 	result, err := call(runner, childCtx)
+	if effects.InvalidatesLargeBlobSnapshot() {
+		a.largeBlobState.Clear()
+	}
 
 	return &result, err
 }

@@ -1,6 +1,9 @@
 package workflow
 
-import "github.com/go-ctap/kit/internal/authenticator"
+import (
+	"github.com/go-ctap/kit/internal/authenticator"
+	rtruntime "github.com/go-ctap/kit/internal/runtime"
+)
 
 type Runner struct {
 	env Environment
@@ -8,6 +11,10 @@ type Runner struct {
 
 func NewRunner(env Environment) Runner {
 	return Runner{env: env}
+}
+
+func (r Runner) recordStateEffect(effect rtruntime.StateEffect) {
+	r.env.Effects.Record(effect)
 }
 
 type LargeBlobDevice interface {

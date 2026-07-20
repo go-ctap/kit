@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/model/report"
 )
 
@@ -28,6 +29,7 @@ func TestWorkflowEnvironmentContainsOnlySharedServices(t *testing.T) {
 		"Events":       reflect.TypeOf((*EventEmitter)(nil)).Elem(),
 		"Interactions": reflect.TypeOf((*InteractionRequester)(nil)).Elem(),
 		"Tokens":       reflect.TypeOf((*TokenService)(nil)).Elem(),
+		"Effects":      reflect.TypeOf((*runtime.StateEffects)(nil)),
 	}
 	if environmentType.NumField() != len(wantFields) {
 		t.Fatalf("workflow Environment has %d fields, want %d", environmentType.NumField(), len(wantFields))

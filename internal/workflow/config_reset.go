@@ -6,6 +6,7 @@ import (
 	"github.com/go-ctap/ctap/protocol"
 	rtconfig "github.com/go-ctap/kit/internal/config"
 	"github.com/go-ctap/kit/internal/errornorm"
+	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
@@ -43,6 +44,8 @@ func (r Runner) ResetFactory(
 	}); err != nil {
 		return output, err
 	}
+
+	r.recordStateEffect(rtruntime.StateEffectAuthenticatorReset)
 
 	err = device.Reset(ctx)
 	r.env.Tokens.Invalidate()

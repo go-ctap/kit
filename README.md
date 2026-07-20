@@ -131,9 +131,12 @@ Credential-list and configuration workflows read current state per operation.
 Large-blob workflows are the deliberate exception: `ListLargeBlobs` refreshes
 private in-memory inventory for the selected open authenticator, and read,
 preview, and mutation operations reuse that inventory. A successful mutation
-updates the large-blob array, and the next explicit `ListLargeBlobs` reads the
-authenticator again. The state never crosses the authenticator boundary, and
-its credential keys are cleared on refresh and close.
+updates the retained large-blob array. Credential mutations, WebAuthn
+large-blob writes, and factory reset invalidate the inventory so the next
+large-blob operation reloads it. Dry runs leave it unchanged, and an explicit
+`ListLargeBlobs` always refreshes it. The state never crosses the authenticator
+boundary, and its credential keys are cleared on invalidation, refresh, and
+close.
 
 `Authenticator.Close` is safe to call more than once or while another goroutine
 is using the authenticator. It cancels the active operation, clears owned secret

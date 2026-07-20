@@ -60,6 +60,8 @@ func (r Runner) UpdateCredentialUser(
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
 		Permission: mutationPermission,
 	}, func(token []byte) error {
+		r.recordStateEffect(rtruntime.StateEffectCredentialInventoryChanged)
+
 		return device.UpdateUserInformation(ctx, token, descriptor, updatedUser)
 	})
 	if err != nil {
