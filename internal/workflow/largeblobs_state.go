@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/errornorm"
+	"github.com/go-ctap/kit/internal/secret"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
 )
@@ -16,8 +17,17 @@ type LargeBlobState struct {
 	current *largeBlobInventory
 }
 
+type largeBlobKeyID struct {
+	rpIDHashHex     string
+	credentialIDHex string
+}
+
+// largeBlobKeyStore owns key buffers returned by credential enumeration.
+type largeBlobKeyStore map[largeBlobKeyID][]byte
+
 type largeBlobInventory struct {
 	credentials appcredentials.InventoryReport
+	keys        largeBlobKeyStore
 	blobs       []protocol.LargeBlob
 }
 
@@ -48,12 +58,16 @@ func (r Runner) refreshLargeBlobInventory(
 	state *LargeBlobState,
 	grantPermission protocol.Permission,
 ) (*largeBlobInventory, error) {
-	credentials, err := r.credentialInventoryReport(ctx, device, grantPermission)
+	keys := make(largeBlobKeyStore)
+	credentials, err := r.credentialInventory(ctx, device, grantPermission, keys)
 	if err != nil {
 		return nil, err
 	}
 
-	inventory := &largeBlobInventory{credentials: credentials}
+	inventory := &largeBlobInventory{
+		credentials: credentials,
+		keys:        keys,
+	}
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
 		inventory.clear()
@@ -114,6 +128,35 @@ func (inventory *largeBlobInventory) clear() {
 		return
 	}
 
-	zeroCredentialInventoryReport(&inventory.credentials)
+	inventory.keys.zero()
+	inventory.keys = nil
 	inventory.blobs = nil
+}
+
+func (keys largeBlobKeyStore) add(rpIDHashHex, credentialIDHex string, key []byte) {
+	keyID := largeBlobKeyID{
+		rpIDHashHex:     rpIDHashHex,
+		credentialIDHex: credentialIDHex,
+	}
+	if _, exists := keys[keyID]; exists {
+		secret.Zero(key)
+
+		return
+	}
+
+	keys[keyID] = key
+}
+
+func (keys largeBlobKeyStore) get(rpIDHashHex, credentialIDHex string) []byte {
+	return keys[largeBlobKeyID{
+		rpIDHashHex:     rpIDHashHex,
+		credentialIDHex: credentialIDHex,
+	}]
+}
+
+func (keys largeBlobKeyStore) zero() {
+	for keyID, key := range keys {
+		secret.Zero(key)
+		delete(keys, keyID)
+	}
 }

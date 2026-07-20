@@ -50,13 +50,12 @@ func (r Runner) loadTargetBlobState(
 		)
 	}
 
-	if len(target.Record.LargeBlobKey) == 0 {
+	largeBlobKey := inventory.keys.get(target.RP.IDHashHex, target.Record.CredentialIDHex)
+	if len(largeBlobKey) == 0 {
 		return targetBlobState{}, failure.New(failure.CodeLargeBlobKeyMissing,
 			failure.WithPhase(failure.PhaseDiscovery),
 		)
 	}
-
-	key := target.Record.LargeBlobKey
 
 	sizeBefore, err := serializedLargeBlobArraySize(inventory.blobs)
 	if err != nil {
@@ -67,14 +66,14 @@ func (r Runner) loadTargetBlobState(
 		selected:                  r.env.Selected,
 		support:                   support,
 		target:                    target,
-		key:                       key,
+		key:                       largeBlobKey,
 		blobs:                     inventory.blobs,
 		currentBlobIndex:          -1,
 		serializedArraySizeBefore: sizeBefore,
 	}
 
 	for index, candidate := range inventory.blobs {
-		raw, err := crypto.DecryptLargeBlob(key, candidate)
+		raw, err := crypto.DecryptLargeBlob(largeBlobKey, candidate)
 		if err != nil {
 			continue
 		}

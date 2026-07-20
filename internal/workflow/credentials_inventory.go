@@ -19,13 +19,14 @@ import (
 )
 
 func (r Runner) ListCredentials(ctx context.Context, device authenticator.CredentialInventoryReader) (appcredentials.InventoryReport, error) {
-	return r.credentialInventoryReport(ctx, device, protocol.PermissionNone)
+	return r.credentialInventory(ctx, device, protocol.PermissionNone, nil)
 }
 
-func (r Runner) credentialInventoryReport(
+func (r Runner) credentialInventory(
 	ctx context.Context,
 	device authenticator.CredentialInventoryReader,
 	grantPermission protocol.Permission,
+	keys largeBlobKeyStore,
 ) (appcredentials.InventoryReport, error) {
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
@@ -52,13 +53,15 @@ func (r Runner) credentialInventoryReport(
 		Permission: grantPermission,
 		ReplaySafe: true,
 	}, func(token []byte) error {
-		current, err := r.buildCredentialInventoryReport(ctx, device, token, permission)
+		current, err := r.buildCredentialInventory(ctx, device, token, permission, keys)
 		if err != nil {
+			keys.zero()
+
 			return err
 		}
 
 		if err := ctx.Err(); err != nil {
-			zeroCredentialInventoryReport(&current)
+			keys.zero()
 
 			return errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseDiscovery))
 		}
@@ -68,6 +71,8 @@ func (r Runner) credentialInventoryReport(
 		return nil
 	})
 	if err != nil {
+		keys.zero()
+
 		return appcredentials.InventoryReport{}, err
 	}
 
@@ -86,11 +91,12 @@ func grantCoversInventoryPermission(
 		grantPermission&protocol.PermissionCredentialManagement != 0
 }
 
-func (r Runner) buildCredentialInventoryReport(
+func (r Runner) buildCredentialInventory(
 	ctx context.Context,
 	device authenticator.CredentialInventoryReader,
 	token []byte,
 	permission protocol.Permission,
+	keys largeBlobKeyStore,
 ) (appcredentials.InventoryReport, error) {
 	if err := ctx.Err(); err != nil {
 		return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseMetadata))
@@ -138,16 +144,9 @@ func (r Runner) buildCredentialInventoryReport(
 			MaxPossibleRemainingResidentCredentialsCount: *metadata.MaxPossibleRemainingResidentCredentialsCount,
 		},
 	}
-	completed := false
-	defer func() {
-		if !completed {
-			zeroCredentialInventoryReport(&report)
-		}
-	}()
-
 	if *metadata.ExistingResidentCredentialsCount == 0 {
 		report.Groups = []appcredentials.CredentialGroup{}
-		completed = true
+
 		return report, nil
 	}
 
@@ -222,20 +221,25 @@ func (r Runner) buildCredentialInventoryReport(
 				))
 			}
 
+			credentialIDHex := hex.EncodeToString(credentialResponse.CredentialID.ID)
 			record := appcredentials.CredentialRecord{
-				CredentialIDHex:      hex.EncodeToString(credentialResponse.CredentialID.ID),
+				CredentialIDHex:      credentialIDHex,
 				CredentialType:       string(credentialResponse.CredentialID.Type),
 				CredentialTransports: credentialTransports(credentialResponse.CredentialID.Transports),
 				UserIDHex:            hex.EncodeToString(credentialResponse.User.ID),
 				UserName:             strings.TrimSpace(credentialResponse.User.Name),
 				DisplayName:          strings.TrimSpace(credentialResponse.User.DisplayName),
 				CredProtect:          credentialResponse.CredProtect,
-				LargeBlobKey:         credentialResponse.LargeBlobKey,
 				ThirdPartyPayment:    credentialResponse.ThirdPartyPayment,
 			}
 
 			if len(credentialResponse.LargeBlobKey) > 0 {
 				record.LargeBlobKeyState = "available"
+				if keys == nil {
+					secret.Zero(credentialResponse.LargeBlobKey)
+				} else {
+					keys.add(group.RPIDHashHex, credentialIDHex, credentialResponse.LargeBlobKey)
+				}
 			} else {
 				record.LargeBlobKeyState = "missing"
 			}
@@ -255,17 +259,7 @@ func (r Runner) buildCredentialInventoryReport(
 	sortInventoryGroups(report.Groups)
 	report.Summary.TotalRPs = uint(len(report.Groups))
 
-	completed = true
 	return report, nil
-}
-
-func zeroCredentialInventoryReport(report *appcredentials.InventoryReport) {
-	for groupIndex := range report.Groups {
-		for credentialIndex := range report.Groups[groupIndex].Credentials {
-			secret.Zero(report.Groups[groupIndex].Credentials[credentialIndex].LargeBlobKey)
-			report.Groups[groupIndex].Credentials[credentialIndex].LargeBlobKey = nil
-		}
-	}
 }
 
 func credentialManagementCommand(info protocol.AuthenticatorGetInfoResponse) protocol.Command {

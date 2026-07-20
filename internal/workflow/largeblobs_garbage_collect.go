@@ -8,7 +8,6 @@ import (
 	"github.com/go-ctap/kit/internal/errornorm"
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	"github.com/go-ctap/kit/internal/secret"
-	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/safety"
@@ -112,7 +111,7 @@ func (r Runner) loadGarbageCollectState(
 		return garbageCollectState{}, err
 	}
 
-	keys := largeBlobKeys(inventory.credentials)
+	keys := validLargeBlobKeys(inventory.keys)
 	replacement := make([]protocol.LargeBlob, 0, len(inventory.blobs))
 	var matchedCount, unmatchedCount int
 	for _, blob := range inventory.blobs {
@@ -196,13 +195,11 @@ func (r Runner) buildGarbageCollectResult(state garbageCollectState) applargeblo
 	}
 }
 
-func largeBlobKeys(inventory appcredentials.InventoryReport) [][]byte {
-	keys := make([][]byte, 0, int(inventory.Summary.TotalCredentials))
-	for _, group := range inventory.Groups {
-		for _, record := range group.Credentials {
-			if len(record.LargeBlobKey) == 32 {
-				keys = append(keys, record.LargeBlobKey)
-			}
+func validLargeBlobKeys(store largeBlobKeyStore) [][]byte {
+	keys := make([][]byte, 0, len(store))
+	for _, key := range store {
+		if len(key) == 32 {
+			keys = append(keys, key)
 		}
 	}
 

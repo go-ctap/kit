@@ -39,6 +39,5 @@ type CredentialRecord struct {
 	DisplayName          string   `json:"displayName,omitempty"`
 	CredProtect          uint     `json:"credProtect,omitempty"`
 	LargeBlobKeyState    string   `json:"largeBlobKeyState,omitempty"`
-	LargeBlobKey         []byte   `json:"-"`
 	ThirdPartyPayment    *bool    `json:"thirdPartyPayment,omitempty"`
 }

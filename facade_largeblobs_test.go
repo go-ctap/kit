@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -12,14 +13,20 @@ import (
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
+	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/transport"
 )
 
-func TestCredentialInventoryDoesNotMarshalLargeBlobKey(t *testing.T) {
+func TestCredentialInventoryDoesNotExposeLargeBlobKey(t *testing.T) {
+	if _, ok := reflect.TypeFor[appcredentials.CredentialRecord]().FieldByName("LargeBlobKey"); ok {
+		t.Fatal("public CredentialRecord exposes LargeBlobKey")
+	}
+
+	a := &largeBlobWriteEventAuthenticator{}
 	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return &largeBlobWriteEventAuthenticator{}, nil
+		return a, nil
 	})
 	defer func() { _ = session.Close() }()
 
@@ -44,6 +51,10 @@ func TestCredentialInventoryDoesNotMarshalLargeBlobKey(t *testing.T) {
 
 	if !bytes.Contains(raw, []byte(`"largeBlobKeyState":"available"`)) {
 		t.Fatalf("credential inventory omitted largeBlobKey availability: %s", raw)
+	}
+
+	if !bytes.Equal(a.lastEnumeratedLargeBlobKey, make([]byte, len(a.lastEnumeratedLargeBlobKey))) {
+		t.Fatal("ListCredentials retained largeBlobKey after building the public report")
 	}
 }
 

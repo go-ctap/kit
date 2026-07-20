@@ -58,7 +58,8 @@ func (r Runner) readLargeBlobFromInventory(
 		Array: applargeblobs.ArrayState{BlobState: applargeblobs.BlobStateUnsupported},
 	}
 
-	if len(target.Record.LargeBlobKey) == 0 {
+	largeBlobKey := inventory.keys.get(target.RP.IDHashHex, target.Record.CredentialIDHex)
+	if len(largeBlobKey) == 0 {
 		result.LargeBlobKeyState = applargeblobs.LargeBlobKeyMissing
 		result.Array = applargeblobs.ArrayState{BlobState: applargeblobs.BlobStateUnknownKeyMissing}
 		result.Decode = rtlargeblobs.Decode(nil, false, req.DecodeMode)
@@ -74,8 +75,6 @@ func (r Runner) readLargeBlobFromInventory(
 		return result, nil
 	}
 
-	key := target.Record.LargeBlobKey
-
 	result.Array = applargeblobs.ArrayState{
 		Read:      true,
 		BlobCount: len(inventory.blobs),
@@ -83,7 +82,7 @@ func (r Runner) readLargeBlobFromInventory(
 	}
 
 	for _, candidate := range inventory.blobs {
-		raw, err := crypto.DecryptLargeBlob(key, candidate)
+		raw, err := crypto.DecryptLargeBlob(largeBlobKey, candidate)
 		if err != nil {
 			continue
 		}

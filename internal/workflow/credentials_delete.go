@@ -28,16 +28,15 @@ func (r Runner) DeleteCredential(
 		return output, err
 	}
 
-	report, err := r.credentialInventoryReport(
+	report, err := r.credentialInventory(
 		ctx,
 		device,
 		inventoryPermission,
+		nil,
 	)
 	if err != nil {
 		return output, err
 	}
-	defer zeroCredentialInventoryReport(&report)
-
 	preview, err := rtcredentials.BuildDeletePreview(report, req.CredentialIDHex)
 	if err != nil {
 		return output, err

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/go-ctap/ctap/protocol"
-	appcredentials "github.com/go-ctap/kit/model/credentials"
 )
 
 func TestLargeBlobStateRetainsInventory(t *testing.T) {
@@ -33,18 +32,14 @@ func TestLargeBlobStateRetainsInventory(t *testing.T) {
 }
 
 func TestLargeBlobStateClearZerosOwnedKeys(t *testing.T) {
+	key := bytes.Repeat([]byte{0x11}, 32)
 	state := NewLargeBlobState()
 	state.replaceInventory(&largeBlobInventory{
-		credentials: appcredentials.InventoryReport{
-			Groups: []appcredentials.CredentialGroup{{
-				Credentials: []appcredentials.CredentialRecord{{
-					LargeBlobKey: bytes.Repeat([]byte{0x11}, 32),
-				}},
-			}},
+		keys: largeBlobKeyStore{
+			{rpIDHashHex: "rp", credentialIDHex: "credential"}: key,
 		},
 	})
 
-	key := state.current.credentials.Groups[0].Credentials[0].LargeBlobKey
 	state.Clear()
 
 	if state.current != nil {
@@ -52,5 +47,21 @@ func TestLargeBlobStateClearZerosOwnedKeys(t *testing.T) {
 	}
 	if !bytes.Equal(key, make([]byte, len(key))) {
 		t.Fatal("largeBlobKey was not zeroed")
+	}
+}
+
+func TestLargeBlobKeyStoreScopesKeysByRP(t *testing.T) {
+	first := bytes.Repeat([]byte{0x11}, 32)
+	second := bytes.Repeat([]byte{0x22}, 32)
+	keys := make(largeBlobKeyStore)
+	defer keys.zero()
+	keys.add("first-rp", "credential", first)
+	keys.add("second-rp", "credential", second)
+
+	if got := keys.get("first-rp", "credential"); !bytes.Equal(got, first) {
+		t.Fatalf("first RP key = %x, want %x", got, first)
+	}
+	if got := keys.get("second-rp", "credential"); !bytes.Equal(got, second) {
+		t.Fatalf("second RP key = %x, want %x", got, second)
 	}
 }

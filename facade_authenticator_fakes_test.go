@@ -267,6 +267,7 @@ type largeBlobWriteEventAuthenticator struct {
 	largeBlobReadErr             error
 	cancelLargeBlobRead          context.CancelFunc
 	omitLargeBlobKey             bool
+	lastEnumeratedLargeBlobKey   []byte
 	largeBlobs                   []protocol.LargeBlob
 	lastSetLargeBlobs            []protocol.LargeBlob
 	maxSerializedLargeBlobArray  uint
@@ -338,6 +339,7 @@ func (a *largeBlobWriteEventAuthenticator) EnumerateCredentials(context.Context,
 		if !a.omitLargeBlobKey {
 			largeBlobKey = bytes.Repeat([]byte{0x01}, 32)
 		}
+		a.lastEnumeratedLargeBlobKey = largeBlobKey
 		yield(protocol.AuthenticatorCredentialManagementResponse{
 			User: credential.PublicKeyCredentialUserEntity{
 				ID:          []byte("user"),

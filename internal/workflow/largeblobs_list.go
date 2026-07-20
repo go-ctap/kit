@@ -80,7 +80,12 @@ func (r Runner) listLargeBlobsFromInventory(
 	report.Credentials = make([]applargeblobs.ListCredential, 0, int(inventory.credentials.Summary.TotalCredentials))
 	for _, group := range inventory.credentials.Groups {
 		for _, record := range group.Credentials {
-			row, err := buildListCredentialRow(buildCtx, group, record)
+			row, err := buildListCredentialRow(
+				buildCtx,
+				group,
+				record,
+				inventory.keys.get(group.RPIDHashHex, record.CredentialIDHex),
+			)
 			if err != nil {
 				return applargeblobs.ListReport{}, err
 			}
@@ -103,6 +108,7 @@ func buildListCredentialRow(
 	ctx listBuildContext,
 	group appcredentials.CredentialGroup,
 	record appcredentials.CredentialRecord,
+	largeBlobKey []byte,
 ) (applargeblobs.ListCredential, error) {
 	row := applargeblobs.ListCredential{
 		DeviceFingerprint: ctx.selected.Fingerprint,
@@ -121,7 +127,7 @@ func buildListCredentialRow(
 		BlobState:         applargeblobs.BlobStateUnsupported,
 	}
 
-	if len(record.LargeBlobKey) == 0 {
+	if len(largeBlobKey) == 0 {
 		if ctx.support.LargeBlobs {
 			row.BlobState = applargeblobs.BlobStateUnknownKeyMissing
 		}
@@ -137,14 +143,12 @@ func buildListCredentialRow(
 
 	row.BlobState = applargeblobs.BlobStateMissing
 
-	key := record.LargeBlobKey
-
 	for index, candidate := range ctx.blobs {
 		if ctx.matchedBlobIndexes[index] {
 			continue
 		}
 
-		raw, err := crypto.DecryptLargeBlob(key, candidate)
+		raw, err := crypto.DecryptLargeBlob(largeBlobKey, candidate)
 		if err != nil {
 			continue
 		}
