@@ -14,17 +14,13 @@ import (
 
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/authenticator"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
-	"github.com/go-ctap/kit/transport"
 )
 
 func TestCredentialStoreStateUsesStandalonePCMRToken(t *testing.T) {
 	a := newStoreStateAuthenticator()
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
 	if _, err := session.ListCredentials(
@@ -66,9 +62,7 @@ func TestCredentialStoreStateUsesStandalonePCMRToken(t *testing.T) {
 
 func TestCredentialInventoryRejectsMissingMandatoryMetadataTotals(t *testing.T) {
 	a := &missingTotalsAuthenticator{stage: "metadata"}
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
 	_, err := session.ListCredentials(
@@ -83,9 +77,7 @@ func TestCredentialInventoryRejectsMissingMandatoryMetadataTotals(t *testing.T) 
 func TestEnableLongTouchForResetDryRunAndRefreshFailureCacheEffects(t *testing.T) {
 	refreshErr := errors.New("refresh failed after config command")
 	a := &longTouchAuthenticator{enableErr: refreshErr}
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
 	if _, err := session.ConfigStatus(context.Background(), session.operationOptions()...); err != nil {
@@ -133,9 +125,7 @@ func TestEnableLongTouchForResetDryRunAndRefreshFailureCacheEffects(t *testing.T
 
 func TestEnableLongTouchForResetSuccess(t *testing.T) {
 	a := &longTouchAuthenticator{}
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
 	result, err := session.EnableLongTouchForReset(
@@ -154,9 +144,7 @@ func TestEnableLongTouchForResetSuccess(t *testing.T) {
 
 func TestSetMinPINLengthPassesParametersWithoutDefaults(t *testing.T) {
 	a := &setMinPINLengthAuthenticator{}
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
 	result, err := session.SetMinPINLength(context.Background(), appconfig.SetMinPINLengthOperation{
@@ -181,6 +169,7 @@ func TestSetMinPINLengthPassesParametersWithoutDefaults(t *testing.T) {
 
 type storeStateAuthenticator struct {
 	contractAuthenticator
+	contractCredentialManager
 	readOnly             atomic.Bool
 	permissions          []protocol.Permission
 	stateTokenPermission protocol.Permission
@@ -273,6 +262,7 @@ func encryptGetInfoMember(token, plaintext []byte, label string) []byte {
 
 type longTouchAuthenticator struct {
 	contractAuthenticator
+	contractConfigManager
 	infoCalls   atomic.Int32
 	enableCalls atomic.Int32
 	enabled     atomic.Bool
@@ -286,6 +276,7 @@ type missingTotalsAuthenticator struct {
 
 type setMinPINLengthAuthenticator struct {
 	contractAuthenticator
+	contractConfigManager
 	params protocol.SetMinPINLengthConfigSubCommandParams
 }
 

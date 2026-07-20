@@ -82,7 +82,7 @@ func (a *yubicoContractAuthenticator) GetYubiKeyDeviceInfo(context.Context) (yub
 	return a.info, a.err
 }
 
-func openYubicoContractAuthenticator(t *testing.T, auth authenticator.Device) *contractAuthenticatorHandle {
+func openYubicoContractAuthenticator(t *testing.T, auth any) *contractAuthenticatorHandle {
 	t.Helper()
 
 	device := newDevice(0, transport.ModeHID, transport.Descriptor{
@@ -94,8 +94,8 @@ func openYubicoContractAuthenticator(t *testing.T, auth authenticator.Device) *c
 	session, err := openAuthenticatorHandle(
 		context.Background(),
 		device,
-		func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-			return auth, nil
+		func(context.Context, transport.Mode, string) (*authenticator.Opened, error) {
+			return adaptContractAuthenticator(auth), nil
 		},
 	)
 	if err != nil {

@@ -11,20 +11,16 @@ import (
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
 	ctaptransport "github.com/go-ctap/ctap/transport"
-	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
-	"github.com/go-ctap/kit/transport"
 	"github.com/samber/lo"
 )
 
 func TestCredentialInventoryReadsFreshStateAndReusesToken(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &refreshCredentialAuthenticator{revision: 1}
-	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, events, a)
 	defer func() { _ = session.Close() }()
 
 	first := runCredentialList(t, session)
@@ -65,9 +61,7 @@ func TestCredentialInventoryReadsFreshStateAndReusesToken(t *testing.T) {
 
 func TestCredentialInventoryReturnsEmptyReportWithoutEnumeratingRPs(t *testing.T) {
 	a := &emptyCredentialAuthenticator{}
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
 	output := runCredentialList(t, session)
@@ -86,9 +80,7 @@ func TestCredentialInventoryReturnsEmptyReportWithoutEnumeratingRPs(t *testing.T
 
 func TestCredentialInventoryReacquiresRejectedTokenOnce(t *testing.T) {
 	a := &rejectedCredentialTokenAuthenticator{}
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
 	output := runCredentialList(t, session)
@@ -111,9 +103,7 @@ func TestCredentialInventoryReacquiresRejectedTokenOnce(t *testing.T) {
 
 func TestCredentialInventoryStopsAfterSecondRejectedToken(t *testing.T) {
 	a := &rejectedCredentialTokenAuthenticator{rejectEveryToken: true}
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
 	_, err := session.ListCredentials(
@@ -135,9 +125,7 @@ func TestCredentialInventoryStopsAfterSecondRejectedToken(t *testing.T) {
 
 func TestCredentialMutationUsesInventoryFromSuccessfulRefresh(t *testing.T) {
 	a := &refreshCredentialAuthenticator{revision: 1}
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
 	_ = runCredentialList(t, session)
@@ -160,9 +148,7 @@ func TestCredentialMutationUsesInventoryFromSuccessfulRefresh(t *testing.T) {
 
 func TestCredentialInventoryProgressEventsIncludeCounts(t *testing.T) {
 	events := &recordingEventSink{}
-	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return &progressCredentialAuthenticator{}, nil
-	})
+	session := openContractAuthenticator(t, events, &progressCredentialAuthenticator{})
 	defer func() { _ = session.Close() }()
 
 	if _, err := session.ListCredentials(
@@ -185,9 +171,7 @@ func TestCredentialInventoryProgressEventsIncludeCounts(t *testing.T) {
 
 func TestCredentialDeleteReusesUnscopedInventoryGrant(t *testing.T) {
 	a := &credentialMutationTokenAuthenticator{}
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
 	_, err := session.DeleteCredential(context.Background(), appcredentials.DeleteOperation{
@@ -202,9 +186,7 @@ func TestCredentialDeleteReusesUnscopedInventoryGrant(t *testing.T) {
 
 func TestCredentialUpdateUserUsesTargetWithoutInventory(t *testing.T) {
 	a := &credentialMutationTokenAuthenticator{}
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
 	_, err := session.UpdateCredentialUser(context.Background(), appcredentials.UpdateUserOperation{
@@ -224,9 +206,7 @@ func TestCredentialUpdateUserUsesTargetWithoutInventory(t *testing.T) {
 
 func TestCredentialUpdateUserDryRunUsesTargetWithoutAuthenticatorCommands(t *testing.T) {
 	a := &credentialMutationTokenAuthenticator{}
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
 	result, err := session.UpdateCredentialUser(context.Background(), appcredentials.UpdateUserOperation{
@@ -269,11 +249,13 @@ type progressCredentialAuthenticator struct {
 
 type emptyCredentialAuthenticator struct {
 	contractAuthenticator
+	contractCredentialManager
 	rpEnumerations atomic.Int32
 }
 
 type rejectedCredentialTokenAuthenticator struct {
 	contractAuthenticator
+	contractCredentialManager
 	rejectEveryToken bool
 	tokenCalls       atomic.Int32
 	metadataCalls    atomic.Int32
@@ -351,6 +333,7 @@ func (a *emptyCredentialAuthenticator) EnumerateRPs(context.Context, []byte) ite
 
 type refreshCredentialAuthenticator struct {
 	contractAuthenticator
+	contractCredentialManager
 	revision             byte
 	metadataErr          error
 	cancelEnumeration    context.CancelFunc

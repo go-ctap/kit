@@ -12,14 +12,14 @@ import (
 
 func TestOpenAuthenticatorAllowsIndependentChannelsForSameDevice(t *testing.T) {
 	opens := 0
-	open := func(context.Context, transport.Mode, string) (authenticator.Device, error) {
+	open := func(context.Context, transport.Mode, string) (any, error) {
 		opens++
 
 		return &contractAuthenticator{}, nil
 	}
 	device := newContractDevice()
 
-	first, err := openAuthenticatorHandle(t.Context(), device, open)
+	first, err := openAuthenticatorHandle(t.Context(), device, adaptContractAuthenticatorOpen(open))
 	if err != nil {
 		t.Fatalf("open first opened: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestOpenAuthenticatorAllowsIndependentChannelsForSameDevice(t *testing.T) {
 		}
 	}()
 
-	second, err := openAuthenticatorHandle(t.Context(), device, open)
+	second, err := openAuthenticatorHandle(t.Context(), device, adaptContractAuthenticatorOpen(open))
 	if err != nil {
 		t.Fatalf("open second opened: %v", err)
 	}
@@ -46,13 +46,21 @@ func TestOpenAuthenticatorAllowsIndependentChannelsForSameDevice(t *testing.T) {
 
 func TestOpenAuthenticatorMakesJournalAvailableWhileOpeningAuthenticator(t *testing.T) {
 	journal := NewLogJournal()
-	open := func(ctx context.Context, _ transport.Mode, _ string) (authenticator.Device, error) {
+	open := func(ctx context.Context, _ transport.Mode, _ string) (any, error) {
 		kitlog.RecorderFrom(ctx).Append(model.LogEntry{Command: "open-command"})
 
 		return &contractAuthenticator{}, nil
 	}
 
-	opened := openContractAuthenticatorWithOptions(t, nil, open, WithLogJournal(journal))
+	opened, err := openAuthenticatorHandle(
+		t.Context(),
+		newContractDevice(),
+		adaptContractAuthenticatorOpen(open),
+		WithLogJournal(journal),
+	)
+	if err != nil {
+		t.Fatalf("OpenAuthenticator: %v", err)
+	}
 	if err := opened.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
@@ -60,6 +68,18 @@ func TestOpenAuthenticatorMakesJournalAvailableWhileOpeningAuthenticator(t *test
 	batch := journal.Read(0)
 	if len(batch.Entries) != 1 || batch.Entries[0].Entry.Command != "open-command" {
 		t.Fatalf("open log entries = %#v", batch.Entries)
+	}
+}
+
+func TestContractAuthenticatorBaseExposesOnlyRuntimeCapabilities(t *testing.T) {
+	opened := adaptContractAuthenticator(&contractAuthenticator{})
+
+	if opened.Lifecycle == nil || opened.Info == nil || opened.Tokens == nil || opened.ConfigStatus == nil {
+		t.Fatalf("runtime capabilities are incomplete: %#v", opened)
+	}
+	if opened.CredentialInventory != nil || opened.Credentials != nil || opened.WebAuthn != nil ||
+		opened.LargeBlobs != nil || opened.Config != nil || opened.Bio != nil {
+		t.Fatalf("base fake exposes unrelated domain capabilities: %#v", opened)
 	}
 }
 
@@ -76,28 +96,26 @@ func (a *contractAuthenticatorHandle) operationOptions(opts ...OperationOption) 
 	return opts
 }
 
-func openContractAuthenticator(t *testing.T, events EventSink, open authenticatorOpenFunc) *contractAuthenticatorHandle {
-	return openContractAuthenticatorWithOptions(t, events, open)
-}
+type contractAuthenticatorOpenFunc func(context.Context, transport.Mode, string) (any, error)
 
-func openContractAuthenticatorWithOptions(
+func openContractAuthenticator(
 	t *testing.T,
 	events EventSink,
-	open authenticatorOpenFunc,
+	implementation any,
 	opts ...AuthenticatorOption,
 ) *contractAuthenticatorHandle {
 	t.Helper()
 
-	if open == nil {
-		open = func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-			return &contractAuthenticator{}, nil
-		}
+	if implementation == nil {
+		implementation = &contractAuthenticator{}
 	}
 
 	opened, err := openAuthenticatorHandle(
 		context.Background(),
 		newContractDevice(),
-		open,
+		func(context.Context, transport.Mode, string) (*authenticator.Opened, error) {
+			return adaptContractAuthenticator(implementation), nil
+		},
 		opts...,
 	)
 	if err != nil {
@@ -105,6 +123,37 @@ func openContractAuthenticatorWithOptions(
 	}
 
 	return &contractAuthenticatorHandle{Authenticator: opened, events: events}
+}
+
+func adaptContractAuthenticatorOpen(open contractAuthenticatorOpenFunc) authenticatorOpenFunc {
+	return func(ctx context.Context, mode transport.Mode, path string) (*authenticator.Opened, error) {
+		implementation, err := open(ctx, mode, path)
+		if err != nil {
+			return nil, err
+		}
+
+		return adaptContractAuthenticator(implementation), nil
+	}
+}
+
+func adaptContractAuthenticator(implementation any) *authenticator.Opened {
+	if opened, ok := implementation.(*authenticator.Opened); ok {
+		return opened
+	}
+
+	opened := &authenticator.Opened{}
+	opened.Lifecycle, _ = implementation.(authenticator.Lifecycle)
+	opened.Info, _ = implementation.(authenticator.InfoProvider)
+	opened.Tokens, _ = implementation.(authenticator.TokenProvider)
+	opened.CredentialInventory, _ = implementation.(authenticator.CredentialInventoryReader)
+	opened.Credentials, _ = implementation.(authenticator.CredentialManager)
+	opened.WebAuthn, _ = implementation.(authenticator.WebAuthnManager)
+	opened.LargeBlobs, _ = implementation.(authenticator.LargeBlobDevice)
+	opened.ConfigStatus, _ = implementation.(authenticator.ConfigStatusDevice)
+	opened.Config, _ = implementation.(authenticator.ConfigDevice)
+	opened.Bio, _ = implementation.(authenticator.BioDevice)
+
+	return opened
 }
 
 func newContractDevice() Device {

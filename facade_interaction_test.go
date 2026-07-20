@@ -6,12 +6,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
-	"github.com/go-ctap/kit/transport"
 )
 
 func TestTypedOperationDoesNotMarshalSecrets(t *testing.T) {
@@ -36,9 +34,7 @@ func TestPINInteractionRejectsEmptyPINAtSessionRun(t *testing.T) {
 	a := &pinOnlyLargeBlobWriteEventAuthenticator{
 		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
 	}
-	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, events, a)
 	defer func() { _ = session.Close() }()
 
 	handler := interactionHandlerFunc(func(model.InteractionRequest) (model.InteractionResponse, error) {
@@ -61,9 +57,7 @@ func TestPINInteractionWithoutHandlerReturnsInvalidState(t *testing.T) {
 	a := &pinOnlyLargeBlobWriteEventAuthenticator{
 		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
 	}
-	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, events, a)
 	defer func() { _ = session.Close() }()
 
 	_, err := session.WriteLargeBlob(context.Background(), applargeblobs.WriteOperation{
@@ -85,9 +79,7 @@ func TestLastInteractionHandlerOptionWins(t *testing.T) {
 	a := &pinOnlyLargeBlobWriteEventAuthenticator{
 		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
 	}
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
 	firstCalls := 0
@@ -124,9 +116,7 @@ func TestCanceledContextDuringInteractionReturnsCanceledFailure(t *testing.T) {
 	a := &pinOnlyLargeBlobWriteEventAuthenticator{
 		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
 	}
-	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, events, a)
 	defer func() { _ = session.Close() }()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -149,9 +139,7 @@ func TestCanceledContextDuringInteractionReturnsCanceledFailure(t *testing.T) {
 
 func TestSetPINExecutesWithoutConfirmationInteraction(t *testing.T) {
 	a := &pinMutationCountingAuthenticator{}
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
 	_, err := session.SetPIN(context.Background(), appconfig.SetPINOperation{
@@ -169,9 +157,7 @@ func TestSetPINExecutesWithoutConfirmationInteraction(t *testing.T) {
 func TestResetTouchInteractionCanceledReturnsCanceledFailure(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &resetCountingAuthenticator{}
-	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, events, a)
 	defer func() { _ = session.Close() }()
 
 	handler := interactionHandlerFunc(func(req model.InteractionRequest) (model.InteractionResponse, error) {
@@ -204,9 +190,7 @@ func TestPINInteractionHandlerReceivesRequestAndValidPINContinues(t *testing.T) 
 	a := &pinOnlyLargeBlobWriteEventAuthenticator{
 		largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
 	}
-	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, events, a)
 	defer func() { _ = session.Close() }()
 
 	var (

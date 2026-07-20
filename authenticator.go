@@ -74,10 +74,19 @@ func WithVerificationFlow(flow VerificationFlow) OperationOption {
 // Authenticator is one opened authenticator channel. It owns transport
 // lifecycle, operation serialization, and runtime token state until Close.
 type Authenticator struct {
-	selected       report.DeviceReport
-	device         authenticator.Device
-	tokens         *rtruntime.TokenStore
-	largeBlobState *workflow.LargeBlobState
+	selected            report.DeviceReport
+	lifecycle           authenticator.Lifecycle
+	info                authenticator.InfoProvider
+	tokenProvider       authenticator.TokenProvider
+	credentialInventory authenticator.CredentialInventoryReader
+	credentials         authenticator.CredentialManager
+	webAuthn            authenticator.WebAuthnManager
+	largeBlobs          authenticator.LargeBlobDevice
+	configStatus        authenticator.ConfigStatusDevice
+	config              authenticator.ConfigDevice
+	bio                 authenticator.BioDevice
+	tokens              *rtruntime.TokenStore
+	largeBlobState      *workflow.LargeBlobState
 
 	runMu   sync.Mutex
 	stateMu sync.Mutex
@@ -126,10 +135,19 @@ func openAuthenticatorHandle(
 	}
 
 	return &Authenticator{
-		selected:       selected,
-		device:         opened,
-		tokens:         rtruntime.NewTokenStore(),
-		largeBlobState: workflow.NewLargeBlobState(),
+		selected:            selected,
+		lifecycle:           opened.Lifecycle,
+		info:                opened.Info,
+		tokenProvider:       opened.Tokens,
+		credentialInventory: opened.CredentialInventory,
+		credentials:         opened.Credentials,
+		webAuthn:            opened.WebAuthn,
+		largeBlobs:          opened.LargeBlobs,
+		configStatus:        opened.ConfigStatus,
+		config:              opened.Config,
+		bio:                 opened.Bio,
+		tokens:              rtruntime.NewTokenStore(),
+		largeBlobState:      workflow.NewLargeBlobState(),
 	}, nil
 }
 
@@ -149,8 +167,8 @@ func (a *Authenticator) Close() error {
 		a.tokens.InvalidateToken()
 		a.largeBlobState.Clear()
 
-		if a.device != nil {
-			a.closeErr = a.device.Close()
+		if a.lifecycle != nil {
+			a.closeErr = a.lifecycle.Close()
 		}
 	})
 

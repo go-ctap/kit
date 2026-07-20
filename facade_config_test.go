@@ -11,11 +11,9 @@ import (
 	ctapdevice "github.com/go-ctap/ctap/authenticator"
 	"github.com/go-ctap/ctap/protocol"
 	ctaptransport "github.com/go-ctap/ctap/transport"
-	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
-	"github.com/go-ctap/kit/transport"
 )
 
 func TestBioSensorInfoReportsSpecNamedEnums(t *testing.T) {
@@ -42,9 +40,7 @@ func TestBioSensorInfoReportsSpecNamedEnums(t *testing.T) {
 				modality:        protocol.BioModalityFingerprint,
 				fingerprintKind: tt.kind,
 			}
-			session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-				return a, nil
-			})
+			session := openContractAuthenticator(t, nil, a)
 			defer func() { _ = session.Close() }()
 
 			output, err := session.BioSensorInfo(context.Background(), session.operationOptions()...)
@@ -99,9 +95,7 @@ func TestBioSensorInfoOmitsUnknownSpecValues(t *testing.T) {
 				modality:        tt.modality,
 				fingerprintKind: tt.fingerprintKind,
 			}
-			session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-				return a, nil
-			})
+			session := openContractAuthenticator(t, nil, a)
 			defer func() { _ = session.Close() }()
 
 			output, err := session.BioSensorInfo(context.Background(), session.operationOptions()...)
@@ -133,9 +127,7 @@ func TestBioSensorInfoOmitsUnknownSpecValues(t *testing.T) {
 func TestResetRequestsTouchInteractionBeforeReset(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &resetCountingAuthenticator{events: events}
-	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, events, a)
 	defer func() { _ = session.Close() }()
 
 	handler := interactionHandlerFunc(func(req model.InteractionRequest) (model.InteractionResponse, error) {
@@ -218,9 +210,7 @@ func TestRunContextReachesTokenAndAuthenticatorCommand(t *testing.T) {
 	type contextKey struct{}
 
 	a := &contextRecordingConfigAuthenticator{}
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
 	marker := new(int)
@@ -253,9 +243,7 @@ func TestBioEnrollmentCleanupUsesBoundedIndependentContext(t *testing.T) {
 		captureErr:      operationErr,
 		cleanupErr:      cleanupErr,
 	}
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
 	result, err := session.BioEnroll(
@@ -297,9 +285,7 @@ func TestBioEnrollmentCleanupUsesBoundedIndependentContext(t *testing.T) {
 func TestBioEnrollmentSuccessfulCleanupIsReported(t *testing.T) {
 	operationErr := errors.New("capture failed")
 	a := &bioCleanupAuthenticator{captureErr: operationErr}
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
 	result, err := session.BioEnroll(
@@ -327,9 +313,7 @@ func runConfirmedResetWithErrorAndEvents(t *testing.T, events *recordingEventSin
 	t.Helper()
 
 	a := &resetCountingAuthenticator{events: events, resetErr: resetErr}
-	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, events, a)
 	defer func() { _ = session.Close() }()
 
 	handler := interactionHandlerFunc(func(req model.InteractionRequest) (model.InteractionResponse, error) {
@@ -354,6 +338,7 @@ func runConfirmedResetWithErrorAndEvents(t *testing.T, events *recordingEventSin
 
 type contextRecordingConfigAuthenticator struct {
 	contractAuthenticator
+	contractConfigManager
 	tokenCtx   context.Context
 	commandCtx context.Context
 }
@@ -390,6 +375,7 @@ func (a *contextRecordingConfigAuthenticator) ToggleAlwaysUV(ctx context.Context
 
 type bioCleanupAuthenticator struct {
 	contractAuthenticator
+	contractBioEnrollmentManager
 	cancelOperation   context.CancelFunc
 	captureErr        error
 	cleanupErr        error
@@ -436,6 +422,7 @@ func (a *bioCleanupAuthenticator) CancelCurrentEnrollment(ctx context.Context) e
 
 type bioSensorAuthenticator struct {
 	contractAuthenticator
+	contractBioEnrollmentManager
 	modality        protocol.BioModality
 	fingerprintKind uint
 }
@@ -501,9 +488,7 @@ func TestPINMutationsRejectEmptyPINAtSessionRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := &pinMutationCountingAuthenticator{configured: tt.configured}
-			session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-				return a, nil
-			})
+			session := openContractAuthenticator(t, nil, a)
 			defer func() { _ = session.Close() }()
 
 			result, err := tt.invoke(session)
@@ -527,9 +512,7 @@ func TestPINMutationsRejectEmptyPINAtSessionRun(t *testing.T) {
 func TestUVTokenAcquisitionRequestsUserVerificationInteraction(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &uvTokenAuthenticator{events: events}
-	session := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, events, a)
 	defer func() { _ = session.Close() }()
 
 	handler := interactionHandlerFunc(func(req model.InteractionRequest) (model.InteractionResponse, error) {

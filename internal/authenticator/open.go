@@ -13,7 +13,7 @@ import (
 )
 
 // Open opens the private CTAP authenticator implementation for a transport path.
-func Open(ctx context.Context, mode transport.Mode, path string) (Device, error) {
+func Open(ctx context.Context, mode transport.Mode, path string) (*Opened, error) {
 	var opts []options.Option
 
 	switch mode {
@@ -32,7 +32,18 @@ func Open(ctx context.Context, mode transport.Mode, path string) (Device, error)
 
 	device, err := ctapdevice.OpenHID(ctx, path, opts...)
 	if err == nil {
-		return device, nil
+		return &Opened{
+			Lifecycle:           device,
+			Info:                device,
+			Tokens:              device,
+			CredentialInventory: device,
+			Credentials:         device,
+			WebAuthn:            device,
+			LargeBlobs:          device,
+			ConfigStatus:        device,
+			Config:              device,
+			Bio:                 device,
+		}, nil
 	}
 
 	switch {

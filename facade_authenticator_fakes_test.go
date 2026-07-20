@@ -7,11 +7,9 @@ import (
 	"iter"
 	"sync/atomic"
 
-	"github.com/go-ctap/ctap/attestation"
 	ctapdevice "github.com/go-ctap/ctap/authenticator"
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/ctap/webauthn"
 	"github.com/go-ctap/kit/model"
 )
 
@@ -37,59 +35,25 @@ func (a *contractAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protoc
 	return nil, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) GetCredsMetadata(context.Context, []byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
+type contractCredentialManager struct{}
+
+func (contractCredentialManager) GetCredsMetadata(context.Context, []byte) (protocol.AuthenticatorCredentialManagementResponse, error) {
 	return protocol.AuthenticatorCredentialManagementResponse{}, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) EnumerateRPs(context.Context, []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+func (contractCredentialManager) EnumerateRPs(context.Context, []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
 	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {}
 }
 
-func (a *contractAuthenticator) EnumerateCredentials(context.Context, []byte, []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
+func (contractCredentialManager) EnumerateCredentials(context.Context, []byte, []byte) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
 	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {}
 }
 
-func (a *contractAuthenticator) DeleteCredential(context.Context, []byte, credential.PublicKeyCredentialDescriptor) error {
+func (contractCredentialManager) DeleteCredential(context.Context, []byte, credential.PublicKeyCredentialDescriptor) error {
 	return errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) UpdateUserInformation(context.Context, []byte, credential.PublicKeyCredentialDescriptor, credential.PublicKeyCredentialUserEntity) error {
-	return errors.New("not implemented")
-}
-
-func (a *contractAuthenticator) MakeCredential(
-	context.Context,
-	[]byte,
-	[]byte,
-	credential.PublicKeyCredentialRpEntity,
-	credential.PublicKeyCredentialUserEntity,
-	[]credential.PublicKeyCredentialParameters,
-	[]credential.PublicKeyCredentialDescriptor,
-	*webauthn.CreateAuthenticationExtensionsClientInputs,
-	map[protocol.Option]bool,
-	uint,
-	[]attestation.AttestationStatementFormatIdentifier,
-) (protocol.AuthenticatorMakeCredentialResponse, error) {
-	return protocol.AuthenticatorMakeCredentialResponse{}, errors.New("not implemented")
-}
-
-func (a *contractAuthenticator) GetAssertion(
-	context.Context,
-	[]byte,
-	string,
-	[]byte,
-	[]credential.PublicKeyCredentialDescriptor,
-	*webauthn.GetAuthenticationExtensionsClientInputs,
-	map[protocol.Option]bool,
-) iter.Seq2[protocol.AuthenticatorGetAssertionResponse, error] {
-	return func(yield func(protocol.AuthenticatorGetAssertionResponse, error) bool) {}
-}
-
-func (a *contractAuthenticator) GetLargeBlobs(context.Context) ([]protocol.LargeBlob, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (a *contractAuthenticator) SetLargeBlobs(context.Context, []byte, []protocol.LargeBlob) error {
+func (contractCredentialManager) UpdateUserInformation(context.Context, []byte, credential.PublicKeyCredentialDescriptor, credential.PublicKeyCredentialUserEntity) error {
 	return errors.New("not implemented")
 }
 
@@ -97,54 +61,59 @@ func (a *contractAuthenticator) GetPINRetries(context.Context) (uint, *bool, err
 	return 0, nil, nil
 }
 func (a *contractAuthenticator) GetUVRetries(context.Context) (uint, error) { return 0, nil }
-func (a *contractAuthenticator) SetPIN(context.Context, string) error {
+
+type contractConfigManager struct{}
+
+func (contractConfigManager) SetPIN(context.Context, string) error {
 	return errors.New("not implemented")
 }
-func (a *contractAuthenticator) ChangePIN(context.Context, string, string) error {
+func (contractConfigManager) ChangePIN(context.Context, string, string) error {
 	return errors.New("not implemented")
 }
-func (a *contractAuthenticator) Reset(context.Context) error { return errors.New("not implemented") }
-func (a *contractAuthenticator) ToggleAlwaysUV(context.Context, []byte) error {
+func (contractConfigManager) Reset(context.Context) error { return errors.New("not implemented") }
+func (contractConfigManager) ToggleAlwaysUV(context.Context, []byte) error {
 	return errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) SetMinPINLength(context.Context, []byte, protocol.SetMinPINLengthConfigSubCommandParams) error {
+func (contractConfigManager) SetMinPINLength(context.Context, []byte, protocol.SetMinPINLengthConfigSubCommandParams) error {
 	return errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) EnableLongTouchForReset(context.Context, []byte) error {
+func (contractConfigManager) EnableLongTouchForReset(context.Context, []byte) error {
 	return errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) GetBioModality(context.Context) (protocol.AuthenticatorBioEnrollmentResponse, error) {
+type contractBioEnrollmentManager struct{}
+
+func (contractBioEnrollmentManager) GetBioModality(context.Context) (protocol.AuthenticatorBioEnrollmentResponse, error) {
 	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) GetFingerprintSensorInfo(context.Context) (protocol.AuthenticatorBioEnrollmentResponse, error) {
+func (contractBioEnrollmentManager) GetFingerprintSensorInfo(context.Context) (protocol.AuthenticatorBioEnrollmentResponse, error) {
 	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) EnrollBegin(context.Context, []byte, uint) (protocol.AuthenticatorBioEnrollmentResponse, error) {
+func (contractBioEnrollmentManager) EnrollBegin(context.Context, []byte, uint) (protocol.AuthenticatorBioEnrollmentResponse, error) {
 	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) EnrollCaptureNextSample(context.Context, []byte, []byte, uint) (protocol.AuthenticatorBioEnrollmentResponse, error) {
+func (contractBioEnrollmentManager) EnrollCaptureNextSample(context.Context, []byte, []byte, uint) (protocol.AuthenticatorBioEnrollmentResponse, error) {
 	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) CancelCurrentEnrollment(context.Context) error {
+func (contractBioEnrollmentManager) CancelCurrentEnrollment(context.Context) error {
 	return errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) EnumerateEnrollments(context.Context, []byte) (protocol.AuthenticatorBioEnrollmentResponse, error) {
+func (contractBioEnrollmentManager) EnumerateEnrollments(context.Context, []byte) (protocol.AuthenticatorBioEnrollmentResponse, error) {
 	return protocol.AuthenticatorBioEnrollmentResponse{}, errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) SetFriendlyName(context.Context, []byte, []byte, string) error {
+func (contractBioEnrollmentManager) SetFriendlyName(context.Context, []byte, []byte, string) error {
 	return errors.New("not implemented")
 }
 
-func (a *contractAuthenticator) RemoveEnrollment(context.Context, []byte, []byte) error {
+func (contractBioEnrollmentManager) RemoveEnrollment(context.Context, []byte, []byte) error {
 	return errors.New("not implemented")
 }
 
@@ -166,6 +135,7 @@ func (a *closeCountingAuthenticator) Close() error {
 
 type resetCountingAuthenticator struct {
 	contractAuthenticator
+	contractConfigManager
 	events               *recordingEventSink
 	resetErr             error
 	resetCount           atomic.Int32
@@ -174,6 +144,7 @@ type resetCountingAuthenticator struct {
 
 type pinMutationCountingAuthenticator struct {
 	contractAuthenticator
+	contractConfigManager
 	configured  bool
 	setErr      error
 	changeErr   error
@@ -220,6 +191,7 @@ func (a *resetCountingAuthenticator) Reset(context.Context) error {
 
 type uvTokenAuthenticator struct {
 	contractAuthenticator
+	contractConfigManager
 	events               *recordingEventSink
 	uvCalled             atomic.Bool
 	userVerificationSeen atomic.Bool
@@ -455,6 +427,7 @@ type cancelablePINAuthenticator struct {
 
 type blockingConfigAuthenticator struct {
 	contractAuthenticator
+	contractConfigManager
 	commandEntered chan struct{}
 }
 

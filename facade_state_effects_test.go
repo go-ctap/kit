@@ -10,13 +10,11 @@ import (
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
 	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
-	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 	appwebauthn "github.com/go-ctap/kit/model/webauthn"
-	"github.com/go-ctap/kit/transport"
 )
 
 func TestAuthenticatorMutationsInvalidateRetainedLargeBlobSnapshot(t *testing.T) {
@@ -208,9 +206,7 @@ func openStateEffectAuthenticator(
 	t.Helper()
 
 	a := &stateEffectAuthenticator{}
-	session := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	session := openContractAuthenticator(t, nil, a)
 	t.Cleanup(func() { _ = session.Close() })
 	handler := interactionHandlerFunc(func(model.InteractionRequest) (model.InteractionResponse, error) {
 		return model.InteractionResponse{}, nil
@@ -309,6 +305,7 @@ func largeBlobWriteAssertionOperation(dryRun bool) appwebauthn.GetAssertionOpera
 
 type stateEffectAuthenticator struct {
 	largeBlobWriteEventAuthenticator
+	contractConfigManager
 	deleteErr error
 }
 

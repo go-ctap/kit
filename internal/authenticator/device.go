@@ -97,13 +97,38 @@ type BioEnrollmentManager interface {
 	RemoveEnrollment(ctx context.Context, pinUvAuthToken []byte, templateID []byte) error
 }
 
-type Device interface {
-	Lifecycle
-	InfoProvider
-	TokenProvider
-	CredentialManager
-	WebAuthnManager
+type LargeBlobDevice interface {
+	CredentialInventoryReader
 	LargeBlobManager
+}
+
+type ConfigStatusDevice interface {
+	InfoProvider
+	RetryProvider
+}
+
+type ConfigDevice interface {
+	ConfigStatusDevice
 	ConfigManager
+}
+
+type BioDevice interface {
+	ConfigStatusDevice
 	BioEnrollmentManager
+}
+
+// Opened is the private capability bundle returned by the authenticator
+// opener. The concrete upstream device is adapted once at the transport
+// boundary; facade code retains only the capability needed by each domain.
+type Opened struct {
+	Lifecycle           Lifecycle
+	Info                InfoProvider
+	Tokens              TokenProvider
+	CredentialInventory CredentialInventoryReader
+	Credentials         CredentialManager
+	WebAuthn            WebAuthnManager
+	LargeBlobs          LargeBlobDevice
+	ConfigStatus        ConfigStatusDevice
+	Config              ConfigDevice
+	Bio                 BioDevice
 }

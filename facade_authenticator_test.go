@@ -9,13 +9,11 @@ import (
 
 	"github.com/go-ctap/ctap/protocol"
 	ctaptransport "github.com/go-ctap/ctap/transport"
-	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/operation"
-	"github.com/go-ctap/kit/transport"
 )
 
 func TestAuthenticatorTypedOperationContract(t *testing.T) {
@@ -73,9 +71,7 @@ func TestAuthenticatorCloseClosesAuthenticatorOnce(t *testing.T) {
 		closeStarted: make(chan struct{}),
 		releaseClose: make(chan struct{}),
 	}
-	opened := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	opened := openContractAuthenticator(t, nil, a)
 	defer func() { _ = opened.Close() }()
 
 	firstErr := make(chan error, 1)
@@ -112,9 +108,7 @@ func TestAuthenticatorCloseCancelsActiveRunAndClosesAuthenticatorOnce(t *testing
 		},
 		closeStarted: make(chan struct{}),
 	}
-	opened := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	opened := openContractAuthenticator(t, events, a)
 
 	interactionEntered := make(chan struct{})
 	runDone := make(chan error, 1)
@@ -182,9 +176,7 @@ func TestAuthenticatorCloseCancelsContextAwareInteractionHandler(t *testing.T) {
 		},
 		closeStarted: make(chan struct{}),
 	}
-	opened := openContractAuthenticator(t, events, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	opened := openContractAuthenticator(t, events, a)
 
 	interactionEntered := make(chan struct{})
 	runDone := make(chan error, 1)
@@ -236,9 +228,7 @@ func TestAuthenticatorCloseCancelsContextAwareInteractionHandler(t *testing.T) {
 
 func TestAuthenticatorCloseCancelsBlockedAuthenticatorCommand(t *testing.T) {
 	a := &blockingConfigAuthenticator{commandEntered: make(chan struct{})}
-	opened := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	opened := openContractAuthenticator(t, nil, a)
 	defer func() { _ = opened.Close() }()
 
 	runDone := make(chan error, 1)
@@ -297,9 +287,7 @@ func TestTransportConnectionFailureClosesAuthenticator(t *testing.T) {
 				operation:   operation,
 				invalidated: true,
 			}
-			opened := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-				return a, nil
-			})
+			opened := openContractAuthenticator(t, nil, a)
 
 			_, err := opened.SetPIN(context.Background(), appconfig.SetPINOperation{
 				NewPIN: "1234",
@@ -338,9 +326,7 @@ func TestTransportFailureWithoutDeviceInvalidationKeepsAuthenticatorOpen(t *test
 	for _, operation := range tests {
 		t.Run(string(operation), func(t *testing.T) {
 			a := &transportFailureAuthenticator{operation: operation}
-			opened := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-				return a, nil
-			})
+			opened := openContractAuthenticator(t, nil, a)
 
 			_, err := opened.SetPIN(context.Background(), appconfig.SetPINOperation{
 				NewPIN: "1234",
@@ -371,9 +357,7 @@ func TestCanceledTransmitWithoutDeviceInvalidationKeepsAuthenticatorOpen(t *test
 		operation: ctaptransport.IOTransmit,
 		cause:     context.Canceled,
 	}
-	opened := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return a, nil
-	})
+	opened := openContractAuthenticator(t, nil, a)
 	defer func() { _ = opened.Close() }()
 
 	_, err := opened.SetPIN(context.Background(), appconfig.SetPINOperation{
@@ -392,6 +376,7 @@ func TestCanceledTransmitWithoutDeviceInvalidationKeepsAuthenticatorOpen(t *test
 
 type transportFailureAuthenticator struct {
 	contractAuthenticator
+	contractConfigManager
 	operation   ctaptransport.IOOperation
 	cause       error
 	invalidated bool
@@ -433,9 +418,7 @@ func TestAuthenticatorEventSinksAreScopedToRun(t *testing.T) {
 	firstEvents := &recordingEventSink{}
 	secondEvents := &recordingEventSink{}
 
-	opened := openContractAuthenticator(t, nil, func(context.Context, transport.Mode, string) (authenticator.Device, error) {
-		return &progressCredentialAuthenticator{}, nil
-	})
+	opened := openContractAuthenticator(t, nil, &progressCredentialAuthenticator{})
 	defer func() { _ = opened.Close() }()
 
 	if _, err := opened.Authenticator.ListCredentials(

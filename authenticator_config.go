@@ -10,7 +10,7 @@ import (
 
 func (a *Authenticator) ConfigStatus(ctx context.Context, opts ...OperationOption) (*config.StatusReport, error) {
 	return executeOperation(a, ctx, appoperation.ConfigStatus, func(runner workflow.Runner, ctx context.Context) (config.StatusReport, error) {
-		return runner.ConfigStatus(ctx, a.device)
+		return runner.ConfigStatus(ctx, a.configStatus)
 	}, opts...)
 }
 
@@ -24,7 +24,7 @@ func (a *Authenticator) SetPIN(
 	}
 
 	return executeOperation(a, ctx, appoperation.SetPIN, func(runner workflow.Runner, ctx context.Context) (config.PINOutput, error) {
-		return runner.SetPIN(ctx, a.device, operation)
+		return runner.SetPIN(ctx, a.config, operation)
 	}, opts...)
 }
 
@@ -42,7 +42,7 @@ func (a *Authenticator) ChangePIN(
 	}
 
 	return executeOperation(a, ctx, appoperation.ChangePIN, func(runner workflow.Runner, ctx context.Context) (config.PINOutput, error) {
-		return runner.ChangePIN(ctx, a.device, operation)
+		return runner.ChangePIN(ctx, a.config, operation)
 	}, opts...)
 }
 
@@ -52,7 +52,7 @@ func (a *Authenticator) SetAlwaysUV(
 	opts ...OperationOption,
 ) (*config.AuthenticatorConfigOutput, error) {
 	return executeOperation(a, ctx, appoperation.SetAlwaysUV, func(runner workflow.Runner, ctx context.Context) (config.AuthenticatorConfigOutput, error) {
-		return runner.SetAlwaysUV(ctx, a.device, operation)
+		return runner.SetAlwaysUV(ctx, a.config, operation)
 	}, opts...)
 }
 
@@ -62,7 +62,7 @@ func (a *Authenticator) SetMinPINLength(
 	opts ...OperationOption,
 ) (*config.AuthenticatorConfigOutput, error) {
 	return executeOperation(a, ctx, appoperation.SetMinPINLength, func(runner workflow.Runner, ctx context.Context) (config.AuthenticatorConfigOutput, error) {
-		return runner.SetMinPINLength(ctx, a.device, operation)
+		return runner.SetMinPINLength(ctx, a.config, operation)
 	}, opts...)
 }
 
@@ -72,19 +72,19 @@ func (a *Authenticator) EnableLongTouchForReset(
 	opts ...OperationOption,
 ) (*config.AuthenticatorConfigOutput, error) {
 	return executeOperation(a, ctx, appoperation.EnableLongTouchForReset, func(runner workflow.Runner, ctx context.Context) (config.AuthenticatorConfigOutput, error) {
-		return runner.EnableLongTouchForReset(ctx, a.device, operation)
+		return runner.EnableLongTouchForReset(ctx, a.config, operation)
 	}, opts...)
 }
 
 func (a *Authenticator) BioSensorInfo(ctx context.Context, opts ...OperationOption) (*config.BioSensorReport, error) {
 	return executeOperation(a, ctx, appoperation.BioSensorInfo, func(runner workflow.Runner, ctx context.Context) (config.BioSensorReport, error) {
-		return runner.BioSensorInfo(ctx, a.device)
+		return runner.BioSensorInfo(ctx, a.bio)
 	}, opts...)
 }
 
 func (a *Authenticator) BioList(ctx context.Context, opts ...OperationOption) (*config.BioListReport, error) {
 	return executeOperation(a, ctx, appoperation.BioList, func(runner workflow.Runner, ctx context.Context) (config.BioListReport, error) {
-		return runner.BioList(ctx, a.device)
+		return runner.BioList(ctx, a.bio)
 	}, opts...)
 }
 
@@ -94,7 +94,7 @@ func (a *Authenticator) BioEnroll(
 	opts ...OperationOption,
 ) (*config.BioEnrollOutput, error) {
 	return executeOperation(a, ctx, appoperation.BioEnroll, func(runner workflow.Runner, ctx context.Context) (config.BioEnrollOutput, error) {
-		return runner.BioEnroll(ctx, a.device, operation)
+		return runner.BioEnroll(ctx, a.bio, operation)
 	}, opts...)
 }
 
@@ -104,7 +104,7 @@ func (a *Authenticator) BioRename(
 	opts ...OperationOption,
 ) (*config.BioMutationOutput, error) {
 	return executeOperation(a, ctx, appoperation.BioRename, func(runner workflow.Runner, ctx context.Context) (config.BioMutationOutput, error) {
-		return runner.BioRename(ctx, a.device, operation)
+		return runner.BioRename(ctx, a.bio, operation)
 	}, opts...)
 }
 
@@ -114,7 +114,7 @@ func (a *Authenticator) BioRemove(
 	opts ...OperationOption,
 ) (*config.BioMutationOutput, error) {
 	return executeOperation(a, ctx, appoperation.BioRemove, func(runner workflow.Runner, ctx context.Context) (config.BioMutationOutput, error) {
-		return runner.BioRemove(ctx, a.device, operation)
+		return runner.BioRemove(ctx, a.bio, operation)
 	}, opts...)
 }
 
@@ -124,6 +124,6 @@ func (a *Authenticator) ResetFactory(
 	opts ...OperationOption,
 ) (*config.ResetFactoryOutput, error) {
 	return executeOperation(a, ctx, appoperation.ResetFactory, func(runner workflow.Runner, ctx context.Context) (config.ResetFactoryOutput, error) {
-		return runner.ResetFactory(ctx, a.device, operation)
+		return runner.ResetFactory(ctx, a.config, operation)
 	}, opts...)
 }

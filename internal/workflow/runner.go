@@ -17,22 +17,7 @@ func (r Runner) recordStateEffect(effect rtruntime.StateEffect) {
 	r.env.Effects.Record(effect)
 }
 
-type LargeBlobDevice interface {
-	authenticator.CredentialInventoryReader
-	authenticator.LargeBlobManager
-}
-
-type ConfigStatusDevice interface {
-	authenticator.InfoProvider
-	authenticator.RetryProvider
-}
-
-type ConfigDevice interface {
-	ConfigStatusDevice
-	authenticator.ConfigManager
-}
-
-type BioDevice interface {
-	ConfigStatusDevice
-	authenticator.BioEnrollmentManager
-}
+type LargeBlobDevice = authenticator.LargeBlobDevice
+type ConfigStatusDevice = authenticator.ConfigStatusDevice
+type ConfigDevice = authenticator.ConfigDevice
+type BioDevice = authenticator.BioDevice

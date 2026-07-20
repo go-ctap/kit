@@ -83,11 +83,11 @@ func Probe(ctx context.Context, device report.DeviceReport) (*report.DeviceMetad
 	var probeErr error
 	switch device.Vendor {
 	case report.VendorYubico:
-		var auth authenticator.Device
+		var auth *authenticator.Opened
 		auth, probeErr = authenticator.Open(ctx, device.Transport, device.Path)
 		if probeErr == nil {
-			metadata, probeErr = Enrich(ctx, device, auth)
-			probeErr = errors.Join(probeErr, auth.Close())
+			metadata, probeErr = Enrich(ctx, device, auth.Info)
+			probeErr = errors.Join(probeErr, auth.Lifecycle.Close())
 		}
 	case report.VendorToken2:
 		metadata, probeErr = probeToken2(ctx, device, true)

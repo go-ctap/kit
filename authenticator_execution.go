@@ -67,7 +67,7 @@ func executeSerializedOperation[T any](
 	effects := rtruntime.NewStateEffects()
 	tokens := rtruntime.NewTokenService(
 		a.tokens,
-		a.device,
+		a.tokenProvider,
 		interactions,
 		rtruntime.VerificationFlow(config.verificationFlow),
 	)

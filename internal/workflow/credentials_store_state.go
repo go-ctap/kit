@@ -15,7 +15,7 @@ import (
 
 func (r Runner) CredentialStoreState(
 	ctx context.Context,
-	device authenticator.CredentialManager,
+	device authenticator.InfoProvider,
 ) (appcredentials.StoreStateResult, error) {
 	r.env.Tokens.InvalidateUnlessPermission(protocol.PermissionPersistentCredentialManagementReadOnly)
 
