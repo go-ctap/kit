@@ -161,15 +161,18 @@ func (a *Authenticator) Close() error {
 	a.stateMu.Unlock()
 
 	a.closeOnce.Do(func() {
+		// Close the transport before waiting for the active operation. Context
+		// cancellation normally releases an in-flight command, but a blocked
+		// device read may require closing the transport to unblock it.
+		if a.lifecycle != nil {
+			a.closeErr = a.lifecycle.Close()
+		}
+
 		a.runMu.Lock()
 		defer a.runMu.Unlock()
 
 		a.tokens.InvalidateToken()
 		a.largeBlobState.Clear()
-
-		if a.lifecycle != nil {
-			a.closeErr = a.lifecycle.Close()
-		}
 	})
 
 	if a.closeErr != nil {

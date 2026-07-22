@@ -259,6 +259,55 @@ func TestAuthenticatorCloseCancelsBlockedAuthenticatorCommand(t *testing.T) {
 	}
 }
 
+func TestAuthenticatorCloseReleasesTransportBeforeWaitingForBlockedCommand(t *testing.T) {
+	a := &closeReleasedConfigAuthenticator{
+		blockingConfigAuthenticator: blockingConfigAuthenticator{
+			commandEntered: make(chan struct{}),
+		},
+		commandReleased: make(chan struct{}),
+	}
+	opened := openContractAuthenticator(t, nil, a)
+
+	runDone := make(chan error, 1)
+	go func() {
+		_, err := opened.SetAlwaysUV(
+			context.Background(),
+			appconfig.SetAlwaysUVOperation{Target: appconfig.AlwaysUVTargetEnable},
+			opened.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
+		)
+		runDone <- err
+	}()
+
+	select {
+	case <-a.commandEntered:
+	case <-time.After(time.Second):
+		t.Fatal("Run did not reach authenticator command")
+	}
+
+	closeDone := make(chan error, 1)
+	go func() { closeDone <- opened.Close() }()
+
+	select {
+	case err := <-closeDone:
+		if err != nil {
+			t.Fatalf("Authenticator.Close: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Authenticator.Close did not release the blocked transport command")
+	}
+
+	select {
+	case err := <-runDone:
+		requireFailureCode(t, err, failure.CodeOperationCanceled)
+	case <-time.After(time.Second):
+		t.Fatal("blocked authenticator command did not return after transport close")
+	}
+
+	if got := a.closeCount.Load(); got != 1 {
+		t.Fatalf("authenticator close count = %d, want 1", got)
+	}
+}
+
 func TestRunAfterAuthenticatorCloseIsRejected(t *testing.T) {
 	opened := openContractAuthenticator(t, nil, nil)
 

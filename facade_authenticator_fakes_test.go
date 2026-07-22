@@ -431,6 +431,12 @@ type blockingConfigAuthenticator struct {
 	commandEntered chan struct{}
 }
 
+type closeReleasedConfigAuthenticator struct {
+	blockingConfigAuthenticator
+	commandReleased chan struct{}
+	closeCount      atomic.Int32
+}
+
 func (a *blockingConfigAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{
 		protocol.OptionAuthenticatorConfig: true,
@@ -458,6 +464,25 @@ func (a *blockingConfigAuthenticator) ToggleAlwaysUV(ctx context.Context, token 
 	<-ctx.Done()
 
 	return ctx.Err()
+}
+
+func (a *closeReleasedConfigAuthenticator) ToggleAlwaysUV(ctx context.Context, token []byte) error {
+	if token == nil {
+		return ctapdevice.ErrPinUvAuthTokenRequired
+	}
+
+	close(a.commandEntered)
+	<-a.commandReleased
+
+	return ctx.Err()
+}
+
+func (a *closeReleasedConfigAuthenticator) Close() error {
+	if a.closeCount.Add(1) == 1 {
+		close(a.commandReleased)
+	}
+
+	return nil
 }
 
 func (a *cancelablePINAuthenticator) Close() error {
