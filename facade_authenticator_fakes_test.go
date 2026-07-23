@@ -398,6 +398,13 @@ type pinPreferredLargeBlobWriteEventAuthenticator struct {
 	uvCalls  atomic.Int32
 }
 
+func (a *pinPreferredLargeBlobWriteEventAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
+	info, valid := a.largeBlobWriteEventAuthenticator.GetInfoCached()
+	info.Options[protocol.OptionClientPIN] = true
+
+	return info, valid
+}
+
 func (a *pinPreferredLargeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingPIN(
 	context.Context,
 	string,

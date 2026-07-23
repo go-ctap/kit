@@ -191,6 +191,152 @@ func TestTokenServiceDefaultFlowFallsBackToPINAfterUVFallbackError(t *testing.T)
 	}
 }
 
+func TestTokenServiceRejectsAuthenticatorWithoutUsableVerificationFlow(t *testing.T) {
+	var requests []model.InteractionRequest
+	authenticator := &recordingTokenDevice{
+		info: protocol.AuthenticatorGetInfoResponse{
+			Versions: protocol.Versions{
+				protocol.U2F_V2,
+				protocol.FIDO_2_0,
+				protocol.FIDO_2_1_PRE,
+			},
+			PinUvAuthProtocols: []protocol.PinUvAuthProtocol{
+				protocol.PinUvAuthProtocolOne,
+			},
+			Options: map[protocol.Option]bool{
+				protocol.OptionResidentKeys:                true,
+				protocol.OptionUserPresence:                true,
+				protocol.OptionUserVerification:            true,
+				protocol.OptionCredentialManagement:        true,
+				protocol.OptionBioEnroll:                   true,
+				protocol.OptionCredentialManagementPreview: true,
+				protocol.OptionUserVerificationMgmtPreview: true,
+			},
+		},
+	}
+	tokens := NewTokenService(
+		&testTokenCache{},
+		authenticator,
+		recordingInteractionHandler(&requests, model.InteractionResponse{}),
+		VerificationFlowDefault,
+	)
+
+	token, err := tokens.acquire(
+		context.Background(),
+		protocol.PermissionCredentialManagement,
+		"",
+	)
+	if token != nil {
+		secret.Zero(token)
+		t.Fatalf("token = %q, want nil", token)
+	}
+
+	if !failure.IsCode(err, failure.CodeVerificationFlowUnsupported) {
+		t.Fatalf("Acquire error = %v, want %s", err, failure.CodeVerificationFlowUnsupported)
+	}
+
+	if len(requests) != 0 {
+		t.Fatalf("interactions = %v, want none", interactionKinds(requests))
+	}
+
+	if authenticator.pinRetriesCalls != 0 ||
+		len(authenticator.pinRPIDs) != 0 ||
+		len(authenticator.uvRPIDs) != 0 {
+		t.Fatalf(
+			"authenticator calls = retries %d, PIN %d, UV %d; want none",
+			authenticator.pinRetriesCalls,
+			len(authenticator.pinRPIDs),
+			len(authenticator.uvRPIDs),
+		)
+	}
+}
+
+func TestTokenServiceDoesNotFallBackToUnavailablePIN(t *testing.T) {
+	var requests []model.InteractionRequest
+	authenticator := &recordingTokenDevice{
+		info: protocol.AuthenticatorGetInfoResponse{
+			Options: map[protocol.Option]bool{
+				protocol.OptionPinUvAuthToken:   true,
+				protocol.OptionUserVerification: true,
+			},
+		},
+		uvErr: ctapdevice.ErrUvNotConfigured,
+	}
+	tokens := NewTokenService(
+		&testTokenCache{},
+		authenticator,
+		recordingInteractionHandler(&requests, model.InteractionResponse{}),
+		VerificationFlowDefault,
+	)
+
+	token, err := tokens.acquire(
+		context.Background(),
+		protocol.PermissionCredentialManagement,
+		"",
+	)
+	if token != nil {
+		secret.Zero(token)
+		t.Fatalf("token = %q, want nil", token)
+	}
+
+	if !failure.IsCode(err, failure.CodeVerificationFlowUnsupported) {
+		t.Fatalf("Acquire error = %v, want %s", err, failure.CodeVerificationFlowUnsupported)
+	}
+
+	if want := []model.InteractionKind{model.InteractionKindUserVerification}; !slices.Equal(interactionKinds(requests), want) {
+		t.Fatalf("interaction kinds = %v, want %v", interactionKinds(requests), want)
+	}
+
+	if len(authenticator.uvRPIDs) != 1 {
+		t.Fatalf("UV token calls = %d, want 1", len(authenticator.uvRPIDs))
+	}
+	if authenticator.pinRetriesCalls != 0 || len(authenticator.pinRPIDs) != 0 {
+		t.Fatalf(
+			"PIN calls = retries %d, token %d; want none",
+			authenticator.pinRetriesCalls,
+			len(authenticator.pinRPIDs),
+		)
+	}
+}
+
+func TestTokenServiceReportsUnconfiguredPINBeforeInteraction(t *testing.T) {
+	authenticator := &recordingTokenDevice{
+		info: protocol.AuthenticatorGetInfoResponse{
+			Options: map[protocol.Option]bool{
+				protocol.OptionClientPIN: false,
+			},
+		},
+	}
+	tokens := NewTokenService(
+		&testTokenCache{},
+		authenticator,
+		NewInteractionBroker(noopEventSink{}, nil),
+		VerificationFlowDefault,
+	)
+
+	token, err := tokens.acquire(
+		context.Background(),
+		protocol.PermissionCredentialManagement,
+		"",
+	)
+	if token != nil {
+		secret.Zero(token)
+		t.Fatalf("token = %q, want nil", token)
+	}
+
+	if !failure.IsCode(err, failure.CodePINNotConfigured) {
+		t.Fatalf("Acquire error = %v, want %s", err, failure.CodePINNotConfigured)
+	}
+
+	if authenticator.pinRetriesCalls != 0 || len(authenticator.pinRPIDs) != 0 {
+		t.Fatalf(
+			"PIN calls = retries %d, token %d; want none",
+			authenticator.pinRetriesCalls,
+			len(authenticator.pinRPIDs),
+		)
+	}
+}
+
 func TestTokenServicePINFlowSkipsUVInteractionAndCommand(t *testing.T) {
 	var requests []model.InteractionRequest
 	authenticator := &recordingTokenDevice{info: uvTokenInfo()}
@@ -803,6 +949,7 @@ func uvTokenInfo() protocol.AuthenticatorGetInfoResponse {
 	return protocol.AuthenticatorGetInfoResponse{
 		UvModality: new(protocol.UserVerifyFingerprintInternal),
 		Options: map[protocol.Option]bool{
+			protocol.OptionClientPIN:        true,
 			protocol.OptionPinUvAuthToken:   true,
 			protocol.OptionUserVerification: true,
 		},

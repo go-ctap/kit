@@ -187,6 +187,20 @@ func (s *TokenService) acquire(
 		}
 	}
 
+	clientPIN, clientPINSupported := info.Options[protocol.OptionClientPIN]
+	if !clientPINSupported {
+		return nil, failure.New(
+			failure.CodeVerificationFlowUnsupported,
+			failure.WithPhase(failure.PhaseTokenAcquisition),
+		)
+	}
+	if !clientPIN {
+		return nil, failure.New(
+			failure.CodePINNotConfigured,
+			failure.WithPhase(failure.PhaseTokenAcquisition),
+		)
+	}
+
 	var previousFailure *failure.Failure
 	for {
 		pinInteraction, err := s.readPINInteractionState(ctx)
