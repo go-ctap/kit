@@ -251,6 +251,64 @@ func TestTokenServiceRejectsAuthenticatorWithoutUsableVerificationFlow(t *testin
 	}
 }
 
+func TestTokenServiceUsesStandardPreviewUVTokenFlow(t *testing.T) {
+	var requests []model.InteractionRequest
+	authenticator := &recordingTokenDevice{
+		info: protocol.AuthenticatorGetInfoResponse{
+			Versions: protocol.Versions{
+				protocol.U2F_V2,
+				protocol.FIDO_2_0,
+				protocol.FIDO_2_1_PRE,
+			},
+			Options: map[protocol.Option]bool{
+				protocol.OptionUserVerification:            true,
+				protocol.OptionUvToken:                     true,
+				protocol.OptionBioEnroll:                   true,
+				protocol.OptionUserVerificationMgmtPreview: false,
+			},
+		},
+		requests: &requests,
+	}
+	tokens := NewTokenService(
+		&testTokenCache{},
+		authenticator,
+		recordingInteractionHandler(&requests, model.InteractionResponse{}),
+		VerificationFlowDefault,
+	)
+
+	token, err := tokens.acquire(
+		context.Background(),
+		protocol.PermissionBioEnrollment,
+		"",
+	)
+	if err != nil {
+		t.Fatalf("Acquire: %v", err)
+	}
+	defer secret.Zero(token)
+
+	if !slices.Equal(interactionKinds(requests), []model.InteractionKind{
+		model.InteractionKindUserVerification,
+	}) {
+		t.Fatalf("interaction kinds = %v, want user verification", interactionKinds(requests))
+	}
+
+	if !authenticator.uvSawInteraction || len(authenticator.uvRPIDs) != 1 {
+		t.Fatalf(
+			"UV calls = %d, saw interaction = %t; want one call after interaction",
+			len(authenticator.uvRPIDs),
+			authenticator.uvSawInteraction,
+		)
+	}
+
+	if authenticator.pinRetriesCalls != 0 || len(authenticator.pinRPIDs) != 0 {
+		t.Fatalf(
+			"PIN calls = retries %d, token %d; want none",
+			authenticator.pinRetriesCalls,
+			len(authenticator.pinRPIDs),
+		)
+	}
+}
+
 func TestTokenServiceDoesNotFallBackToUnavailablePIN(t *testing.T) {
 	var requests []model.InteractionRequest
 	authenticator := &recordingTokenDevice{
