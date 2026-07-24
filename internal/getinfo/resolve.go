@@ -41,7 +41,7 @@ func Resolve(info protocol.AuthenticatorGetInfoResponse) model.Assessment {
 	add(optionFact(info.Options, model.FactIDBioEnrollment, "options.bioEnroll", protocol.OptionBioEnroll, optionConfigured))
 	add(optionFact(info.Options, model.FactIDBioEnrollmentPreview, "options.userVerificationMgmtPreview", protocol.OptionUserVerificationMgmtPreview, optionConfigured))
 	add(optionFact(info.Options, model.FactIDUvBioEnroll, "options.uvBioEnroll", protocol.OptionUvBioEnroll, optionCapability))
-	add(optionalUintPointerFact(model.FactIDUvModality, "uvModality", uintPointer(info.UvModality), ""))
+	add(optionalUintPointerFact(model.FactIDUvModality, "uvModality", userVerifyPointer(info.UvModality), ""))
 	add(optionalUintFact(model.FactIDPreferredPlatformUVAttempts, "preferredPlatformUvAttempts", info.PreferredPlatformUvAttempts, ""))
 	add(optionalUintPointerFact(model.FactIDUVCountSinceLastPINEntry, "uvCountSinceLastPinEntry", info.UvCountSinceLastPinEntry, ""))
 
@@ -351,7 +351,7 @@ func stringsFrom[S ~[]E, E ~string](values S) []string {
 	return result
 }
 
-func uintPointer[T ~uint](value *T) *uint {
+func userVerifyPointer(value *protocol.UserVerify) *uint {
 	if value == nil {
 		return nil
 	}

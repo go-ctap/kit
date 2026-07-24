@@ -300,6 +300,10 @@ func TestBioEnrollmentSuccessfulCleanupIsReported(t *testing.T) {
 	if result.Result == nil || !result.Result.CancelAttempted || !result.Result.CancelSucceeded {
 		t.Fatalf("bio result = %#v, want successful cleanup", result.Result)
 	}
+
+	if got, want := result.Result.LastEnrollSampleStatus, "CTAP2_ENROLL_FEEDBACK_FP_GOOD"; got != want {
+		t.Fatalf("last enrollment sample status = %q, want %q", got, want)
+	}
 }
 
 func runConfirmedResetWithError(t *testing.T, resetErr error) error {
@@ -398,10 +402,12 @@ func (a *bioCleanupAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, prot
 
 func (a *bioCleanupAuthenticator) EnrollBegin(context.Context, []byte, uint) (protocol.AuthenticatorBioEnrollmentResponse, error) {
 	remaining := uint(1)
+	status := protocol.LastEnrollSampleStatusFingerprintGood
 
 	return protocol.AuthenticatorBioEnrollmentResponse{
-		TemplateID:       []byte("template"),
-		RemainingSamples: &remaining,
+		TemplateID:             []byte("template"),
+		LastEnrollSampleStatus: &status,
+		RemainingSamples:       &remaining,
 	}, nil
 }
 

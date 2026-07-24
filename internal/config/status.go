@@ -1,9 +1,6 @@
 package config
 
 import (
-	"strconv"
-	"strings"
-
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/getinfo"
@@ -44,7 +41,7 @@ func BuildStatusReport(device report.DeviceReport, info protocol.AuthenticatorGe
 	r.Bio = buildBioStatus(bioCapability(info, assessment))
 	if info.UvModality != nil {
 		r.Bio.UVModality = new(uint(*info.UvModality))
-		r.Bio.UVModalityLabel = formatUVModalityLabel(*info.UvModality)
+		r.Bio.UVModalityLabel = info.UvModality.String()
 	}
 	r.ResetHints.TransportsForReset = lo.Map(info.TransportsForReset, func(value credential.AuthenticatorTransport, _ int) string {
 		return string(value)
@@ -60,37 +57,6 @@ func BuildStatusReport(device report.DeviceReport, info protocol.AuthenticatorGe
 	r.Limits = buildLimitsStatus(info, assessment)
 
 	return r
-}
-
-type uvModalityStringer interface {
-	~uint
-	String() string
-}
-
-func formatUVModalityLabel[T uvModalityStringer](modality T) string {
-	if label := modality.String(); label != "" {
-		return label
-	}
-
-	raw := uint(modality)
-	if raw == 0 {
-		return ""
-	}
-
-	labels := make([]string, 0)
-	for bit := uint(1); bit != 0 && bit <= raw; bit <<= 1 {
-		if raw&bit == 0 {
-			continue
-		}
-
-		if label := T(bit).String(); label != "" {
-			labels = append(labels, label)
-			continue
-		}
-		labels = append(labels, "0x"+strings.ToUpper(strconv.FormatUint(uint64(bit), 16)))
-	}
-
-	return strings.Join(labels, ", ")
 }
 
 func buildPINStatus(info protocol.AuthenticatorGetInfoResponse, assessment appinspect.Assessment) appconfig.PINStatus {

@@ -78,16 +78,20 @@ func TestBuildStatusReportMatchesCtaphidOptionSemantics(t *testing.T) {
 }
 
 func TestBuildStatusReportLabelsUVModality(t *testing.T) {
+	modality := protocol.UserVerifyFingerprintInternal |
+		protocol.UserVerifyPasscodeExternal |
+		protocol.UserVerify(0x2000)
 	statusReport := BuildStatusReport(nilDevice(), protocol.AuthenticatorGetInfoResponse{
-		UvModality: new(protocol.UserVerifyFingerprintInternal),
+		UvModality: new(modality),
 	})
 
-	if statusReport.Bio.UVModality == nil || *statusReport.Bio.UVModality != uint(protocol.UserVerifyFingerprintInternal) {
-		t.Fatalf("uv modality = %#v, want numeric fingerprint flag", statusReport.Bio.UVModality)
+	if statusReport.Bio.UVModality == nil || *statusReport.Bio.UVModality != uint(modality) {
+		t.Fatalf("uv modality = %#v, want %#x", statusReport.Bio.UVModality, modality)
 	}
 
-	if statusReport.Bio.UVModalityLabel != "fingerprint_internal" {
-		t.Fatalf("uv modality label = %q, want fingerprint_internal", statusReport.Bio.UVModalityLabel)
+	const want = "fingerprint_internal,passcode_external,unknown(0x2000)"
+	if statusReport.Bio.UVModalityLabel != want {
+		t.Fatalf("uv modality label = %q, want %q", statusReport.Bio.UVModalityLabel, want)
 	}
 }
 
