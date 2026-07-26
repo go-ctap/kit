@@ -309,6 +309,54 @@ func TestTokenServiceUsesStandardPreviewUVTokenFlow(t *testing.T) {
 	}
 }
 
+func TestTokenServiceSkipsUVPromptWhenPermissionCapabilityIsUnsupported(t *testing.T) {
+	tests := []struct {
+		name       string
+		permission protocol.Permission
+		option     protocol.Option
+	}{
+		{"bio enrollment", protocol.PermissionBioEnrollment, protocol.OptionBioEnroll},
+		{"authenticator configuration", protocol.PermissionAuthenticatorConfiguration, protocol.OptionAuthenticatorConfig},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var requests []model.InteractionRequest
+			authenticator := &recordingTokenDevice{
+				info: protocol.AuthenticatorGetInfoResponse{
+					Options: map[protocol.Option]bool{
+						tt.option:                       true,
+						protocol.OptionClientPIN:        true,
+						protocol.OptionPinUvAuthToken:   true,
+						protocol.OptionUserVerification: true,
+					},
+				},
+			}
+			tokens := NewTokenService(
+				&testTokenCache{},
+				authenticator,
+				recordingInteractionHandler(&requests, model.InteractionResponse{
+					PIN: []byte("1234"),
+				}),
+				VerificationFlowDefault,
+			)
+
+			token, err := tokens.acquire(context.Background(), tt.permission, "")
+			if err != nil {
+				t.Fatalf("Acquire: %v", err)
+			}
+			defer secret.Zero(token)
+
+			if want := []model.InteractionKind{model.InteractionKindPIN}; !slices.Equal(interactionKinds(requests), want) {
+				t.Fatalf("interaction kinds = %v, want %v", interactionKinds(requests), want)
+			}
+			if len(authenticator.uvRPIDs) != 0 {
+				t.Fatalf("UV token calls = %d, want 0", len(authenticator.uvRPIDs))
+			}
+		})
+	}
+}
+
 func TestTokenServiceDoesNotFallBackToUnavailablePIN(t *testing.T) {
 	var requests []model.InteractionRequest
 	authenticator := &recordingTokenDevice{

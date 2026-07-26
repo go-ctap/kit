@@ -164,7 +164,7 @@ func (s *TokenService) acquire(
 		))
 	}
 	if s.verificationFlow != VerificationFlowPIN &&
-		supportsUserVerificationTokenFlow(info) {
+		supportsUserVerificationTokenFlow(info, permission) {
 		_, err = s.interactions.RequestInteraction(ctx, model.InteractionRequest{
 			Kind:       model.InteractionKindUserVerification,
 			Permission: permissionLabel(permission),
@@ -281,7 +281,10 @@ func (s *TokenService) storeToken(key TokenKey, token []byte) []byte {
 	return out
 }
 
-func supportsUserVerificationTokenFlow(info protocol.AuthenticatorGetInfoResponse) bool {
+func supportsUserVerificationTokenFlow(
+	info protocol.AuthenticatorGetInfoResponse,
+	permission protocol.Permission,
+) bool {
 	if !info.Options[protocol.OptionUserVerification] {
 		return false
 	}
@@ -290,7 +293,21 @@ func supportsUserVerificationTokenFlow(info protocol.AuthenticatorGetInfoRespons
 		return true
 	}
 
-	return info.Options[protocol.OptionPinUvAuthToken]
+	if !info.Options[protocol.OptionPinUvAuthToken] {
+		return false
+	}
+
+	if permission&protocol.PermissionBioEnrollment != 0 &&
+		!info.Options[protocol.OptionUvBioEnroll] {
+		return false
+	}
+
+	if permission&protocol.PermissionAuthenticatorConfiguration != 0 &&
+		!info.Options[protocol.OptionUvAcfg] {
+		return false
+	}
+
+	return true
 }
 
 func fallbackToPIN(err error) bool {
