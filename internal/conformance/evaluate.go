@@ -324,7 +324,7 @@ func nonNil[T any](values []T) []T {
 	return values
 }
 
-func selectAny(*getInfoContext) bool { return true }
+func selectAny(_ *getInfoContext) bool { return true }
 
 func selectCTAP21OrLater(context *getInfoContext) bool {
 	return context.target.Profile == model.ProfileFIDO21 || context.target.Profile == model.ProfileFIDO23
@@ -341,7 +341,5 @@ func selectCTAP21Document(context *getInfoContext) bool {
 func selectCTAP23Document(context *getInfoContext) bool {
 	return context.target.Specification == model.SpecificationCTAP23
 }
-
-func selectConfigInventory(context *getInfoContext) bool { return context.inventoryApplies }
 
 func selectCommandsKnown(context *getInfoContext) bool { return context.commandsKnown }

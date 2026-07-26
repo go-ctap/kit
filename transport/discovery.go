@@ -46,6 +46,8 @@ func Discover(ctx context.Context, requested Mode) (Mode, []Descriptor, error) {
 }
 
 // Events reports when the set of reachable FIDO devices may have changed.
+//
+//goland:noinspection GoUnusedExportedFunction
 func Events(ctx context.Context, requested Mode) (<-chan ctapdiscover.Event, error) {
 	mode, err := resolveMode(requested)
 	if err != nil {

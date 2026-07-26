@@ -62,6 +62,7 @@ type BiometricStatusReport struct {
 // AuthenticatorStatus is an MDS authenticator status value.
 type AuthenticatorStatus string
 
+//goland:noinspection GoUnusedConst
 const (
 	AuthenticatorStatusNotFIDOCertified          AuthenticatorStatus = "NOT_FIDO_CERTIFIED"
 	AuthenticatorStatusFIDOCertified             AuthenticatorStatus = "FIDO_CERTIFIED"

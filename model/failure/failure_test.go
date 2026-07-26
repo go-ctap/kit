@@ -146,11 +146,16 @@ func TestFailureJSONWireShape(t *testing.T) {
 }
 
 func TestUnknownCodeBecomesInternalError(t *testing.T) {
+	const (
+		unknownCode  Code  = "NOT_REGISTERED"
+		unknownPhase Phase = "not-registered"
+	)
+
 	err := Wrap(
-		Code("NOT_REGISTERED"),
+		unknownCode,
 		errors.New("cause"),
 		WithParams(map[string]string{"field": "value"}),
-		WithPhase(Phase("not-registered")),
+		WithPhase(unknownPhase),
 	)
 
 	if err.Code != CodeInternalError || err.Category != CategoryInternal {
@@ -169,7 +174,7 @@ func TestUnknownCodeBecomesInternalError(t *testing.T) {
 		t.Fatal("unknown code does not resolve to INTERNAL_ERROR")
 	}
 
-	if IsCode(err, Code("NOT_REGISTERED")) {
+	if IsCode(err, unknownCode) {
 		t.Fatal("IsCode accepted an unknown target code")
 	}
 }

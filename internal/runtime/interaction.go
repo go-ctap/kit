@@ -15,6 +15,8 @@ type InteractionBroker struct {
 }
 
 type InteractionHandler interface {
+	// RequestInteraction returns a zero response on error. On success, ownership
+	// of response.PIN transfers to the runtime.
 	RequestInteraction(context.Context, model.InteractionRequest) (model.InteractionResponse, error)
 }
 
@@ -53,8 +55,6 @@ func (b *InteractionBroker) RequestInteraction(
 
 	response, err := b.handler.RequestInteraction(ctx, req)
 	if err != nil {
-		secret.Zero(response.PIN)
-
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			err = ctxErr
 		}

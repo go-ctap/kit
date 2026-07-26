@@ -8,7 +8,7 @@ import (
 	"github.com/go-ctap/kit/model/failure"
 )
 
-func upstreamCode(err error, ctx errorContext) (failure.Code, bool) {
+func upstreamCode(err error, annotation Annotation) (failure.Code, bool) {
 	switch {
 	case errors.Is(err, ctapdevice.ErrPinUvAuthTokenRequired):
 		return failure.CodePINUVAuthTokenRequired, true
@@ -25,7 +25,7 @@ func upstreamCode(err error, ctx errorContext) (failure.Code, bool) {
 		return failure.CodeLargeBlobIntegrityFailure, true
 	case errors.Is(err, ctapdevice.ErrLargeBlobsTooBig):
 		return failure.CodeLargeBlobArrayTooLarge, true
-	case errors.Is(err, ctapdevice.SyntaxError) && ctx.command == protocol.AuthenticatorLargeBlobs:
+	case errors.Is(err, ctapdevice.SyntaxError) && annotation.command == protocol.AuthenticatorLargeBlobs:
 		return failure.CodeLargeBlobArrayInvalid, true
 	case errors.Is(err, ctapdevice.ErrInvalidSaltSize), errors.Is(err, ctapdevice.SyntaxError):
 		return failure.CodeCTAPParameterInvalid, true
@@ -34,14 +34,14 @@ func upstreamCode(err error, ctx errorContext) (failure.Code, bool) {
 	case errors.Is(err, ctapdevice.ErrPingPongMismatch):
 		return failure.CodeTransportFailure, true
 	case errors.Is(err, ctapdevice.ErrNotSupported):
-		return unsupportedCode(ctx), true
+		return unsupportedCode(annotation), true
 	default:
 		return "", false
 	}
 }
 
-func unsupportedCode(ctx errorContext) failure.Code {
-	switch ctx.command {
+func unsupportedCode(annotation Annotation) failure.Code {
+	switch annotation.command {
 	case protocol.AuthenticatorGetInfo:
 		return failure.CodeGetInfoUnsupported
 	case protocol.AuthenticatorClientPIN:

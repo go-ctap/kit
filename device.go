@@ -20,6 +20,8 @@ type Device struct {
 }
 
 // DiscoverDevices returns authenticators reachable through the configured transport policy.
+//
+//goland:noinspection GoUnusedExportedFunction
 func DiscoverDevices(ctx context.Context, mode transport.Mode) ([]Device, error) {
 	return discoverDevices(ctx, transport.Discover, mode)
 }

@@ -10,7 +10,7 @@ import (
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
-	"github.com/go-ctap/kit/model/report"
+	modelreport "github.com/go-ctap/kit/model/report"
 )
 
 func (r Runner) ListLargeBlobs(
@@ -39,7 +39,7 @@ func (r Runner) ListLargeBlobs(
 }
 
 type listBuildContext struct {
-	selected           report.DeviceReport
+	selected           modelreport.DeviceReport
 	support            applargeblobs.SupportReport
 	blobs              []protocol.LargeBlob
 	matchedBlobIndexes map[int]bool
@@ -152,12 +152,11 @@ func buildListCredentialRow(
 		if err != nil {
 			continue
 		}
-		defer secret.Zero(raw)
-
 		ctx.matchedBlobIndexes[index] = true
 		row.BlobPresent = true
 		row.BlobState = applargeblobs.BlobStatePresent
 		row.BlobByteCount = len(raw)
+		secret.Zero(raw)
 
 		break
 	}

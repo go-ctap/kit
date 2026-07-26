@@ -131,8 +131,10 @@ func TestEvaluateGetInfoUsesStableTargetsAndLeavesOtherProfilesUnresolved(t *tes
 
 func TestEvaluateGetInfoDoesNotPromoteFIDO22NoteToNormativeFinding(t *testing.T) {
 	t.Run("identifier only remains unresolved", func(t *testing.T) {
+		const fido22 protocol.Version = "FIDO_2_2"
+
 		report := engine.EvaluateGetInfo(protocol.AuthenticatorGetInfoResponse{
-			Versions: protocol.Versions{protocol.Version("FIDO_2_2")},
+			Versions: protocol.Versions{fido22},
 		})
 		if report.Target != nil {
 			t.Fatalf("target = %#v, want unresolved", report.Target)

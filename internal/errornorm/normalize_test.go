@@ -103,7 +103,7 @@ func TestNormalizeCTAPProvenance(t *testing.T) {
 	}
 
 	var gotRaw *ctaptransport.CTAPError
-	if !errors.As(err, &gotRaw) || gotRaw != raw {
+	if !errors.As(err, &gotRaw) || !errors.Is(gotRaw, raw) {
 		t.Fatalf("errors.As CTAPError = %p, want %p", gotRaw, raw)
 	}
 }
@@ -125,7 +125,7 @@ func TestNormalizeCTAPHIDErrorResponse(t *testing.T) {
 	}
 
 	var gotRaw *ctaphid.ErrorResponse
-	if !errors.As(err, &gotRaw) || gotRaw != raw {
+	if !errors.As(err, &gotRaw) || !errors.Is(gotRaw, raw) {
 		t.Fatalf("errors.As ErrorResponse = %p, want %p", gotRaw, raw)
 	}
 }
@@ -150,7 +150,7 @@ func TestNormalizeTransportIOError(t *testing.T) {
 	}
 
 	var gotIOErr *ctaptransport.IOError
-	if !errors.As(err, &gotIOErr) || gotIOErr != raw {
+	if !errors.As(err, &gotIOErr) || !errors.Is(gotIOErr, raw) {
 		t.Fatalf("errors.As IOError = %p, want %p", gotIOErr, raw)
 	}
 
@@ -178,7 +178,7 @@ func TestNormalizeToken2TransportErrors(t *testing.T) {
 		}
 
 		var got *ctaptoken2.APDUError
-		if !errors.As(err, &got) || got != raw {
+		if !errors.As(err, &got) || !errors.Is(got, raw) {
 			t.Fatalf("errors.As APDUError = %p, want %p", got, raw)
 		}
 	})
@@ -197,10 +197,10 @@ func TestNormalizeToken2TransportErrors(t *testing.T) {
 
 func TestNormalizeCommandOverrides(t *testing.T) {
 	tests := []struct {
-		name   string
-		ctx    errorContext
-		status ctaptransport.StatusCode
-		code   failure.Code
+		name       string
+		annotation Annotation
+		status     ctaptransport.StatusCode
+		code       failure.Code
 	}{
 		{"make credential denied", commandContext(protocol.AuthenticatorMakeCredential), ctaptransport.CTAP2_ERR_OPERATION_DENIED, failure.CodeCredentialCreationDenied},
 		{"assertion invalid credential", commandContext(protocol.AuthenticatorGetAssertion), ctaptransport.CTAP2_ERR_INVALID_CREDENTIAL, failure.CodeCredentialNotFound},
@@ -228,8 +228,8 @@ func TestNormalizeCommandOverrides(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := codeForCTAP(tt.status, tt.ctx); got != tt.code {
-				t.Errorf("codeForCTAP(0x%02x, command 0x%02x) = %s, want %s", uint8(tt.status), uint8(tt.ctx.command), got, tt.code)
+			if got := codeForCTAP(tt.status, tt.annotation); got != tt.code {
+				t.Errorf("codeForCTAP(0x%02x, command 0x%02x) = %s, want %s", uint8(tt.status), uint8(tt.annotation.command), got, tt.code)
 			}
 		})
 	}
@@ -257,7 +257,7 @@ func TestNormalizeCommandOverrideProvenance(t *testing.T) {
 	}
 
 	var gotRaw *ctaptransport.CTAPError
-	if !errors.As(err, &gotRaw) || gotRaw != raw {
+	if !errors.As(err, &gotRaw) || !errors.Is(gotRaw, raw) {
 		t.Fatalf("raw CTAP error not preserved: %v", err)
 	}
 }
@@ -367,10 +367,10 @@ func TestNormalizeGeneralErrors(t *testing.T) {
 
 func TestUpstreamCode(t *testing.T) {
 	tests := []struct {
-		name string
-		err  error
-		ctx  errorContext
-		code failure.Code
+		name       string
+		err        error
+		annotation Annotation
+		code       failure.Code
 	}{
 		{"PIN UV auth token required", ctapdevice.ErrPinUvAuthTokenRequired, commandContext(protocol.AuthenticatorMakeCredential), failure.CodePINUVAuthTokenRequired},
 		{"PIN not set", ctapdevice.ErrPinNotSet, tokenContext(protocol.ClientPINSubCommandGetPinUvAuthTokenUsingPinWithPermissions), failure.CodePINNotConfigured},
@@ -389,9 +389,9 @@ func TestUpstreamCode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := upstreamCode(tt.err, tt.ctx)
+			got, ok := upstreamCode(tt.err, tt.annotation)
 			if !ok || got != tt.code {
-				t.Errorf("upstreamCode(%v, command 0x%02x) = %s, %t; want %s, true", tt.err, uint8(tt.ctx.command), got, ok, tt.code)
+				t.Errorf("upstreamCode(%v, command 0x%02x) = %s, %t; want %s, true", tt.err, uint8(tt.annotation.command), got, ok, tt.code)
 			}
 		})
 	}
@@ -442,15 +442,15 @@ func TestNormalizeUpstreamSentinel(t *testing.T) {
 	}
 }
 
-func commandContext(command protocol.Command) errorContext {
+func commandContext(command protocol.Command) Annotation {
 	return WithCommand(failure.PhaseAuthenticatorCommand, command)
 }
 
-func tokenContext(subCommand protocol.ClientPINSubCommand) errorContext {
+func tokenContext(subCommand protocol.ClientPINSubCommand) Annotation {
 	return WithClientPINSubCommand(failure.PhaseTokenAcquisition, subCommand)
 }
 
-func bioContext(subCommand protocol.BioEnrollmentSubCommand) errorContext {
+func bioContext(subCommand protocol.BioEnrollmentSubCommand) Annotation {
 	return WithBioEnrollmentSubCommand(
 		failure.PhaseAuthenticatorCommand,
 		protocol.AuthenticatorBioEnrollment,
@@ -458,7 +458,7 @@ func bioContext(subCommand protocol.BioEnrollmentSubCommand) errorContext {
 	)
 }
 
-func credentialContext(subCommand protocol.CredentialManagementSubCommand) errorContext {
+func credentialContext(subCommand protocol.CredentialManagementSubCommand) Annotation {
 	return WithCredentialManagementSubCommand(
 		failure.PhaseAuthenticatorCommand,
 		protocol.AuthenticatorCredentialManagement,
@@ -466,7 +466,7 @@ func credentialContext(subCommand protocol.CredentialManagementSubCommand) error
 	)
 }
 
-func configContext(subCommand protocol.ConfigSubCommand) errorContext {
+func configContext(subCommand protocol.ConfigSubCommand) Annotation {
 	return WithConfigSubCommand(failure.PhaseAuthenticatorCommand, subCommand)
 }
 

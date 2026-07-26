@@ -35,10 +35,3 @@ func BuildResetFactoryPreview(status appconfig.StatusReport) appconfig.ResetPrev
 		},
 	}
 }
-
-func BuildResetFactoryDryRunPreview(status appconfig.StatusReport) appconfig.ResetPreview {
-	preview := BuildResetFactoryPreview(status)
-	preview.Mode = safety.PreviewModeDryRun
-
-	return preview
-}

@@ -6,16 +6,16 @@ import (
 	"github.com/go-ctap/kit/model/failure"
 )
 
-func codeForCTAP(status ctaptransport.StatusCode, ctx errorContext) failure.Code {
-	if code, ok := commandCode(status, ctx); ok {
+func codeForCTAP(status ctaptransport.StatusCode, annotation Annotation) failure.Code {
+	if code, ok := commandCode(status, annotation); ok {
 		return code
 	}
 
 	return defaultCode(status)
 }
 
-func commandCode(status ctaptransport.StatusCode, ctx errorContext) (failure.Code, bool) {
-	switch ctx.command {
+func commandCode(status ctaptransport.StatusCode, annotation Annotation) (failure.Code, bool) {
+	switch annotation.command {
 	case protocol.AuthenticatorMakeCredential:
 		if status == ctaptransport.CTAP2_ERR_OPERATION_DENIED {
 			return failure.CodeCredentialCreationDenied, true
@@ -45,7 +45,7 @@ func commandCode(status ctaptransport.StatusCode, ctx errorContext) (failure.Cod
 			return failure.CodeResetTouchTimeout, true
 		}
 	case protocol.AuthenticatorBioEnrollment, protocol.PrototypeAuthenticatorBioEnrollment:
-		return bioEnrollmentCode(status, ctx)
+		return bioEnrollmentCode(status, annotation)
 	case protocol.AuthenticatorCredentialManagement, protocol.PrototypeAuthenticatorCredentialManagement:
 		if status == ctaptransport.CTAP2_ERR_INVALID_CREDENTIAL {
 			return failure.CodeCredentialNotFound, true
@@ -73,15 +73,16 @@ func commandCode(status ctaptransport.StatusCode, ctx errorContext) (failure.Cod
 	return "", false
 }
 
-func bioEnrollmentCode(status ctaptransport.StatusCode, ctx errorContext) (failure.Code, bool) {
+func bioEnrollmentCode(status ctaptransport.StatusCode, annotation Annotation) (failure.Code, bool) {
 	switch status {
 	case ctaptransport.CTAP2_ERR_INVALID_OPTION:
-		switch protocol.BioEnrollmentSubCommand(ctx.subCommand) {
+		switch protocol.BioEnrollmentSubCommand(annotation.subCommand) {
 		case protocol.BioEnrollmentSubCommandEnumerateEnrollments:
 			return failure.CodeBioNoEnrollments, true
 		case protocol.BioEnrollmentSubCommandSetFriendlyName,
 			protocol.BioEnrollmentSubCommandRemoveEnrollment:
 			return failure.CodeBioEnrollmentNotFound, true
+		default:
 		}
 	case ctaptransport.CTAP2_ERR_USER_ACTION_TIMEOUT, ctaptransport.CTAP2_ERR_ACTION_TIMEOUT:
 		return failure.CodeBioInteractionTimeout, true

@@ -70,29 +70,29 @@ func normalizedCommandError(err error, entry model.LogEntry) error {
 		phase = failure.PhaseAssertionContinuation
 	}
 
-	context := errornorm.WithCommand(phase, protocol.Command(entry.CommandCode))
+	annotation := errornorm.WithCommand(phase, protocol.Command(entry.CommandCode))
 	if entry.SubCommandCode != nil {
 		switch protocol.Command(entry.CommandCode) {
 		case protocol.AuthenticatorClientPIN:
-			context = errornorm.WithClientPINSubCommand(phase, protocol.ClientPINSubCommand(*entry.SubCommandCode))
+			annotation = errornorm.WithClientPINSubCommand(phase, protocol.ClientPINSubCommand(*entry.SubCommandCode))
 		case protocol.AuthenticatorCredentialManagement,
 			protocol.PrototypeAuthenticatorCredentialManagement:
-			context = errornorm.WithCredentialManagementSubCommand(
+			annotation = errornorm.WithCredentialManagementSubCommand(
 				phase,
 				protocol.Command(entry.CommandCode),
 				protocol.CredentialManagementSubCommand(*entry.SubCommandCode),
 			)
 		case protocol.AuthenticatorBioEnrollment,
 			protocol.PrototypeAuthenticatorBioEnrollment:
-			context = errornorm.WithBioEnrollmentSubCommand(
+			annotation = errornorm.WithBioEnrollmentSubCommand(
 				phase,
 				protocol.Command(entry.CommandCode),
 				protocol.BioEnrollmentSubCommand(*entry.SubCommandCode),
 			)
 		case protocol.AuthenticatorConfig:
-			context = errornorm.WithConfigSubCommand(phase, protocol.ConfigSubCommand(*entry.SubCommandCode))
+			annotation = errornorm.WithConfigSubCommand(phase, protocol.ConfigSubCommand(*entry.SubCommandCode))
 		}
 	}
 
-	return errornorm.Normalize(errornorm.Annotate(err, context), string(entry.OperationKind))
+	return errornorm.Normalize(errornorm.Annotate(err, annotation), string(entry.OperationKind))
 }

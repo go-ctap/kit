@@ -342,7 +342,7 @@ func decimalValues[S ~[]E, E unsigned](input S) []string {
 	return values
 }
 
-func stringsFrom[S ~[]E, E ~string](values S) []string {
+func stringsFrom[E ~string](values []E) []string {
 	result := make([]string, len(values))
 	for i, value := range values {
 		result[i] = string(value)

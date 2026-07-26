@@ -25,9 +25,9 @@ func TestFindByHexID(t *testing.T) {
 }
 
 func TestBuildDeletePreview(t *testing.T) {
-	report := sampleInventoryReport()
+	inventory := sampleInventoryReport()
 
-	preview, err := BuildDeletePreview(report, "deadbeef")
+	preview, err := BuildDeletePreview(inventory, "deadbeef")
 	if err != nil {
 		t.Fatalf("BuildDeletePreview: %v", err)
 	}

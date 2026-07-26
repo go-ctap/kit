@@ -10,6 +10,8 @@ import (
 
 // CanProbeDeviceMetadata reports whether the runtime has a metadata probe for
 // the discovered device.
+//
+//goland:noinspection GoUnusedExportedFunction
 func CanProbeDeviceMetadata(device report.DeviceReport) bool {
 	return vendorinfo.CanProbe(device)
 }

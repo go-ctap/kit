@@ -7,24 +7,24 @@ import (
 	"github.com/go-ctap/kit/model/failure"
 )
 
-type errorContext struct {
+type Annotation struct {
 	phase      failure.Phase
 	command    protocol.Command
 	subCommand uint64
 }
 
-func WithPhase(phase failure.Phase) errorContext {
-	return errorContext{phase: phase}
+func WithPhase(phase failure.Phase) Annotation {
+	return Annotation{phase: phase}
 }
 
-func WithCommand(phase failure.Phase, command protocol.Command) errorContext {
-	return errorContext{
+func WithCommand(phase failure.Phase, command protocol.Command) Annotation {
+	return Annotation{
 		phase:   phase,
 		command: command,
 	}
 }
 
-func WithClientPINSubCommand(phase failure.Phase, subCommand protocol.ClientPINSubCommand) errorContext {
+func WithClientPINSubCommand(phase failure.Phase, subCommand protocol.ClientPINSubCommand) Annotation {
 	return withSubCommand(
 		phase,
 		protocol.AuthenticatorClientPIN,
@@ -36,7 +36,7 @@ func WithBioEnrollmentSubCommand(
 	phase failure.Phase,
 	command protocol.Command,
 	subCommand protocol.BioEnrollmentSubCommand,
-) errorContext {
+) Annotation {
 	return withSubCommand(phase, command, uint64(subCommand))
 }
 
@@ -44,11 +44,11 @@ func WithCredentialManagementSubCommand(
 	phase failure.Phase,
 	command protocol.Command,
 	subCommand protocol.CredentialManagementSubCommand,
-) errorContext {
+) Annotation {
 	return withSubCommand(phase, command, uint64(subCommand))
 }
 
-func WithConfigSubCommand(phase failure.Phase, subCommand protocol.ConfigSubCommand) errorContext {
+func WithConfigSubCommand(phase failure.Phase, subCommand protocol.ConfigSubCommand) Annotation {
 	return withSubCommand(
 		phase,
 		protocol.AuthenticatorConfig,
@@ -60,8 +60,8 @@ func withSubCommand(
 	phase failure.Phase,
 	command protocol.Command,
 	subCommand uint64,
-) errorContext {
-	return errorContext{
+) Annotation {
+	return Annotation{
 		phase:      phase,
 		command:    command,
 		subCommand: subCommand,
@@ -69,8 +69,8 @@ func withSubCommand(
 }
 
 type annotatedError struct {
-	err error
-	ctx errorContext
+	err        error
+	annotation Annotation
 }
 
 func (e *annotatedError) Error() string {
@@ -81,12 +81,12 @@ func (e *annotatedError) Unwrap() error {
 	return e.err
 }
 
-// Annotate records safe runtime context without changing the error identity.
-// Context closest to the source wins over broader boundary context.
-func Annotate(err error, ctx errorContext) error {
+// Annotate records safe normalization metadata without changing the error identity.
+// The annotation closest to the source wins over broader boundary metadata.
+func Annotate(err error, annotation Annotation) error {
 	if annotated, ok := errors.AsType[*annotatedError](err); ok {
 		return annotated
 	}
 
-	return &annotatedError{err: err, ctx: ctx}
+	return &annotatedError{err: err, annotation: annotation}
 }

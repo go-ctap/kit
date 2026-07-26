@@ -384,10 +384,10 @@ func TestTransportConnectionFailureClosesAuthenticator(t *testing.T) {
 		ctaptransport.IOTransmit,
 	}
 
-	for _, operation := range tests {
-		t.Run(string(operation), func(t *testing.T) {
+	for _, ioOperation := range tests {
+		t.Run(string(ioOperation), func(t *testing.T) {
 			a := &transportFailureAuthenticator{
-				operation:   operation,
+				operation:   ioOperation,
 				invalidated: true,
 			}
 			opened := openContractAuthenticator(t, nil, a)
@@ -426,9 +426,9 @@ func TestTransportFailureWithoutDeviceInvalidationKeepsAuthenticatorOpen(t *test
 		ctaptransport.IOTransmit,
 	}
 
-	for _, operation := range tests {
-		t.Run(string(operation), func(t *testing.T) {
-			a := &transportFailureAuthenticator{operation: operation}
+	for _, ioOperation := range tests {
+		t.Run(string(ioOperation), func(t *testing.T) {
+			a := &transportFailureAuthenticator{operation: ioOperation}
 			opened := openContractAuthenticator(t, nil, a)
 
 			_, err := opened.SetPIN(context.Background(), appconfig.SetPINOperation{

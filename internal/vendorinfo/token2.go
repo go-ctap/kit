@@ -100,7 +100,7 @@ func probeToken2Once(
 	// PC/SC is the primary source because it exposes the full serial, model
 	// identity, and configuration even when Token2's optional feature HID is
 	// disabled. CTAPHID is used only to disambiguate matching PC/SC readers.
-	candidates := token2PCSCCandidates(ctx, device.ProductID)
+	candidates := token2PCSCCandidates(ctx)
 	if metadata, ok := selectToken2Candidate(candidates, device.Serial, ""); ok {
 		return &metadata, nil
 	}
@@ -120,7 +120,7 @@ func probeToken2Once(
 	return nil, nil
 }
 
-func token2PCSCCandidates(ctx context.Context, productID uint16) []token2Candidate {
+func token2PCSCCandidates(ctx context.Context) []token2Candidate {
 	var candidates []token2Candidate
 	for reader, err := range nativepcsc.Enumerate() {
 		if err != nil || ctx.Err() != nil {

@@ -13,14 +13,14 @@ import (
 // requested public operation is supplied only at this boundary; annotations
 // carry the lower-level phase and actual authenticator command instead.
 func Normalize(err error, operation string) *failure.Error {
-	ctx := annotatedContext(err)
+	annotation := errorAnnotation(err)
 	if existing, ok := errors.AsType[*failure.Error](err); ok {
 		if operation != "" {
 			existing.Operation = operation
 		}
 
 		if existing.Phase == "" {
-			existing.Phase = ctx.phase
+			existing.Phase = annotation.phase
 		}
 
 		return existing
@@ -30,7 +30,7 @@ func Normalize(err error, operation string) *failure.Error {
 		return failure.Wrap(
 			failure.CodeOperationCanceled,
 			err,
-			failureOptions(operation, ctx.phase, nil)...,
+			failureOptions(operation, annotation.phase, nil)...,
 		)
 	}
 
@@ -38,26 +38,26 @@ func Normalize(err error, operation string) *failure.Error {
 		return failure.Wrap(
 			failure.CodeOperationTimeout,
 			err,
-			failureOptions(operation, ctx.phase, nil)...,
+			failureOptions(operation, annotation.phase, nil)...,
 		)
 	}
 
 	if ctapErr, ok := errors.AsType[*ctaptransport.CTAPError](err); ok {
-		return normalizeCTAP(err, ctapErr, operation, ctx)
+		return normalizeCTAP(err, ctapErr, operation, annotation)
 	}
 
-	if code, ok := upstreamCode(err, ctx); ok {
-		return failure.Wrap(code, err, failureOptions(operation, ctx.phase, nil)...)
+	if code, ok := upstreamCode(err, annotation); ok {
+		return failure.Wrap(code, err, failureOptions(operation, annotation.phase, nil)...)
 	}
 
 	if code, ok := transportCode(err); ok {
-		return failure.Wrap(code, err, failureOptions(operation, ctx.phase, nil)...)
+		return failure.Wrap(code, err, failureOptions(operation, annotation.phase, nil)...)
 	}
 
 	return failure.Wrap(
 		failure.CodeInternalError,
 		err,
-		failureOptions(operation, ctx.phase, nil)...,
+		failureOptions(operation, annotation.phase, nil)...,
 	)
 }
 
@@ -65,34 +65,34 @@ func normalizeCTAP(
 	err error,
 	ctapErr *ctaptransport.CTAPError,
 	operation string,
-	ctx errorContext,
+	annotation Annotation,
 ) *failure.Error {
-	ctx.command = ctapErr.Command
-	if ctx.phase == "" {
-		ctx.phase = failure.PhaseAuthenticatorCommand
+	annotation.command = ctapErr.Command
+	if annotation.phase == "" {
+		annotation.phase = failure.PhaseAuthenticatorCommand
 	}
 
-	if ctx.command == protocol.AuthenticatorGetNextAssertion {
-		ctx.phase = failure.PhaseAssertionContinuation
+	if annotation.command == protocol.AuthenticatorGetNextAssertion {
+		annotation.phase = failure.PhaseAssertionContinuation
 	}
 
-	detail := ctapDetail(ctapErr, ctx)
+	detail := ctapDetail(ctapErr, annotation)
 
 	return failure.Wrap(
-		codeForCTAP(ctapErr.StatusCode, ctx),
+		codeForCTAP(ctapErr.StatusCode, annotation),
 		err,
-		failureOptions(operation, ctx.phase, detail)...,
+		failureOptions(operation, annotation.phase, detail)...,
 	)
 }
 
-func ctapDetail(ctapErr *ctaptransport.CTAPError, ctx errorContext) *failure.CTAPDetail {
+func ctapDetail(ctapErr *ctaptransport.CTAPError, annotation Annotation) *failure.CTAPDetail {
 	detail := &failure.CTAPDetail{
-		CommandCode: uint8(ctx.command),
+		CommandCode: uint8(annotation.command),
 		StatusCode:  uint8(ctapErr.StatusCode),
 	}
 
-	if ctx.subCommand != 0 {
-		subCommand := ctx.subCommand
+	if annotation.subCommand != 0 {
+		subCommand := annotation.subCommand
 		detail.SubCommandCode = &subCommand
 	}
 
@@ -107,10 +107,10 @@ func failureOptions(operation string, phase failure.Phase, detail *failure.CTAPD
 	}
 }
 
-func annotatedContext(err error) errorContext {
-	if annotated, ok := err.(*annotatedError); ok {
-		return annotated.ctx
+func errorAnnotation(err error) Annotation {
+	if annotated, ok := errors.AsType[*annotatedError](err); ok {
+		return annotated.annotation
 	}
 
-	return errorContext{}
+	return Annotation{}
 }

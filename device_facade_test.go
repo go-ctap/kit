@@ -152,15 +152,13 @@ func TestSelectDeviceUsesDiscoverySnapshot(t *testing.T) {
 
 	if _, err = SelectDevice(devices, ""); err == nil {
 		t.Fatal("SelectDevice(empty,multiple) returned nil error")
-	} else {
-		requireFailureCode(t, err, failure.CodeDeviceSelectionRequired)
 	}
+	requireFailureCode(t, err, failure.CodeDeviceSelectionRequired)
 
 	if _, err = SelectDevice(devices, "missing"); err == nil {
 		t.Fatal("SelectDevice(missing) returned nil error")
-	} else {
-		requireFailureCode(t, err, failure.CodeDeviceNotFound)
 	}
+	requireFailureCode(t, err, failure.CodeDeviceNotFound)
 
 	selected, err = SelectDevice(devices[:1], "")
 	if err != nil {
@@ -173,9 +171,8 @@ func TestSelectDeviceUsesDiscoverySnapshot(t *testing.T) {
 
 	if _, err = SelectDevice(nil, ""); err == nil {
 		t.Fatal("SelectDevice(empty list) returned nil error")
-	} else {
-		requireFailureCode(t, err, failure.CodeDeviceUnavailable)
 	}
+	requireFailureCode(t, err, failure.CodeDeviceUnavailable)
 }
 
 func TestOpenAuthenticatorRejectsZeroDevice(t *testing.T) {

@@ -51,6 +51,9 @@ func TestEnrichYubicoNormalizesMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Enrich: %v", err)
 	}
+	if metadata == nil {
+		t.Fatal("Enrich returned nil metadata")
+	}
 
 	if metadata.Model != "YubiKey 5C NFC" || metadata.Serial != "12345678" || metadata.Firmware != "5.7.1" {
 		t.Fatalf("metadata = %#v", metadata)
@@ -273,6 +276,9 @@ func TestEnrichYubicoIgnoresKnownInvalidNFCMetadata(t *testing.T) {
 	}, provider)
 	if err != nil {
 		t.Fatalf("Enrich: %v", err)
+	}
+	if metadata == nil {
+		t.Fatal("Enrich returned nil metadata")
 	}
 
 	if metadata.Model != "YubiKey 5C" || len(metadata.Interfaces) != 1 {
