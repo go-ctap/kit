@@ -15,15 +15,6 @@ func (f interactionHandlerFunc) RequestInteraction(_ context.Context, req model.
 	return f(req)
 }
 
-type contextualInteractionHandlerFunc func(context.Context, model.InteractionRequest) (model.InteractionResponse, error)
-
-func (f contextualInteractionHandlerFunc) RequestInteraction(
-	ctx context.Context,
-	req model.InteractionRequest,
-) (model.InteractionResponse, error) {
-	return f(ctx, req)
-}
-
 func userVerificationHandler(t *testing.T) InteractionHandler {
 	t.Helper()
 
@@ -58,11 +49,5 @@ func (s *recordingEventSink) Events() []model.OperationEvent {
 func eventStages(events []model.OperationEvent) []model.OperationStage {
 	return lo.Map(events, func(event model.OperationEvent, _ int) model.OperationStage {
 		return event.Stage
-	})
-}
-
-func hasStage(events []model.OperationEvent, stage model.OperationStage) bool {
-	return lo.ContainsBy(events, func(event model.OperationEvent) bool {
-		return event.Stage == stage
 	})
 }

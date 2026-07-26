@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/go-ctap/kit/model"
@@ -66,7 +67,7 @@ func TestPINInteractionWithoutHandlerReturnsInvalidState(t *testing.T) {
 	}, session.operationOptions()...)
 	requireFailureCode(t, err, failure.CodeInteractionHandlerRequired)
 
-	if !hasStage(events.Events(), model.OperationStageInteractionRequired) {
+	if !slices.Contains(eventStages(events.Events()), model.OperationStageInteractionRequired) {
 		t.Fatal("interaction-required was not emitted before missing handler error")
 	}
 

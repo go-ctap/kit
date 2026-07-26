@@ -7,14 +7,127 @@ import (
 	"testing"
 	"time"
 
+	ctapdevice "github.com/go-ctap/ctap/authenticator"
 	"github.com/go-ctap/ctap/protocol"
 	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/kit/model"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
-	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/operation"
 )
+
+type closeCountingAuthenticator struct {
+	contractAuthenticator
+	closeStarted chan struct{}
+	releaseClose chan struct{}
+	closeCount   atomic.Int32
+}
+
+func (a *closeCountingAuthenticator) Close() error {
+	if a.closeCount.Add(1) == 1 {
+		close(a.closeStarted)
+		<-a.releaseClose
+	}
+
+	return nil
+}
+
+type cancelablePINConfigAuthenticator struct {
+	contractAuthenticator
+	contractConfigManager
+	closeStarted chan struct{}
+	closeCount   atomic.Int32
+}
+
+func (a *cancelablePINConfigAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
+	return protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{
+		protocol.OptionAuthenticatorConfig: true,
+		protocol.OptionClientPIN:           true,
+		protocol.OptionPinUvAuthToken:      true,
+		protocol.OptionAlwaysUv:            false,
+	}}, true
+}
+
+func (a *cancelablePINConfigAuthenticator) ToggleAlwaysUV(context.Context, []byte) error {
+	return ctapdevice.ErrPinUvAuthTokenRequired
+}
+
+func (a *cancelablePINConfigAuthenticator) Close() error {
+	if a.closeCount.Add(1) == 1 {
+		close(a.closeStarted)
+	}
+
+	return nil
+}
+
+type contextualInteractionHandlerFunc func(context.Context, model.InteractionRequest) (model.InteractionResponse, error)
+
+func (f contextualInteractionHandlerFunc) RequestInteraction(
+	ctx context.Context,
+	req model.InteractionRequest,
+) (model.InteractionResponse, error) {
+	return f(ctx, req)
+}
+
+type blockingConfigAuthenticator struct {
+	contractAuthenticator
+	contractConfigManager
+	commandEntered chan struct{}
+}
+
+func (a *blockingConfigAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
+	return protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{
+		protocol.OptionAuthenticatorConfig: true,
+		protocol.OptionPinUvAuthToken:      true,
+		protocol.OptionUserVerification:    true,
+		protocol.OptionUvAcfg:              true,
+		protocol.OptionAlwaysUv:            false,
+	}}, true
+}
+
+func (a *blockingConfigAuthenticator) GetPinUvAuthTokenUsingUV(
+	context.Context,
+	protocol.Permission,
+	string,
+) ([]byte, error) {
+	return []byte("token"), nil
+}
+
+func (a *blockingConfigAuthenticator) ToggleAlwaysUV(ctx context.Context, token []byte) error {
+	if token == nil {
+		return ctapdevice.ErrPinUvAuthTokenRequired
+	}
+
+	close(a.commandEntered)
+	<-ctx.Done()
+
+	return ctx.Err()
+}
+
+type closeReleasedConfigAuthenticator struct {
+	blockingConfigAuthenticator
+	commandReleased chan struct{}
+	closeCount      atomic.Int32
+}
+
+func (a *closeReleasedConfigAuthenticator) ToggleAlwaysUV(ctx context.Context, token []byte) error {
+	if token == nil {
+		return ctapdevice.ErrPinUvAuthTokenRequired
+	}
+
+	close(a.commandEntered)
+	<-a.commandReleased
+
+	return ctx.Err()
+}
+
+func (a *closeReleasedConfigAuthenticator) Close() error {
+	if a.closeCount.Add(1) == 1 {
+		close(a.commandReleased)
+	}
+
+	return nil
+}
 
 func TestAuthenticatorTypedOperationContract(t *testing.T) {
 	opened := openContractAuthenticator(t, nil, nil)
@@ -101,14 +214,10 @@ func TestAuthenticatorCloseClosesAuthenticatorOnce(t *testing.T) {
 }
 
 func TestAuthenticatorCloseCancelsActiveRunAndClosesAuthenticatorOnce(t *testing.T) {
-	events := &recordingEventSink{}
-	a := &cancelablePINAuthenticator{
-		pinOnlyLargeBlobWriteEventAuthenticator: pinOnlyLargeBlobWriteEventAuthenticator{
-			largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
-		},
+	a := &cancelablePINConfigAuthenticator{
 		closeStarted: make(chan struct{}),
 	}
-	opened := openContractAuthenticator(t, events, a)
+	opened := openContractAuthenticator(t, nil, a)
 
 	interactionEntered := make(chan struct{})
 	runDone := make(chan error, 1)
@@ -120,15 +229,18 @@ func TestAuthenticatorCloseCancelsActiveRunAndClosesAuthenticatorOnce(t *testing
 	})
 
 	go func() {
-		_, err := opened.WriteLargeBlob(context.Background(), applargeblobs.WriteOperation{
-			CredentialIDHex: "c05e",
-			Payload:         []byte("test"),
-		}, opened.operationOptions(WithInteractionHandler(handler))...)
+		_, err := opened.SetAlwaysUV(
+			context.Background(),
+			appconfig.SetAlwaysUVOperation{Target: appconfig.AlwaysUVTargetEnable},
+			opened.operationOptions(WithInteractionHandler(handler))...,
+		)
 		runDone <- err
 	}()
 
 	select {
 	case <-interactionEntered:
+	case err := <-runDone:
+		t.Fatalf("Run returned before PIN interaction: %v", err)
 	case <-time.After(time.Second):
 		t.Fatal("Run did not reach PIN interaction")
 	}
@@ -154,64 +266,6 @@ func TestAuthenticatorCloseCancelsActiveRunAndClosesAuthenticatorOnce(t *testing
 		case <-time.After(time.Second):
 			t.Fatal("Authenticator.Close did not return")
 		}
-	}
-
-	select {
-	case err := <-runDone:
-		requireFailureCode(t, err, failure.CodeOperationCanceled)
-	case <-time.After(time.Second):
-		t.Fatal("Run was not canceled by Authenticator.Close")
-	}
-
-	if got := a.closeCount.Load(); got != 1 {
-		t.Fatalf("authenticator close count = %d, want 1", got)
-	}
-}
-
-func TestAuthenticatorCloseCancelsContextAwareInteractionHandler(t *testing.T) {
-	events := &recordingEventSink{}
-	a := &cancelablePINAuthenticator{
-		pinOnlyLargeBlobWriteEventAuthenticator: pinOnlyLargeBlobWriteEventAuthenticator{
-			largeBlobWriteEventAuthenticator: largeBlobWriteEventAuthenticator{},
-		},
-		closeStarted: make(chan struct{}),
-	}
-	opened := openContractAuthenticator(t, events, a)
-
-	interactionEntered := make(chan struct{})
-	runDone := make(chan error, 1)
-	handler := contextualInteractionHandlerFunc(func(ctx context.Context, _ model.InteractionRequest) (model.InteractionResponse, error) {
-		close(interactionEntered)
-		<-ctx.Done()
-
-		return model.InteractionResponse{}, ctx.Err()
-	})
-
-	go func() {
-		_, err := opened.WriteLargeBlob(context.Background(), applargeblobs.WriteOperation{
-			CredentialIDHex: "c05e",
-			Payload:         []byte("test"),
-		}, opened.operationOptions(WithInteractionHandler(handler))...)
-		runDone <- err
-	}()
-
-	select {
-	case <-interactionEntered:
-	case <-time.After(time.Second):
-		t.Fatal("Run did not reach PIN interaction")
-	}
-
-	closeDone := make(chan error, 1)
-
-	go func() { closeDone <- opened.Close() }()
-
-	select {
-	case err := <-closeDone:
-		if err != nil {
-			t.Fatalf("Authenticator.Close: %v", err)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("Authenticator.Close waited for canceled interaction handler")
 	}
 
 	select {

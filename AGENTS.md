@@ -35,6 +35,7 @@
 - Mutating operations should expose dry-run previews when useful, but dry-run is optional for callers and the runtime must not enforce product confirmation flows. The consuming client owns warnings, confirmation UX, and the decision to execute destructive operations.
 
 ## API And Go
+- USE Goland MCP!
 - Following Go formatting/style is critical: use `gofmt`/`goimports`, Google Go Style Guide, and Go Code Review Comments.
 - Preserve semantic whitespace: separate logical phases with blank lines; keep `x, err := ...` cuddled with its `if err != nil`; do not cuddle unrelated statements, side effects, or final returns; keep tiny error pairs tight; do not wrap long lines only for arbitrary width.
 - Do not add compatibility aliases or re-export wrappers for old layouts.

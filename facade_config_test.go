@@ -156,53 +156,52 @@ func TestResetRequestsTouchInteractionBeforeReset(t *testing.T) {
 	}
 }
 
-func TestResetWindowExpiredMapsNotAllowed(t *testing.T) {
-	err := runConfirmedResetWithError(t, &ctaptransport.CTAPError{
-		Command:    protocol.AuthenticatorReset,
-		StatusCode: ctaptransport.CTAP2_ERR_NOT_ALLOWED,
-	})
-
-	requireFailureCode(t, err, failure.CodeResetWindowExpired)
-}
-
-func TestResetTimeoutStatusMapsTimeout(t *testing.T) {
-	tests := []ctaptransport.StatusCode{
-		ctaptransport.CTAP2_ERR_USER_ACTION_TIMEOUT,
-		ctaptransport.CTAP2_ERR_ACTION_TIMEOUT,
+func TestResetStatusNormalization(t *testing.T) {
+	tests := []struct {
+		name    string
+		command protocol.Command
+		status  ctaptransport.StatusCode
+		want    failure.Code
+	}{
+		{
+			name:    "reset window expired",
+			command: protocol.AuthenticatorReset,
+			status:  ctaptransport.CTAP2_ERR_NOT_ALLOWED,
+			want:    failure.CodeResetWindowExpired,
+		},
+		{
+			name:    "user action timeout",
+			command: protocol.AuthenticatorReset,
+			status:  ctaptransport.CTAP2_ERR_USER_ACTION_TIMEOUT,
+			want:    failure.CodeResetTouchTimeout,
+		},
+		{
+			name:    "action timeout",
+			command: protocol.AuthenticatorReset,
+			status:  ctaptransport.CTAP2_ERR_ACTION_TIMEOUT,
+			want:    failure.CodeResetTouchTimeout,
+		},
+		{
+			name:    "not allowed for another command",
+			command: protocol.AuthenticatorMakeCredential,
+			status:  ctaptransport.CTAP2_ERR_NOT_ALLOWED,
+			want:    failure.CodeAuthenticatorOperationNotAllowed,
+		},
 	}
 
-	for _, status := range tests {
-		t.Run(status.String(), func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			err := runConfirmedResetWithError(t, &ctaptransport.CTAPError{
-				Command:    protocol.AuthenticatorReset,
-				StatusCode: status,
+				Command:    tt.command,
+				StatusCode: tt.status,
 			})
 
-			requireFailureCode(t, err, failure.CodeResetTouchTimeout)
+			requireFailureCode(t, err, tt.want)
+
+			if _, ok := errors.AsType[*ctaptransport.CTAPError](err); !ok {
+				t.Fatalf("Run error = %v, want original CTAPError in chain", err)
+			}
 		})
-	}
-}
-
-func TestResetNotAllowedForOtherCommandDoesNotMapWindowExpired(t *testing.T) {
-	err := runConfirmedResetWithError(t, &ctaptransport.CTAPError{
-		Command:    protocol.AuthenticatorMakeCredential,
-		StatusCode: ctaptransport.CTAP2_ERR_NOT_ALLOWED,
-	})
-
-	requireFailureCode(t, err, failure.CodeAuthenticatorOperationNotAllowed)
-}
-
-func TestRunReturnsNormalizedCTAPError(t *testing.T) {
-	events := &recordingEventSink{}
-	err := runConfirmedResetWithErrorAndEvents(t, events, &ctaptransport.CTAPError{
-		Command:    protocol.AuthenticatorReset,
-		StatusCode: ctaptransport.CTAP2_ERR_ACTION_TIMEOUT,
-	})
-
-	requireFailureCode(t, err, failure.CodeResetTouchTimeout)
-
-	if _, ok := errors.AsType[*ctaptransport.CTAPError](err); !ok {
-		t.Fatalf("Run error = %v, want original CTAPError in chain", err)
 	}
 }
 
@@ -310,12 +309,6 @@ func runConfirmedResetWithError(t *testing.T, resetErr error) error {
 	t.Helper()
 
 	events := &recordingEventSink{}
-	return runConfirmedResetWithErrorAndEvents(t, events, resetErr)
-}
-
-func runConfirmedResetWithErrorAndEvents(t *testing.T, events *recordingEventSink, resetErr error) error {
-	t.Helper()
-
 	a := &resetCountingAuthenticator{events: events, resetErr: resetErr}
 	session := openContractAuthenticator(t, events, a)
 	defer func() { _ = session.Close() }()
@@ -451,65 +444,49 @@ func (a *bioSensorAuthenticator) GetFingerprintSensorInfo(context.Context) (prot
 
 func TestPINMutationsRejectEmptyPINAtSessionRun(t *testing.T) {
 	tests := []struct {
-		name       string
-		configured bool
-		invoke     func(*contractAuthenticatorHandle) (*appconfig.PINOutput, error)
-		wantSet    int32
-		wantChange int32
+		name   string
+		set    *appconfig.SetPINOperation
+		change *appconfig.ChangePINOperation
 	}{
 		{
 			name: "set empty new PIN",
-			invoke: func(session *contractAuthenticatorHandle) (*appconfig.PINOutput, error) {
-				return session.SetPIN(
-					context.Background(),
-					appconfig.SetPINOperation{},
-					session.operationOptions()...,
-				)
-			},
+			set:  &appconfig.SetPINOperation{},
 		},
 		{
-			name:       "change empty current PIN",
-			configured: true,
-			invoke: func(session *contractAuthenticatorHandle) (*appconfig.PINOutput, error) {
-				return session.ChangePIN(
-					context.Background(),
-					appconfig.ChangePINOperation{NewPIN: "5678"},
-					session.operationOptions()...,
-				)
-			},
+			name:   "change empty current PIN",
+			change: &appconfig.ChangePINOperation{NewPIN: "5678"},
 		},
 		{
-			name:       "change empty new PIN",
-			configured: true,
-			invoke: func(session *contractAuthenticatorHandle) (*appconfig.PINOutput, error) {
-				return session.ChangePIN(
-					context.Background(),
-					appconfig.ChangePINOperation{CurrentPIN: "1234"},
-					session.operationOptions()...,
-				)
-			},
+			name:   "change empty new PIN",
+			change: &appconfig.ChangePINOperation{CurrentPIN: "1234"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := &pinMutationCountingAuthenticator{configured: tt.configured}
+			a := &pinMutationCountingAuthenticator{configured: tt.change != nil}
 			session := openContractAuthenticator(t, nil, a)
 			defer func() { _ = session.Close() }()
 
-			result, err := tt.invoke(session)
+			var result *appconfig.PINOutput
+			var err error
+			if tt.set != nil {
+				result, err = session.SetPIN(context.Background(), *tt.set, session.operationOptions()...)
+			} else {
+				result, err = session.ChangePIN(context.Background(), *tt.change, session.operationOptions()...)
+			}
 			if result != nil {
 				t.Fatalf("result = %#v, want nil", result)
 			}
 
 			requireFailureCode(t, err, failure.CodePINRequired)
 
-			if got := a.setCalls.Load(); got != tt.wantSet {
-				t.Fatalf("SetPIN calls = %d, want %d", got, tt.wantSet)
+			if got := a.setCalls.Load(); got != 0 {
+				t.Fatalf("SetPIN calls = %d, want 0", got)
 			}
 
-			if got := a.changeCalls.Load(); got != tt.wantChange {
-				t.Fatalf("ChangePIN calls = %d, want %d", got, tt.wantChange)
+			if got := a.changeCalls.Load(); got != 0 {
+				t.Fatalf("ChangePIN calls = %d, want 0", got)
 			}
 		})
 	}

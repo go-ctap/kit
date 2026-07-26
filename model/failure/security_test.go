@@ -3,7 +3,6 @@ package failure
 import (
 	"encoding/json"
 	"errors"
-	"strings"
 	"testing"
 )
 
@@ -24,26 +23,9 @@ func TestJSONNeverIncludesCauseOrRejectedParams(t *testing.T) {
 		t.Fatalf("Marshal: %v", marshalErr)
 	}
 
-	text := string(raw)
-	for _, forbidden := range []string{
-		"123456",
-		"token-secret",
-		"erase-everything",
-		"pinUvAuthToken",
-		"resetPhrase",
-		"current PIN",
-	} {
-		if strings.Contains(text, forbidden) {
-			t.Fatalf("Marshal leaked %q: %s", forbidden, text)
-		}
-	}
-
-	if !strings.Contains(text, `"field":"currentPIN"`) {
-		t.Fatalf("Marshal omitted allowlisted parameter: %s", text)
-	}
-
-	if !strings.Contains(text, `"category":"invalid-operation"`) {
-		t.Fatalf("Marshal omitted the registered category: %s", text)
+	want := `{"code":"PIN_REQUIRED","category":"invalid-operation","params":{"field":"currentPIN"}}`
+	if string(raw) != want {
+		t.Fatalf("Marshal = %s, want redacted wire form %s", raw, want)
 	}
 }
 
@@ -70,19 +52,8 @@ func TestConstructionCanonicalizesOperationAndCTAPSymbols(t *testing.T) {
 		t.Fatalf("Marshal: %v", marshalErr)
 	}
 
-	text := string(raw)
-	if strings.Contains(text, canary) {
-		t.Fatalf("Marshal leaked unregistered metadata: %s", text)
-	}
-
-	for _, expected := range []string{
-		`"command":"authenticatorClientPIN"`,
-		`"subCommandFamily":"clientPIN"`,
-		`"subCommand":"getPinUvAuthTokenUsingPinWithPermissions"`,
-		`"status":"CTAP2_ERR_PIN_AUTH_INVALID"`,
-	} {
-		if !strings.Contains(text, expected) {
-			t.Fatalf("Marshal omitted canonical metadata %s: %s", expected, text)
-		}
+	want := `{"code":"PIN_UV_AUTH_INVALID","category":"invalid-state","ctap":{"command":"authenticatorClientPIN","commandCode":6,"subCommandFamily":"clientPIN","subCommand":"getPinUvAuthTokenUsingPinWithPermissions","subCommandCode":9,"status":"CTAP2_ERR_PIN_AUTH_INVALID","statusCode":51}}`
+	if string(raw) != want {
+		t.Fatalf("Marshal = %s, want canonical wire form %s", raw, want)
 	}
 }

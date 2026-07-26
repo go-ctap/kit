@@ -9,30 +9,24 @@ import (
 	"github.com/go-ctap/kit/model/report"
 )
 
-func TestClassify(t *testing.T) {
+func TestClassifyAndCanProbe(t *testing.T) {
 	tests := []struct {
 		vendorID uint16
-		want     report.Vendor
+		vendor   report.Vendor
+		canProbe bool
 	}{
-		{vendorID: 0x1050, want: report.VendorYubico},
-		{vendorID: 0x349e, want: report.VendorToken2},
-		{vendorID: 0xffff, want: report.VendorUnknown},
+		{vendorID: 0x1050, vendor: report.VendorYubico, canProbe: true},
+		{vendorID: 0x349e, vendor: report.VendorToken2, canProbe: true},
+		{vendorID: 0xffff, vendor: report.VendorUnknown},
 	}
 
 	for _, test := range tests {
-		if got := Classify(test.vendorID); got != test.want {
-			t.Fatalf("Classify(%#04x) = %q, want %q", test.vendorID, got, test.want)
+		if got := Classify(test.vendorID); got != test.vendor {
+			t.Errorf("Classify(%#04x) = %q, want %q", test.vendorID, got, test.vendor)
 		}
-	}
-}
-
-func TestCanProbe(t *testing.T) {
-	if !CanProbe(report.DeviceReport{Vendor: report.VendorYubico}) {
-		t.Fatal("Yubico probe is unavailable")
-	}
-
-	if !CanProbe(report.DeviceReport{Vendor: report.VendorToken2}) {
-		t.Fatal("Token2 probe is unavailable")
+		if got := CanProbe(report.DeviceReport{Vendor: test.vendor}); got != test.canProbe {
+			t.Errorf("CanProbe(%q) = %v, want %v", test.vendor, got, test.canProbe)
+		}
 	}
 }
 

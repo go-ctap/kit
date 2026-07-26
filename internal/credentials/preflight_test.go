@@ -65,10 +65,7 @@ func TestBuildDeletePreviewMissingCredential(t *testing.T) {
 }
 
 func TestBuildUpdateUserPreviewRejectsInvalidUserIDHex(t *testing.T) {
-	target, err := FindByHexID(sampleInventoryReport(), "deadbeef")
-	if err != nil {
-		t.Fatalf("FindByHexID: %v", err)
-	}
+	target := sampleCredentialTarget(t)
 
 	for _, userIDHex := range []string{"zz", "abc"} {
 		_, err := BuildUpdateUserPreview(UpdateUserOperation{
@@ -99,10 +96,7 @@ func TestBuildUpdateUserPreviewRequiresTargetAndChange(t *testing.T) {
 }
 
 func TestBuildUpdateUserPreviewAcceptsUnchangedUserID(t *testing.T) {
-	target, err := FindByHexID(sampleInventoryReport(), "deadbeef")
-	if err != nil {
-		t.Fatalf("FindByHexID: %v", err)
-	}
+	target := sampleCredentialTarget(t)
 
 	preview, err := BuildUpdateUserPreview(UpdateUserOperation{
 		Target:         target,
@@ -121,12 +115,9 @@ func TestBuildUpdateUserPreviewAcceptsUnchangedUserID(t *testing.T) {
 }
 
 func TestBuildUpdateUserPreviewRejectsChangedUserID(t *testing.T) {
-	target, err := FindByHexID(sampleInventoryReport(), "deadbeef")
-	if err != nil {
-		t.Fatalf("FindByHexID: %v", err)
-	}
+	target := sampleCredentialTarget(t)
 
-	_, err = BuildUpdateUserPreview(UpdateUserOperation{
+	_, err := BuildUpdateUserPreview(UpdateUserOperation{
 		Target:         target,
 		UserIDHex:      "0a0b",
 		UserIDProvided: true,
@@ -136,6 +127,17 @@ func TestBuildUpdateUserPreviewRejectsChangedUserID(t *testing.T) {
 	if !failure.IsCode(err, failure.CodeCTAPParameterInvalid) {
 		t.Fatalf("BuildUpdateUserPreview(changed user ID) error = %v, want %s", err, failure.CodeCTAPParameterInvalid)
 	}
+}
+
+func sampleCredentialTarget(t *testing.T) CredentialTarget {
+	t.Helper()
+
+	target, err := FindByHexID(sampleInventoryReport(), "deadbeef")
+	if err != nil {
+		t.Fatalf("FindByHexID: %v", err)
+	}
+
+	return target
 }
 
 func sampleInventoryReport() InventoryReport {

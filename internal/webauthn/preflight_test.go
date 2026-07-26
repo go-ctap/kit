@@ -13,123 +13,88 @@ import (
 
 func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {
 	userPresenceFalse := false
-	base := MakeCredentialInput{
-		RP:             credential.PublicKeyCredentialRpEntity{ID: "example.com"},
-		User:           credential.PublicKeyCredentialUserEntity{ID: []byte{0x01, 0x02}},
-		ClientDataJSON: []byte(`{"type":"webauthn.create"}`),
-		PubKeyCredParams: []credential.PublicKeyCredentialParameters{
-			{Algorithm: -7},
-		},
-	}
+	base := validMakeCredentialInput(nil)
 
 	tests := []struct {
 		name     string
-		input    MakeCredentialInput
+		change   func(*MakeCredentialInput)
 		wantCode failure.Code
 	}{
 		{
 			name:     "rp id",
 			wantCode: failure.CodeRelyingPartyIDRequired,
-			input: MakeCredentialInput{
-				User:             base.User,
-				ClientDataJSON:   base.ClientDataJSON,
-				PubKeyCredParams: base.PubKeyCredParams,
+			change: func(input *MakeCredentialInput) {
+				input.RP.ID = ""
 			},
 		},
 		{
 			name:     "user id",
 			wantCode: failure.CodeUserIDRequired,
-			input: MakeCredentialInput{
-				RP:               base.RP,
-				ClientDataJSON:   base.ClientDataJSON,
-				PubKeyCredParams: base.PubKeyCredParams,
+			change: func(input *MakeCredentialInput) {
+				input.User.ID = nil
 			},
 		},
 		{
 			name:     "client data",
 			wantCode: failure.CodeClientDataJSONRequired,
-			input: MakeCredentialInput{
-				RP:               base.RP,
-				User:             base.User,
-				PubKeyCredParams: base.PubKeyCredParams,
+			change: func(input *MakeCredentialInput) {
+				input.ClientDataJSON = nil
 			},
 		},
 		{
 			name:     "params",
 			wantCode: failure.CodePublicKeyCredentialParametersRequired,
-			input: MakeCredentialInput{
-				RP:             base.RP,
-				User:           base.User,
-				ClientDataJSON: base.ClientDataJSON,
+			change: func(input *MakeCredentialInput) {
+				input.PubKeyCredParams = nil
 			},
 		},
 		{
 			name:     "algorithm",
 			wantCode: failure.CodePublicKeyCredentialAlgorithmRequired,
-			input: MakeCredentialInput{
-				RP:               base.RP,
-				User:             base.User,
-				ClientDataJSON:   base.ClientDataJSON,
-				PubKeyCredParams: []credential.PublicKeyCredentialParameters{{}},
+			change: func(input *MakeCredentialInput) {
+				input.PubKeyCredParams = []credential.PublicKeyCredentialParameters{{}}
 			},
 		},
 		{
 			name:     "user id length",
 			wantCode: failure.CodeCTAPLengthInvalid,
-			input: MakeCredentialInput{
-				RP:               base.RP,
-				User:             credential.PublicKeyCredentialUserEntity{ID: bytes.Repeat([]byte{0x01}, 65)},
-				ClientDataJSON:   base.ClientDataJSON,
-				PubKeyCredParams: base.PubKeyCredParams,
+			change: func(input *MakeCredentialInput) {
+				input.User.ID = bytes.Repeat([]byte{0x01}, 65)
 			},
 		},
 		{
 			name:     "duplicate parameter",
 			wantCode: failure.CodeCTAPParameterInvalid,
-			input: MakeCredentialInput{
-				RP:             base.RP,
-				User:           base.User,
-				ClientDataJSON: base.ClientDataJSON,
-				PubKeyCredParams: []credential.PublicKeyCredentialParameters{
+			change: func(input *MakeCredentialInput) {
+				input.PubKeyCredParams = []credential.PublicKeyCredentialParameters{
 					{Algorithm: -7},
 					{Algorithm: -7},
-				},
+				}
 			},
 		},
 		{
 			name:     "false user presence",
 			wantCode: failure.CodeCTAPOptionInvalid,
-			input: MakeCredentialInput{
-				RP:               base.RP,
-				User:             base.User,
-				ClientDataJSON:   base.ClientDataJSON,
-				PubKeyCredParams: base.PubKeyCredParams,
-				Options:          AuthenticatorOptions{UserPresence: &userPresenceFalse},
+			change: func(input *MakeCredentialInput) {
+				input.Options = AuthenticatorOptions{UserPresence: &userPresenceFalse}
 			},
 		},
 		{
 			name:     "enterprise attestation",
 			wantCode: failure.CodeCTAPOptionInvalid,
-			input: MakeCredentialInput{
-				RP:                    base.RP,
-				User:                  base.User,
-				ClientDataJSON:        base.ClientDataJSON,
-				PubKeyCredParams:      base.PubKeyCredParams,
-				EnterpriseAttestation: 3,
+			change: func(input *MakeCredentialInput) {
+				input.EnterpriseAttestation = 3
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NormalizeMakeCredentialInput(tt.input)
-			if !failure.IsCode(err, tt.wantCode) {
-				t.Fatalf("NormalizeMakeCredentialInput error = %v, want %s", err, tt.wantCode)
-			}
+			input := base
+			tt.change(&input)
 
-			if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
-				t.Fatalf("NormalizeMakeCredentialInput phase = %q, want %q", got, failure.PhaseValidation)
-			}
+			_, err := NormalizeMakeCredentialInput(input)
+			assertValidationFailure(t, err, tt.wantCode)
 		})
 	}
 }
@@ -193,13 +158,7 @@ func TestNormalizeGetAssertionInputValidatesAllowListID(t *testing.T) {
 			{},
 		},
 	})
-	if !failure.IsCode(err, failure.CodeCredentialIDRequired) {
-		t.Fatalf("NormalizeGetAssertionInput error = %v, want %s", err, failure.CodeCredentialIDRequired)
-	}
-
-	if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
-		t.Fatalf("NormalizeGetAssertionInput phase = %q, want %q", got, failure.PhaseValidation)
-	}
+	assertValidationFailure(t, err, failure.CodeCredentialIDRequired)
 }
 
 func TestNormalizeGetAssertionInputRequiresCoreFields(t *testing.T) {
@@ -227,13 +186,18 @@ func TestNormalizeGetAssertionInputRequiresCoreFields(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := NormalizeGetAssertionInput(tt.input)
-			if !failure.IsCode(err, tt.wantCode) {
-				t.Fatalf("NormalizeGetAssertionInput error = %v, want %s", err, tt.wantCode)
-			}
-
-			if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
-				t.Fatalf("NormalizeGetAssertionInput phase = %q, want %q", got, failure.PhaseValidation)
-			}
+			assertValidationFailure(t, err, tt.wantCode)
 		})
+	}
+}
+
+func assertValidationFailure(t *testing.T, err error, wantCode failure.Code) {
+	t.Helper()
+
+	if !failure.IsCode(err, wantCode) {
+		t.Fatalf("error = %v, want %s", err, wantCode)
+	}
+	if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
+		t.Fatalf("failure phase = %q, want %q", got, failure.PhaseValidation)
 	}
 }

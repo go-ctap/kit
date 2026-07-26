@@ -103,21 +103,10 @@ func TestResolveListsAndJSONAreDeterministic(t *testing.T) {
 	}
 
 	commands := requireFact(t, first, model.FactIDAuthenticatorConfigCommands)
-	if commands.Value.List == nil || !reflect.DeepEqual(*commands.Value.List, []string{"4", "1"}) {
-		t.Fatalf("config commands = %#v", commands.Value)
-	}
-	vendorCommands := requireFact(t, first, model.FactIDVendorPrototypeConfigCommands)
-	if vendorCommands.Value.List == nil || !reflect.DeepEqual(*vendorCommands.Value.List, []string{"4294967296", "7"}) {
-		t.Fatalf("vendor commands = %#v", vendorCommands.Value)
-	}
-	certifications := requireFact(t, first, model.FactIDCertifications)
-	if certifications.Value.List == nil || !reflect.DeepEqual(*certifications.Value.List, []string{"FIDO=2", "FIPS-CMVP-2=3"}) {
-		t.Fatalf("certifications = %#v", certifications.Value)
-	}
-	algorithms := requireFact(t, first, model.FactIDAlgorithms)
-	if algorithms.Value.List == nil || !reflect.DeepEqual(*algorithms.Value.List, []string{"public-key:-7"}) {
-		t.Fatalf("algorithms = %#v", algorithms.Value)
-	}
+	assertListFact(t, commands, []string{"4", "1"})
+	assertListFact(t, requireFact(t, first, model.FactIDVendorPrototypeConfigCommands), []string{"4294967296", "7"})
+	assertListFact(t, requireFact(t, first, model.FactIDCertifications), []string{"FIDO=2", "FIPS-CMVP-2=3"})
+	assertListFact(t, requireFact(t, first, model.FactIDAlgorithms), []string{"public-key:-7"})
 
 	firstJSON, err := json.Marshal(first)
 	if err != nil {
@@ -185,5 +174,13 @@ func assertIntegerFact(t *testing.T, assessment model.Assessment, id model.FactI
 	fact := requireFact(t, assessment, id)
 	if fact.State != model.FactStateObserved || fact.Origin != origin || fact.Value.Kind != model.FactValueInteger || fact.Value.Integer == nil || *fact.Value.Integer != value || fact.Value.Unit != unit {
 		t.Fatalf("fact %q = %#v, want observed/%s integer=%d unit=%s", id, fact, origin, value, unit)
+	}
+}
+
+func assertListFact(t *testing.T, fact model.Fact, want []string) {
+	t.Helper()
+
+	if fact.Value.List == nil || !reflect.DeepEqual(*fact.Value.List, want) {
+		t.Fatalf("fact %q list = %#v, want %#v", fact.ID, fact.Value.List, want)
 	}
 }

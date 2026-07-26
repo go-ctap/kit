@@ -18,67 +18,7 @@ import (
 )
 
 func TestAuthenticatorMutationsInvalidateRetainedLargeBlobSnapshot(t *testing.T) {
-	tests := []struct {
-		name   string
-		mutate func(*contractAuthenticatorHandle, InteractionHandler) error
-	}{
-		{
-			name: "delete credential",
-			mutate: func(session *contractAuthenticatorHandle, handler InteractionHandler) error {
-				_, err := session.DeleteCredential(t.Context(), appcredentials.DeleteOperation{
-					CredentialIDHex: "c05e",
-				}, session.operationOptions(WithInteractionHandler(handler))...)
-
-				return err
-			},
-		},
-		{
-			name: "update credential user",
-			mutate: func(session *contractAuthenticatorHandle, handler InteractionHandler) error {
-				_, err := session.UpdateCredentialUser(t.Context(), appcredentials.UpdateUserOperation{
-					Target:       credentialMutationTarget(),
-					Name:         "updated",
-					NameProvided: true,
-				}, session.operationOptions(WithInteractionHandler(handler))...)
-
-				return err
-			},
-		},
-		{
-			name: "make credential",
-			mutate: func(session *contractAuthenticatorHandle, handler InteractionHandler) error {
-				_, err := session.MakeCredential(
-					t.Context(),
-					sampleMakeCredentialOperation(false),
-					session.operationOptions(WithInteractionHandler(handler))...,
-				)
-
-				return err
-			},
-		},
-		{
-			name: "write large blob through WebAuthn",
-			mutate: func(session *contractAuthenticatorHandle, handler InteractionHandler) error {
-				_, err := session.GetAssertion(t.Context(), largeBlobWriteAssertionOperation(false),
-					session.operationOptions(WithInteractionHandler(handler))...,
-				)
-
-				return err
-			},
-		},
-		{
-			name: "factory reset",
-			mutate: func(session *contractAuthenticatorHandle, handler InteractionHandler) error {
-				_, err := session.ResetFactory(t.Context(), appconfig.ResetFactoryOperation{},
-					session.operationOptions(WithInteractionHandler(handler))...,
-				)
-
-				return err
-			},
-		},
-	}
-
-	for _, tt := range tests {
+	for _, tt := range stateMutationCases(t, false) {
 		t.Run(tt.name, func(t *testing.T) {
 			a, session, handler := openStateEffectAuthenticator(t)
 			primeLargeBlobSnapshot(t, session, handler)
@@ -93,69 +33,7 @@ func TestAuthenticatorMutationsInvalidateRetainedLargeBlobSnapshot(t *testing.T)
 }
 
 func TestMutationDryRunsKeepRetainedLargeBlobSnapshot(t *testing.T) {
-	tests := []struct {
-		name   string
-		mutate func(*contractAuthenticatorHandle, InteractionHandler) error
-	}{
-		{
-			name: "delete credential",
-			mutate: func(session *contractAuthenticatorHandle, handler InteractionHandler) error {
-				_, err := session.DeleteCredential(t.Context(), appcredentials.DeleteOperation{
-					CredentialIDHex: "c05e",
-					DryRun:          true,
-				}, session.operationOptions(WithInteractionHandler(handler))...)
-
-				return err
-			},
-		},
-		{
-			name: "update credential user",
-			mutate: func(session *contractAuthenticatorHandle, handler InteractionHandler) error {
-				_, err := session.UpdateCredentialUser(t.Context(), appcredentials.UpdateUserOperation{
-					Target:       credentialMutationTarget(),
-					Name:         "updated",
-					NameProvided: true,
-					DryRun:       true,
-				}, session.operationOptions(WithInteractionHandler(handler))...)
-
-				return err
-			},
-		},
-		{
-			name: "make credential",
-			mutate: func(session *contractAuthenticatorHandle, handler InteractionHandler) error {
-				_, err := session.MakeCredential(
-					t.Context(),
-					sampleMakeCredentialOperation(true),
-					session.operationOptions(WithInteractionHandler(handler))...,
-				)
-
-				return err
-			},
-		},
-		{
-			name: "write large blob through WebAuthn",
-			mutate: func(session *contractAuthenticatorHandle, handler InteractionHandler) error {
-				_, err := session.GetAssertion(t.Context(), largeBlobWriteAssertionOperation(true),
-					session.operationOptions(WithInteractionHandler(handler))...,
-				)
-
-				return err
-			},
-		},
-		{
-			name: "factory reset",
-			mutate: func(session *contractAuthenticatorHandle, handler InteractionHandler) error {
-				_, err := session.ResetFactory(t.Context(), appconfig.ResetFactoryOperation{DryRun: true},
-					session.operationOptions(WithInteractionHandler(handler))...,
-				)
-
-				return err
-			},
-		},
-	}
-
-	for _, tt := range tests {
+	for _, tt := range stateMutationCases(t, true) {
 		t.Run(tt.name, func(t *testing.T) {
 			a, session, handler := openStateEffectAuthenticator(t)
 			primeLargeBlobSnapshot(t, session, handler)
@@ -198,6 +76,74 @@ func TestFailedLargeBlobWriteInvalidatesRetainedSnapshot(t *testing.T) {
 	}
 
 	assertNextLargeBlobReadRefreshes(t, a, session, handler)
+}
+
+type stateMutationCase struct {
+	name   string
+	mutate func(*contractAuthenticatorHandle, InteractionHandler) error
+}
+
+func stateMutationCases(t *testing.T, dryRun bool) []stateMutationCase {
+	t.Helper()
+
+	return []stateMutationCase{
+		{
+			name: "delete credential",
+			mutate: func(session *contractAuthenticatorHandle, handler InteractionHandler) error {
+				_, err := session.DeleteCredential(t.Context(), appcredentials.DeleteOperation{
+					CredentialIDHex: "c05e",
+					DryRun:          dryRun,
+				}, session.operationOptions(WithInteractionHandler(handler))...)
+
+				return err
+			},
+		},
+		{
+			name: "update credential user",
+			mutate: func(session *contractAuthenticatorHandle, handler InteractionHandler) error {
+				_, err := session.UpdateCredentialUser(t.Context(), appcredentials.UpdateUserOperation{
+					Target:       credentialMutationTarget(),
+					Name:         "updated",
+					NameProvided: true,
+					DryRun:       dryRun,
+				}, session.operationOptions(WithInteractionHandler(handler))...)
+
+				return err
+			},
+		},
+		{
+			name: "make credential",
+			mutate: func(session *contractAuthenticatorHandle, handler InteractionHandler) error {
+				_, err := session.MakeCredential(
+					t.Context(),
+					sampleMakeCredentialOperation(dryRun),
+					session.operationOptions(WithInteractionHandler(handler))...,
+				)
+
+				return err
+			},
+		},
+		{
+			name: "write large blob through WebAuthn",
+			mutate: func(session *contractAuthenticatorHandle, handler InteractionHandler) error {
+				_, err := session.GetAssertion(t.Context(), largeBlobWriteAssertionOperation(dryRun),
+					session.operationOptions(WithInteractionHandler(handler))...,
+				)
+
+				return err
+			},
+		},
+		{
+			name: "factory reset",
+			mutate: func(session *contractAuthenticatorHandle, handler InteractionHandler) error {
+				_, err := session.ResetFactory(t.Context(), appconfig.ResetFactoryOperation{DryRun: dryRun},
+					session.operationOptions(WithInteractionHandler(handler))...,
+				)
+
+				return err
+			},
+		},
+	}
 }
 
 func openStateEffectAuthenticator(

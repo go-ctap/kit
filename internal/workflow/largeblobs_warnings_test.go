@@ -10,17 +10,25 @@ import (
 
 func TestLargeBlobMutationWarningsDescribeFirstMatchingEntry(t *testing.T) {
 	state := targetBlobState{currentBlobIndex: 0}
-
-	preview := buildMutationPreview(state, applargeblobs.MutationReplace, 4, 32, false)
-	if got := preview.Warnings[1].Message; !strings.Contains(got, "first large-blob entry") ||
-		!strings.Contains(got, "additional matching entries remain unchanged") {
-		t.Fatalf("replace warning = %q", got)
+	tests := []struct {
+		name      string
+		operation applargeblobs.MutationOperation
+		byteCount int
+		arraySize int
+	}{
+		{name: "replace", operation: applargeblobs.MutationReplace, byteCount: 4, arraySize: 32},
+		{name: "delete", operation: applargeblobs.MutationDelete, arraySize: 17},
 	}
 
-	preview = buildMutationPreview(state, applargeblobs.MutationDelete, 0, 17, false)
-	if got := preview.Warnings[1].Message; !strings.Contains(got, "first large-blob entry") ||
-		!strings.Contains(got, "additional matching entries remain unchanged") {
-		t.Fatalf("delete warning = %q", got)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			preview := buildMutationPreview(state, test.operation, test.byteCount, test.arraySize, false)
+			got := preview.Warnings[1].Message
+			if !strings.Contains(got, "first large-blob entry") ||
+				!strings.Contains(got, "additional matching entries remain unchanged") {
+				t.Fatalf("warning = %q", got)
+			}
+		})
 	}
 }
 

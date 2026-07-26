@@ -72,21 +72,7 @@ func TestSecretHandleInvalidationZeroesBytes(t *testing.T) {
 	}
 }
 
-func TestSecretHandleStringRedactsBytes(t *testing.T) {
-	secret := New([]byte("super-secret-token"))
-
-	for _, rendered := range []string{
-		secret.String(),
-		fmt.Sprint(secret),
-		fmt.Sprintf("%#v", secret),
-	} {
-		if rendered != secretRedacted {
-			t.Fatalf("expected redacted string, got %q", rendered)
-		}
-	}
-}
-
-func TestSecretHandleJSONRedactsBytes(t *testing.T) {
+func TestSecretHandleRenderingRedactsBytes(t *testing.T) {
 	secret := New([]byte("super-secret-token"))
 
 	encoded, err := json.Marshal(secret)
@@ -94,7 +80,22 @@ func TestSecretHandleJSONRedactsBytes(t *testing.T) {
 		t.Fatalf("marshal secret: %v", err)
 	}
 
-	if string(encoded) != `"`+secretRedacted+`"` {
-		t.Fatalf("expected redacted JSON, got %s", encoded)
+	tests := []struct {
+		name string
+		got  string
+		want string
+	}{
+		{"String", secret.String(), secretRedacted},
+		{"Stringer", fmt.Sprint(secret), secretRedacted},
+		{"GoStringer", fmt.Sprintf("%#v", secret), secretRedacted},
+		{"JSON", string(encoded), `"` + secretRedacted + `"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.got != tt.want {
+				t.Fatalf("rendered secret = %q, want %q", tt.got, tt.want)
+			}
+		})
 	}
 }

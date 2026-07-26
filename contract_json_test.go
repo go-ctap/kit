@@ -14,7 +14,6 @@ import (
 	"github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/largeblobs"
-	"github.com/go-ctap/kit/model/operation"
 	"github.com/go-ctap/kit/model/report"
 	webauthn2 "github.com/go-ctap/kit/model/webauthn"
 )
@@ -22,154 +21,66 @@ import (
 func TestOperationEventStagesHaveCountsWithoutPercent(t *testing.T) {
 	completed := uint64(1)
 	total := uint64(3)
-	event := model.OperationEvent{
+	assertJSON(t, model.OperationEvent{
 		Stage:     model.OperationStageEnumeratingRPs,
 		Completed: &completed,
 		Total:     &total,
-	}
-
-	if event.Stage != model.OperationStageEnumeratingRPs {
-		t.Fatalf("unexpected stage: %s", event.Stage)
-	}
-
-	if event.Completed == nil || *event.Completed != 1 {
-		t.Fatalf("unexpected completed count: %#v", event.Completed)
-	}
+	}, `{"stage":"enumerating-rps","completed":1,"total":3}`)
 }
 
 func TestOperationEventIncludesStateStages(t *testing.T) {
-	stages := []model.OperationStage{
-		model.OperationStageCapturingBioSample,
-	}
-
-	for _, stage := range stages {
-		if stage == "" {
-			t.Fatal("stage must not be empty")
-		}
-	}
-}
-
-func TestWebAuthnOperationKindStrings(t *testing.T) {
-	if got := operation.MakeCredential; got != "webauthn.makeCredential" {
-		t.Fatalf("MakeCredential kind = %q", got)
-	}
-
-	if got := operation.GetAssertion; got != "webauthn.getAssertion" {
-		t.Fatalf("GetAssertion kind = %q", got)
-	}
+	assertJSON(t, model.OperationEvent{
+		Stage: model.OperationStageCapturingBioSample,
+	}, `{"stage":"capturing-bio-sample"}`)
 }
 
 func TestUserVerificationInteractionJSON(t *testing.T) {
 	modality := protocol.UserVerifyFingerprintInternal
-	raw, err := json.Marshal(model.InteractionRequest{
+	assertJSON(t, model.InteractionRequest{
 		Kind:       model.InteractionKindUserVerification,
 		Permission: "credentialManagement",
 		UVModality: &modality,
-	})
-	if err != nil {
-		t.Fatalf("marshal interaction request: %v", err)
-	}
-
-	if !strings.Contains(string(raw), `"kind":"user-verification"`) {
-		t.Fatalf("user-verification JSON contract missing: %s", raw)
-	}
-
-	if !strings.Contains(string(raw), `"uvModality":2`) {
-		t.Fatalf("user-verification modality missing: %s", raw)
-	}
-
-	flow, err := json.Marshal(VerificationFlowPIN)
-	if err != nil {
-		t.Fatalf("marshal verification flow: %v", err)
-	}
-
-	if string(flow) != `"pin"` {
-		t.Fatalf("verification flow JSON = %s, want pin", flow)
-	}
-
-	if strings.Contains(string(raw), "operationId") {
-		t.Fatalf("operationId leaked into interaction request JSON: %s", raw)
-	}
-
-	if strings.Contains(string(raw), "selectionId") {
-		t.Fatalf("selectionId leaked into interaction request JSON: %s", raw)
-	}
-
-	if strings.Contains(string(raw), "interactionId") {
-		t.Fatalf("interactionId leaked into interaction request JSON: %s", raw)
-	}
-
-	if strings.Contains(string(raw), `"status"`) {
-		t.Fatalf("status leaked into interaction request JSON: %s", raw)
-	}
+	}, `{"kind":"user-verification","permission":"credentialManagement","uvModality":2}`)
+	assertJSON(t, VerificationFlowPIN, `"pin"`)
 }
 
-func TestPINRetryInteractionJSON(t *testing.T) {
-	retriesRemaining := uint(6)
+func TestPINInteractionJSON(t *testing.T) {
 	powerCycleState := false
-	raw, err := json.Marshal(model.InteractionRequest{
-		Kind:       model.InteractionKindPIN,
-		Permission: "credentialManagement",
-		PINState: &model.PINInteractionState{
-			Failure: failure.Snapshot(failure.New(
-				failure.CodePINInvalid,
-				failure.WithPhase(failure.PhaseTokenAcquisition),
-			)),
-			RetriesRemaining: &retriesRemaining,
-			PowerCycleState:  &powerCycleState,
+	tests := []struct {
+		name  string
+		state model.PINInteractionState
+		want  string
+	}{
+		{
+			name: "initial state",
+			state: model.PINInteractionState{
+				RetriesRemaining: new(uint(7)),
+				PowerCycleState:  &powerCycleState,
+			},
+			want: `{"kind":"pin","permission":"credentialManagement","pinState":{"retriesRemaining":7,"powerCycleState":false}}`,
 		},
-	})
-	if err != nil {
-		t.Fatalf("marshal PIN retry interaction: %v", err)
-	}
-
-	want := `{"kind":"pin","permission":"credentialManagement","pinState":{"failure":{"code":"PIN_INVALID","category":"invalid-state","phase":"token-acquisition"},"retriesRemaining":6,"powerCycleState":false}}`
-	if string(raw) != want {
-		t.Fatalf("PIN retry interaction JSON = %s, want %s", raw, want)
-	}
-}
-
-func TestInitialPINInteractionJSON(t *testing.T) {
-	retriesRemaining := uint(7)
-	powerCycleState := false
-	raw, err := json.Marshal(model.InteractionRequest{
-		Kind:       model.InteractionKindPIN,
-		Permission: "credentialManagement",
-		PINState: &model.PINInteractionState{
-			RetriesRemaining: &retriesRemaining,
-			PowerCycleState:  &powerCycleState,
+		{
+			name: "retry state",
+			state: model.PINInteractionState{
+				Failure: failure.Snapshot(failure.New(
+					failure.CodePINInvalid,
+					failure.WithPhase(failure.PhaseTokenAcquisition),
+				)),
+				RetriesRemaining: new(uint(6)),
+				PowerCycleState:  &powerCycleState,
+			},
+			want: `{"kind":"pin","permission":"credentialManagement","pinState":{"failure":{"code":"PIN_INVALID","category":"invalid-state","phase":"token-acquisition"},"retriesRemaining":6,"powerCycleState":false}}`,
 		},
-	})
-	if err != nil {
-		t.Fatalf("marshal initial PIN interaction: %v", err)
 	}
 
-	want := `{"kind":"pin","permission":"credentialManagement","pinState":{"retriesRemaining":7,"powerCycleState":false}}`
-	if string(raw) != want {
-		t.Fatalf("initial PIN interaction JSON = %s, want %s", raw, want)
-	}
-}
-
-func TestTouchInteractionJSON(t *testing.T) {
-	raw, err := json.Marshal(model.InteractionRequest{
-		Kind:        model.InteractionKindTouch,
-		Message:     "Touch authenticator",
-		Destructive: true,
-	})
-	if err != nil {
-		t.Fatalf("marshal interaction request: %v", err)
-	}
-
-	if !strings.Contains(string(raw), `"kind":"touch"`) {
-		t.Fatalf("touch JSON contract missing: %s", raw)
-	}
-
-	if strings.Contains(string(raw), "operationId") {
-		t.Fatalf("operationId leaked into interaction request JSON: %s", raw)
-	}
-
-	if strings.Contains(string(raw), "selectionId") || strings.Contains(string(raw), "interactionId") {
-		t.Fatalf("runtime correlation fields leaked into interaction request JSON: %s", raw)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertJSON(t, model.InteractionRequest{
+				Kind:       model.InteractionKindPIN,
+				Permission: "credentialManagement",
+				PINState:   &tt.state,
+			}, tt.want)
+		})
 	}
 }
 
@@ -184,54 +95,10 @@ func TestInteractionRequestJSONIncludesPreviewAndResponseOmitsPIN(t *testing.T) 
 		},
 	}
 
-	raw, err := json.Marshal(request)
-	if err != nil {
-		t.Fatalf("marshal interaction request: %v", err)
-	}
-
-	text := string(raw)
-	if !strings.Contains(text, `"preview"`) || !strings.Contains(text, "factory reset erases authenticator state") {
-		t.Fatalf("interaction request omitted preview: %s", text)
-	}
-
-	if strings.Contains(text, "pinUvAuthToken") {
-		t.Fatalf("interaction request leaked token marker: %s", text)
-	}
-
-	if strings.Contains(text, "expectedPhrase") || strings.Contains(text, "typed-confirm") {
-		t.Fatalf("interaction request included typed confirmation fields: %s", text)
-	}
-
-	if strings.Contains(text, "operationId") {
-		t.Fatalf("operationId leaked into interaction request JSON: %s", text)
-	}
-
-	if strings.Contains(text, "selectionId") || strings.Contains(text, "interactionId") {
-		t.Fatalf("runtime correlation fields leaked into interaction request JSON: %s", text)
-	}
-
-	response, err := json.Marshal(model.InteractionResponse{
+	assertJSON(t, request, `{"kind":"touch","message":"Factory reset fingerprint-1?","destructive":true,"preview":{"deviceFingerprint":"fingerprint-1","warnings":["factory reset erases authenticator state"]}}`)
+	assertJSON(t, model.InteractionResponse{
 		PIN: []byte("123456"),
-	})
-	if err != nil {
-		t.Fatalf("marshal interaction response: %v", err)
-	}
-
-	if strings.Contains(string(response), "123456") || strings.Contains(string(response), "PIN") {
-		t.Fatalf("interaction response leaked PIN: %s", response)
-	}
-
-	if strings.Contains(string(response), "phrase") {
-		t.Fatalf("interaction response leaked phrase field: %s", response)
-	}
-
-	if strings.Contains(string(response), "operationId") {
-		t.Fatalf("operationId leaked into interaction response JSON: %s", response)
-	}
-
-	if strings.Contains(string(response), "interactionId") || strings.Contains(string(response), `"kind"`) {
-		t.Fatalf("runtime echo fields leaked into interaction response JSON: %s", response)
-	}
+	}, `{}`)
 }
 
 func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
@@ -792,58 +659,16 @@ func TestDeviceReportVendorMetadataJSON(t *testing.T) {
 		},
 	}
 
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		t.Fatalf("Marshal: %v", err)
-	}
-
-	text := string(encoded)
-	for _, want := range []string{
-		`"fingerprint":"attachment-1"`,
-		`"path":"hid://one"`,
-		`"vendor":"yubico"`,
-		`"metadata"`,
-		`"model":"YubiKey 5C NFC"`,
-		`"serial":"12345678"`,
-		`"firmware":"5.7.1"`,
-		`"interface":"usb"`,
-		`"supported":["u2f","ctap2"]`,
-		`"enabled":["ctap2"]`,
-	} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("JSON %s does not contain %s", text, want)
-		}
-	}
-
-	for _, obsolete := range []string{`"deviceId"`, `"deviceFingerprint"`, `"stableId"`, `"location"`} {
-		if strings.Contains(text, obsolete) {
-			t.Fatalf("JSON retained obsolete field %s: %s", obsolete, text)
-		}
-	}
+	assertJSON(t, value, `{"fingerprint":"attachment-1","transport":"","path":"hid://one","vendorId":0,"productId":0,"vendor":"yubico","metadata":{"model":"YubiKey 5C NFC","serial":"12345678","firmware":"5.7.1","interfaces":[{"interface":"usb","supported":["u2f","ctap2"],"enabled":["ctap2"]}]}}`)
 }
 
 func TestCTAP23JSONPresenceContracts(t *testing.T) {
-	operation := config.SetMinPINLengthOperation{
+	setMinPINLength := config.SetMinPINLengthOperation{
 		NewMinPINLength: new(uint(0)),
 	}
 
-	raw, err := json.Marshal(operation)
-	if err != nil {
-		t.Fatalf("Marshal operation: %v", err)
-	}
-
-	if string(raw) != `{"newMinPINLength":0}` {
-		t.Fatalf("operation JSON = %s", raw)
-	}
-
-	absent, err := json.Marshal(config.SetMinPINLengthOperation{})
-	if err != nil {
-		t.Fatalf("Marshal absent operation: %v", err)
-	}
-
-	if string(absent) != "{}" {
-		t.Fatalf("absent operation JSON = %s, want {}", absent)
-	}
+	assertJSON(t, setMinPINLength, `{"newMinPINLength":0}`)
+	assertJSON(t, config.SetMinPINLengthOperation{}, `{}`)
 
 	emptyBlob := ""
 	written := false
@@ -857,27 +682,22 @@ func TestCTAP23JSONPresenceContracts(t *testing.T) {
 		},
 	}
 
-	raw, err = json.Marshal(extensions)
-	if err != nil {
-		t.Fatalf("Marshal extensions: %v", err)
-	}
-
-	for _, want := range []string{`"blobHex":""`, `"written":false`, `"thirdPartyPayment":false`} {
-		if !strings.Contains(string(raw), want) {
-			t.Fatalf("extensions JSON = %s, want %s", raw, want)
-		}
-	}
-
-	storeState, err := json.Marshal(credentials.StoreStateResult{
+	assertJSON(t, extensions, `{"client":{"largeBlob":{"blobHex":"","written":false}},"authenticator":{"thirdPartyPayment":false}}`)
+	assertJSON(t, credentials.StoreStateResult{
 		AuthenticatorIdentifierHex: "00",
 		CredentialStoreStateHex:    "11",
-	})
+	}, `{"authenticatorIdentifierHex":"00","credentialStoreStateHex":"11"}`)
+}
+
+func assertJSON(t *testing.T, value any, want string) {
+	t.Helper()
+
+	raw, err := json.Marshal(value)
 	if err != nil {
-		t.Fatalf("Marshal store state: %v", err)
+		t.Fatalf("json.Marshal(%T): %v", value, err)
 	}
 
-	if !strings.Contains(string(storeState), `"authenticatorIdentifierHex":"00"`) ||
-		!strings.Contains(string(storeState), `"credentialStoreStateHex":"11"`) {
-		t.Fatalf("store state JSON = %s", storeState)
+	if string(raw) != want {
+		t.Fatalf("json.Marshal(%T) = %s, want %s", value, raw, want)
 	}
 }

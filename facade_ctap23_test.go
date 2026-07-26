@@ -198,11 +198,11 @@ func (a *storeStateAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfo
 }
 
 func (a *storeStateAuthenticator) infoOptions() map[protocol.Option]bool {
-	options := map[protocol.Option]bool{
-		protocol.OptionCredentialManagement: true,
-		protocol.OptionPinUvAuthToken:       true,
-		protocol.OptionUserVerification:     true,
-	}
+	options := enabledInfoOptions(
+		protocol.OptionCredentialManagement,
+		protocol.OptionPinUvAuthToken,
+		protocol.OptionUserVerification,
+	)
 
 	if a.readOnly.Load() {
 		options[protocol.OptionPersistentCredentialManagementReadOnly] = true
@@ -282,10 +282,7 @@ type setMinPINLengthAuthenticator struct {
 
 func (a *setMinPINLengthAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{
-		Options: map[protocol.Option]bool{
-			protocol.OptionAuthenticatorConfig: true,
-			protocol.OptionSetMinPINLength:     true,
-		},
+		Options:                     enabledInfoOptions(protocol.OptionAuthenticatorConfig, protocol.OptionSetMinPINLength),
 		MinPINLength:                4,
 		MaxPINLength:                63,
 		AuthenticatorConfigCommands: []protocol.ConfigSubCommand{protocol.ConfigSubCommandSetMinPINLength},
@@ -303,11 +300,11 @@ func (a *setMinPINLengthAuthenticator) SetMinPINLength(
 }
 
 func (a *missingTotalsAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
-	return protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{
-		protocol.OptionCredentialManagement: true,
-		protocol.OptionPinUvAuthToken:       true,
-		protocol.OptionUserVerification:     true,
-	}}, true
+	return protocol.AuthenticatorGetInfoResponse{Options: enabledInfoOptions(
+		protocol.OptionCredentialManagement,
+		protocol.OptionPinUvAuthToken,
+		protocol.OptionUserVerification,
+	)}, true
 }
 
 func (a *missingTotalsAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
@@ -354,12 +351,19 @@ func (a *longTouchAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoR
 	a.infoCalls.Add(1)
 
 	return protocol.AuthenticatorGetInfoResponse{
-		Options: map[protocol.Option]bool{
-			protocol.OptionAuthenticatorConfig: true,
-		},
+		Options:                     enabledInfoOptions(protocol.OptionAuthenticatorConfig),
 		LongTouchForReset:           new(a.enabled.Load()),
 		AuthenticatorConfigCommands: []protocol.ConfigSubCommand{protocol.ConfigSubCommandEnableLongTouchForReset},
 	}, true
+}
+
+func enabledInfoOptions(options ...protocol.Option) map[protocol.Option]bool {
+	enabled := make(map[protocol.Option]bool, len(options))
+	for _, option := range options {
+		enabled[option] = true
+	}
+
+	return enabled
 }
 
 func (a *longTouchAuthenticator) EnableLongTouchForReset(context.Context, []byte) error {

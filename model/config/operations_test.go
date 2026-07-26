@@ -2,37 +2,34 @@ package config
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 )
 
 func TestPINOperationsDoNotMarshalSecrets(t *testing.T) {
-	setPIN := SetPINOperation{NewPIN: "123456", DryRun: true}
-	raw, err := json.Marshal(setPIN)
-	if err != nil {
-		t.Fatalf("marshal set PIN: %v", err)
+	tests := []struct {
+		name      string
+		operation any
+	}{
+		{
+			name:      "set PIN",
+			operation: SetPINOperation{NewPIN: "123456", DryRun: true},
+		},
+		{
+			name:      "change PIN",
+			operation: ChangePINOperation{CurrentPIN: "123456", NewPIN: "654321", DryRun: true},
+		},
 	}
 
-	if strings.Contains(string(raw), "123456") || strings.Contains(string(raw), "newPIN") {
-		t.Fatalf("set PIN operation marshaled secret: %s", raw)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw, err := json.Marshal(tt.operation)
+			if err != nil {
+				t.Fatalf("Marshal: %v", err)
+			}
 
-	if string(raw) != `{"dryRun":true}` {
-		t.Fatalf("marshaled set PIN operation = %s", raw)
-	}
-
-	changePIN := ChangePINOperation{CurrentPIN: "123456", NewPIN: "654321", DryRun: true}
-	raw, err = json.Marshal(changePIN)
-	if err != nil {
-		t.Fatalf("marshal change PIN: %v", err)
-	}
-
-	if strings.Contains(string(raw), "123456") || strings.Contains(string(raw), "654321") ||
-		strings.Contains(string(raw), "currentPIN") || strings.Contains(string(raw), "newPIN") {
-		t.Fatalf("change PIN operation marshaled secret: %s", raw)
-	}
-
-	if string(raw) != `{"dryRun":true}` {
-		t.Fatalf("marshaled change PIN operation = %s", raw)
+			if string(raw) != `{"dryRun":true}` {
+				t.Fatalf("Marshal = %s, want secret-free dry-run form", raw)
+			}
+		})
 	}
 }

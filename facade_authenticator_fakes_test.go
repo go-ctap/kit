@@ -117,22 +117,6 @@ func (contractBioEnrollmentManager) RemoveEnrollment(context.Context, []byte, []
 	return errors.New("not implemented")
 }
 
-type closeCountingAuthenticator struct {
-	contractAuthenticator
-	closeStarted chan struct{}
-	releaseClose chan struct{}
-	closeCount   atomic.Int32
-}
-
-func (a *closeCountingAuthenticator) Close() error {
-	if a.closeCount.Add(1) == 1 {
-		close(a.closeStarted)
-		<-a.releaseClose
-	}
-
-	return nil
-}
-
 type resetCountingAuthenticator struct {
 	contractAuthenticator
 	contractConfigManager
@@ -424,78 +408,4 @@ func (a *pinPreferredLargeBlobWriteEventAuthenticator) GetPinUvAuthTokenUsingUV(
 	a.uvCalls.Add(1)
 
 	return nil, errors.New("UV token acquisition should not run for PIN verification flow")
-}
-
-type cancelablePINAuthenticator struct {
-	pinOnlyLargeBlobWriteEventAuthenticator
-	closeStarted chan struct{}
-	closeCount   atomic.Int32
-}
-
-type blockingConfigAuthenticator struct {
-	contractAuthenticator
-	contractConfigManager
-	commandEntered chan struct{}
-}
-
-type closeReleasedConfigAuthenticator struct {
-	blockingConfigAuthenticator
-	commandReleased chan struct{}
-	closeCount      atomic.Int32
-}
-
-func (a *blockingConfigAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
-	return protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{
-		protocol.OptionAuthenticatorConfig: true,
-		protocol.OptionPinUvAuthToken:      true,
-		protocol.OptionUserVerification:    true,
-		protocol.OptionUvAcfg:              true,
-		protocol.OptionAlwaysUv:            false,
-	}}, true
-}
-
-func (a *blockingConfigAuthenticator) GetPinUvAuthTokenUsingUV(
-	context.Context,
-	protocol.Permission,
-	string,
-) ([]byte, error) {
-	return []byte("token"), nil
-}
-
-func (a *blockingConfigAuthenticator) ToggleAlwaysUV(ctx context.Context, token []byte) error {
-	if token == nil {
-		return ctapdevice.ErrPinUvAuthTokenRequired
-	}
-
-	close(a.commandEntered)
-	<-ctx.Done()
-
-	return ctx.Err()
-}
-
-func (a *closeReleasedConfigAuthenticator) ToggleAlwaysUV(ctx context.Context, token []byte) error {
-	if token == nil {
-		return ctapdevice.ErrPinUvAuthTokenRequired
-	}
-
-	close(a.commandEntered)
-	<-a.commandReleased
-
-	return ctx.Err()
-}
-
-func (a *closeReleasedConfigAuthenticator) Close() error {
-	if a.closeCount.Add(1) == 1 {
-		close(a.commandReleased)
-	}
-
-	return nil
-}
-
-func (a *cancelablePINAuthenticator) Close() error {
-	if a.closeCount.Add(1) == 1 {
-		close(a.closeStarted)
-	}
-
-	return nil
 }

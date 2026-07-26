@@ -17,65 +17,68 @@ import (
 
 func TestDefaultCode(t *testing.T) {
 	tests := []struct {
+		name   string
 		status ctaptransport.StatusCode
 		code   failure.Code
 	}{
-		{ctaptransport.CTAP1_ERR_INVALID_COMMAND, failure.CodeCTAPCommandInvalid},
-		{ctaptransport.CTAP1_ERR_INVALID_PARAMETER, failure.CodeCTAPParameterInvalid},
-		{ctaptransport.CTAP1_ERR_INVALID_LENGTH, failure.CodeCTAPLengthInvalid},
-		{ctaptransport.CTAP1_ERR_INVALID_SEQ, failure.CodeCTAPSequenceInvalid},
-		{ctaptransport.CTAP1_ERR_TIMEOUT, failure.CodeAuthenticatorTimeout},
-		{ctaptransport.CTAP1_ERR_CHANNEL_BUSY, failure.CodeAuthenticatorBusy},
-		{ctaptransport.CTAP1_ERR_LOCK_REQUIRED, failure.CodeCTAPLockRequired},
-		{ctaptransport.CTAP1_ERR_INVALID_CHANNEL, failure.CodeCTAPChannelInvalid},
-		{ctaptransport.CTAP2_ERR_CBOR_UNEXPECTED_TYPE, failure.CodeCTAPCBORTypeInvalid},
-		{ctaptransport.CTAP2_ERR_INVALID_CBOR, failure.CodeCTAPCBORInvalid},
-		{ctaptransport.CTAP2_ERR_MISSING_PARAMETER, failure.CodeCTAPParameterMissing},
-		{ctaptransport.CTAP2_ERR_LIMIT_EXCEEDED, failure.CodeCTAPLimitExceeded},
-		{ctaptransport.CTAP2_ERR_FP_DATABASE_FULL, failure.CodeBioDatabaseFull},
-		{ctaptransport.CTAP2_ERR_LARGE_BLOB_STORAGE_FULL, failure.CodeLargeBlobStorageFull},
-		{ctaptransport.CTAP2_ERR_CREDENTIAL_EXCLUDED, failure.CodeCredentialExcluded},
-		{ctaptransport.CTAP2_ERR_PROCESSING, failure.CodeAuthenticatorProcessing},
-		{ctaptransport.CTAP2_ERR_INVALID_CREDENTIAL, failure.CodeCredentialInvalid},
-		{ctaptransport.CTAP2_ERR_USER_ACTION_PENDING, failure.CodeUserActionPending},
-		{ctaptransport.CTAP2_ERR_OPERATION_PENDING, failure.CodeAuthenticatorOperationPending},
-		{ctaptransport.CTAP2_ERR_NO_OPERATIONS, failure.CodeAuthenticatorNoOperations},
-		{ctaptransport.CTAP2_ERR_UNSUPPORTED_ALGORITHM, failure.CodeAlgorithmUnsupported},
-		{ctaptransport.CTAP2_ERR_OPERATION_DENIED, failure.CodeAuthenticatorOperationDenied},
-		{ctaptransport.CTAP2_ERR_KEY_STORE_FULL, failure.CodeCredentialStoreFull},
-		{ctaptransport.CTAP2_ERR_UNSUPPORTED_OPTION, failure.CodeCTAPOptionUnsupported},
-		{ctaptransport.CTAP2_ERR_INVALID_OPTION, failure.CodeCTAPOptionInvalid},
-		{ctaptransport.CTAP2_ERR_KEEPALIVE_CANCEL, failure.CodeAuthenticatorOperationCanceled},
-		{ctaptransport.CTAP2_ERR_NO_CREDENTIALS, failure.CodeCredentialNotFound},
-		{ctaptransport.CTAP2_ERR_USER_ACTION_TIMEOUT, failure.CodeUserActionTimeout},
-		{ctaptransport.CTAP2_ERR_NOT_ALLOWED, failure.CodeAuthenticatorOperationNotAllowed},
-		{ctaptransport.CTAP2_ERR_PIN_INVALID, failure.CodePINInvalid},
-		{ctaptransport.CTAP2_ERR_PIN_BLOCKED, failure.CodePINBlocked},
-		{ctaptransport.CTAP2_ERR_PIN_AUTH_INVALID, failure.CodePINUVAuthInvalid},
-		{ctaptransport.CTAP2_ERR_PIN_AUTH_BLOCKED, failure.CodePINUVAuthBlocked},
-		{ctaptransport.CTAP2_ERR_PIN_NOT_SET, failure.CodePINNotConfigured},
-		{ctaptransport.CTAP2_ERR_PUAT_REQUIRED, failure.CodePINUVAuthTokenRequired},
-		{ctaptransport.CTAP2_ERR_PIN_POLICY_VIOLATION, failure.CodePINPolicyViolation},
-		{ctaptransport.RESERVED_FOR_FUTURE_USE, failure.CodeCTAPReservedStatus},
-		{ctaptransport.CTAP2_ERR_REQUEST_TOO_LARGE, failure.CodeCTAPRequestTooLarge},
-		{ctaptransport.CTAP2_ERR_ACTION_TIMEOUT, failure.CodeAuthenticatorActionTimeout},
-		{ctaptransport.CTAP2_ERR_UP_REQUIRED, failure.CodeUserPresenceRequired},
-		{ctaptransport.CTAP2_ERR_UV_BLOCKED, failure.CodeUserVerificationBlocked},
-		{ctaptransport.CTAP2_ERR_INTEGRITY_FAILURE, failure.CodeCTAPIntegrityFailure},
-		{ctaptransport.CTAP2_ERR_INVALID_SUBCOMMAND, failure.CodeCTAPSubcommandInvalid},
-		{ctaptransport.CTAP2_ERR_UV_INVALID, failure.CodeUserVerificationInvalid},
-		{ctaptransport.CTAP2_ERR_UNAUTHORIZED_PERMISSION, failure.CodePINUVPermissionUnauthorized},
-		{ctaptransport.CTAP1_ERR_OTHER, failure.CodeCTAPOtherError},
-		{0x41, failure.CodeCTAPReservedStatus},
-		{0xe1, failure.CodeCTAPExtensionError},
-		{0xf1, failure.CodeCTAPVendorError},
-		{ctaptransport.CTAP2_OK, failure.CodeInternalError},
+		{"invalid command", ctaptransport.CTAP1_ERR_INVALID_COMMAND, failure.CodeCTAPCommandInvalid},
+		{"invalid parameter", ctaptransport.CTAP1_ERR_INVALID_PARAMETER, failure.CodeCTAPParameterInvalid},
+		{"invalid length", ctaptransport.CTAP1_ERR_INVALID_LENGTH, failure.CodeCTAPLengthInvalid},
+		{"invalid sequence", ctaptransport.CTAP1_ERR_INVALID_SEQ, failure.CodeCTAPSequenceInvalid},
+		{"timeout", ctaptransport.CTAP1_ERR_TIMEOUT, failure.CodeAuthenticatorTimeout},
+		{"channel busy", ctaptransport.CTAP1_ERR_CHANNEL_BUSY, failure.CodeAuthenticatorBusy},
+		{"lock required", ctaptransport.CTAP1_ERR_LOCK_REQUIRED, failure.CodeCTAPLockRequired},
+		{"invalid channel", ctaptransport.CTAP1_ERR_INVALID_CHANNEL, failure.CodeCTAPChannelInvalid},
+		{"unexpected CBOR type", ctaptransport.CTAP2_ERR_CBOR_UNEXPECTED_TYPE, failure.CodeCTAPCBORTypeInvalid},
+		{"invalid CBOR", ctaptransport.CTAP2_ERR_INVALID_CBOR, failure.CodeCTAPCBORInvalid},
+		{"missing parameter", ctaptransport.CTAP2_ERR_MISSING_PARAMETER, failure.CodeCTAPParameterMissing},
+		{"limit exceeded", ctaptransport.CTAP2_ERR_LIMIT_EXCEEDED, failure.CodeCTAPLimitExceeded},
+		{"fingerprint database full", ctaptransport.CTAP2_ERR_FP_DATABASE_FULL, failure.CodeBioDatabaseFull},
+		{"large blob storage full", ctaptransport.CTAP2_ERR_LARGE_BLOB_STORAGE_FULL, failure.CodeLargeBlobStorageFull},
+		{"credential excluded", ctaptransport.CTAP2_ERR_CREDENTIAL_EXCLUDED, failure.CodeCredentialExcluded},
+		{"processing", ctaptransport.CTAP2_ERR_PROCESSING, failure.CodeAuthenticatorProcessing},
+		{"invalid credential", ctaptransport.CTAP2_ERR_INVALID_CREDENTIAL, failure.CodeCredentialInvalid},
+		{"user action pending", ctaptransport.CTAP2_ERR_USER_ACTION_PENDING, failure.CodeUserActionPending},
+		{"operation pending", ctaptransport.CTAP2_ERR_OPERATION_PENDING, failure.CodeAuthenticatorOperationPending},
+		{"no operations", ctaptransport.CTAP2_ERR_NO_OPERATIONS, failure.CodeAuthenticatorNoOperations},
+		{"unsupported algorithm", ctaptransport.CTAP2_ERR_UNSUPPORTED_ALGORITHM, failure.CodeAlgorithmUnsupported},
+		{"operation denied", ctaptransport.CTAP2_ERR_OPERATION_DENIED, failure.CodeAuthenticatorOperationDenied},
+		{"key store full", ctaptransport.CTAP2_ERR_KEY_STORE_FULL, failure.CodeCredentialStoreFull},
+		{"unsupported option", ctaptransport.CTAP2_ERR_UNSUPPORTED_OPTION, failure.CodeCTAPOptionUnsupported},
+		{"invalid option", ctaptransport.CTAP2_ERR_INVALID_OPTION, failure.CodeCTAPOptionInvalid},
+		{"keepalive cancel", ctaptransport.CTAP2_ERR_KEEPALIVE_CANCEL, failure.CodeAuthenticatorOperationCanceled},
+		{"no credentials", ctaptransport.CTAP2_ERR_NO_CREDENTIALS, failure.CodeCredentialNotFound},
+		{"user action timeout", ctaptransport.CTAP2_ERR_USER_ACTION_TIMEOUT, failure.CodeUserActionTimeout},
+		{"not allowed", ctaptransport.CTAP2_ERR_NOT_ALLOWED, failure.CodeAuthenticatorOperationNotAllowed},
+		{"PIN invalid", ctaptransport.CTAP2_ERR_PIN_INVALID, failure.CodePINInvalid},
+		{"PIN blocked", ctaptransport.CTAP2_ERR_PIN_BLOCKED, failure.CodePINBlocked},
+		{"PIN auth invalid", ctaptransport.CTAP2_ERR_PIN_AUTH_INVALID, failure.CodePINUVAuthInvalid},
+		{"PIN auth blocked", ctaptransport.CTAP2_ERR_PIN_AUTH_BLOCKED, failure.CodePINUVAuthBlocked},
+		{"PIN not set", ctaptransport.CTAP2_ERR_PIN_NOT_SET, failure.CodePINNotConfigured},
+		{"PIN UV auth token required", ctaptransport.CTAP2_ERR_PUAT_REQUIRED, failure.CodePINUVAuthTokenRequired},
+		{"PIN policy violation", ctaptransport.CTAP2_ERR_PIN_POLICY_VIOLATION, failure.CodePINPolicyViolation},
+		{"reserved status", ctaptransport.RESERVED_FOR_FUTURE_USE, failure.CodeCTAPReservedStatus},
+		{"request too large", ctaptransport.CTAP2_ERR_REQUEST_TOO_LARGE, failure.CodeCTAPRequestTooLarge},
+		{"action timeout", ctaptransport.CTAP2_ERR_ACTION_TIMEOUT, failure.CodeAuthenticatorActionTimeout},
+		{"user presence required", ctaptransport.CTAP2_ERR_UP_REQUIRED, failure.CodeUserPresenceRequired},
+		{"user verification blocked", ctaptransport.CTAP2_ERR_UV_BLOCKED, failure.CodeUserVerificationBlocked},
+		{"integrity failure", ctaptransport.CTAP2_ERR_INTEGRITY_FAILURE, failure.CodeCTAPIntegrityFailure},
+		{"invalid subcommand", ctaptransport.CTAP2_ERR_INVALID_SUBCOMMAND, failure.CodeCTAPSubcommandInvalid},
+		{"user verification invalid", ctaptransport.CTAP2_ERR_UV_INVALID, failure.CodeUserVerificationInvalid},
+		{"unauthorized permission", ctaptransport.CTAP2_ERR_UNAUTHORIZED_PERMISSION, failure.CodePINUVPermissionUnauthorized},
+		{"other", ctaptransport.CTAP1_ERR_OTHER, failure.CodeCTAPOtherError},
+		{"unassigned", 0x41, failure.CodeCTAPReservedStatus},
+		{"extension", 0xe1, failure.CodeCTAPExtensionError},
+		{"vendor", 0xf1, failure.CodeCTAPVendorError},
+		{"success is not an error", ctaptransport.CTAP2_OK, failure.CodeInternalError},
 	}
 
 	for _, tt := range tests {
-		if got := defaultCode(tt.status); got != tt.code {
-			t.Errorf("defaultCode(0x%02x) = %s, want %s", uint8(tt.status), got, tt.code)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			if got := defaultCode(tt.status); got != tt.code {
+				t.Errorf("defaultCode(0x%02x) = %s, want %s", uint8(tt.status), got, tt.code)
+			}
+		})
 	}
 }
 
@@ -86,8 +89,7 @@ func TestNormalizeCTAPProvenance(t *testing.T) {
 	}
 	err := Normalize(raw, "inspect")
 	assertFailure(t, err, failure.CodePINInvalid, "inspect", failure.PhaseAuthenticatorCommand)
-
-	detail := failure.Snapshot(err).CTAP
+	detail := err.CTAP
 	if detail == nil {
 		t.Fatal("CTAP detail = nil")
 	}
@@ -118,8 +120,8 @@ func TestNormalizeCTAPHIDErrorResponse(t *testing.T) {
 		"webauthn.getAssertion",
 		failure.PhaseAuthenticatorCommand,
 	)
-	if failure.Snapshot(err).CTAP != nil {
-		t.Fatalf("CTAPHID error acquired CBOR CTAP detail: %#v", failure.Snapshot(err).CTAP)
+	if err.CTAP != nil {
+		t.Fatalf("CTAPHID error acquired CBOR CTAP detail: %#v", err.CTAP)
 	}
 
 	var gotRaw *ctaphid.ErrorResponse
@@ -143,8 +145,8 @@ func TestNormalizeTransportIOError(t *testing.T) {
 		"webauthn.getAssertion",
 		failure.PhaseAuthenticatorCommand,
 	)
-	if failure.Snapshot(err).CTAP != nil {
-		t.Fatalf("device I/O error acquired CTAP detail: %#v", failure.Snapshot(err).CTAP)
+	if err.CTAP != nil {
+		t.Fatalf("device I/O error acquired CTAP detail: %#v", err.CTAP)
 	}
 
 	var gotIOErr *ctaptransport.IOError
@@ -171,8 +173,8 @@ func TestNormalizeToken2TransportErrors(t *testing.T) {
 			"webauthn.getAssertion",
 			failure.PhaseAuthenticatorCommand,
 		)
-		if failure.Snapshot(err).CTAP != nil {
-			t.Fatalf("APDU error acquired CTAP detail: %#v", failure.Snapshot(err).CTAP)
+		if err.CTAP != nil {
+			t.Fatalf("APDU error acquired CTAP detail: %#v", err.CTAP)
 		}
 
 		var got *ctaptoken2.APDUError
@@ -195,38 +197,41 @@ func TestNormalizeToken2TransportErrors(t *testing.T) {
 
 func TestNormalizeCommandOverrides(t *testing.T) {
 	tests := []struct {
+		name   string
 		ctx    errorContext
 		status ctaptransport.StatusCode
 		code   failure.Code
 	}{
-		{commandContext(protocol.AuthenticatorMakeCredential), ctaptransport.CTAP2_ERR_OPERATION_DENIED, failure.CodeCredentialCreationDenied},
-		{commandContext(protocol.AuthenticatorGetAssertion), ctaptransport.CTAP2_ERR_INVALID_CREDENTIAL, failure.CodeCredentialNotFound},
-		{commandContext(protocol.AuthenticatorGetAssertion), ctaptransport.CTAP2_ERR_OPERATION_DENIED, failure.CodeAssertionDenied},
-		{commandContext(protocol.AuthenticatorGetAssertion), ctaptransport.CTAP2_ERR_NOT_ALLOWED, failure.CodeAssertionNotAllowed},
-		{commandContext(protocol.AuthenticatorGetNextAssertion), ctaptransport.CTAP2_ERR_NOT_ALLOWED, failure.CodeAssertionContinuationUnavailable},
-		{commandContext(protocol.AuthenticatorGetInfo), ctaptransport.CTAP1_ERR_INVALID_COMMAND, failure.CodeGetInfoUnsupported},
-		{commandContext(protocol.AuthenticatorReset), ctaptransport.CTAP2_ERR_NOT_ALLOWED, failure.CodeResetWindowExpired},
-		{commandContext(protocol.AuthenticatorReset), ctaptransport.CTAP2_ERR_USER_ACTION_TIMEOUT, failure.CodeResetTouchTimeout},
-		{commandContext(protocol.AuthenticatorReset), ctaptransport.CTAP2_ERR_ACTION_TIMEOUT, failure.CodeResetTouchTimeout},
-		{bioContext(protocol.BioEnrollmentSubCommandEnumerateEnrollments), ctaptransport.CTAP2_ERR_INVALID_OPTION, failure.CodeBioNoEnrollments},
-		{bioContext(protocol.BioEnrollmentSubCommandSetFriendlyName), ctaptransport.CTAP2_ERR_INVALID_OPTION, failure.CodeBioEnrollmentNotFound},
-		{bioContext(protocol.BioEnrollmentSubCommandRemoveEnrollment), ctaptransport.CTAP2_ERR_INVALID_OPTION, failure.CodeBioEnrollmentNotFound},
-		{bioContext(protocol.BioEnrollmentSubCommandEnrollBegin), ctaptransport.CTAP2_ERR_INVALID_OPTION, failure.CodeCTAPOptionInvalid},
-		{bioContext(protocol.BioEnrollmentSubCommandEnrollBegin), ctaptransport.CTAP2_ERR_USER_ACTION_TIMEOUT, failure.CodeBioInteractionTimeout},
-		{bioContext(protocol.BioEnrollmentSubCommandEnrollBegin), ctaptransport.CTAP2_ERR_ACTION_TIMEOUT, failure.CodeBioInteractionTimeout},
-		{credentialContext(protocol.CredentialManagementSubCommandDeleteCredential), ctaptransport.CTAP2_ERR_INVALID_CREDENTIAL, failure.CodeCredentialNotFound},
-		{commandContext(protocol.AuthenticatorSelection), ctaptransport.CTAP2_ERR_KEEPALIVE_CANCEL, failure.CodeAuthenticatorSelectionCanceled},
-		{commandContext(protocol.AuthenticatorSelection), ctaptransport.CTAP2_ERR_USER_ACTION_TIMEOUT, failure.CodeAuthenticatorSelectionTimeout},
-		{commandContext(protocol.AuthenticatorSelection), ctaptransport.CTAP2_ERR_ACTION_TIMEOUT, failure.CodeAuthenticatorSelectionTimeout},
-		{commandContext(protocol.AuthenticatorLargeBlobs), ctaptransport.CTAP1_ERR_INVALID_SEQ, failure.CodeLargeBlobWriteSequenceInvalid},
-		{commandContext(protocol.AuthenticatorLargeBlobs), ctaptransport.CTAP2_ERR_INTEGRITY_FAILURE, failure.CodeLargeBlobIntegrityFailure},
-		{configContext(protocol.ConfigSubCommandSetMinPINLength), ctaptransport.CTAP2_ERR_KEY_STORE_FULL, failure.CodeAuthenticatorConfigStorageFull},
+		{"make credential denied", commandContext(protocol.AuthenticatorMakeCredential), ctaptransport.CTAP2_ERR_OPERATION_DENIED, failure.CodeCredentialCreationDenied},
+		{"assertion invalid credential", commandContext(protocol.AuthenticatorGetAssertion), ctaptransport.CTAP2_ERR_INVALID_CREDENTIAL, failure.CodeCredentialNotFound},
+		{"assertion denied", commandContext(protocol.AuthenticatorGetAssertion), ctaptransport.CTAP2_ERR_OPERATION_DENIED, failure.CodeAssertionDenied},
+		{"assertion not allowed", commandContext(protocol.AuthenticatorGetAssertion), ctaptransport.CTAP2_ERR_NOT_ALLOWED, failure.CodeAssertionNotAllowed},
+		{"next assertion not allowed", commandContext(protocol.AuthenticatorGetNextAssertion), ctaptransport.CTAP2_ERR_NOT_ALLOWED, failure.CodeAssertionContinuationUnavailable},
+		{"get info invalid command", commandContext(protocol.AuthenticatorGetInfo), ctaptransport.CTAP1_ERR_INVALID_COMMAND, failure.CodeGetInfoUnsupported},
+		{"reset not allowed", commandContext(protocol.AuthenticatorReset), ctaptransport.CTAP2_ERR_NOT_ALLOWED, failure.CodeResetWindowExpired},
+		{"reset user timeout", commandContext(protocol.AuthenticatorReset), ctaptransport.CTAP2_ERR_USER_ACTION_TIMEOUT, failure.CodeResetTouchTimeout},
+		{"reset action timeout", commandContext(protocol.AuthenticatorReset), ctaptransport.CTAP2_ERR_ACTION_TIMEOUT, failure.CodeResetTouchTimeout},
+		{"bio enumerate invalid option", bioContext(protocol.BioEnrollmentSubCommandEnumerateEnrollments), ctaptransport.CTAP2_ERR_INVALID_OPTION, failure.CodeBioNoEnrollments},
+		{"bio rename invalid option", bioContext(protocol.BioEnrollmentSubCommandSetFriendlyName), ctaptransport.CTAP2_ERR_INVALID_OPTION, failure.CodeBioEnrollmentNotFound},
+		{"bio remove invalid option", bioContext(protocol.BioEnrollmentSubCommandRemoveEnrollment), ctaptransport.CTAP2_ERR_INVALID_OPTION, failure.CodeBioEnrollmentNotFound},
+		{"bio enroll invalid option", bioContext(protocol.BioEnrollmentSubCommandEnrollBegin), ctaptransport.CTAP2_ERR_INVALID_OPTION, failure.CodeCTAPOptionInvalid},
+		{"bio enroll user timeout", bioContext(protocol.BioEnrollmentSubCommandEnrollBegin), ctaptransport.CTAP2_ERR_USER_ACTION_TIMEOUT, failure.CodeBioInteractionTimeout},
+		{"bio enroll action timeout", bioContext(protocol.BioEnrollmentSubCommandEnrollBegin), ctaptransport.CTAP2_ERR_ACTION_TIMEOUT, failure.CodeBioInteractionTimeout},
+		{"credential delete invalid credential", credentialContext(protocol.CredentialManagementSubCommandDeleteCredential), ctaptransport.CTAP2_ERR_INVALID_CREDENTIAL, failure.CodeCredentialNotFound},
+		{"selection canceled", commandContext(protocol.AuthenticatorSelection), ctaptransport.CTAP2_ERR_KEEPALIVE_CANCEL, failure.CodeAuthenticatorSelectionCanceled},
+		{"selection user timeout", commandContext(protocol.AuthenticatorSelection), ctaptransport.CTAP2_ERR_USER_ACTION_TIMEOUT, failure.CodeAuthenticatorSelectionTimeout},
+		{"selection action timeout", commandContext(protocol.AuthenticatorSelection), ctaptransport.CTAP2_ERR_ACTION_TIMEOUT, failure.CodeAuthenticatorSelectionTimeout},
+		{"large blob invalid sequence", commandContext(protocol.AuthenticatorLargeBlobs), ctaptransport.CTAP1_ERR_INVALID_SEQ, failure.CodeLargeBlobWriteSequenceInvalid},
+		{"large blob integrity", commandContext(protocol.AuthenticatorLargeBlobs), ctaptransport.CTAP2_ERR_INTEGRITY_FAILURE, failure.CodeLargeBlobIntegrityFailure},
+		{"config storage full", configContext(protocol.ConfigSubCommandSetMinPINLength), ctaptransport.CTAP2_ERR_KEY_STORE_FULL, failure.CodeAuthenticatorConfigStorageFull},
 	}
 
 	for _, tt := range tests {
-		if got := codeForCTAP(tt.status, tt.ctx); got != tt.code {
-			t.Errorf("codeForCTAP(0x%02x, command 0x%02x) = %s, want %s", uint8(tt.status), uint8(tt.ctx.command), got, tt.code)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			if got := codeForCTAP(tt.status, tt.ctx); got != tt.code {
+				t.Errorf("codeForCTAP(0x%02x, command 0x%02x) = %s, want %s", uint8(tt.status), uint8(tt.ctx.command), got, tt.code)
+			}
+		})
 	}
 }
 
@@ -246,7 +251,7 @@ func TestNormalizeCommandOverrideProvenance(t *testing.T) {
 		failure.PhaseAssertionContinuation,
 	)
 
-	detail := failure.Snapshot(err).CTAP
+	detail := err.CTAP
 	if detail == nil || detail.CommandCode != uint8(protocol.AuthenticatorGetNextAssertion) {
 		t.Fatalf("CTAP detail = %#v, want getNextAssertion command", detail)
 	}
@@ -289,8 +294,8 @@ func TestNormalizeGeneralErrors(t *testing.T) {
 			"webauthn.getAssertion",
 			failure.PhaseAuthenticatorCommand,
 		)
-		if failure.Snapshot(err).CTAP != nil {
-			t.Fatalf("plain command error acquired CTAP detail: %#v", failure.Snapshot(err).CTAP)
+		if err.CTAP != nil {
+			t.Fatalf("plain command error acquired CTAP detail: %#v", err.CTAP)
 		}
 
 		if !errors.Is(err, raw) {
@@ -362,37 +367,58 @@ func TestNormalizeGeneralErrors(t *testing.T) {
 
 func TestUpstreamCode(t *testing.T) {
 	tests := []struct {
+		name string
 		err  error
 		ctx  errorContext
 		code failure.Code
 	}{
-		{ctapdevice.ErrPinUvAuthTokenRequired, commandContext(protocol.AuthenticatorMakeCredential), failure.CodePINUVAuthTokenRequired},
-		{ctapdevice.ErrPinNotSet, tokenContext(protocol.ClientPINSubCommandGetPinUvAuthTokenUsingPinWithPermissions), failure.CodePINNotConfigured},
-		{ctapdevice.ErrPinAlreadySet, WithClientPINSubCommand(failure.PhaseAuthenticatorCommand, protocol.ClientPINSubCommandSetPIN), failure.CodePINAlreadyConfigured},
-		{ctapdevice.ErrPinChangeRequired, commandContext(protocol.AuthenticatorMakeCredential), failure.CodePINChangeRequired},
-		{ctapdevice.ErrBuiltInUVRequired, commandContext(protocol.AuthenticatorGetAssertion), failure.CodeVerificationFlowUnsupported},
-		{ctapdevice.ErrUvNotConfigured, tokenContext(protocol.ClientPINSubCommandGetPinUvAuthTokenUsingUvWithPermissions), failure.CodeVerificationFlowUnsupported},
-		{ctapdevice.ErrLargeBlobsIntegrityCheck, commandContext(protocol.AuthenticatorLargeBlobs), failure.CodeLargeBlobIntegrityFailure},
-		{ctapdevice.SyntaxError, commandContext(protocol.AuthenticatorLargeBlobs), failure.CodeLargeBlobArrayInvalid},
-		{ctapdevice.ErrLargeBlobsTooBig, commandContext(protocol.AuthenticatorLargeBlobs), failure.CodeLargeBlobArrayTooLarge},
-		{ctapdevice.ErrInvalidSaltSize, commandContext(protocol.AuthenticatorGetAssertion), failure.CodeCTAPParameterInvalid},
-		{ctapdevice.SyntaxError, commandContext(protocol.AuthenticatorGetAssertion), failure.CodeCTAPParameterInvalid},
-		{ctapdevice.ErrSpecViolation, commandContext(protocol.AuthenticatorGetAssertion), failure.CodeCTAPSpecViolation},
-		{ctapdevice.ErrPingPongMismatch, WithPhase(failure.PhaseAuthenticatorCommand), failure.CodeTransportFailure},
-		{ctapdevice.ErrNotSupported, commandContext(protocol.AuthenticatorGetInfo), failure.CodeGetInfoUnsupported},
-		{ctapdevice.ErrNotSupported, commandContext(protocol.AuthenticatorClientPIN), failure.CodePINUnsupported},
-		{ctapdevice.ErrNotSupported, commandContext(protocol.AuthenticatorBioEnrollment), failure.CodeBioUnsupported},
-		{ctapdevice.ErrNotSupported, commandContext(protocol.AuthenticatorCredentialManagement), failure.CodeCredentialManagementUnsupported},
-		{ctapdevice.ErrNotSupported, commandContext(protocol.AuthenticatorLargeBlobs), failure.CodeLargeBlobUnsupported},
-		{ctapdevice.ErrNotSupported, commandContext(protocol.AuthenticatorConfig), failure.CodeAuthenticatorConfigUnsupported},
-		{ctapdevice.ErrNotSupported, commandContext(protocol.AuthenticatorGetAssertion), failure.CodeOperationUnsupported},
+		{"PIN UV auth token required", ctapdevice.ErrPinUvAuthTokenRequired, commandContext(protocol.AuthenticatorMakeCredential), failure.CodePINUVAuthTokenRequired},
+		{"PIN not set", ctapdevice.ErrPinNotSet, tokenContext(protocol.ClientPINSubCommandGetPinUvAuthTokenUsingPinWithPermissions), failure.CodePINNotConfigured},
+		{"PIN already set", ctapdevice.ErrPinAlreadySet, WithClientPINSubCommand(failure.PhaseAuthenticatorCommand, protocol.ClientPINSubCommandSetPIN), failure.CodePINAlreadyConfigured},
+		{"PIN change required", ctapdevice.ErrPinChangeRequired, commandContext(protocol.AuthenticatorMakeCredential), failure.CodePINChangeRequired},
+		{"built-in UV required", ctapdevice.ErrBuiltInUVRequired, commandContext(protocol.AuthenticatorGetAssertion), failure.CodeVerificationFlowUnsupported},
+		{"UV not configured", ctapdevice.ErrUvNotConfigured, tokenContext(protocol.ClientPINSubCommandGetPinUvAuthTokenUsingUvWithPermissions), failure.CodeVerificationFlowUnsupported},
+		{"large blob integrity", ctapdevice.ErrLargeBlobsIntegrityCheck, commandContext(protocol.AuthenticatorLargeBlobs), failure.CodeLargeBlobIntegrityFailure},
+		{"large blob syntax", ctapdevice.SyntaxError, commandContext(protocol.AuthenticatorLargeBlobs), failure.CodeLargeBlobArrayInvalid},
+		{"large blob too big", ctapdevice.ErrLargeBlobsTooBig, commandContext(protocol.AuthenticatorLargeBlobs), failure.CodeLargeBlobArrayTooLarge},
+		{"invalid salt", ctapdevice.ErrInvalidSaltSize, commandContext(protocol.AuthenticatorGetAssertion), failure.CodeCTAPParameterInvalid},
+		{"generic syntax", ctapdevice.SyntaxError, commandContext(protocol.AuthenticatorGetAssertion), failure.CodeCTAPParameterInvalid},
+		{"spec violation", ctapdevice.ErrSpecViolation, commandContext(protocol.AuthenticatorGetAssertion), failure.CodeCTAPSpecViolation},
+		{"ping pong mismatch", ctapdevice.ErrPingPongMismatch, WithPhase(failure.PhaseAuthenticatorCommand), failure.CodeTransportFailure},
 	}
 
 	for _, tt := range tests {
-		got, ok := upstreamCode(tt.err, tt.ctx)
-		if !ok || got != tt.code {
-			t.Errorf("upstreamCode(%v, command 0x%02x) = %s, %t; want %s, true", tt.err, uint8(tt.ctx.command), got, ok, tt.code)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := upstreamCode(tt.err, tt.ctx)
+			if !ok || got != tt.code {
+				t.Errorf("upstreamCode(%v, command 0x%02x) = %s, %t; want %s, true", tt.err, uint8(tt.ctx.command), got, ok, tt.code)
+			}
+		})
+	}
+}
+
+func TestUpstreamUnsupportedCode(t *testing.T) {
+	tests := []struct {
+		name    string
+		command protocol.Command
+		code    failure.Code
+	}{
+		{"get info", protocol.AuthenticatorGetInfo, failure.CodeGetInfoUnsupported},
+		{"client PIN", protocol.AuthenticatorClientPIN, failure.CodePINUnsupported},
+		{"bio enrollment", protocol.AuthenticatorBioEnrollment, failure.CodeBioUnsupported},
+		{"credential management", protocol.AuthenticatorCredentialManagement, failure.CodeCredentialManagementUnsupported},
+		{"large blobs", protocol.AuthenticatorLargeBlobs, failure.CodeLargeBlobUnsupported},
+		{"authenticator config", protocol.AuthenticatorConfig, failure.CodeAuthenticatorConfigUnsupported},
+		{"other command", protocol.AuthenticatorGetAssertion, failure.CodeOperationUnsupported},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := upstreamCode(ctapdevice.ErrNotSupported, commandContext(tt.command))
+			if !ok || got != tt.code {
+				t.Errorf("upstreamCode(ErrNotSupported, command 0x%02x) = %s, %t; want %s, true", uint8(tt.command), got, ok, tt.code)
+			}
+		})
 	}
 }
 
@@ -446,27 +472,27 @@ func configContext(subCommand protocol.ConfigSubCommand) errorContext {
 
 func assertFailure(
 	t *testing.T,
-	err error,
+	typed *failure.Error,
 	code failure.Code,
 	operation string,
 	phase failure.Phase,
 ) {
 	t.Helper()
 
-	snapshot := failure.Snapshot(err)
-	if snapshot == nil {
-		t.Fatal("failure snapshot = nil")
+	if typed.Code != code {
+		t.Fatalf("failure code = %s, want %s", typed.Code, code)
 	}
 
-	if snapshot.Code != code {
-		t.Fatalf("failure code = %s, want %s", snapshot.Code, code)
+	wantCategory := failure.New(code).Category
+	if typed.Category != wantCategory {
+		t.Fatalf("failure category = %s, want %s", typed.Category, wantCategory)
 	}
 
-	if snapshot.Operation != operation {
-		t.Fatalf("operation = %q, want %q", snapshot.Operation, operation)
+	if typed.Operation != operation {
+		t.Fatalf("operation = %q, want %q", typed.Operation, operation)
 	}
 
-	if snapshot.Phase != phase {
-		t.Fatalf("phase = %q, want %q", snapshot.Phase, phase)
+	if typed.Phase != phase {
+		t.Fatalf("phase = %q, want %q", typed.Phase, phase)
 	}
 }

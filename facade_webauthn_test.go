@@ -59,13 +59,9 @@ func TestGetAssertionDryRunDoesNotAcquireTokenOrCallAuthenticator(t *testing.T) 
 	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
-	result, err := session.GetAssertion(context.Background(), appwebauthn.GetAssertionOperation{
-		GetAssertionInput: appwebauthn.GetAssertionInput{
-			RPID:           "example.com",
-			ClientDataJSON: []byte(`{"type":"webauthn.get"}`),
-		},
-		DryRun: true,
-	}, session.operationOptions()...)
+	op := sampleGetAssertionOperation()
+	op.DryRun = true
+	result, err := session.GetAssertion(context.Background(), op, session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("GetAssertion: %v", err)
 	}
@@ -92,15 +88,12 @@ func TestGetAssertionLargeBlobWriteExecutesWithoutRuntimeConfirmation(t *testing
 	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
-	op := appwebauthn.GetAssertionOperation{GetAssertionInput: appwebauthn.GetAssertionInput{
-		RPID:           "example.com",
-		ClientDataJSON: []byte(`{"type":"webauthn.get"}`),
-		Extensions: &webauthn.GetAuthenticationExtensionsClientInputs{
-			LargeBlobInputs: &webauthn.LargeBlobInputs{LargeBlob: webauthn.AuthenticationExtensionsLargeBlobInputs{
-				Write: []byte{},
-			}},
-		},
-	}}
+	op := sampleGetAssertionOperation()
+	op.Extensions = &webauthn.GetAuthenticationExtensionsClientInputs{
+		LargeBlobInputs: &webauthn.LargeBlobInputs{LargeBlob: webauthn.AuthenticationExtensionsLargeBlobInputs{
+			Write: []byte{},
+		}},
+	}
 
 	if _, err := session.GetAssertion(context.Background(), op, session.operationOptions()...); err != nil {
 		t.Fatalf("GetAssertion: %v", err)
@@ -179,8 +172,8 @@ func TestMakeCredentialMapsRequestAndUsesRawClientDataJSON(t *testing.T) {
 		)
 	}
 
-	if len(a.tokenRPIDs) != 0 {
-		t.Fatalf("token rpIDs = %v, want built-in UV without a token", a.tokenRPIDs)
+	if len(a.tokenRPIDs) != 0 || len(a.makeCredentialToken) != 0 {
+		t.Fatalf("token rpIDs/token = %v/%q, want built-in UV without a token", a.tokenRPIDs, a.makeCredentialToken)
 	}
 }
 
@@ -257,25 +250,6 @@ func TestMakeCredentialKeepsPartialResultAndInvalidatesInventoryOnRefreshFailure
 	}
 }
 
-func TestMakeCredentialSkipsTokenWhenAuthenticatorDoesNotRequireIt(t *testing.T) {
-	a := &webauthnTestAuthenticator{makeCredentialUvNotRequired: true}
-	session := openContractAuthenticator(t, nil, a)
-	defer func() { _ = session.Close() }()
-
-	op := sampleMakeCredentialOperation(false)
-	if _, err := session.MakeCredential(context.Background(), op, session.operationOptions()...); err != nil {
-		t.Fatalf("MakeCredential: %v", err)
-	}
-
-	if len(a.tokenRPIDs) != 0 {
-		t.Fatalf("token rpIDs = %v, want none", a.tokenRPIDs)
-	}
-
-	if string(a.makeCredentialToken) != "" {
-		t.Fatalf("MakeCredential token = %q, want none", a.makeCredentialToken)
-	}
-}
-
 func TestCredentialInventoryAlwaysReadsFreshStateAroundMakeCredential(t *testing.T) {
 	a := &webauthnTestAuthenticator{makeCredentialUvNotRequired: true}
 	session := openContractAuthenticator(t, nil, a)
@@ -321,15 +295,9 @@ func TestGetAssertionReturnsAllAssertionsInOrder(t *testing.T) {
 	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
-	output, err := session.GetAssertion(context.Background(), appwebauthn.GetAssertionOperation{
-		GetAssertionInput: appwebauthn.GetAssertionInput{
-			RPID:           "example.com",
-			ClientDataJSON: []byte(`{"type":"webauthn.get"}`),
-			AllowList: []credential.PublicKeyCredentialDescriptor{
-				{ID: []byte{0xc0, 0x5e}},
-			},
-		},
-	}, session.operationOptions()...)
+	op := sampleGetAssertionOperation()
+	op.AllowList = []credential.PublicKeyCredentialDescriptor{{ID: []byte{0xc0, 0x5e}}}
+	output, err := session.GetAssertion(context.Background(), op, session.operationOptions()...)
 	if err != nil {
 		t.Fatalf("GetAssertion: %v", err)
 	}
@@ -371,16 +339,13 @@ func TestGetAssertionUsesBuiltInUVWhenRequested(t *testing.T) {
 	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
-	uv := true
-	_, err := session.GetAssertion(context.Background(), appwebauthn.GetAssertionOperation{
-		GetAssertionInput: appwebauthn.GetAssertionInput{
-			RPID:           "example.com",
-			ClientDataJSON: []byte("client-data"),
-			Options: appwebauthn.AuthenticatorOptions{
-				UserVerification: &uv,
-			},
-		},
-	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...)
+	op := sampleGetAssertionOperation()
+	op.Options.UserVerification = new(true)
+	_, err := session.GetAssertion(
+		context.Background(),
+		op,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
+	)
 	if err != nil {
 		t.Fatalf("GetAssertion: %v", err)
 	}
@@ -403,12 +368,11 @@ func TestGetAssertionAcquiresScopedTokenWhenCTAPRequiresIt(t *testing.T) {
 	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
-	_, err := session.GetAssertion(context.Background(), appwebauthn.GetAssertionOperation{
-		GetAssertionInput: appwebauthn.GetAssertionInput{
-			RPID:           "example.com",
-			ClientDataJSON: []byte("client-data"),
-		},
-	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...)
+	_, err := session.GetAssertion(
+		context.Background(),
+		sampleGetAssertionOperation(),
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
+	)
 	if err != nil {
 		t.Fatalf("GetAssertion: %v", err)
 	}
@@ -431,12 +395,11 @@ func TestGetAssertionAcquiresScopedTokenWhenCTAPRequiresBuiltInUV(t *testing.T) 
 	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
-	_, err := session.GetAssertion(context.Background(), appwebauthn.GetAssertionOperation{
-		GetAssertionInput: appwebauthn.GetAssertionInput{
-			RPID:           "example.com",
-			ClientDataJSON: []byte("client-data"),
-		},
-	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...)
+	_, err := session.GetAssertion(
+		context.Background(),
+		sampleGetAssertionOperation(),
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
+	)
 	if err != nil {
 		t.Fatalf("GetAssertion: %v", err)
 	}
@@ -475,15 +438,12 @@ func TestWebAuthnDelegatesPRFRoutingToCTAP(t *testing.T) {
 		t.Fatalf("MakeCredential extensions = %#v, want unmodified PRF input", a.makeCredentialExtensions)
 	}
 
-	getOperation := appwebauthn.GetAssertionOperation{GetAssertionInput: appwebauthn.GetAssertionInput{
-		RPID:           "example.com",
-		ClientDataJSON: []byte("client-data"),
-		Extensions: &webauthn.GetAuthenticationExtensionsClientInputs{
-			PRFInputs: &webauthn.PRFInputs{PRF: webauthn.AuthenticationExtensionsPRFInputs{
-				Eval: webauthn.AuthenticationExtensionsPRFValues{First: []byte("get")},
-			}},
-		},
-	}}
+	getOperation := sampleGetAssertionOperation()
+	getOperation.Extensions = &webauthn.GetAuthenticationExtensionsClientInputs{
+		PRFInputs: &webauthn.PRFInputs{PRF: webauthn.AuthenticationExtensionsPRFInputs{
+			Eval: webauthn.AuthenticationExtensionsPRFValues{First: []byte("get")},
+		}},
+	}
 	if _, err := session.GetAssertion(
 		context.Background(),
 		getOperation,
@@ -531,12 +491,7 @@ func TestWebAuthnCTAPStatusMapsCodes(t *testing.T) {
 			invoke: func(ctx context.Context, session *contractAuthenticatorHandle) error {
 				_, err := session.GetAssertion(
 					ctx,
-					appwebauthn.GetAssertionOperation{
-						GetAssertionInput: appwebauthn.GetAssertionInput{
-							RPID:           "example.com",
-							ClientDataJSON: []byte("client-data"),
-						},
-					},
+					sampleGetAssertionOperation(),
 					session.operationOptions()...,
 				)
 
@@ -602,6 +557,15 @@ func sampleMakeCredentialOperation(dryRun bool) appwebauthn.MakeCredentialOperat
 			},
 		},
 		DryRun: dryRun,
+	}
+}
+
+func sampleGetAssertionOperation() appwebauthn.GetAssertionOperation {
+	return appwebauthn.GetAssertionOperation{
+		GetAssertionInput: appwebauthn.GetAssertionInput{
+			RPID:           "example.com",
+			ClientDataJSON: []byte(`{"type":"webauthn.get"}`),
+		},
 	}
 }
 

@@ -320,13 +320,8 @@ func TestLargeBlobListAlwaysObservesCurrentAuthenticatorState(t *testing.T) {
 }
 
 func TestLargeBlobDeleteLastBlobWritesEmptyArray(t *testing.T) {
-	current, err := crypto.EncryptLargeBlob(bytes.Repeat([]byte{0x01}, 32), []byte("current"))
-	if err != nil {
-		t.Fatalf("encrypt current blob: %v", err)
-	}
-
 	a := &largeBlobWriteEventAuthenticator{
-		largeBlobs: []protocol.LargeBlob{current},
+		largeBlobs: []protocol.LargeBlob{encryptedLargeBlob(t, 0x01, "current")},
 	}
 	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
@@ -377,200 +372,167 @@ func TestLargeBlobDeleteLastBlobWritesEmptyArray(t *testing.T) {
 	}
 }
 
-func TestLargeBlobGarbageCollectNoopDoesNotWrite(t *testing.T) {
-	matched, err := crypto.EncryptLargeBlob(bytes.Repeat([]byte{0x01}, 32), []byte("current"))
-	if err != nil {
-		t.Fatalf("encrypt matched blob: %v", err)
-	}
-
-	a := &largeBlobWriteEventAuthenticator{
-		largeBlobs: []protocol.LargeBlob{matched},
-	}
-	session := openContractAuthenticator(t, nil, a)
-	defer func() { _ = session.Close() }()
-
-	output, err := session.GarbageCollectLargeBlobs(
-		context.Background(),
-		applargeblobs.GarbageCollectOperation{},
-		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
-	)
-	if err != nil {
-		t.Fatalf("garbage collect large blobs: %v", err)
-	}
-
-	if output.Result == nil {
-		t.Fatal("garbage collect result = nil")
-	}
-
-	if !output.Result.Noop {
-		t.Fatal("garbage collect result noop = false, want true")
-	}
-
-	if got := a.largeBlobWrites.Load(); got != 0 {
-		t.Fatalf("large blob writes = %d, want 0", got)
-	}
-
-	if got := a.rpEnumerations.Load(); got != 1 {
-		t.Fatalf("RP enumerations = %d, want 1", got)
-	}
-
-	if got := a.credentialEnumerations.Load(); got != 1 {
-		t.Fatalf("credential enumerations = %d, want 1", got)
-	}
-
-	if got := a.largeBlobReads.Load(); got != 1 {
-		t.Fatalf("large blob reads = %d, want 1", got)
-	}
-}
-
-func TestLargeBlobGarbageCollectSkipsNonConformingEntries(t *testing.T) {
+func TestLargeBlobGarbageCollectResults(t *testing.T) {
 	nonConforming := protocol.LargeBlob{
 		Ciphertext: []byte("not-a-gcm-ciphertext"),
 		Nonce:      []byte("short"),
 		OrigSize:   4,
 	}
-	a := &largeBlobWriteEventAuthenticator{
-		largeBlobs: []protocol.LargeBlob{nonConforming},
-	}
-	session := openContractAuthenticator(t, nil, a)
-	defer func() { _ = session.Close() }()
-
-	output, err := session.GarbageCollectLargeBlobs(
-		context.Background(),
-		applargeblobs.GarbageCollectOperation{},
-		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
-	)
-	if err != nil {
-		t.Fatalf("garbage collect large blobs: %v", err)
-	}
-
-	if output.Result == nil {
-		t.Fatal("garbage collect result = nil")
-	}
-
-	if !output.Result.Noop {
-		t.Fatal("garbage collect result noop = false, want true")
-	}
-
-	if output.Result.BlobCountAfter != 1 {
-		t.Fatalf("blob count after = %d, want 1", output.Result.BlobCountAfter)
+	tests := []struct {
+		name          string
+		blobs         []protocol.LargeBlob
+		wantNoop      bool
+		wantDeleted   int
+		wantAfter     int
+		wantUnmatched int
+		wantWrites    int32
+	}{
+		{
+			name:      "matched blob is a noop",
+			blobs:     []protocol.LargeBlob{encryptedLargeBlob(t, 0x01, "current")},
+			wantNoop:  true,
+			wantAfter: 1,
+		},
+		{
+			name:      "non-conforming blob is preserved",
+			blobs:     []protocol.LargeBlob{nonConforming},
+			wantNoop:  true,
+			wantAfter: 1,
+		},
 	}
 
-	if output.Result.UnmatchedBlobCount != 0 {
-		t.Fatalf("unmatched blob count = %d, want 0", output.Result.UnmatchedBlobCount)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := &largeBlobWriteEventAuthenticator{largeBlobs: tt.blobs}
+			session := openContractAuthenticator(t, nil, a)
+			t.Cleanup(func() { _ = session.Close() })
 
-	if got := a.largeBlobWrites.Load(); got != 0 {
-		t.Fatalf("large blob writes = %d, want 0", got)
+			output, err := session.GarbageCollectLargeBlobs(
+				t.Context(),
+				applargeblobs.GarbageCollectOperation{},
+				session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
+			)
+			if err != nil {
+				t.Fatalf("GarbageCollectLargeBlobs: %v", err)
+			}
+			if output.Result == nil {
+				t.Fatal("result = nil")
+			}
+
+			result := output.Result
+			if result.Noop != tt.wantNoop ||
+				result.DeletedBlobCount != tt.wantDeleted ||
+				result.BlobCountAfter != tt.wantAfter ||
+				result.UnmatchedBlobCount != tt.wantUnmatched {
+				t.Fatalf(
+					"result = {noop:%t deleted:%d after:%d unmatched:%d}, want {noop:%t deleted:%d after:%d unmatched:%d}",
+					result.Noop,
+					result.DeletedBlobCount,
+					result.BlobCountAfter,
+					result.UnmatchedBlobCount,
+					tt.wantNoop,
+					tt.wantDeleted,
+					tt.wantAfter,
+					tt.wantUnmatched,
+				)
+			}
+			if got := a.largeBlobWrites.Load(); got != tt.wantWrites {
+				t.Fatalf("large blob writes = %d, want %d", got, tt.wantWrites)
+			}
+			if got := len(a.lastSetLargeBlobs); got != tt.wantAfter && tt.wantWrites != 0 {
+				t.Fatalf("replacement blob count = %d, want %d", got, tt.wantAfter)
+			}
+			if got := a.rpEnumerations.Load(); got != 1 {
+				t.Fatalf("RP enumerations = %d, want 1", got)
+			}
+			if got := a.credentialEnumerations.Load(); got != 1 {
+				t.Fatalf("credential enumerations = %d, want 1", got)
+			}
+			if got := a.largeBlobReads.Load(); got != 1 {
+				t.Fatalf("large blob reads = %d, want 1", got)
+			}
+		})
 	}
 }
 
-func TestLargeBlobGarbageCollectRemovesOnlyUnmatchedEntries(t *testing.T) {
-	matched, err := crypto.EncryptLargeBlob(bytes.Repeat([]byte{0x01}, 32), []byte("current"))
-	if err != nil {
-		t.Fatalf("encrypt matched blob: %v", err)
-	}
-	unmatched, err := crypto.EncryptLargeBlob(bytes.Repeat([]byte{0x02}, 32), []byte("orphan"))
-	if err != nil {
-		t.Fatalf("encrypt unmatched blob: %v", err)
-	}
-
-	a := &largeBlobWriteEventAuthenticator{
-		largeBlobs: []protocol.LargeBlob{matched, unmatched},
-	}
-	session := openContractAuthenticator(t, nil, a)
-	defer func() { _ = session.Close() }()
-
-	output, err := session.GarbageCollectLargeBlobs(
-		context.Background(),
-		applargeblobs.GarbageCollectOperation{},
-		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
-	)
-	if err != nil {
-		t.Fatalf("garbage collect large blobs: %v", err)
-	}
-
-	if output.Result == nil {
-		t.Fatal("garbage collect result = nil")
-	}
-
-	if output.Result.DeletedBlobCount != 1 {
-		t.Fatalf("deleted blob count = %d, want 1", output.Result.DeletedBlobCount)
+func TestLargeBlobGarbageCollectWireMutation(t *testing.T) {
+	tests := []struct {
+		name      string
+		blobs     []protocol.LargeBlob
+		wantAfter int
+		checkWire func(*testing.T, []protocol.LargeBlob)
+	}{
+		{
+			name: "preserves matched blob",
+			blobs: []protocol.LargeBlob{
+				encryptedLargeBlob(t, 0x01, "current"),
+				encryptedLargeBlob(t, 0x02, "orphan"),
+			},
+			wantAfter: 1,
+			checkWire: func(t *testing.T, blobs []protocol.LargeBlob) {
+				if _, err := crypto.DecryptLargeBlob(bytes.Repeat([]byte{0x01}, 32), blobs[0]); err != nil {
+					t.Fatalf("replacement blob is not decryptable by known largeBlobKey: %v", err)
+				}
+			},
+		},
+		{
+			name:  "writes empty array when all blobs are unmatched",
+			blobs: []protocol.LargeBlob{encryptedLargeBlob(t, 0x02, "orphan")},
+			checkWire: func(t *testing.T, blobs []protocol.LargeBlob) {
+				if blobs == nil {
+					t.Fatal("replacement blobs = nil, want empty slice")
+				}
+			},
+		},
 	}
 
-	if got := a.largeBlobWrites.Load(); got != 1 {
-		t.Fatalf("large blob writes = %d, want 1", got)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := &largeBlobWriteEventAuthenticator{largeBlobs: tt.blobs}
+			session := openContractAuthenticator(t, nil, a)
+			t.Cleanup(func() { _ = session.Close() })
 
-	if got := len(a.lastSetLargeBlobs); got != 1 {
-		t.Fatalf("replacement blob count = %d, want 1", got)
-	}
+			output, err := session.GarbageCollectLargeBlobs(
+				t.Context(),
+				applargeblobs.GarbageCollectOperation{},
+				session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
+			)
+			if err != nil {
+				t.Fatalf("GarbageCollectLargeBlobs: %v", err)
+			}
+			if output.Result == nil {
+				t.Fatal("result = nil")
+			}
+			if output.Result.Noop || output.Result.DeletedBlobCount != 1 || output.Result.BlobCountAfter != tt.wantAfter {
+				t.Fatalf(
+					"result = {noop:%t deleted:%d after:%d}, want {noop:false deleted:1 after:%d}",
+					output.Result.Noop,
+					output.Result.DeletedBlobCount,
+					output.Result.BlobCountAfter,
+					tt.wantAfter,
+				)
+			}
+			if got := a.largeBlobWrites.Load(); got != 1 {
+				t.Fatalf("large blob writes = %d, want 1", got)
+			}
+			if got := len(a.lastSetLargeBlobs); got != tt.wantAfter {
+				t.Fatalf("replacement blob count = %d, want %d", got, tt.wantAfter)
+			}
 
-	if _, err := crypto.DecryptLargeBlob(bytes.Repeat([]byte{0x01}, 32), a.lastSetLargeBlobs[0]); err != nil {
-		t.Fatalf("replacement blob is not decryptable by known largeBlobKey: %v", err)
-	}
-
-	if got := a.rpEnumerations.Load(); got != 1 {
-		t.Fatalf("RP enumerations = %d, want 1", got)
-	}
-
-	if got := a.credentialEnumerations.Load(); got != 1 {
-		t.Fatalf("credential enumerations = %d, want 1", got)
-	}
-
-	if got := a.largeBlobReads.Load(); got != 1 {
-		t.Fatalf("large blob reads = %d, want 1", got)
+			tt.checkWire(t, a.lastSetLargeBlobs)
+		})
 	}
 }
 
-func TestLargeBlobGarbageCollectAllUnmatchedWritesEmptyArray(t *testing.T) {
-	unmatched, err := crypto.EncryptLargeBlob(bytes.Repeat([]byte{0x02}, 32), []byte("orphan"))
+func encryptedLargeBlob(t *testing.T, keyByte byte, payload string) protocol.LargeBlob {
+	t.Helper()
+
+	blob, err := crypto.EncryptLargeBlob(bytes.Repeat([]byte{keyByte}, 32), []byte(payload))
 	if err != nil {
-		t.Fatalf("encrypt unmatched blob: %v", err)
+		t.Fatalf("EncryptLargeBlob: %v", err)
 	}
 
-	a := &largeBlobWriteEventAuthenticator{
-		largeBlobs: []protocol.LargeBlob{unmatched},
-	}
-	session := openContractAuthenticator(t, nil, a)
-	defer func() { _ = session.Close() }()
-
-	output, err := session.GarbageCollectLargeBlobs(
-		context.Background(),
-		applargeblobs.GarbageCollectOperation{},
-		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
-	)
-	if err != nil {
-		t.Fatalf("garbage collect large blobs: %v", err)
-	}
-
-	if output.Result == nil {
-		t.Fatal("garbage collect result = nil")
-	}
-
-	if output.Result.Noop {
-		t.Fatal("garbage collect result noop = true, want false")
-	}
-
-	if output.Result.DeletedBlobCount != 1 {
-		t.Fatalf("deleted blob count = %d, want 1", output.Result.DeletedBlobCount)
-	}
-
-	if output.Result.BlobCountAfter != 0 {
-		t.Fatalf("blob count after = %d, want 0", output.Result.BlobCountAfter)
-	}
-
-	if got := a.largeBlobWrites.Load(); got != 1 {
-		t.Fatalf("large blob writes = %d, want 1", got)
-	}
-
-	if a.lastSetLargeBlobs == nil {
-		t.Fatal("replacement blobs = nil, want empty slice")
-	}
-
-	if got := len(a.lastSetLargeBlobs); got != 0 {
-		t.Fatalf("replacement blob count = %d, want 0", got)
-	}
+	return blob
 }
 
 func TestLargeBlobWritePINOnlyFlowDoesNotRequestUserVerification(t *testing.T) {
