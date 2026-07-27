@@ -64,22 +64,23 @@ func TestBuildDeletePreviewMissingCredential(t *testing.T) {
 	}
 }
 
-func TestBuildUpdateUserPreviewRejectsInvalidUserIDHex(t *testing.T) {
+func TestBuildUpdateUserPreviewKeepsUserID(t *testing.T) {
 	target := sampleCredentialTarget(t)
 
-	for _, userIDHex := range []string{"zz", "abc"} {
-		_, err := BuildUpdateUserPreview(UpdateUserOperation{
-			Target:         target,
-			UserIDHex:      userIDHex,
-			UserIDProvided: true,
-		})
-		if !failure.IsCode(err, failure.CodeUserIDHexInvalid) {
-			t.Fatalf("BuildUpdateUserPreview(%q) error = %v, want %s", userIDHex, err, failure.CodeUserIDHexInvalid)
-		}
-
-		if got := failure.Snapshot(err).Phase; got != failure.PhaseValidation {
-			t.Fatalf("BuildUpdateUserPreview(%q) phase = %q, want %q", userIDHex, got, failure.PhaseValidation)
-		}
+	preview, err := BuildUpdateUserPreview(UpdateUserOperation{
+		Target:       target,
+		Name:         "alice-new@example.com",
+		NameProvided: true,
+	})
+	if err != nil {
+		t.Fatalf("BuildUpdateUserPreview: %v", err)
+	}
+	if preview.Proposed.UserIDHex != "0102" {
+		t.Fatalf("Proposed.UserIDHex = %q, want unchanged user ID", preview.Proposed.UserIDHex)
+	}
+	if got := preview.Warnings[0]; got.Severity != safety.SeverityDestructive ||
+		got.Code != "credential.update_user.mutation" {
+		t.Fatalf("first warning = %#v, want destructive update warning", got)
 	}
 }
 
@@ -92,40 +93,6 @@ func TestBuildUpdateUserPreviewRequiresTargetAndChange(t *testing.T) {
 	_, err = ResolveUpdatedUser(UpdateUserOperation{})
 	if !failure.IsCode(err, failure.CodeCredentialChangesRequired) {
 		t.Fatalf("ResolveUpdatedUser(no changes) error = %v, want %s", err, failure.CodeCredentialChangesRequired)
-	}
-}
-
-func TestBuildUpdateUserPreviewAcceptsUnchangedUserID(t *testing.T) {
-	target := sampleCredentialTarget(t)
-
-	preview, err := BuildUpdateUserPreview(UpdateUserOperation{
-		Target:         target,
-		UserIDHex:      "0102",
-		UserIDProvided: true,
-		Name:           "alice-new@example.com",
-		NameProvided:   true,
-	})
-	if err != nil {
-		t.Fatalf("BuildUpdateUserPreview: %v", err)
-	}
-
-	if preview.Proposed.UserIDHex != "0102" {
-		t.Fatalf("Proposed.UserIDHex = %q, want unchanged user ID", preview.Proposed.UserIDHex)
-	}
-}
-
-func TestBuildUpdateUserPreviewRejectsChangedUserID(t *testing.T) {
-	target := sampleCredentialTarget(t)
-
-	_, err := BuildUpdateUserPreview(UpdateUserOperation{
-		Target:         target,
-		UserIDHex:      "0a0b",
-		UserIDProvided: true,
-		Name:           "alice-new@example.com",
-		NameProvided:   true,
-	})
-	if !failure.IsCode(err, failure.CodeCTAPParameterInvalid) {
-		t.Fatalf("BuildUpdateUserPreview(changed user ID) error = %v, want %s", err, failure.CodeCTAPParameterInvalid)
 	}
 }
 

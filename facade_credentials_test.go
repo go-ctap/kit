@@ -3,6 +3,7 @@ package ctapkit
 import (
 	"bytes"
 	"context"
+	"errors"
 	"iter"
 	"slices"
 	"sync/atomic"
@@ -195,6 +196,25 @@ func TestCredentialMutationsUseUnscopedGrant(t *testing.T) {
 				t.Fatalf("metadata calls = %d, want %d", got, tt.wantMetadataCalls)
 			}
 		})
+	}
+}
+
+func TestCredentialMutationErrorDoesNotRefreshGetInfo(t *testing.T) {
+	mutationErr := errors.New("credential mutation failed")
+	a := &failingCredentialMutationAuthenticator{mutationErr: mutationErr}
+	session := openContractAuthenticator(t, nil, a)
+	defer func() { _ = session.Close() }()
+
+	_, err := session.UpdateCredentialUser(
+		context.Background(),
+		credentialUpdate(false),
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
+	)
+	if !errors.Is(err, mutationErr) {
+		t.Fatalf("UpdateCredentialUser error = %v, want mutation error", err)
+	}
+	if got := a.freshInfoCalls.Load(); got != 0 {
+		t.Fatalf("fresh GetInfo calls = %d, want 0", got)
 	}
 }
 
@@ -517,6 +537,34 @@ type credentialMutationTokenAuthenticator struct {
 	tokenRPIDs    []string
 	deleteTokens  []string
 	updateTokens  []string
+}
+
+type failingCredentialMutationAuthenticator struct {
+	credentialMutationTokenAuthenticator
+	mutationErr    error
+	cacheInvalid   bool
+	freshInfoCalls atomic.Int32
+}
+
+func (a *failingCredentialMutationAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
+	return credentialManagementInfo(), !a.cacheInvalid
+}
+
+func (a *failingCredentialMutationAuthenticator) GetInfo(context.Context) (protocol.AuthenticatorGetInfoResponse, error) {
+	a.freshInfoCalls.Add(1)
+
+	return protocol.AuthenticatorGetInfoResponse{}, errors.New("unexpected GetInfo refresh")
+}
+
+func (a *failingCredentialMutationAuthenticator) UpdateUserInformation(
+	context.Context,
+	[]byte,
+	credential.PublicKeyCredentialDescriptor,
+	credential.PublicKeyCredentialUserEntity,
+) error {
+	a.cacheInvalid = true
+
+	return a.mutationErr
 }
 
 func (a *credentialMutationTokenAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {

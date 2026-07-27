@@ -19,7 +19,7 @@ func (r Runner) DeleteCredential(
 ) (appcredentials.DeleteOutput, error) {
 	var output appcredentials.DeleteOutput
 
-	inventoryPermission, mutationPermission, err := r.inventoryMutationPermissions(
+	inventoryPermission, mutationPermission, command, err := r.inventoryMutationPermissions(
 		ctx,
 		device,
 		protocol.PermissionCredentialManagement,
@@ -66,13 +66,9 @@ func (r Runner) DeleteCredential(
 		return device.DeleteCredential(ctx, token, descriptor)
 	})
 	if err != nil {
-		info, infoErr := r.getAuthenticatorInfo(ctx, device)
-		if infoErr != nil {
-			return output, infoErr
-		}
 		return output, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 			failure.PhaseAuthenticatorCommand,
-			credentialManagementCommand(info),
+			command,
 			protocol.CredentialManagementSubCommandDeleteCredential,
 		))
 	}

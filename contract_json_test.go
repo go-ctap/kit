@@ -198,15 +198,17 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 		{
 			name: "credential operation inputs use ID spellings",
 			value: credentials.UpdateUserOperation{
-				Target:         credentials.CredentialTarget{},
-				UserIDHex:      "0102",
-				UserIDProvided: true,
+				Target:       credentials.CredentialTarget{},
+				Name:         "updated",
+				NameProvided: true,
 			},
 			want: []string{
-				`"userIDHex":"0102"`,
-				`"userIDProvided":true`,
+				`"name":"updated"`,
+				`"nameProvided":true`,
 			},
 			reject: []string{
+				`"userIDHex"`,
+				`"userIDProvided"`,
 				`"userIdHex"`,
 				`"userIdProvided"`,
 			},

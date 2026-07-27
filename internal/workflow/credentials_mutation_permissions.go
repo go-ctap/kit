@@ -15,27 +15,29 @@ func (r Runner) inventoryMutationPermissions(
 	ctx context.Context,
 	device authenticator.CredentialInventoryReader,
 	required protocol.Permission,
-) (protocol.Permission, protocol.Permission, error) {
+) (protocol.Permission, protocol.Permission, protocol.Command, error) {
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
-		return protocol.PermissionNone, protocol.PermissionNone, err
+		return protocol.PermissionNone, protocol.PermissionNone, 0, err
 	}
+	command := credentialManagementCommand(info)
+
 	inventory, err := inventoryPermission(info)
 	if err != nil {
-		return protocol.PermissionNone, protocol.PermissionNone, err
+		return protocol.PermissionNone, protocol.PermissionNone, 0, err
 	}
 
 	if required&protocol.PermissionCredentialManagement != 0 {
-		return required, required, nil
+		return required, required, command, nil
 	}
 
 	if inventory == protocol.PermissionPersistentCredentialManagementReadOnly {
-		return inventory, required, nil
+		return inventory, required, command, nil
 	}
 
 	grant := required | protocol.PermissionCredentialManagement
 
-	return grant, grant, nil
+	return grant, grant, command, nil
 }
 
 func credentialDescriptor(record appcredentials.CredentialRecord) (credential.PublicKeyCredentialDescriptor, error) {

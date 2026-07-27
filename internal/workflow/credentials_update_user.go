@@ -32,7 +32,7 @@ func (r Runner) UpdateCredentialUser(
 		return output, nil
 	}
 
-	_, mutationPermission, err := r.inventoryMutationPermissions(
+	_, mutationPermission, command, err := r.inventoryMutationPermissions(
 		ctx,
 		device,
 		protocol.PermissionCredentialManagement,
@@ -65,13 +65,9 @@ func (r Runner) UpdateCredentialUser(
 		return device.UpdateUserInformation(ctx, token, descriptor, updatedUser)
 	})
 	if err != nil {
-		info, infoErr := r.getAuthenticatorInfo(ctx, device)
-		if infoErr != nil {
-			return output, infoErr
-		}
 		return output, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 			failure.PhaseAuthenticatorCommand,
-			credentialManagementCommand(info),
+			command,
 			protocol.CredentialManagementSubCommandUpdateUserInformation,
 		))
 	}

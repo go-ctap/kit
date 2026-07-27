@@ -18,7 +18,7 @@ func (r Runner) WriteLargeBlob(
 ) (applargeblobs.MutationOutput, error) {
 	var output applargeblobs.MutationOutput
 
-	inventoryPermission, mutationPermission, err := r.inventoryMutationPermissions(
+	inventoryPermission, mutationPermission, _, err := r.inventoryMutationPermissions(
 		ctx,
 		device,
 		protocol.PermissionLargeBlobWrite,
@@ -93,7 +93,7 @@ func (r Runner) DeleteLargeBlob(
 ) (applargeblobs.MutationOutput, error) {
 	var output applargeblobs.MutationOutput
 
-	inventoryPermission, mutationPermission, err := r.inventoryMutationPermissions(
+	inventoryPermission, mutationPermission, _, err := r.inventoryMutationPermissions(
 		ctx,
 		device,
 		protocol.PermissionLargeBlobWrite,
