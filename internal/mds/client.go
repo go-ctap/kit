@@ -151,8 +151,16 @@ func (c *Client) blob(ctx context.Context, source string, opts LookupOptions) (*
 
 		return c.refreshBlob(ctx, source, cacheKey, current)
 	})
-	if err != nil && local != nil && opts.AllowStaleOnFetchError {
-		return local, true, nil
+	if err != nil {
+		if contextErr := ctx.Err(); contextErr != nil {
+			return nil, false, contextErr
+		}
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil, false, err
+		}
+		if local != nil && opts.AllowStaleOnFetchError {
+			return local, true, nil
+		}
 	}
 
 	return refreshed, cached, err

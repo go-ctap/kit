@@ -3,6 +3,7 @@ package mds
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -45,4 +46,27 @@ func TestMetadataStatementRejectsInvalidAuthenticatorGetInfoHex(t *testing.T) {
 	if err == nil {
 		t.Fatal("Unmarshal succeeded with invalid byte string")
 	}
+}
+
+func TestMDSJSONFieldContracts(t *testing.T) {
+	const batchCertificate = "batch-certificate"
+
+	statusJSON, err := json.Marshal(StatusReport{BatchCertificate: stringPointer(batchCertificate)})
+	if err != nil {
+		t.Fatalf("marshal status report: %v", err)
+	}
+	if !strings.Contains(string(statusJSON), `"batchCertificate":"batch-certificate"`) {
+		t.Fatalf("status JSON = %s, want batchCertificate", statusJSON)
+	}
+	emptyStatusJSON, err := json.Marshal(StatusReport{})
+	if err != nil {
+		t.Fatalf("marshal empty status report: %v", err)
+	}
+	if strings.Contains(string(emptyStatusJSON), "batchCertificate") {
+		t.Fatalf("empty status JSON = %s, want omitted batchCertificate", emptyStatusJSON)
+	}
+}
+
+func stringPointer(value string) *string {
+	return &value
 }

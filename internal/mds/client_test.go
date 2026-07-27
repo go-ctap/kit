@@ -113,6 +113,60 @@ func TestLookupAllowsVerifiedStaleCacheOnRateLimit(t *testing.T) {
 	}
 }
 
+func TestLookupDoesNotMaskContextErrorWithStaleCache(t *testing.T) {
+	tests := []struct {
+		name    string
+		context func() (context.Context, context.CancelFunc)
+		want    error
+	}{
+		{
+			name: "canceled",
+			context: func() (context.Context, context.CancelFunc) {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+
+				return ctx, func() {}
+			},
+			want: context.Canceled,
+		},
+		{
+			name: "deadline",
+			context: func() (context.Context, context.CancelFunc) {
+				return context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+			},
+			want: context.DeadlineExceeded,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			const source = "https://mds.example.test/context-error"
+
+			cache := NewCache()
+			client := &Client{
+				Source: source,
+				Cache:  cache,
+			}
+			cache.Set(client.cacheKey(source), &Blob{
+				Number:   1,
+				Entries:  map[uuid.UUID]*appmds.PayloadEntry{},
+				CachedAt: time.Now().Add(-48 * time.Hour),
+			})
+			ctx, cancel := test.context()
+			defer cancel()
+
+			_, err := client.Lookup(ctx, uuid.New(), LookupOptions{
+				Refresh:                true,
+				AllowStaleOnFetchError: true,
+			})
+
+			if !errors.Is(err, test.want) {
+				t.Fatalf("Lookup error = %v, want %v", err, test.want)
+			}
+		})
+	}
+}
+
 func TestLookupSharesCachedEntry(t *testing.T) {
 	const source = "https://mds.example.test/shared-entry"
 
@@ -185,6 +239,53 @@ func TestLookupKeepsDiskCacheWhenVerificationFails(t *testing.T) {
 
 	if !bytes.Equal(retained, cached) {
 		t.Fatalf("retained disk cache = %q, want %q", retained, cached)
+	}
+}
+
+func TestLookupKeepsVerifiedMemoryCacheWhenRemoteVerificationFails(t *testing.T) {
+	const source = "https://mds.example.test/unverifiable-remote"
+
+	aaguid := uuid.New()
+	entry := &appmds.PayloadEntry{
+		AAGUID: aaguid,
+		MetadataStatement: appmds.MetadataStatement{
+			Description: "Verified local authenticator",
+		},
+	}
+	local := &Blob{
+		Number:   7,
+		Entries:  map[uuid.UUID]*appmds.PayloadEntry{aaguid: entry},
+		CachedAt: time.Now().Add(-48 * time.Hour),
+	}
+	cache := NewCache()
+	client := &Client{
+		Source: source,
+		HTTPClient: &http.Client{Transport: roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader("not-a-jwt")),
+				Request:    request,
+			}, nil
+		})},
+		Cache: cache,
+	}
+	cacheKey := client.cacheKey(source)
+	cache.Set(cacheKey, local)
+
+	result, err := client.Lookup(t.Context(), aaguid, LookupOptions{
+		Refresh:                true,
+		AllowStaleOnFetchError: true,
+	})
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if !result.Cached || result.Entry != entry || result.BlobNumber != local.Number {
+		t.Fatalf("result = %+v, want verified local entry", result)
+	}
+	cached, found := cache.Get(cacheKey)
+	if !found || cached != local {
+		t.Fatalf("cached blob = %p, %t; want unchanged verified blob %p", cached, found, local)
 	}
 }
 

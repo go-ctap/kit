@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// LookupResult is the public result of a FIDO Metadata Service AAGUID lookup.
+// LookupResult is the public result of a verified FIDO Metadata Service AAGUID lookup.
 type LookupResult struct {
 	AAGUID     uuid.UUID     `json:"aaguid"`
 	Found      bool          `json:"found"`
@@ -36,6 +36,7 @@ type StatusReport struct {
 	Status                           AuthenticatorStatus `json:"status"`
 	EffectiveDate                    *string             `json:"effectiveDate,omitempty"`
 	AuthenticatorVersion             *uint64             `json:"authenticatorVersion,omitempty"`
+	BatchCertificate                 *string             `json:"batchCertificate,omitempty"`
 	Certificate                      *string             `json:"certificate,omitempty"`
 	URL                              *string             `json:"url,omitempty"`
 	CertificationDescriptor          *string             `json:"certificationDescriptor,omitempty"`

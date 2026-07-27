@@ -142,7 +142,7 @@ packages.
 | Biometrics      | `BioSensorInfo`, `BioList`, `BioEnroll`, `BioRename`, `BioRemove`                                                  |
 | Credentials     | `ListCredentials`, `CredentialStoreState`, `DeleteCredential`, `UpdateCredentialUser`                              |
 | Large blobs     | `ReadLargeBlob`, `ListLargeBlobs`, `WriteLargeBlob`, `DeleteLargeBlob`, `GarbageCollectLargeBlobs`                 |
-| WebAuthn        | `MakeCredential`, `GetAssertion`                                                                                   |
+| WebAuthn        | `MakeCredential`, `GetAssertion`, `VerifyMakeCredential`, `VerifyGetAssertion`                                     |
 | Device metadata | `CanProbeDeviceMetadata`, `ProbeDeviceMetadata`                                                                    |
 | Metadata        | `ctapkit.LookupMDS`                                                                                                |
 
@@ -169,6 +169,16 @@ ctapkit.WithVerificationFlow(ctapkit.VerificationFlowPIN)
 ```
 
 The authenticator always makes the final decision about whether a verification method succeeds.
+
+## WebAuthn result verification
+
+`ctapkit.VerifyMakeCredential` and `ctapkit.VerifyGetAssertion` perform local structural and signature verification.
+They correlate the operation input with the runtime result and return a compact `verified`, `failed`, or `unavailable`
+summary. Verification does not use the network, clock, MDS, or an application trust policy.
+
+These helpers do not replace relying-party validation of the WebAuthn ceremony. The application still owns expected
+challenge and origin checks, client-data type policy, and attestation trust decisions. An application that needs FIDO
+metadata calls `ctapkit.LookupMDS` separately with the credential's AAGUID.
 
 ## Previews and dry runs
 
@@ -214,7 +224,7 @@ described in
 ## FIDO Metadata Service
 
 `ctapkit.LookupMDS` fetches and verifies the FIDO MDS3 blob, finds an entry by AAGUID, and caches the verified blob in
-memory and on disk.
+memory and on disk. Lookup is AAGUID-only and is independent from WebAuthn result verification.
 
 ```go
 inspection, err := authenticator.Inspect(ctx)
