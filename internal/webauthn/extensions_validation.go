@@ -10,10 +10,6 @@ import (
 	"github.com/go-ctap/kit/model/safety"
 )
 
-func hasPRFEvaluation(input *ctapwebauthn.PRFInputs) bool {
-	return input != nil && (!input.PRF.Eval.IsZero() || len(input.PRF.EvalByCredential) > 0)
-}
-
 func makeCredentialExtensionWarnings(
 	info protocol.AuthenticatorGetInfoResponse,
 	input *ctapwebauthn.CreateAuthenticationExtensionsClientInputs,
@@ -71,7 +67,9 @@ func getAssertionExtensionWarnings(
 			"webauthn.extension.hmac_secret.not_advertised", "hmac-secret", "hmac-secret"))
 	}
 
-	if hasPRFEvaluation(input.PRFInputs) && !slices.Contains(info.Extensions, extension.ExtensionIdentifierHMACSecret) {
+	if input.PRFInputs != nil &&
+		(!input.PRFInputs.PRF.Eval.IsZero() || len(input.PRFInputs.PRF.EvalByCredential) > 0) &&
+		!slices.Contains(info.Extensions, extension.ExtensionIdentifierHMACSecret) {
 		warnings = append(warnings, unsupportedExtensionWarning(
 			"webauthn.extension.prf.not_advertised", "prf", "hmac-secret"))
 	}

@@ -140,7 +140,9 @@ func yubicoModelName(fallback string, info yubico.DeviceInfo) string {
 		return "YubiKey Preview"
 	}
 
-	if !supportsYubicoDynamicName(info.FirmwareVersion) || info.FormFactor == yubico.FormFactorUnknown {
+	if info.FirmwareVersion.Major != 5 ||
+		info.FirmwareVersion.Minor < 1 ||
+		info.FormFactor == yubico.FormFactorUnknown {
 		return fallback
 	}
 
@@ -194,10 +196,6 @@ func yubicoModelName(fallback string, info yubico.DeviceInfo) string {
 	name := strings.Join(parts, " ")
 	name = strings.Replace(name, "5 C", "5C", 1)
 	return strings.Replace(name, "5 A", "5A", 1)
-}
-
-func supportsYubicoDynamicName(version yubico.FirmwareVersion) bool {
-	return version.Major == 5 && version.Minor >= 1
 }
 
 func isYubicoPreview(version yubico.FirmwareVersion) bool {

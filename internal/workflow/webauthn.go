@@ -107,7 +107,9 @@ func (r Runner) GetAssertion(
 	}
 
 	readAssertions := func(token []byte) error {
-		if writesLargeBlob(input.Extensions) {
+		if input.Extensions != nil &&
+			input.Extensions.LargeBlobInputs != nil &&
+			input.Extensions.LargeBlob.Write != nil {
 			r.recordStateEffect(rtruntime.StateEffectLargeBlobArrayChanged)
 		}
 
@@ -150,10 +152,6 @@ func (r Runner) GetAssertion(
 	}
 
 	return output, nil
-}
-
-func writesLargeBlob(input *ctapwebauthn.GetAuthenticationExtensionsClientInputs) bool {
-	return input != nil && input.LargeBlobInputs != nil && input.LargeBlob.Write != nil
 }
 
 func (r Runner) afterUserPresence(present bool) {

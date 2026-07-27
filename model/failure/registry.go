@@ -217,18 +217,14 @@ func validParamValue(rule paramValueRule, value string) bool {
 
 	switch rule {
 	case paramValueUint:
-		return isCanonicalUint(value)
+		parsed, err := strconv.ParseUint(value, 10, 64)
+		return err == nil && strconv.FormatUint(parsed, 10) == value
 	case paramValueHTTPStatus:
 		status, err := strconv.ParseUint(value, 10, 16)
 		return err == nil && status >= 100 && status <= 599 && strconv.FormatUint(status, 10) == value
 	default:
 		return false
 	}
-}
-
-func isCanonicalUint(value string) bool {
-	parsed, err := strconv.ParseUint(value, 10, 64)
-	return err == nil && strconv.FormatUint(parsed, 10) == value
 }
 
 func values(entries ...string) map[string]struct{} {

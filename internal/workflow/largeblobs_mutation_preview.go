@@ -121,10 +121,14 @@ func buildMutationPreview(
 	}
 
 	return applargeblobs.MutationPreview{
-		Operation:                          operation,
-		Device:                             state.selected,
-		Support:                            state.support,
-		Target:                             buildBlobTarget(state.target),
+		Operation: operation,
+		Device:    state.selected,
+		Support:   state.support,
+		Target: applargeblobs.BlobTarget{
+			CredentialIDHex: state.target.Record.CredentialIDHex,
+			RP:              state.target.RP,
+			User:            state.target.User,
+		},
 		LargeBlobKeyState:                  applargeblobs.LargeBlobKeyAvailable,
 		CurrentByteCount:                   len(state.currentBytes),
 		ProposedByteCount:                  proposedByteCount,

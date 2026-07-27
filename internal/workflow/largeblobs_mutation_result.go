@@ -1,9 +1,6 @@
 package workflow
 
-import (
-	appcredentials "github.com/go-ctap/kit/model/credentials"
-	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
-)
+import applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 
 func buildMutationResult(
 	state targetBlobState,
@@ -29,14 +26,6 @@ func buildMutationResult(
 		BlobCountBefore:                    len(state.blobs),
 		BlobCountAfter:                     blobCountAfter(len(state.blobs), operation, noBlob),
 		NoBlob:                             noBlob,
-	}
-}
-
-func buildBlobTarget(target appcredentials.CredentialTarget) applargeblobs.BlobTarget {
-	return applargeblobs.BlobTarget{
-		CredentialIDHex: target.Record.CredentialIDHex,
-		RP:              target.RP,
-		User:            target.User,
 	}
 }
 
