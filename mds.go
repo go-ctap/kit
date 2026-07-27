@@ -99,6 +99,6 @@ func runtimeMDSError(err error) error {
 	case errors.Is(err, rtmds.ErrVerify):
 		return failure.Wrap(failure.CodeMDSVerificationFailed, err, failure.WithPhase(failure.PhaseMetadata))
 	default:
-		return normalizeBoundaryError(err, failure.PhaseMetadata)
+		return NormalizeError(err, failure.PhaseMetadata)
 	}
 }

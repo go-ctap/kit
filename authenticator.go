@@ -11,7 +11,10 @@ import (
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
+	"github.com/go-ctap/kit/transport"
 )
+
+type authenticatorOpenFunc func(context.Context, transport.Mode, string) (*authenticator.Opened, error)
 
 type AuthenticatorOption func(*authenticatorConfig)
 
@@ -102,7 +105,7 @@ func OpenAuthenticator(
 	device Device,
 	opts ...AuthenticatorOption,
 ) (*Authenticator, error) {
-	return openAuthenticatorHandle(ctx, device, openAuthenticator, opts...)
+	return openAuthenticatorHandle(ctx, device, authenticator.Open, opts...)
 }
 
 func openAuthenticatorHandle(
@@ -176,7 +179,7 @@ func (a *Authenticator) Close() error {
 	})
 
 	if a.closeErr != nil {
-		return normalizeBoundaryError(a.closeErr, failure.PhaseCleanup)
+		return NormalizeError(a.closeErr, failure.PhaseCleanup)
 	}
 
 	return nil

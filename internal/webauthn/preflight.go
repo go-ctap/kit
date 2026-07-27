@@ -94,7 +94,7 @@ func NormalizeMakeCredentialInput(
 	pubKeyCredParams, err := lo.MapErr(
 		input.PubKeyCredParams,
 		func(param credential.PublicKeyCredentialParameters, _ int) (credential.PublicKeyCredentialParameters, error) {
-			param = normalizeCredentialParameter(param)
+			param.Type = credentialTypeOrDefault(param.Type)
 			if param.Algorithm == 0 {
 				return credential.PublicKeyCredentialParameters{}, validationFailure(
 					failure.CodePublicKeyCredentialAlgorithmRequired,
@@ -174,14 +174,6 @@ func normalizeDescriptors(
 			return descriptor, nil
 		},
 	)
-}
-
-func normalizeCredentialParameter(
-	param credential.PublicKeyCredentialParameters,
-) credential.PublicKeyCredentialParameters {
-	param.Type = credentialTypeOrDefault(param.Type)
-
-	return param
 }
 
 func credentialTypeOrDefault(value credential.PublicKeyCredentialType) credential.PublicKeyCredentialType {

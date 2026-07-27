@@ -21,10 +21,6 @@ func NormalizeError(err error, phase failure.Phase) error {
 	return errornorm.Normalize(errornorm.Annotate(err, errornorm.WithPhase(phase)), "")
 }
 
-func normalizeBoundaryError(err error, phase failure.Phase) error {
-	return NormalizeError(err, phase)
-}
-
 func runtimePINRequiredError(field string) error {
 	return failure.New(failure.CodePINRequired,
 		failure.WithPhase(failure.PhaseValidation),
