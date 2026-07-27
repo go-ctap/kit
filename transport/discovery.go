@@ -72,10 +72,10 @@ func discoveryOptions(mode Mode) []options.Option {
 
 func discoveryError(mode Mode, err error) error {
 	if mode == ModeWindowsProxy {
-		return proxyUnavailableError(err)
+		return normalizeTransportError(err, failure.CodeTransportProxyUnavailable)
 	}
 
-	return transportError(err)
+	return normalizeTransportError(err, failure.CodeTransportFailure)
 }
 
 func descriptorsFromDeviceInfos(infos []*ghid.DeviceInfo) []Descriptor {
@@ -98,14 +98,6 @@ func unsupportedModeError() error {
 	return failure.New(failure.CodeTransportModeUnsupported,
 		failure.WithPhase(failure.PhaseDiscovery),
 	)
-}
-
-func transportError(err error) error {
-	return normalizeTransportError(err, failure.CodeTransportFailure)
-}
-
-func proxyUnavailableError(err error) error {
-	return normalizeTransportError(err, failure.CodeTransportProxyUnavailable)
 }
 
 func normalizeTransportError(err error, fallback failure.Code) error {

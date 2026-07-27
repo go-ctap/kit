@@ -222,19 +222,15 @@ func token2FeatureHIDMetadata(
 func token2IdentityMetadata(serialNumber string) report.DeviceMetadata {
 	metadata := report.DeviceMetadata{Serial: serialNumber}
 	if identity, ok := token2.Identify(serialNumber); ok {
-		metadata.Model = normalizedToken2ModelName(identity.Model)
+		model := identity.Model
+		if strings.EqualFold(strings.TrimSpace(model.Branding), "unbranded") {
+			model.Branding = ""
+		}
+		metadata.Model = model.DisplayName()
 		metadata.Firmware = strings.TrimSpace(identity.Model.Revision)
 	}
 
 	return metadata
-}
-
-func normalizedToken2ModelName(model token2.Model) string {
-	if strings.EqualFold(strings.TrimSpace(model.Branding), "unbranded") {
-		model.Branding = ""
-	}
-
-	return model.DisplayName()
 }
 
 func addToken2Config(metadata *report.DeviceMetadata, config token2.Config) {

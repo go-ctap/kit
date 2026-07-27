@@ -50,8 +50,19 @@ func (r Runner) MakeCredential(
 	}, func(token []byte) error {
 		r.recordStateEffect(rtruntime.StateEffectCredentialInventoryChanged)
 
-		var err error
-		response, err = r.callMakeCredential(ctx, device, token, input)
+		response, err = device.MakeCredential(
+			ctx,
+			token,
+			input.ClientDataJSON,
+			input.RP,
+			input.User,
+			input.PubKeyCredParams,
+			input.ExcludeList,
+			input.Extensions,
+			ctapAuthenticatorOptions(input.Options, token != nil),
+			input.EnterpriseAttestation,
+			input.AttestationFormatsPreference,
+		)
 
 		return err
 	})
@@ -63,7 +74,10 @@ func (r Runner) MakeCredential(
 			}
 		}
 
-		return output, annotateMakeCredentialError(err)
+		return output, errornorm.Annotate(err, errornorm.WithCommand(
+			failure.PhaseAuthenticatorCommand,
+			protocol.AuthenticatorMakeCredential,
+		))
 	}
 	result, err := makeCredentialResult(r.env.Selected.Fingerprint, input.RP.ID, input.Extensions, response)
 	if err != nil {
@@ -124,7 +138,10 @@ func (r Runner) GetAssertion(
 			ctapAuthenticatorOptions(input.Options, token != nil),
 		) {
 			if err != nil {
-				return annotateGetAssertionError(err)
+				return errornorm.Annotate(err, errornorm.WithCommand(
+					failure.PhaseAuthenticatorCommand,
+					protocol.AuthenticatorGetAssertion,
+				))
 			}
 
 			result.Assertions = append(result.Assertions, assertionResult(index, response))
@@ -158,41 +175,6 @@ func (r Runner) afterUserPresence(present bool) {
 	if present {
 		r.env.Tokens.InvalidateUnlessPermission(protocol.PermissionLargeBlobWrite)
 	}
-}
-
-func (r Runner) callMakeCredential(
-	ctx context.Context,
-	device authenticator.WebAuthnManager,
-	token []byte,
-	input appwebauthn.MakeCredentialInput,
-) (protocol.AuthenticatorMakeCredentialResponse, error) {
-	return device.MakeCredential(
-		ctx,
-		token,
-		input.ClientDataJSON,
-		input.RP,
-		input.User,
-		input.PubKeyCredParams,
-		input.ExcludeList,
-		input.Extensions,
-		ctapAuthenticatorOptions(input.Options, token != nil),
-		input.EnterpriseAttestation,
-		input.AttestationFormatsPreference,
-	)
-}
-
-func annotateMakeCredentialError(err error) error {
-	return errornorm.Annotate(err, errornorm.WithCommand(
-		failure.PhaseAuthenticatorCommand,
-		protocol.AuthenticatorMakeCredential,
-	))
-}
-
-func annotateGetAssertionError(err error) error {
-	return errornorm.Annotate(err, errornorm.WithCommand(
-		failure.PhaseAuthenticatorCommand,
-		protocol.AuthenticatorGetAssertion,
-	))
 }
 
 func makeCredentialResult(

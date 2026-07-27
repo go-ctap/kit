@@ -13,46 +13,46 @@ func TestTransportErrors(t *testing.T) {
 	failureCause := errors.New("device disconnected")
 	proxyCause := errors.New("proxy unavailable")
 	tests := []struct {
-		name      string
-		err       error
-		normalize func(error) error
-		code      failure.Code
+		name     string
+		err      error
+		fallback failure.Code
+		code     failure.Code
 	}{
 		{
-			name:      "canceled",
-			err:       context.Canceled,
-			normalize: transportError,
-			code:      failure.CodeOperationCanceled,
+			name:     "canceled",
+			err:      context.Canceled,
+			fallback: failure.CodeTransportFailure,
+			code:     failure.CodeOperationCanceled,
 		},
 		{
-			name:      "deadline",
-			err:       context.DeadlineExceeded,
-			normalize: transportError,
-			code:      failure.CodeOperationTimeout,
+			name:     "deadline",
+			err:      context.DeadlineExceeded,
+			fallback: failure.CodeTransportFailure,
+			code:     failure.CodeOperationTimeout,
 		},
 		{
-			name:      "permission",
-			err:       fs.ErrPermission,
-			normalize: transportError,
-			code:      failure.CodeTransportPermissionDenied,
+			name:     "permission",
+			err:      fs.ErrPermission,
+			fallback: failure.CodeTransportFailure,
+			code:     failure.CodeTransportPermissionDenied,
 		},
 		{
-			name:      "transport",
-			err:       failureCause,
-			normalize: transportError,
-			code:      failure.CodeTransportFailure,
+			name:     "transport",
+			err:      failureCause,
+			fallback: failure.CodeTransportFailure,
+			code:     failure.CodeTransportFailure,
 		},
 		{
-			name:      "proxy",
-			err:       proxyCause,
-			normalize: proxyUnavailableError,
-			code:      failure.CodeTransportProxyUnavailable,
+			name:     "proxy",
+			err:      proxyCause,
+			fallback: failure.CodeTransportProxyUnavailable,
+			code:     failure.CodeTransportProxyUnavailable,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.normalize(tt.err)
+			err := normalizeTransportError(tt.err, tt.fallback)
 
 			if !failure.IsCode(err, tt.code) {
 				t.Fatalf("code = %q, want %q", failure.Snapshot(err).Code, tt.code)
