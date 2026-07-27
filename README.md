@@ -144,7 +144,6 @@ packages.
 | Large blobs     | `ReadLargeBlob`, `ListLargeBlobs`, `WriteLargeBlob`, `DeleteLargeBlob`, `GarbageCollectLargeBlobs`                 |
 | WebAuthn        | `MakeCredential`, `GetAssertion`, `VerifyMakeCredential`, `VerifyGetAssertion`                                     |
 | Device metadata | `CanProbeDeviceMetadata`, `ProbeDeviceMetadata`                                                                    |
-| Metadata        | `ctapkit.LookupMDS`                                                                                                |
 
 Operation methods return pointers to concrete result types. A nil pointer means that the workflow did not start. A
 non-nil value may contain a preview or other partial data together with an error.
@@ -177,8 +176,8 @@ They correlate the operation input with the runtime result and return a compact 
 summary. Verification does not use the network, clock, MDS, or an application trust policy.
 
 These helpers do not replace relying-party validation of the WebAuthn ceremony. The application still owns expected
-challenge and origin checks, client-data type policy, and attestation trust decisions. An application that needs FIDO
-metadata calls `ctapkit.LookupMDS` separately with the credential's AAGUID.
+challenge and origin checks, client-data type policy, and attestation trust decisions. Applications can obtain verified
+FIDO metadata separately with [`github.com/go-ctap/mds`](https://github.com/go-ctap/mds).
 
 ## Previews and dry runs
 
@@ -221,26 +220,6 @@ Use `failure.IsCode` for application decisions. Do not parse `err.Error()`. The 
 described in
 [`docs/error-contract.md`](docs/error-contract.md).
 
-## FIDO Metadata Service
-
-`ctapkit.LookupMDS` fetches and verifies the FIDO MDS3 blob, finds an entry by AAGUID, and caches the verified blob in
-memory and on disk. Lookup is AAGUID-only and is independent from WebAuthn result verification.
-
-```go
-inspection, err := authenticator.Inspect(ctx)
-if err != nil {
-	return err
-}
-
-metadata, err := ctapkit.LookupMDS(ctx, inspection.Info.AAGUID)
-if err != nil {
-	return err
-}
-```
-
-The runtime verifies disk cache entries again before it uses them. Applications own metadata presentation and trust
-policy.
-
 ## Diagnostic journal
 
 Create a journal and pass it when the authenticator is opened:
@@ -271,7 +250,7 @@ sensitive data.
 
 | Package                                                                             | Use it for                                                                                |
 |-------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
-| `ctapkit`                                                                           | Device discovery, authenticator lifecycle, typed operations, MDS, and diagnostic journals |
+| `ctapkit`                                                                           | Device discovery, authenticator lifecycle, typed operations, and diagnostic journals      |
 | `model`                                                                             | Shared event, interaction, and log DTOs                                                   |
 | `model/config`                                                                      | Configuration and biometric operation DTOs                                                |
 | `model/credentials`                                                                 | Credential inventory and mutation DTOs                                                    |
@@ -279,7 +258,7 @@ sensitive data.
 | `model/largeblobs`                                                                  | Large-blob operation DTOs                                                                 |
 | `model/webauthn`                                                                    | WebAuthn operation DTOs                                                                   |
 | `model/failure`                                                                     | Stable public error codes and snapshots                                                   |
-| `model/conformance`, `model/mds`, `model/operation`, `model/report`, `model/safety` | Shared report and contract DTOs                                                           |
+| `model/conformance`, `model/operation`, `model/report`, `model/safety`              | Shared report and contract DTOs                                                           |
 | `transport`                                                                         | HID and Windows proxy discovery modes                                                     |
 
 Packages under `internal` contain runtime implementation details and are not a public API.

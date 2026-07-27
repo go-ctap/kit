@@ -2,25 +2,16 @@ package ctapkit
 
 import (
 	"bytes"
-	"crypto"
-	"crypto/ecdsa"
 	"crypto/sha256"
-	"crypto/x509"
 	"encoding/hex"
+	"errors"
 	"reflect"
 
-	"github.com/fxamacker/cbor/v2"
 	"github.com/go-ctap/ctap/attestation"
 	"github.com/go-ctap/ctap/cose"
 	"github.com/go-ctap/ctap/protocol"
 	appwebauthn "github.com/go-ctap/kit/model/webauthn"
 )
-
-type attestationObject struct {
-	Format    attestation.AttestationStatementFormatIdentifier `cbor:"fmt"`
-	AuthData  []byte                                           `cbor:"authData"`
-	Statement map[string]any                                   `cbor:"attStmt"`
-}
 
 func VerifyMakeCredential(
 	input appwebauthn.MakeCredentialInput,
@@ -97,8 +88,13 @@ func VerifyMakeCredential(
 		return finishMakeCredentialVerification(verification, outcome)
 	}
 
-	object, ok := parseAttestationObject(result.AttestationObjectCBORHex)
-	if !ok {
+	objectRaw, err := hex.DecodeString(result.AttestationObjectCBORHex)
+	if err != nil {
+		outcome.fail(appwebauthn.VerificationIssueAttestationObjectMalformed)
+		return finishMakeCredentialVerification(verification, outcome)
+	}
+	object, err := attestation.ParseObject(objectRaw)
+	if err != nil {
 		outcome.fail(appwebauthn.VerificationIssueAttestationObjectMalformed)
 		return finishMakeCredentialVerification(verification, outcome)
 	}
@@ -111,29 +107,38 @@ func VerifyMakeCredential(
 	signedData := make([]byte, 0, len(authDataRaw)+len(clientDataHash))
 	signedData = append(signedData, authDataRaw...)
 	signedData = append(signedData, clientDataHash[:]...)
-	response := protocol.AuthenticatorMakeCredentialResponse{AttestationStatement: object.Statement}
 
 	switch object.Format {
 	case attestation.AttestationStatementFormatIdentifierPacked:
-		verifyPackedAttestation(
-			&verification,
-			&outcome,
-			response,
+		statement, parsed := attestation.ParsePackedStatement(object.Statement)
+		if !parsed {
+			outcome.fail(appwebauthn.VerificationIssueAttestationStatementMalformed)
+			break
+		}
+		_, ecdaaPresent := object.Statement["ecdaaKeyId"]
+		statementVerification, err := attestation.VerifyPacked(
+			statement,
+			ecdaaPresent,
 			credentialPublicKey,
 			algorithm,
 			signedData,
 		)
+		applyAttestationStatementVerification(&verification, &outcome, statementVerification, err)
 	case attestation.AttestationStatementFormatIdentifierFIDOU2F:
-		verifyFIDOU2FAttestation(
-			&verification,
-			&outcome,
-			response,
+		statement, parsed := attestation.ParseFIDOU2FStatement(object.Statement)
+		if !parsed {
+			outcome.fail(appwebauthn.VerificationIssueAttestationStatementMalformed)
+			break
+		}
+		statementVerification, err := attestation.VerifyFIDOU2F(
+			statement,
 			credentialPublicKey,
 			algorithm,
 			authData.RPIDHash,
 			clientDataHash[:],
 			attested.CredentialID,
 		)
+		applyAttestationStatementVerification(&verification, &outcome, statementVerification, err)
 	case attestation.AttestationStatementFormatIdentifierNone:
 		verification.AttestationType = appwebauthn.AttestationTypeNone
 		if len(object.Statement) != 0 {
@@ -145,24 +150,6 @@ func VerifyMakeCredential(
 	}
 
 	return finishMakeCredentialVerification(verification, outcome)
-}
-
-func parseAttestationObject(value string) (attestationObject, bool) {
-	raw, err := hex.DecodeString(value)
-	if err != nil {
-		return attestationObject{}, false
-	}
-	reader := bytes.NewReader(raw)
-	decoder := cbor.NewDecoder(reader)
-	var object attestationObject
-	if err := decoder.Decode(&object); err != nil || reader.Len() != 0 {
-		return attestationObject{}, false
-	}
-	if object.Format == "" || object.AuthData == nil || object.Statement == nil {
-		return attestationObject{}, false
-	}
-
-	return object, true
 }
 
 func makeCredentialResultMatches(
@@ -186,105 +173,27 @@ func makeCredentialResultMatches(
 		result.AAGUID == authData.AttestedCredentialData.AAGUID.String()
 }
 
-func verifyPackedAttestation(
+func applyAttestationStatementVerification(
 	verification *appwebauthn.MakeCredentialVerification,
 	outcome *verificationOutcome,
-	response protocol.AuthenticatorMakeCredentialResponse,
-	credentialPublicKey crypto.PublicKey,
-	credentialAlgorithm cose.Algorithm,
-	signedData []byte,
+	statementVerification attestation.Verification,
+	err error,
 ) {
-	statement, ok := response.PackedAttestationStatementFormat()
-	if !ok {
-		outcome.fail(appwebauthn.VerificationIssueAttestationStatementMalformed)
-		return
-	}
-	if _, ecdaa := response.AttestationStatement["ecdaaKeyId"]; ecdaa {
-		verification.AttestationType = appwebauthn.AttestationTypeUnsupported
+	verification.AttestationType = appwebauthn.AttestationType(statementVerification.Type)
+	verification.SignatureValid = statementVerification.SignatureValid
+	switch {
+	case err == nil:
+	case errors.Is(err, attestation.ErrFormatUnsupported):
 		outcome.unavailable(appwebauthn.VerificationIssueAttestationFormatUnsupported)
-		return
-	}
-
-	if len(statement.X509Chain) == 0 {
-		verification.AttestationType = appwebauthn.AttestationTypeSelf
-		if statement.Algorithm != credentialAlgorithm {
-			outcome.fail(appwebauthn.VerificationIssueAttestationStatementMalformed)
-			return
-		}
-		verification.SignatureValid = verifySignature(
-			outcome,
-			credentialPublicKey,
-			statement.Algorithm,
-			signedData,
-			statement.Signature,
-			appwebauthn.VerificationIssueAttestationSignatureInvalid,
-		)
-
-		return
-	}
-
-	verification.AttestationType = appwebauthn.AttestationTypeBasic
-	leaf, err := x509.ParseCertificate(statement.X509Chain[0])
-	if err != nil {
-		outcome.fail(appwebauthn.VerificationIssueAttestationStatementMalformed)
-		return
-	}
-	verification.SignatureValid = verifySignature(
-		outcome,
-		leaf.PublicKey,
-		statement.Algorithm,
-		signedData,
-		statement.Signature,
-		appwebauthn.VerificationIssueAttestationSignatureInvalid,
-	)
-}
-
-func verifyFIDOU2FAttestation(
-	verification *appwebauthn.MakeCredentialVerification,
-	outcome *verificationOutcome,
-	response protocol.AuthenticatorMakeCredentialResponse,
-	credentialPublicKey crypto.PublicKey,
-	credentialAlgorithm cose.Algorithm,
-	rpIDHash []byte,
-	clientDataHash []byte,
-	credentialID []byte,
-) {
-	verification.AttestationType = appwebauthn.AttestationTypeBasic
-	statement, ok := response.FIDOU2FAttestationStatementFormat()
-	if !ok || len(statement.X509Chain) == 0 {
-		outcome.fail(appwebauthn.VerificationIssueAttestationStatementMalformed)
-		return
-	}
-	key, ok := credentialPublicKey.(*ecdsa.PublicKey)
-	if !ok || credentialAlgorithm != cose.AlgorithmES256 {
-		outcome.fail(appwebauthn.VerificationIssueAttestationStatementMalformed)
-		return
-	}
-	encodedKey, err := key.Bytes()
-	if err != nil {
+	case errors.Is(err, attestation.ErrAlgorithmUnsupported):
+		outcome.unavailable(appwebauthn.VerificationIssueCredentialAlgorithmUnsupported)
+	case errors.Is(err, attestation.ErrCredentialKeyMalformed):
 		outcome.fail(appwebauthn.VerificationIssueCredentialKeyMalformed)
-		return
-	}
-
-	signedData := make([]byte, 0, 1+len(rpIDHash)+len(clientDataHash)+len(credentialID)+len(encodedKey))
-	signedData = append(signedData, 0)
-	signedData = append(signedData, rpIDHash...)
-	signedData = append(signedData, clientDataHash...)
-	signedData = append(signedData, credentialID...)
-	signedData = append(signedData, encodedKey...)
-	leaf, err := x509.ParseCertificate(statement.X509Chain[0])
-	if err != nil {
+	case errors.Is(err, attestation.ErrSignatureInvalid):
+		outcome.fail(appwebauthn.VerificationIssueAttestationSignatureInvalid)
+	default:
 		outcome.fail(appwebauthn.VerificationIssueAttestationStatementMalformed)
-		return
 	}
-	verification.SignatureValid = verifySignature(
-		outcome,
-		leaf.PublicKey,
-		cose.AlgorithmES256,
-		signedData,
-		statement.Signature,
-		appwebauthn.VerificationIssueAttestationSignatureInvalid,
-	)
 }
 
 func finishMakeCredentialVerification(
