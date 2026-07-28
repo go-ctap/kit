@@ -645,7 +645,7 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 	}
 }
 
-func TestDeviceReportVendorMetadataJSON(t *testing.T) {
+func TestDeviceReportVendorDetailsJSON(t *testing.T) {
 	value := report.DeviceReport{
 		Attachment: report.AttachmentReport{
 			ID:        "attachment-1",
@@ -658,9 +658,49 @@ func TestDeviceReportVendorMetadataJSON(t *testing.T) {
 			Firmware: "5.7.1",
 			Interfaces: []report.InterfaceReport{{
 				Interface: report.InterfaceUSB,
-				Supported: []report.Capability{report.CapabilityU2F, report.CapabilityCTAP2},
-				Enabled:   []report.Capability{report.CapabilityCTAP2},
+				Supported: []report.Capability{
+					report.CapabilityU2F,
+					report.CapabilityHSMAuth,
+					report.CapabilityCTAP2,
+				},
+				Enabled: []report.Capability{
+					report.CapabilityHSMAuth,
+					report.CapabilityCTAP2,
+				},
 			}},
+			Details: &report.VendorDetails{
+				Yubico: &report.YubicoDetails{
+					PartNumber:        "5060405",
+					FormFactor:        report.YubicoFormFactorUSBCKeychain,
+					IsFIPS:            true,
+					EffectiveFirmware: "5.8.0",
+					VersionQualifier: &report.YubicoVersionQualifier{
+						Version:     "5.8.0",
+						ReleaseType: report.YubicoReleaseTypeBeta,
+						Iteration:   3,
+					},
+					AutoEjectTimeout:         10,
+					ChallengeResponseTimeout: 20,
+					Locked:                   true,
+					FIPSCapable: []report.Capability{
+						report.CapabilityPIV,
+						report.CapabilityHSMAuth,
+						report.CapabilityCTAP2,
+					},
+					FIPSApproved: []report.Capability{
+						report.CapabilityPIV,
+						report.CapabilityCTAP2,
+					},
+					PINComplexity: true,
+					NFCRestricted: true,
+					ResetBlocked: []report.Capability{
+						report.CapabilityU2F,
+						report.CapabilityHSMAuth,
+					},
+					FPSVersion: "1.2.3",
+					STMVersion: "4.5.6",
+				},
+			},
 		},
 		Resolution: report.IdentityResolution{
 			State:    report.IdentityResolved,
@@ -668,7 +708,7 @@ func TestDeviceReportVendorMetadataJSON(t *testing.T) {
 		},
 	}
 
-	assertJSON(t, value, `{"attachment":{"id":"attachment-1","transport":"hid"},"identity":{"vendor":"yubico","model":"YubiKey 5C NFC","serial":"12345678","firmware":"5.7.1","interfaces":[{"interface":"usb","supported":["u2f","ctap2"],"enabled":["ctap2"]}]},"identityResolution":{"state":"resolved","provider":"yubico"}}`)
+	assertJSON(t, value, `{"attachment":{"id":"attachment-1","transport":"hid"},"identity":{"vendor":"yubico","model":"YubiKey 5C NFC","serial":"12345678","firmware":"5.7.1","interfaces":[{"interface":"usb","supported":["u2f","hsmauth","ctap2"],"enabled":["hsmauth","ctap2"]}],"details":{"yubico":{"partNumber":"5060405","formFactor":"usbCKeychain","isFIPS":true,"isSecurityKey":false,"effectiveFirmware":"5.8.0","versionQualifier":{"version":"5.8.0","releaseType":"beta","iteration":3},"autoEjectTimeout":10,"challengeResponseTimeout":20,"locked":true,"fipsCapable":["piv","hsmauth","ctap2"],"fipsApproved":["piv","ctap2"],"pinComplexity":true,"nfcRestricted":true,"resetBlocked":["u2f","hsmauth"],"fpsVersion":"1.2.3","stmVersion":"4.5.6"}}},"identityResolution":{"state":"resolved","provider":"yubico"}}`)
 }
 
 func TestCTAP23JSONPresenceContracts(t *testing.T) {

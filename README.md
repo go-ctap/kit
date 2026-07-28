@@ -113,7 +113,9 @@ func main() {
 later through full snapshot events from `Inventory.Events` without changing the
 attachment ID or list order. HID authenticators can open while that optional
 identity is still resolving. Smart-card opens wait for the resolver to release
-its exclusive PC/SC access.
+its exclusive PC/SC access. `DeviceIdentity.Details` is a tagged collection of
+provider-specific reports; the Yubico section includes device-information
+properties that do not belong in the normalized identity fields.
 
 ## Runtime lifecycle
 

@@ -88,15 +88,22 @@ func (r *Resolver) resolveYubico(
 		return nil, err
 	}
 
+	return yubicoIdentity(descriptor.Product, info), nil
+}
+
+func yubicoIdentity(fallbackModel string, info yubico.DeviceInfo) *report.DeviceIdentity {
 	identity := &report.DeviceIdentity{
 		Vendor:   report.VendorYubico,
-		Model:    info.ModelName(descriptor.Product),
+		Model:    info.ModelName(fallbackModel),
 		Firmware: info.FirmwareVersion.String(),
 		Interfaces: []report.InterfaceReport{{
 			Interface: report.InterfaceUSB,
 			Supported: yubicoCapabilities(info.SupportedUSBCapabilities),
 			Enabled:   yubicoCapabilities(info.EnabledUSBCapabilities),
 		}},
+		Details: &report.VendorDetails{
+			Yubico: yubicoDetails(info),
+		},
 	}
 	if info.Serial != nil {
 		identity.Serial = strconv.FormatUint(uint64(*info.Serial), 10)
@@ -116,7 +123,76 @@ func (r *Resolver) resolveYubico(
 		})
 	}
 
-	return identity, nil
+	return identity
+}
+
+func yubicoDetails(info yubico.DeviceInfo) *report.YubicoDetails {
+	details := &report.YubicoDetails{
+		FormFactor:               yubicoFormFactor(info.FormFactor),
+		IsFIPS:                   info.IsFIPS,
+		IsSecurityKey:            info.IsSecurityKey,
+		AutoEjectTimeout:         info.AutoEjectTimeout,
+		ChallengeResponseTimeout: info.ChallengeResponseTimeout,
+		Locked:                   info.Locked,
+		FIPSCapable:              yubicoCapabilities(info.FIPSCapable),
+		FIPSApproved:             yubicoCapabilities(info.FIPSApproved),
+		PINComplexity:            info.PinComplexity,
+		NFCRestricted:            info.NFCRestricted,
+		ResetBlocked:             yubicoCapabilities(info.ResetBlocked),
+	}
+	if info.PartNumber != nil {
+		details.PartNumber = *info.PartNumber
+	}
+	if effective := info.EffectiveFirmwareVersion().String(); effective != info.FirmwareVersion.String() {
+		details.EffectiveFirmware = effective
+	}
+	if qualifier := info.VersionQualifier; qualifier != nil {
+		details.VersionQualifier = &report.YubicoVersionQualifier{
+			Version:     qualifier.Version.String(),
+			ReleaseType: yubicoReleaseType(qualifier.ReleaseType),
+			Iteration:   qualifier.Iteration,
+		}
+	}
+	if info.FPSVersion != nil {
+		details.FPSVersion = info.FPSVersion.String()
+	}
+	if info.STMVersion != nil {
+		details.STMVersion = info.STMVersion.String()
+	}
+
+	return details
+}
+
+func yubicoFormFactor(value yubico.FormFactor) report.YubicoFormFactor {
+	switch value {
+	case yubico.FormFactorUSBAKeychain:
+		return report.YubicoFormFactorUSBAKeychain
+	case yubico.FormFactorUSBANano:
+		return report.YubicoFormFactorUSBANano
+	case yubico.FormFactorUSBCKeychain:
+		return report.YubicoFormFactorUSBCKeychain
+	case yubico.FormFactorUSBCNano:
+		return report.YubicoFormFactorUSBCNano
+	case yubico.FormFactorUSBCLightning:
+		return report.YubicoFormFactorUSBCLightning
+	case yubico.FormFactorUSBABiometricKeychain:
+		return report.YubicoFormFactorUSBABiometricKeychain
+	case yubico.FormFactorUSBCBiometricKeychain:
+		return report.YubicoFormFactorUSBCBiometricKeychain
+	default:
+		return report.YubicoFormFactorUnknown
+	}
+}
+
+func yubicoReleaseType(value yubico.ReleaseType) report.YubicoReleaseType {
+	switch value {
+	case yubico.ReleaseTypeAlpha:
+		return report.YubicoReleaseTypeAlpha
+	case yubico.ReleaseTypeBeta:
+		return report.YubicoReleaseTypeBeta
+	default:
+		return report.YubicoReleaseTypeFinal
+	}
 }
 
 func (r *Resolver) resolveToken2(
@@ -175,6 +251,7 @@ func yubicoCapabilities(value yubico.Capability) []report.Capability {
 		{yubico.CapabilityOpenPGP, report.CapabilityOpenPGP},
 		{yubico.CapabilityPIV, report.CapabilityPIV},
 		{yubico.CapabilityOATH, report.CapabilityOATH},
+		{yubico.CapabilityHSMAuth, report.CapabilityHSMAuth},
 		{yubico.CapabilityCTAP2, report.CapabilityCTAP2},
 	}
 

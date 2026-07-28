@@ -11,7 +11,8 @@ The root `ctapkit` package exposes three runtime concepts:
 - `Attachment` is the transport endpoint represented by
   `DeviceReport.Attachment`; its opaque ID depends only on that endpoint.
 - `DeviceIdentity` is optional vendor identity resolved independently from the
-  attachment and published as an atomic update.
+  attachment and published as an atomic update. Its optional `Details` field is
+  an extensible tagged collection of concrete provider-specific reports.
 - `Authenticator` is one opened CTAP authenticator channel. It remains open
   while the application has that attachment selected.
 
@@ -148,7 +149,7 @@ flowchart LR
   A["Transport discovery"] --> B["Publish attachment snapshot"]
   B --> C["Queue one resolver task for connection generation"]
   C --> D["Collect exact correlation evidence"]
-  D --> E["Return one atomic DeviceIdentity"]
+  D --> E["Return one atomic DeviceIdentity and vendor details"]
   E --> F["Publish full identity snapshot"]
 ```
 
