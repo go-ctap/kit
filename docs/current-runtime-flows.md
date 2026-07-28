@@ -33,12 +33,12 @@ A typical UI uses the runtime as follows:
 6. Close the selected authenticator and then the inventory when the application exits.
 
 Attachments are published before optional identity is available. The
-inventory resolves each attachment once per connection generation through one
-bounded queue and emits full typed snapshots. HID authenticators open through
-an independent CTAPHID channel without waiting for optional identity. Opening
-a pending smart-card attachment promotes and waits for that same task so the
-resolver releases its exclusive PC/SC access first. Identity failure does not
-prevent CTAP open.
+inventory resolves each attachment once per connection generation through an
+independent task and emits full typed snapshots. HID authenticators open
+through an independent CTAPHID channel without waiting for optional identity.
+Opening a pending smart-card attachment waits for that attachment's task so
+the resolver releases its exclusive PC/SC access first. Identity failure does
+not prevent CTAP open.
 
 The consuming application may use a selection ID to correlate UI requests,
 events, and interactions. That ID is application coordination state; it is not
@@ -147,16 +147,16 @@ persist it:
 ```mermaid
 flowchart LR
   A["Transport discovery"] --> B["Publish attachment snapshot"]
-  B --> C["Queue one resolver task for connection generation"]
+  B --> C["Start one resolver task for connection generation"]
   C --> D["Collect exact correlation evidence"]
   D --> E["Return one atomic DeviceIdentity and vendor details"]
   E --> F["Publish full identity snapshot"]
 ```
 
 `AttachmentID` is stable across identity updates and never contains the vendor
-serial. Removal cancels the resolver task and its generation guard rejects late
-results. Identity is resolved again after reinsertion and is never read from or
-written to a persistent cache. Token2 correlation accepts only exact serial,
+serial. Removal cancels the resolver task, and record ownership rejects late
+results. Identity is resolved again after reinsertion and is never read from
+or written to a persistent cache. Token2 correlation accepts only exact serial,
 USB parent/instance, or ATR product-and-suffix evidence; ambiguity produces an
 unavailable identity rather than selecting a convenient candidate.
 

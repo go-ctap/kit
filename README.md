@@ -127,8 +127,8 @@ A normal application follows this lifecycle:
 4. Run typed operations on the returned `*ctapkit.Authenticator`.
 5. Close the authenticator when selection changes, then close the inventory when the application exits.
 
-An `Inventory` owns transport monitoring and one bounded identity-resolution queue. An `Authenticator` owns one open
-transport channel, its token cache, and its close and cancellation state. It runs one
+An `Inventory` owns transport monitoring and independent identity-resolution tasks for its attachments. An
+`Authenticator` owns one open transport channel, its token cache, and its close and cancellation state. It runs one
 complete workflow at a time. This prevents two multi-command operations on the same channel from mixing with each other.
 
 Credential-list and configuration workflows read current state per operation. Large-blob workflows are the deliberate

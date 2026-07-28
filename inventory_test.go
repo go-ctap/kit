@@ -3,7 +3,6 @@ package ctapkit
 import (
 	"context"
 	"errors"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -44,6 +43,15 @@ func (r *blockingIdentityResolver) Resolve(
 	}
 }
 
+type inventoryDiscoveryFunc func(context.Context, transport.Mode) ([]discovery.Descriptor, error)
+
+func (f inventoryDiscoveryFunc) Discover(
+	ctx context.Context,
+	mode transport.Mode,
+) ([]discovery.Descriptor, error) {
+	return f(ctx, mode)
+}
+
 type inventoryTestLifecycle struct{}
 
 func (inventoryTestLifecycle) Close() error { return nil }
@@ -73,12 +81,9 @@ func newTestInventory(
 		ctx:         ctx,
 		cancel:      cancel,
 		events:      make(chan InventoryEvent, 1),
-		workerDone:  make(chan struct{}),
 		monitorDone: monitorDone,
 		records:     make(map[report.AttachmentID]*inventoryRecord),
 	}
-	inventory.cond = sync.NewCond(&inventory.mu)
-	go inventory.runResolver()
 	t.Cleanup(func() {
 		if err := inventory.Close(); err != nil {
 			t.Errorf("close inventory: %v", err)
@@ -139,18 +144,31 @@ func TestInventoryOpenWaitsForExistingResolveTask(t *testing.T) {
 	resolver := &blockingIdentityResolver{
 		provider: report.VendorToken2,
 		err:      resolveErr,
-		started:  make(chan struct{}, 1),
+		started:  make(chan struct{}, 2),
 		release:  make(chan struct{}),
 	}
 	openCalled := make(chan struct{}, 1)
 	inventory := newTestInventory(t, resolver, recordInventoryOpen(openCalled))
-	inventory.applyDescriptors([]discovery.Descriptor{{
-		Transport: transport.ModeSmartCard,
-		Path:      "reader-1",
-		ATR:       []byte{0x01},
-	}})
+	inventory.applyDescriptors([]discovery.Descriptor{
+		{
+			Transport: transport.ModeSmartCard,
+			Path:      "reader-1",
+			ATR:       []byte{0x01},
+		},
+		{
+			Transport: transport.ModeHID,
+			Path:      "hid-2",
+			VendorID:  0x349e,
+		},
+	})
 	id := inventory.Snapshot().Devices[0].Attachment.ID
-	<-resolver.started
+	for range 2 {
+		select {
+		case <-resolver.started:
+		case <-time.After(time.Second):
+			t.Fatal("identity tasks did not start concurrently")
+		}
+	}
 
 	opened := make(chan *Authenticator, 1)
 	openErrors := make(chan error, 1)
@@ -171,8 +189,8 @@ func TestInventoryOpenWaitsForExistingResolveTask(t *testing.T) {
 	if err := <-openErrors; err != nil {
 		t.Fatalf("open after identity failure: %v", err)
 	}
-	if resolver.calls.Load() != 1 {
-		t.Fatalf("resolve calls = %d, want 1", resolver.calls.Load())
+	if resolver.calls.Load() != 2 {
+		t.Fatalf("resolve calls = %d, want 2", resolver.calls.Load())
 	}
 	if authenticator == nil {
 		t.Fatal("open returned nil authenticator")
@@ -197,6 +215,9 @@ func TestInventoryHIDOpenDoesNotWaitForIdentity(t *testing.T) {
 	}})
 	id := inventory.Snapshot().Devices[0].Attachment.ID
 	<-resolver.started
+	inventory.mu.Lock()
+	resolveDone := inventory.records[id].done
+	inventory.mu.Unlock()
 
 	authenticator, err := inventory.OpenAuthenticator(t.Context(), id)
 	if err != nil {
@@ -210,8 +231,14 @@ func TestInventoryHIDOpenDoesNotWaitForIdentity(t *testing.T) {
 	if err := authenticator.Close(); err != nil {
 		t.Fatalf("close authenticator: %v", err)
 	}
-
-	close(resolver.release)
+	if err := inventory.Close(); err != nil {
+		t.Fatalf("close inventory: %v", err)
+	}
+	select {
+	case <-resolveDone:
+	default:
+		t.Fatal("close returned before identity task finished")
+	}
 }
 
 func TestInventoryRemovalRejectsLateIdentity(t *testing.T) {
@@ -231,12 +258,21 @@ func TestInventoryRemovalRejectsLateIdentity(t *testing.T) {
 		VendorID:  0x349e,
 	}})
 	<-resolver.started
+	id := inventory.Snapshot().Devices[0].Attachment.ID
+	inventory.mu.Lock()
+	record := inventory.records[id]
+	inventory.mu.Unlock()
 
 	inventory.applyDescriptors(nil)
 	close(resolver.release)
-	event := <-inventory.Events()
-	if len(event.Snapshot.Devices) != 0 {
-		t.Fatalf("late identity restored removed attachment: %#v", event.Snapshot.Devices)
+	<-record.done
+	if devices := inventory.Snapshot().Devices; len(devices) != 0 {
+		t.Fatalf("late identity restored removed attachment: %#v", devices)
+	}
+	select {
+	case event := <-inventory.Events():
+		t.Fatalf("late identity published an event: %#v", event)
+	default:
 	}
 }
 
@@ -279,7 +315,79 @@ func TestInventoryReplacesIdentityWhenConnectionEvidenceChanges(t *testing.T) {
 	inventory.mu.Lock()
 	secondRecord := inventory.records[secondDevice.Attachment.ID]
 	inventory.mu.Unlock()
-	if secondRecord == firstRecord || secondRecord.generation <= firstRecord.generation {
-		t.Fatal("connection evidence change did not create a new generation")
+	if secondRecord == firstRecord {
+		t.Fatal("connection evidence change did not replace the inventory record")
+	}
+}
+
+func TestInventorySerializesScans(t *testing.T) {
+	var calls atomic.Int32
+	firstStarted := make(chan struct{})
+	releaseFirst := make(chan struct{})
+
+	inventory := newTestInventory(t, &blockingIdentityResolver{provider: report.VendorUnknown}, nil)
+	inventory.discovery = inventoryDiscoveryFunc(func(
+		ctx context.Context,
+		_ transport.Mode,
+	) ([]discovery.Descriptor, error) {
+		call := calls.Add(1)
+		path := "newer"
+		if call == 1 {
+			close(firstStarted)
+			select {
+			case <-releaseFirst:
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+			path = "older"
+		}
+
+		return []discovery.Descriptor{{
+			Transport: transport.ModeHID,
+			Path:      path,
+		}}, nil
+	})
+
+	done := make(chan error, 2)
+	go func() {
+		done <- inventory.scan(t.Context(), InventoryTriggerTopology)
+	}()
+	<-firstStarted
+
+	secondLaunched := make(chan struct{})
+	go func() {
+		close(secondLaunched)
+		done <- inventory.Refresh(t.Context())
+	}()
+	<-secondLaunched
+	time.Sleep(20 * time.Millisecond)
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("concurrent discovery calls = %d, want 1", got)
+	}
+
+	close(releaseFirst)
+	for range 2 {
+		if err := <-done; err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+	}
+	if got := calls.Load(); got != 2 {
+		t.Fatalf("discovery calls = %d, want 2", got)
+	}
+
+	snapshot := inventory.Snapshot()
+	if len(snapshot.Devices) != 1 {
+		t.Fatalf("final devices = %d, want 1", len(snapshot.Devices))
+	}
+	expectedID := attachmentReport(discovery.Descriptor{
+		Transport: transport.ModeHID,
+		Path:      "newer",
+	}).ID
+	if snapshot.Devices[0].Attachment.ID != expectedID {
+		t.Fatalf(
+			"final attachment = %q, want %q",
+			snapshot.Devices[0].Attachment.ID,
+			expectedID,
+		)
 	}
 }

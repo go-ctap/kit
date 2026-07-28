@@ -2,7 +2,6 @@ package ctapkit
 
 import (
 	"context"
-	"slices"
 	"sync"
 	"time"
 
@@ -45,48 +44,38 @@ type identityResolver interface {
 	) (*report.DeviceIdentity, report.Vendor, bool, error)
 }
 
+type inventoryDiscovery interface {
+	Discover(context.Context, transport.Mode) ([]discovery.Descriptor, error)
+}
+
 type inventoryRecord struct {
 	device     attachment
-	generation uint64
 	resolveCtx context.Context
 	cancel     context.CancelFunc
 	done       chan struct{}
-	doneOnce   sync.Once
-}
-
-func (r *inventoryRecord) finish() {
-	r.doneOnce.Do(func() {
-		close(r.done)
-	})
-}
-
-type resolveWork struct {
-	record     *inventoryRecord
-	generation uint64
 }
 
 // Inventory owns transport monitoring, attachment topology and optional
 // identity resolution for one fixed transport mode.
 type Inventory struct {
 	mode        transport.Mode
-	discovery   *discovery.Discovery
+	discovery   inventoryDiscovery
 	identity    identityResolver
 	open        authenticatorOpenFunc
 	ctx         context.Context
 	cancel      context.CancelFunc
 	events      chan InventoryEvent
 	monitor     <-chan discovery.Event
-	workerDone  chan struct{}
 	monitorDone chan struct{}
 	closeOnce   sync.Once
 
-	mu         sync.Mutex
-	cond       *sync.Cond
-	closed     bool
-	generation uint64
-	records    map[report.AttachmentID]*inventoryRecord
-	order      []report.AttachmentID
-	queue      []resolveWork
+	scanMu    sync.Mutex
+	resolvers sync.WaitGroup
+
+	mu      sync.Mutex
+	closed  bool
+	records map[report.AttachmentID]*inventoryRecord
+	order   []report.AttachmentID
 }
 
 // OpenInventory performs the initial attachment scan and starts transport
@@ -99,21 +88,20 @@ func OpenInventory(ctx context.Context, mode transport.Mode) (*Inventory, error)
 	}
 
 	lifetime, cancel := context.WithCancel(context.Background())
+	source := discovery.New()
 	inventory := &Inventory{
 		mode:        mode,
-		discovery:   discovery.New(),
+		discovery:   source,
 		identity:    rtidentity.NewResolver(),
 		open:        rtauthenticator.Open,
 		ctx:         lifetime,
 		cancel:      cancel,
 		events:      make(chan InventoryEvent, 1),
-		workerDone:  make(chan struct{}),
 		monitorDone: make(chan struct{}),
 		records:     make(map[report.AttachmentID]*inventoryRecord),
 	}
-	inventory.cond = sync.NewCond(&inventory.mu)
 
-	monitor, err := inventory.discovery.Events(lifetime, mode)
+	monitor, err := source.Events(lifetime, mode)
 	if err != nil {
 		cancel()
 		return nil, err
@@ -127,7 +115,6 @@ func OpenInventory(ctx context.Context, mode transport.Mode) (*Inventory, error)
 	}
 	inventory.applyDescriptors(descriptors)
 
-	go inventory.runResolver()
 	go inventory.runMonitor()
 
 	return inventory, nil
@@ -150,6 +137,13 @@ func (i *Inventory) Events() <-chan InventoryEvent {
 // Refresh performs one authoritative attachment scan. Failed optional identity
 // does not turn a successful topology refresh into an error.
 func (i *Inventory) Refresh(ctx context.Context) error {
+	return i.scan(ctx, InventoryTriggerManual)
+}
+
+func (i *Inventory) scan(ctx context.Context, trigger InventoryTrigger) error {
+	i.scanMu.Lock()
+	defer i.scanMu.Unlock()
+
 	i.mu.Lock()
 	closed := i.closed
 	i.mu.Unlock()
@@ -165,7 +159,7 @@ func (i *Inventory) Refresh(ctx context.Context) error {
 		return err
 	}
 	i.applyDescriptors(descriptors)
-	i.publish(InventoryTriggerManual, nil)
+	i.publish(trigger, nil)
 
 	return nil
 }
@@ -190,7 +184,6 @@ func (i *Inventory) OpenAuthenticator(
 	}
 	var done <-chan struct{}
 	if record.device.descriptor.Transport == transport.ModeSmartCard {
-		i.promoteLocked(record)
 		done = record.done
 	}
 	i.mu.Unlock()
@@ -223,7 +216,7 @@ func (i *Inventory) OpenAuthenticator(
 func (i *Inventory) Close() error {
 	i.closeOnce.Do(func() {
 		i.stop()
-		<-i.workerDone
+		i.resolvers.Wait()
 		<-i.monitorDone
 		close(i.events)
 	})
@@ -240,15 +233,19 @@ func (i *Inventory) stop() {
 	i.closed = true
 	for _, record := range i.records {
 		record.cancel()
-		record.finish()
 	}
-	i.queue = nil
-	i.cond.Broadcast()
 	i.mu.Unlock()
 	i.cancel()
 }
 
 func (i *Inventory) applyDescriptors(descriptors []discovery.Descriptor) {
+	type pendingIdentity struct {
+		record     *inventoryRecord
+		id         report.AttachmentID
+		descriptor discovery.Descriptor
+	}
+	var pending []pendingIdentity
+
 	i.mu.Lock()
 	if i.closed {
 		i.mu.Unlock()
@@ -270,10 +267,8 @@ func (i *Inventory) applyDescriptors(descriptors []discovery.Descriptor) {
 		}
 		if existing != nil {
 			existing.cancel()
-			existing.finish()
 		}
 
-		i.generation++
 		resolveCtx, cancel := context.WithCancel(i.ctx)
 		provider := i.identity.Provider(descriptor)
 		state := report.IdentityUnavailable
@@ -291,102 +286,74 @@ func (i *Inventory) applyDescriptors(descriptors []discovery.Descriptor) {
 					},
 				},
 			},
-			generation: i.generation,
 			resolveCtx: resolveCtx,
 			cancel:     cancel,
 			done:       make(chan struct{}),
 		}
 		next[id] = record
 		if state == report.IdentityResolving {
-			i.queue = append(i.queue, resolveWork{
+			i.resolvers.Add(1)
+			pending = append(pending, pendingIdentity{
 				record:     record,
-				generation: record.generation,
+				id:         id,
+				descriptor: descriptor,
 			})
 		} else {
-			record.finish()
+			close(record.done)
 		}
 	}
 
 	for id, record := range i.records {
 		if next[id] == nil {
 			record.cancel()
-			record.finish()
 		}
 	}
 	i.records = next
 	i.order = order
-	i.cond.Broadcast()
 	i.mu.Unlock()
-}
 
-func (i *Inventory) runResolver() {
-	defer close(i.workerDone)
-
-	for {
-		i.mu.Lock()
-		for !i.closed && len(i.queue) == 0 {
-			i.cond.Wait()
-		}
-		if i.closed {
-			i.mu.Unlock()
-			return
-		}
-		work := i.queue[0]
-		i.queue = i.queue[1:]
-		current := i.records[work.record.device.report.Attachment.ID]
-		if current != work.record ||
-			current.generation != work.generation {
-			i.mu.Unlock()
-			work.record.finish()
-			continue
-		}
-		descriptor := work.record.device.descriptor
-		i.mu.Unlock()
-
-		resolveCtx, cancel := context.WithTimeout(work.record.resolveCtx, identityTimeout)
-		identity, provider, applicable, err := i.identity.Resolve(resolveCtx, descriptor)
-		cancel()
-
-		i.mu.Lock()
-		current = i.records[work.record.device.report.Attachment.ID]
-		if current == work.record &&
-			current.generation == work.generation &&
-			!i.closed {
-			resolution := report.IdentityResolution{Provider: provider}
-			switch {
-			case err != nil:
-				resolution.State = report.IdentityFailed
-				normalized := NormalizeError(err, failure.PhaseIdentity)
-				resolution.Error = failure.Snapshot(normalized)
-			case identity != nil:
-				resolution.State = report.IdentityResolved
-				current.device.report.Identity = identity
-			case !applicable:
-				resolution.State = report.IdentityUnavailable
-			default:
-				resolution.State = report.IdentityUnavailable
-			}
-			current.device.report.Resolution = resolution
-		}
-		work.record.finish()
-		i.mu.Unlock()
-
-		i.publish(InventoryTriggerIdentity, nil)
+	for _, task := range pending {
+		go i.resolveIdentity(task.record, task.id, task.descriptor)
 	}
 }
 
-func (i *Inventory) promoteLocked(record *inventoryRecord) {
-	index := slices.IndexFunc(i.queue, func(work resolveWork) bool {
-		return work.record == record
-	})
-	if index <= 0 {
+func (i *Inventory) resolveIdentity(
+	record *inventoryRecord,
+	id report.AttachmentID,
+	descriptor discovery.Descriptor,
+) {
+	defer i.resolvers.Done()
+	defer close(record.done)
+
+	resolveCtx, cancel := context.WithTimeout(record.resolveCtx, identityTimeout)
+	identity, provider, applicable, err := i.identity.Resolve(resolveCtx, descriptor)
+	cancel()
+
+	i.mu.Lock()
+	current := i.records[id]
+	if current != record || i.closed {
+		i.mu.Unlock()
 		return
 	}
 
-	work := i.queue[index]
-	copy(i.queue[1:index+1], i.queue[0:index])
-	i.queue[0] = work
-	i.cond.Signal()
+	resolution := report.IdentityResolution{Provider: provider}
+	switch {
+	case err != nil:
+		resolution.State = report.IdentityFailed
+		normalized := NormalizeError(err, failure.PhaseIdentity)
+		resolution.Error = failure.Snapshot(normalized)
+	case identity != nil:
+		resolution.State = report.IdentityResolved
+		current.device.report.Identity = identity
+	case !applicable:
+		resolution.State = report.IdentityUnavailable
+	default:
+		resolution.State = report.IdentityUnavailable
+	}
+	current.device.report.Resolution = resolution
+	i.mu.Unlock()
+
+	i.publish(InventoryTriggerIdentity, nil)
 }
 
 func (i *Inventory) runMonitor() {
@@ -415,14 +382,10 @@ func (i *Inventory) runMonitor() {
 			}
 		}
 
-		descriptors, err := i.discovery.Discover(i.ctx, i.mode)
-		if err != nil {
+		if err := i.scan(i.ctx, InventoryTriggerTopology); err != nil {
 			normalized := NormalizeError(err, failure.PhaseDiscovery)
 			i.publish(InventoryTriggerTopology, failure.Snapshot(normalized))
-			continue
 		}
-		i.applyDescriptors(descriptors)
-		i.publish(InventoryTriggerTopology, nil)
 	}
 }
 
