@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/discovery"
@@ -235,6 +236,7 @@ func (r *Resolver) resolveToken2(
 	}
 	if result.ModelKnown {
 		identity.Model = token2ModelName(result.Identity.Model)
+		identity.Firmware = strings.TrimSpace(result.Identity.Model.Release)
 	}
 
 	return identity, nil
