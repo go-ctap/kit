@@ -14,14 +14,14 @@ const fingerprintLength = 16
 // Fingerprint returns an opaque identifier for one discovered authenticator.
 // A serial-backed fingerprint follows the device across transport path changes;
 // devices without a reported serial fall back to their current attachment.
-func Fingerprint(mode transport.Mode, descriptor transport.Descriptor) string {
-	seed := fingerprintSeed(mode, descriptor)
+func Fingerprint(descriptor transport.Descriptor) string {
+	seed := fingerprintSeed(descriptor)
 	sum := sha256.Sum256([]byte(seed))
 
 	return hex.EncodeToString(sum[:])[:fingerprintLength]
 }
 
-func fingerprintSeed(mode transport.Mode, descriptor transport.Descriptor) string {
+func fingerprintSeed(descriptor transport.Descriptor) string {
 	parts := []string{
 		"ctapkit-fingerprint-v1",
 		fmt.Sprintf("%04x", descriptor.VendorID),
@@ -33,5 +33,15 @@ func fingerprintSeed(mode transport.Mode, descriptor transport.Descriptor) strin
 		return strings.Join(append(parts, "serial", serial), "\x00")
 	}
 
-	return strings.Join(append(parts, "path", string(mode), strings.TrimSpace(descriptor.Path)), "\x00")
+	attachment := append(
+		parts,
+		"path",
+		string(descriptor.Transport),
+		strings.TrimSpace(descriptor.Path),
+	)
+	if len(descriptor.ATR) != 0 {
+		attachment = append(attachment, "atr", hex.EncodeToString(descriptor.ATR))
+	}
+
+	return strings.Join(attachment, "\x00")
 }

@@ -157,7 +157,8 @@ func adaptContractAuthenticator(implementation any) *authenticator.Opened {
 }
 
 func newContractDevice() Device {
-	return newDevice(0, transport.ModeHID, transport.Descriptor{
+	return newDevice(0, transport.Descriptor{
+		Transport: transport.ModeHID,
 		Path:      "contract-path",
 		VendorID:  1,
 		ProductID: 2,

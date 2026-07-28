@@ -65,29 +65,29 @@ func (d Device) Report() report.DeviceReport {
 	return d.report
 }
 
-type discoverTransportFunc func(context.Context, transport.Mode) (transport.Mode, []transport.Descriptor, error)
+type discoverTransportFunc func(context.Context, transport.Mode) ([]transport.Descriptor, error)
 
 func discoverDevices(ctx context.Context, discover discoverTransportFunc, mode transport.Mode) ([]Device, error) {
 	if mode == "" {
 		mode = transport.ModeAuto
 	}
 
-	mode, descriptors, err := discover(ctx, mode)
+	descriptors, err := discover(ctx, mode)
 	if err != nil {
 		return nil, err
 	}
 
 	return lo.Map(descriptors, func(descriptor transport.Descriptor, index int) Device {
-		return newDevice(index, mode, descriptor)
+		return newDevice(index, descriptor)
 	}), nil
 }
 
-func newDevice(index int, mode transport.Mode, descriptor transport.Descriptor) Device {
+func newDevice(index int, descriptor transport.Descriptor) Device {
 	return Device{
 		report: report.DeviceReport{
-			Fingerprint:  rtdevice.Fingerprint(mode, descriptor),
+			Fingerprint:  rtdevice.Fingerprint(descriptor),
 			OrdinalAlias: strconv.Itoa(index + 1),
-			Transport:    mode,
+			Transport:    descriptor.Transport,
 			Path:         descriptor.Path,
 			Manufacturer: descriptor.Manufacturer,
 			Product:      descriptor.Product,

@@ -9,12 +9,13 @@ import (
 
 func TestFingerprint(t *testing.T) {
 	base := transport.Descriptor{
+		Transport: transport.ModeHID,
 		Path:      "hid://path-a",
 		Serial:    "12345678",
 		VendorID:  0x1050,
 		ProductID: 0x0407,
 	}
-	fingerprint := Fingerprint(transport.ModeHID, base)
+	fingerprint := Fingerprint(base)
 
 	if matched := regexp.MustCompile(`^[0-9a-f]{16}$`).MatchString(fingerprint); !matched {
 		t.Fatalf("fingerprint %q does not match expected lowercase hex shape", fingerprint)
@@ -39,12 +40,13 @@ func TestFingerprint(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			descriptor := transport.Descriptor{
+				Transport: test.mode,
 				Path:      test.path,
 				Serial:    test.serial,
 				VendorID:  base.VendorID,
 				ProductID: test.product,
 			}
-			got := Fingerprint(test.mode, descriptor)
+			got := Fingerprint(descriptor)
 			if same := got == fingerprint; same != test.wantSame {
 				t.Fatalf("fingerprint = %q, base = %q, same = %v, want %v", got, fingerprint, same, test.wantSame)
 			}
@@ -54,11 +56,12 @@ func TestFingerprint(t *testing.T) {
 
 func TestFingerprintFallsBackToTransportAttachmentWithoutSerial(t *testing.T) {
 	descriptor := transport.Descriptor{
+		Transport: transport.ModeHID,
 		Path:      "hid://path-a",
 		VendorID:  0x1050,
 		ProductID: 0x0407,
 	}
-	fingerprint := Fingerprint(transport.ModeHID, descriptor)
+	fingerprint := Fingerprint(descriptor)
 
 	tests := []struct {
 		name     string
@@ -72,11 +75,26 @@ func TestFingerprintFallsBackToTransportAttachmentWithoutSerial(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			descriptor.Transport = test.mode
 			descriptor.Path = test.path
-			got := Fingerprint(test.mode, descriptor)
+			got := Fingerprint(descriptor)
 			if same := got == fingerprint; same != test.wantSame {
 				t.Fatalf("fingerprint = %q, base = %q, same = %v, want %v", got, fingerprint, same, test.wantSame)
 			}
 		})
+	}
+}
+
+func TestFingerprintDistinguishesSmartCardATR(t *testing.T) {
+	first := transport.Descriptor{
+		Transport: transport.ModeSmartCard,
+		Path:      "PC/SC Reader",
+		ATR:       []byte{0x01},
+	}
+	second := first
+	second.ATR = []byte{0x02}
+
+	if Fingerprint(first) == Fingerprint(second) {
+		t.Fatal("fingerprints for different smart-card ATRs collide")
 	}
 }

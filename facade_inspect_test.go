@@ -85,7 +85,8 @@ func (a *yubicoContractAuthenticator) GetYubiKeyDeviceInfo(context.Context) (yub
 func openYubicoContractAuthenticator(t *testing.T, auth any) *contractAuthenticatorHandle {
 	t.Helper()
 
-	device := newDevice(0, transport.ModeHID, transport.Descriptor{
+	device := newDevice(0, transport.Descriptor{
+		Transport: transport.ModeHID,
 		Path:      "contract-yubico",
 		Product:   "Yubico Authenticator",
 		VendorID:  0x1050,

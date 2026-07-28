@@ -10,7 +10,6 @@ import (
 )
 
 type fakeTransportDiscovery struct {
-	mode      transport.Mode
 	list      []transport.Descriptor
 	err       error
 	requested transport.Mode
@@ -19,14 +18,14 @@ type fakeTransportDiscovery struct {
 func (d *fakeTransportDiscovery) discover(
 	_ context.Context,
 	requested transport.Mode,
-) (transport.Mode, []transport.Descriptor, error) {
+) ([]transport.Descriptor, error) {
 	d.requested = requested
 
 	if d.err != nil {
-		return "", nil, d.err
+		return nil, d.err
 	}
 
-	return d.mode, d.list, nil
+	return d.list, nil
 }
 
 func TestDiscoverDevicesReturnsOpaqueDevicesWithReports(t *testing.T) {
@@ -185,8 +184,13 @@ func TestOpenAuthenticatorRejectsZeroDevice(t *testing.T) {
 }
 
 func newFakeTransportDiscovery(descriptors []transport.Descriptor) *fakeTransportDiscovery {
+	for index := range descriptors {
+		if descriptors[index].Transport == "" {
+			descriptors[index].Transport = transport.ModeHID
+		}
+	}
+
 	return &fakeTransportDiscovery{
-		mode: transport.ModeHID,
 		list: descriptors,
 	}
 }

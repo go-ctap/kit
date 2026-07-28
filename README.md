@@ -37,13 +37,14 @@ JSON rendering, or product-specific workflows. Applications must provide those p
 
 ## Transports
 
-| Mode                         | Platform              | Behavior                                                                                                      |
-|------------------------------|-----------------------|---------------------------------------------------------------------------------------------------------------|
-| `transport.ModeAuto`         | Linux, macOS, Windows | Uses HID on Linux and macOS. On Windows, it uses HID for an elevated process and the Windows proxy otherwise. |
-| `transport.ModeHID`          | Linux, macOS, Windows | Opens the authenticator through direct USB HID access.                                                        |
-| `transport.ModeWindowsProxy` | Windows               | Connects to a running [`go-ctap/windows-proxy`](https://github.com/go-ctap/windows-proxy).                    |
+| Mode                         | Platform              | Behavior                                                                                                                                                |
+|------------------------------|-----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `transport.ModeAuto`         | Linux, macOS, Windows | Discovers PC/SC smart cards together with the platform HID policy. On Windows, HID uses direct access when elevated and the Windows proxy otherwise.     |
+| `transport.ModeHID`          | Linux, macOS, Windows | Opens the authenticator through direct USB HID access.                                                                                                  |
+| `transport.ModeSmartCard`    | Linux, macOS, Windows | Discovers present PC/SC cards exposing the standard FIDO ISO 7816 applet and opens them exclusively for CTAP commands.                                  |
+| `transport.ModeWindowsProxy` | Windows               | Connects to a running [`go-ctap/windows-proxy`](https://github.com/go-ctap/windows-proxy).                                                              |
 
-NFC, BLE, hybrid, and generic smart-card transports are not part of this runtime.
+BLE and hybrid transports are not part of this runtime.
 
 ## Installation
 
