@@ -1,2 +1,2 @@
-// Package device owns runtime authenticator fingerprints.
+// Package device derives opaque attachment IDs from transport endpoints.
 package device

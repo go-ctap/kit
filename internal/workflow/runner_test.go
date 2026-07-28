@@ -49,7 +49,7 @@ func TestWorkflowEnvironmentContainsOnlySharedServices(t *testing.T) {
 
 func TestInspectAcceptsInfoCapabilityOnly(t *testing.T) {
 	runner := NewRunner(Environment{
-		Selected: report.DeviceReport{Fingerprint: "inspect-capability"},
+		Selected: report.DeviceReport{Attachment: report.AttachmentReport{ID: "inspect-capability"}},
 	})
 
 	result, err := runner.Inspect(t.Context(), inspectDeviceStub{
@@ -59,7 +59,7 @@ func TestInspectAcceptsInfoCapabilityOnly(t *testing.T) {
 		t.Fatalf("Inspect: %v", err)
 	}
 
-	if result.Device.Fingerprint != "inspect-capability" {
-		t.Fatalf("fingerprint = %q, want inspect-capability", result.Device.Fingerprint)
+	if result.Device.Attachment.ID != "inspect-capability" {
+		t.Fatalf("attachment ID = %q, want inspect-capability", result.Device.Attachment.ID)
 	}
 }

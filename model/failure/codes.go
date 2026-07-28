@@ -14,10 +14,7 @@ const (
 	CodeInteractionHandlerRequired            Code = "INTERACTION_HANDLER_REQUIRED"
 	CodeInteractionCanceled                   Code = "INTERACTION_CANCELED"
 	CodeAuthenticatorClosed                   Code = "AUTHENTICATOR_CLOSED"
-	CodeDeviceHandleInvalid                   Code = "DEVICE_HANDLE_INVALID"
 	CodeDeviceNotFound                        Code = "DEVICE_NOT_FOUND"
-	CodeDeviceSelectionRequired               Code = "DEVICE_SELECTION_REQUIRED"
-	CodeDeviceUnavailable                     Code = "DEVICE_UNAVAILABLE"
 	CodeTransportModeUnsupported              Code = "TRANSPORT_MODE_UNSUPPORTED"
 	CodeTransportPermissionDenied             Code = "TRANSPORT_PERMISSION_DENIED"
 	CodeTransportProxyUnavailable             Code = "TRANSPORT_PROXY_UNAVAILABLE"
@@ -154,6 +151,7 @@ const (
 	PhaseAuthenticatorCommand  Phase = "authenticator-command"
 	PhaseAssertionContinuation Phase = "assertion-continuation"
 	PhaseMetadata              Phase = "metadata"
+	PhaseIdentity              Phase = "identity"
 	PhaseDecode                Phase = "decode"
 	PhaseCleanup               Phase = "cleanup"
 )

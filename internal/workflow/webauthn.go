@@ -12,6 +12,7 @@ import (
 	rtruntime "github.com/go-ctap/kit/internal/runtime"
 	rtwebauthn "github.com/go-ctap/kit/internal/webauthn"
 	"github.com/go-ctap/kit/model/failure"
+	"github.com/go-ctap/kit/model/report"
 	appwebauthn "github.com/go-ctap/kit/model/webauthn"
 	"github.com/samber/lo"
 )
@@ -68,7 +69,7 @@ func (r Runner) MakeCredential(
 	})
 	if err != nil {
 		if response.AuthData != nil && response.AuthData.AttestedCredentialData != nil {
-			if result, resultErr := makeCredentialResult(r.env.Selected.Fingerprint, input.RP.ID, input.Extensions, response); resultErr == nil {
+			if result, resultErr := makeCredentialResult(r.env.Selected.Attachment.ID, input.RP.ID, input.Extensions, response); resultErr == nil {
 				output.Result = &result
 				r.afterUserPresence(result.UserPresent)
 			}
@@ -79,7 +80,7 @@ func (r Runner) MakeCredential(
 			protocol.AuthenticatorMakeCredential,
 		))
 	}
-	result, err := makeCredentialResult(r.env.Selected.Fingerprint, input.RP.ID, input.Extensions, response)
+	result, err := makeCredentialResult(r.env.Selected.Attachment.ID, input.RP.ID, input.Extensions, response)
 	if err != nil {
 		return output, err
 	}
@@ -116,8 +117,8 @@ func (r Runner) GetAssertion(
 	}
 
 	result := appwebauthn.GetAssertionResult{
-		DeviceFingerprint: r.env.Selected.Fingerprint,
-		RPID:              input.RPID,
+		AttachmentID: r.env.Selected.Attachment.ID,
+		RPID:         input.RPID,
 	}
 
 	readAssertions := func(token []byte) error {
@@ -178,7 +179,7 @@ func (r Runner) afterUserPresence(present bool) {
 }
 
 func makeCredentialResult(
-	fingerprint string,
+	attachmentID report.AttachmentID,
 	rpID string,
 	extensions *ctapwebauthn.CreateAuthenticationExtensionsClientInputs,
 	response protocol.AuthenticatorMakeCredentialResponse,
@@ -206,7 +207,7 @@ func makeCredentialResult(
 	}
 
 	return appwebauthn.MakeCredentialResult{
-		DeviceFingerprint:        fingerprint,
+		AttachmentID:             attachmentID,
 		RPID:                     rpID,
 		Format:                   response.Format,
 		CredentialIDHex:          hex.EncodeToString(response.AuthData.AttestedCredentialData.CredentialID),

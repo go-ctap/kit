@@ -27,7 +27,7 @@ Main features include:
 - resident credential listing, update, and deletion;
 - large-blob reading, writing, deletion, and garbage collection;
 - WebAuthn credential creation and assertion;
-- optional vendor device model, firmware, and interface metadata;
+- progressive vendor device identity resolution;
 - FIDO Metadata Service (MDS3) lookup and verification;
 - operation progress events and interaction callbacks;
 - bounded and redacted CTAP diagnostic logs.
@@ -74,15 +74,21 @@ import (
 func main() {
 	ctx := context.Background()
 
-	devices, err := ctapkit.DiscoverDevices(ctx, transport.ModeAuto)
+	inventory, err := ctapkit.OpenInventory(ctx, transport.ModeAuto)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if len(devices) == 0 {
+	defer inventory.Close()
+
+	snapshot := inventory.Snapshot()
+	if len(snapshot.Devices) == 0 {
 		log.Fatal("no FIDO2 authenticator found")
 	}
 
-	authenticator, err := ctapkit.OpenAuthenticator(ctx, devices[0])
+	authenticator, err := inventory.OpenAuthenticator(
+		ctx,
+		snapshot.Devices[0].Attachment.ID,
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -97,27 +103,30 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("product: %s\n", inspection.Device.Product)
+	fmt.Printf("attachment: %s\n", inspection.Device.Attachment.ID)
 	fmt.Printf("versions: %v\n", inspection.Info.Versions)
 	fmt.Printf("AAGUID: %s\n", inspection.Info.AAGUID)
 }
 ```
 
-`DiscoverDevices` returns `ctapkit.Device` handles. Use `Device.Report`
-to show safe discovery details. `ctapkit.SelectDevice` can resolve a displayed fingerprint or ordinal alias from the
-same discovery result.
+`Inventory.Snapshot` publishes attachments immediately. Vendor identity arrives
+later through full snapshot events from `Inventory.Events` without changing the
+attachment ID or list order. HID authenticators can open while that optional
+identity is still resolving. Smart-card opens wait for the resolver to release
+its exclusive PC/SC access.
 
 ## Runtime lifecycle
 
 A normal application follows this lifecycle:
 
-1. Discover the connected devices.
-2. Choose one `ctapkit.Device` from that discovery result.
-3. Open it with `ctapkit.OpenAuthenticator`.
+1. Open one `ctapkit.Inventory` for a fixed transport mode.
+2. Choose an attachment from its snapshot.
+3. Open it with `Inventory.OpenAuthenticator`.
 4. Run typed operations on the returned `*ctapkit.Authenticator`.
-5. Close it when the selected device changes or the application exits.
+5. Close the authenticator when selection changes, then close the inventory when the application exits.
 
-An `Authenticator` owns one open transport channel, its token cache, and its close and cancellation state. It runs one
+An `Inventory` owns transport monitoring and one bounded identity-resolution queue. An `Authenticator` owns one open
+transport channel, its token cache, and its close and cancellation state. It runs one
 complete workflow at a time. This prevents two multi-command operations on the same channel from mixing with each other.
 
 Credential-list and configuration workflows read current state per operation. Large-blob workflows are the deliberate
@@ -144,7 +153,6 @@ packages.
 | Credentials     | `ListCredentials`, `CredentialStoreState`, `DeleteCredential`, `UpdateCredentialUser`                              |
 | Large blobs     | `ReadLargeBlob`, `ListLargeBlobs`, `WriteLargeBlob`, `DeleteLargeBlob`, `GarbageCollectLargeBlobs`                 |
 | WebAuthn        | `MakeCredential`, `GetAssertion`, `VerifyMakeCredential`, `VerifyGetAssertion`                                     |
-| Device metadata | `CanProbeDeviceMetadata`, `ProbeDeviceMetadata`                                                                    |
 
 Operation methods return pointers to concrete result types. A nil pointer means that the workflow did not start. A
 non-nil value may contain a preview or other partial data together with an error.
@@ -260,7 +268,7 @@ sensitive data.
 | `model/webauthn`                                                                    | WebAuthn operation DTOs                                                                   |
 | `model/failure`                                                                     | Stable public error codes and snapshots                                                   |
 | `model/conformance`, `model/operation`, `model/report`, `model/safety`              | Shared report and contract DTOs                                                           |
-| `transport`                                                                         | HID and Windows proxy discovery modes                                                     |
+| `transport`                                                                         | HID, PC/SC smart-card, and Windows proxy discovery modes                                  |
 
 Packages under `internal` contain runtime implementation details and are not a public API.
 

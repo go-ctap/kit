@@ -27,3 +27,6 @@ go.work.sum
 
 # Goland
 .idea/
+
+# Local Codex MCP endpoints
+.codex/config.toml

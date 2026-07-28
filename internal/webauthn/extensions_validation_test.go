@@ -37,7 +37,7 @@ func TestWebAuthnExtensionJSONUsesLevel3Shapes(t *testing.T) {
 }
 
 func TestBuildWebAuthnPreviewsKeepRawWarningsAndPRFSemantics(t *testing.T) {
-	device := report.DeviceReport{Fingerprint: "device-1"}
+	device := report.DeviceReport{Attachment: report.AttachmentReport{ID: "device-1"}}
 	info := protocol.AuthenticatorGetInfoResponse{}
 	makeExtensions := createPRFExtensions(ctapwebauthn.AuthenticationExtensionsPRFInputs{
 		Eval: ctapwebauthn.AuthenticationExtensionsPRFValues{First: []byte{}},

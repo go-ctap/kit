@@ -1,4 +1,4 @@
-package transport
+package discovery
 
 import (
 	"context"

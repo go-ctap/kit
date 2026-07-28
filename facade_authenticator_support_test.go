@@ -5,8 +5,10 @@ import (
 	"testing"
 
 	"github.com/go-ctap/kit/internal/authenticator"
+	"github.com/go-ctap/kit/internal/discovery"
 	kitlog "github.com/go-ctap/kit/internal/logging"
 	"github.com/go-ctap/kit/model"
+	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 )
 
@@ -144,6 +146,7 @@ func adaptContractAuthenticator(implementation any) *authenticator.Opened {
 	opened := &authenticator.Opened{}
 	opened.Lifecycle, _ = implementation.(authenticator.Lifecycle)
 	opened.Info, _ = implementation.(authenticator.InfoProvider)
+	opened.Vendor, _ = implementation.(authenticator.VendorProvider)
 	opened.Tokens, _ = implementation.(authenticator.TokenProvider)
 	opened.CredentialInventory, _ = implementation.(authenticator.CredentialInventoryReader)
 	opened.Credentials, _ = implementation.(authenticator.CredentialManager)
@@ -156,11 +159,18 @@ func adaptContractAuthenticator(implementation any) *authenticator.Opened {
 	return opened
 }
 
-func newContractDevice() Device {
-	return newDevice(0, transport.Descriptor{
+func newContractDevice() attachment {
+	descriptor := discovery.Descriptor{
 		Transport: transport.ModeHID,
 		Path:      "contract-path",
 		VendorID:  1,
 		ProductID: 2,
-	})
+	}
+	return attachment{
+		descriptor: descriptor,
+		report: report.DeviceReport{
+			Attachment: attachmentReport(descriptor),
+			Resolution: report.IdentityResolution{State: report.IdentityUnavailable},
+		},
+	}
 }

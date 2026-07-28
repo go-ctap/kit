@@ -49,7 +49,7 @@ type GetAssertionPreview struct {
 }
 
 type MakeCredentialResult struct {
-	DeviceFingerprint        string                                           `json:"deviceFingerprint"`
+	AttachmentID             report.AttachmentID                              `json:"attachmentId"`
 	RPID                     string                                           `json:"rpID"`
 	Format                   attestation.AttestationStatementFormatIdentifier `json:"fmt"`
 	CredentialIDHex          string                                           `json:"credentialIDHex"`
@@ -65,9 +65,9 @@ type MakeCredentialResult struct {
 }
 
 type GetAssertionResult struct {
-	DeviceFingerprint string      `json:"deviceFingerprint"`
-	RPID              string      `json:"rpID"`
-	Assertions        []Assertion `json:"assertions,omitempty"`
+	AttachmentID report.AttachmentID `json:"attachmentId"`
+	RPID         string              `json:"rpID"`
+	Assertions   []Assertion         `json:"assertions,omitempty"`
 }
 
 type Assertion struct {

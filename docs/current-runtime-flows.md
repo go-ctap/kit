@@ -4,12 +4,16 @@ This document describes the current runtime boundaries and lifecycle.
 
 ## Runtime Entities
 
-The root `ctapkit` package exposes two device concepts:
+The root `ctapkit` package exposes three runtime concepts:
 
-- `Device` is a lightweight handle from one discovery snapshot. Discovery only
-  uses HID or the configured platform proxy and does not open a CTAP channel.
+- `Inventory` owns discovery, transport events, attachment topology, and
+  progressive hardware-identity resolution for one fixed transport mode.
+- `Attachment` is the transport endpoint represented by
+  `DeviceReport.Attachment`; its opaque ID depends only on that endpoint.
+- `DeviceIdentity` is optional vendor identity resolved independently from the
+  attachment and published as an atomic update.
 - `Authenticator` is one opened CTAP authenticator channel. It remains open
-  while the application has that device selected.
+  while the application has that attachment selected.
 
 `Authenticator` directly owns the opened device, selected discovery report,
 token store, operation mutex, active-operation cancel function, and close
@@ -20,16 +24,20 @@ core.
 
 A typical UI uses the runtime as follows:
 
-1. Discover the currently attached devices.
-2. Select the first device by default and call `OpenAuthenticator`.
-3. Run operations against that authenticator.
-4. Close it and open another authenticator when the user changes selection.
-5. Close the selected authenticator when the application exits.
+1. Open one `Inventory` for the application's transport mode.
+2. Read its snapshot and select the first attachment by default.
+3. Call `Inventory.OpenAuthenticator` with that attachment ID.
+4. Run operations against that authenticator.
+5. Close it and open another authenticator when the user changes selection.
+6. Close the selected authenticator and then the inventory when the application exits.
 
-Discovery metadata can be enriched independently in the background. A probe
-opens its own short-lived CTAPHID channel, reads vendor information, and closes
-that channel. CTAPHID channel isolation allows this probe to coexist with the
-channel owned by the selected `Authenticator`.
+Attachments are published before optional identity is available. The
+inventory resolves each attachment once per connection generation through one
+bounded queue and emits full typed snapshots. HID authenticators open through
+an independent CTAPHID channel without waiting for optional identity. Opening
+a pending smart-card attachment promotes and waits for that same task so the
+resolver releases its exclusive PC/SC access first. Identity failure does not
+prevent CTAP open.
 
 The consuming application may use a selection ID to correlate UI requests,
 events, and interactions. That ID is application coordination state; it is not
@@ -39,14 +47,17 @@ another runtime session object.
 
 ```mermaid
 flowchart TD
-  A["OpenAuthenticator(ctx, device, options)"] --> B["Validate discovered Device handle"]
-  B --> C["Open raw transport path"]
-  C --> D["Allocate CTAPHID channel"]
-  D --> E["Construct CTAP device"]
-  E --> F["Return *Authenticator"]
+  A["Inventory.OpenAuthenticator(ctx, attachmentID, options)"] --> B["Find current attachment"]
+  B --> C{"Smart-card identity pending?"}
+  C -->|yes| D["Wait for its existing identity task"]
+  C -->|no| E["Open raw transport path"]
+  D --> E
+  E --> F["Allocate transport channel"]
+  F --> G["Construct CTAP device"]
+  G --> H["Return *Authenticator"]
 
-  B -->|invalid| X["DEVICE_HANDLE_INVALID"]
-  C -->|failure| Y["Normalized transport failure"]
+  B -->|missing| X["DEVICE_NOT_FOUND"]
+  E -->|failure| Y["Normalized transport failure"]
 ```
 
 Opening options configure the log journal for the lifetime of the opened
@@ -68,7 +79,8 @@ flowchart TD
 
 The operation mutex prevents multi-command workflows on the same opened
 channel from interleaving. It is not a device-wide lease. Other authenticators
-and background probes use separate CTAPHID channels and can run concurrently.
+and HID inventory identity tasks use separate CTAPHID channels and can run
+concurrently.
 
 The interaction broker is operation-scoped because the handler supplied with
 `WithInteractionHandler` and its cancel context belong to one application
@@ -90,7 +102,7 @@ The authenticator retains only state that belongs to the opened channel:
 - one private large-blob snapshot containing the credential keys and blob
   array used by large-blob workflows;
 - closed state and the active operation cancel function;
-- immutable open options and the selected discovery report.
+- immutable open options and the device snapshot captured at open.
 
 Credential inventories and config reports are not cached. Large-blob workflows
 are the deliberate exception: `ListLargeBlobs` refreshes the private snapshot,
@@ -126,30 +138,26 @@ workflow before waiting for the operation mutex, so a pending interaction or
 cancel-aware transport command can unwind. A subsequent typed operation method
 returns `AUTHENTICATOR_CLOSED`.
 
-## Background Metadata Enrichment
+## Progressive Device Identity
 
-A consuming application may maintain an in-memory metadata cache for the
-current discovery topology and a small persistent cache keyed by device
-fingerprint. A vendor probe accepts the opaque `Device` handle from the same
-discovery snapshot; caller-constructed reports cannot be used to open a probe
-channel. Probes are short-lived and independent from the selected authenticator:
+Identity is runtime state owned by `Inventory`; applications neither merge nor
+persist it:
 
 ```mermaid
 flowchart LR
-  A["Discovery snapshot"] --> B["Load metadata by device fingerprint"]
-  B -->|cache miss| C["Choose unprobed known vendor"]
-  C --> D["Open independent probe channel"]
-  D --> E["Read vendor model / serial / firmware"]
-  E --> F["Close probe channel"]
-  F --> G["Persist, merge, and emit discovery-changed"]
+  A["Transport discovery"] --> B["Publish attachment snapshot"]
+  B --> C["Queue one resolver task for connection generation"]
+  C --> D["Collect exact correlation evidence"]
+  D --> E["Return one atomic DeviceIdentity"]
+  E --> F["Publish full identity snapshot"]
 ```
 
-When discovery reports a serial, the fingerprint is derived from vendor ID,
-product ID, and serial, so it follows the device between ports. Devices that do
-not expose a serial fall back to a hash of transport mode and path; moving one
-of those devices may therefore create another tiny cache entry. That
-duplication is accepted: a hit avoids the much more expensive HID/PCSC probe,
-while a miss remains safe and simply refreshes metadata in the background.
+`AttachmentID` is stable across identity updates and never contains the vendor
+serial. Removal cancels the resolver task and its generation guard rejects late
+results. Identity is resolved again after reinsertion and is never read from or
+written to a persistent cache. Token2 correlation accepts only exact serial,
+USB parent/instance, or ATR product-and-suffix evidence; ambiguity produces an
+unavailable identity rather than selecting a convenient candidate.
 
 ## Safety Properties
 

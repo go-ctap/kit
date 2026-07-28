@@ -100,17 +100,9 @@ type Authenticator struct {
 	closeErr  error
 }
 
-func OpenAuthenticator(
-	ctx context.Context,
-	device Device,
-	opts ...AuthenticatorOption,
-) (*Authenticator, error) {
-	return openAuthenticatorHandle(ctx, device, authenticator.Open, opts...)
-}
-
 func openAuthenticatorHandle(
 	ctx context.Context,
-	device Device,
+	device attachment,
 	open authenticatorOpenFunc,
 	opts ...AuthenticatorOption,
 ) (*Authenticator, error) {
@@ -121,18 +113,16 @@ func openAuthenticatorHandle(
 		}
 	}
 
-	if !device.valid {
-		return nil, failure.New(failure.CodeDeviceHandleInvalid,
-			failure.WithPhase(failure.PhaseAuthenticator),
-		)
-	}
-
 	var recorder logging.Recorder
 	if config.journal != nil {
 		recorder = config.journal.journal
 	}
 	selected := device.report
-	opened, err := open(logging.WithRecorder(ctx, recorder), selected.Transport, selected.Path)
+	opened, err := open(
+		logging.WithRecorder(ctx, recorder),
+		device.descriptor.Transport,
+		device.descriptor.Path,
+	)
 	if err != nil {
 		return nil, err
 	}

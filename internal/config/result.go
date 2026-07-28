@@ -1,37 +1,40 @@
 package config
 
-import appconfig "github.com/go-ctap/kit/model/config"
+import (
+	appconfig "github.com/go-ctap/kit/model/config"
+	"github.com/go-ctap/kit/model/report"
+)
 
-func ResetResultForDevice(fingerprint string) appconfig.ResetResult {
-	return appconfig.ResetResult{DeviceFingerprint: fingerprint, Reset: true}
+func ResetResultForDevice(attachmentID report.AttachmentID) appconfig.ResetResult {
+	return appconfig.ResetResult{AttachmentID: attachmentID, Reset: true}
 }
 
-func PINSetResult(fingerprint string) appconfig.PINMutationResult {
-	return appconfig.PINMutationResult{Operation: appconfig.PINMutationSet, DeviceFingerprint: fingerprint, PINState: appconfig.StateConfigured}
+func PINSetResult(attachmentID report.AttachmentID) appconfig.PINMutationResult {
+	return appconfig.PINMutationResult{Operation: appconfig.PINMutationSet, AttachmentID: attachmentID, PINState: appconfig.StateConfigured}
 }
 
-func PINChangeResult(fingerprint string) appconfig.PINMutationResult {
-	return appconfig.PINMutationResult{Operation: appconfig.PINMutationChange, DeviceFingerprint: fingerprint, PINState: appconfig.StateConfigured}
+func PINChangeResult(attachmentID report.AttachmentID) appconfig.PINMutationResult {
+	return appconfig.PINMutationResult{Operation: appconfig.PINMutationChange, AttachmentID: attachmentID, PINState: appconfig.StateConfigured}
 }
 
-func AlwaysUVResult(fingerprint string, target appconfig.AlwaysUVTarget, requestedAlwaysUV bool) appconfig.AuthenticatorConfigResult {
+func AlwaysUVResult(attachmentID report.AttachmentID, target appconfig.AlwaysUVTarget, requestedAlwaysUV bool) appconfig.AuthenticatorConfigResult {
 	state := appconfig.StateNotConfigured
 	if requestedAlwaysUV {
 		state = appconfig.StateConfigured
 	}
 
 	return appconfig.AuthenticatorConfigResult{
-		Operation:         appconfig.AuthenticatorConfigAlwaysUV,
-		DeviceFingerprint: fingerprint,
-		Target:            target,
-		State:             state,
+		Operation:    appconfig.AuthenticatorConfigAlwaysUV,
+		AttachmentID: attachmentID,
+		Target:       target,
+		State:        state,
 	}
 }
 
-func MinPINLengthResult(fingerprint string, operation appconfig.SetMinPINLengthOperation) appconfig.AuthenticatorConfigResult {
+func MinPINLengthResult(attachmentID report.AttachmentID, operation appconfig.SetMinPINLengthOperation) appconfig.AuthenticatorConfigResult {
 	return appconfig.AuthenticatorConfigResult{
 		Operation:           appconfig.AuthenticatorConfigMinPINLength,
-		DeviceFingerprint:   fingerprint,
+		AttachmentID:        attachmentID,
 		NewMinPINLength:     operation.NewMinPINLength,
 		MinPINLengthRPIDs:   operation.MinPINLengthRPIDs,
 		ForceChangePIN:      operation.ForceChangePIN,
@@ -40,10 +43,10 @@ func MinPINLengthResult(fingerprint string, operation appconfig.SetMinPINLengthO
 	}
 }
 
-func LongTouchForResetResult(fingerprint string) appconfig.AuthenticatorConfigResult {
+func LongTouchForResetResult(attachmentID report.AttachmentID) appconfig.AuthenticatorConfigResult {
 	return appconfig.AuthenticatorConfigResult{
-		Operation:         appconfig.AuthenticatorConfigLongTouch,
-		DeviceFingerprint: fingerprint,
-		State:             appconfig.StateConfigured,
+		Operation:    appconfig.AuthenticatorConfigLongTouch,
+		AttachmentID: attachmentID,
+		State:        appconfig.StateConfigured,
 	}
 }

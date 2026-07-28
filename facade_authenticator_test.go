@@ -138,7 +138,7 @@ func TestAuthenticatorTypedOperationContract(t *testing.T) {
 		t.Fatalf("ConfigStatus: %v", err)
 	}
 
-	if output.Device.Fingerprint == "" {
+	if output.Device.Attachment.ID == "" {
 		t.Fatalf("unexpected output: %#v", output)
 	}
 }

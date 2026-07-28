@@ -7,6 +7,7 @@ import (
 	"github.com/go-ctap/ctap/attestation"
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/ctap/transport/ctaphid"
 	"github.com/go-ctap/ctap/webauthn"
 )
 
@@ -17,6 +18,14 @@ type Lifecycle interface {
 type InfoProvider interface {
 	GetInfo(context.Context) (protocol.AuthenticatorGetInfoResponse, error)
 	GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool)
+}
+
+type VendorProvider interface {
+	Vendor(
+		context.Context,
+		ctaphid.Command,
+		[]byte,
+	) (ctaphid.VendorResponse, error)
 }
 
 type TokenProvider interface {
@@ -123,6 +132,7 @@ type BioDevice interface {
 type Opened struct {
 	Lifecycle           Lifecycle
 	Info                InfoProvider
+	Vendor              VendorProvider
 	Tokens              TokenProvider
 	CredentialInventory CredentialInventoryReader
 	Credentials         CredentialManager

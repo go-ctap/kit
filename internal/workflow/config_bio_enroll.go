@@ -97,8 +97,8 @@ func (r Runner) runBioEnrollment(
 ) (appconfig.BioEnrollResult, error) {
 	progress := r.bioEnrollmentProgress(ctx)
 	result := appconfig.BioEnrollResult{
-		DeviceFingerprint: preview.Device.Fingerprint,
-		PreviewOnly:       preview.PreviewOnly,
+		AttachmentID: preview.Device.Attachment.ID,
+		PreviewOnly:  preview.PreviewOnly,
 	}
 
 	cancelAfterFailure := func(cause error) (appconfig.BioEnrollResult, error) {

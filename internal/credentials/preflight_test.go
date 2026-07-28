@@ -109,7 +109,7 @@ func sampleCredentialTarget(t *testing.T) CredentialTarget {
 
 func sampleInventoryReport() InventoryReport {
 	return InventoryReport{
-		Device: report.DeviceReport{Fingerprint: "cred01"},
+		Device: report.DeviceReport{Attachment: report.AttachmentReport{ID: "cred01"}},
 		Support: SupportReport{
 			CredentialManagement: true,
 		},

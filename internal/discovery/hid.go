@@ -1,6 +1,6 @@
 //go:build linux || darwin
 
-package transport
+package discovery
 
 func resolveMode(requested Mode) (Mode, error) {
 	switch requested {

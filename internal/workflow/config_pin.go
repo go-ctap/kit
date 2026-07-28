@@ -49,7 +49,7 @@ func (r Runner) SetPIN(
 			protocol.ClientPINSubCommandSetPIN,
 		))
 	}
-	output.Result = new(rtconfig.PINSetResult(r.env.Selected.Fingerprint))
+	output.Result = new(rtconfig.PINSetResult(r.env.Selected.Attachment.ID))
 	return output, nil
 }
 
@@ -91,6 +91,6 @@ func (r Runner) ChangePIN(
 			protocol.ClientPINSubCommandChangePIN,
 		))
 	}
-	output.Result = new(rtconfig.PINChangeResult(r.env.Selected.Fingerprint))
+	output.Result = new(rtconfig.PINChangeResult(r.env.Selected.Attachment.ID))
 	return output, nil
 }

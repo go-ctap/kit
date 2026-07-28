@@ -50,7 +50,7 @@ func (r Runner) EnableLongTouchForReset(
 			protocol.ConfigSubCommandEnableLongTouchForReset,
 		))
 	}
-	output.Result = new(rtconfig.LongTouchForResetResult(r.env.Selected.Fingerprint))
+	output.Result = new(rtconfig.LongTouchForResetResult(r.env.Selected.Attachment.ID))
 
 	return output, nil
 }

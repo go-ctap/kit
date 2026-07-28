@@ -41,7 +41,7 @@ type ListArraySummary struct {
 }
 
 type ListCredential struct {
-	DeviceFingerprint string                   `json:"deviceFingerprint,omitempty"`
+	AttachmentID      report.AttachmentID      `json:"attachmentId,omitempty"`
 	CredentialIDHex   string                   `json:"credentialIDHex"`
 	RP                credentials.RelyingParty `json:"rp"`
 	User              credentials.UserIdentity `json:"user"`

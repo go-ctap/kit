@@ -65,14 +65,14 @@ type BioEnrollSample struct {
 }
 
 type BioEnrollResult struct {
-	DeviceFingerprint      string            `json:"deviceFingerprint"`
-	PreviewOnly            bool              `json:"previewOnly"`
-	TemplateIDHex          string            `json:"templateIDHex"`
-	Samples                []BioEnrollSample `json:"samples,omitempty"`
-	LastEnrollSampleStatus string            `json:"lastEnrollSampleStatus,omitempty"`
-	RemainingSamples       *uint             `json:"remainingSamples,omitempty"`
-	CancelAttempted        bool              `json:"cancelAttempted"`
-	CancelSucceeded        bool              `json:"cancelSucceeded"`
+	AttachmentID           report.AttachmentID `json:"attachmentId"`
+	PreviewOnly            bool                `json:"previewOnly"`
+	TemplateIDHex          string              `json:"templateIDHex"`
+	Samples                []BioEnrollSample   `json:"samples,omitempty"`
+	LastEnrollSampleStatus string              `json:"lastEnrollSampleStatus,omitempty"`
+	RemainingSamples       *uint               `json:"remainingSamples,omitempty"`
+	CancelAttempted        bool                `json:"cancelAttempted"`
+	CancelSucceeded        bool                `json:"cancelSucceeded"`
 }
 
 type BioMutationPreview struct {
@@ -86,9 +86,9 @@ type BioMutationPreview struct {
 }
 
 type BioMutationResult struct {
-	Operation         BioMutationOperation `json:"operation"`
-	DeviceFingerprint string               `json:"deviceFingerprint"`
-	PreviewOnly       bool                 `json:"previewOnly"`
-	TemplateIDHex     string               `json:"templateIDHex"`
-	FriendlyName      string               `json:"friendlyName,omitempty"`
+	Operation     BioMutationOperation `json:"operation"`
+	AttachmentID  report.AttachmentID  `json:"attachmentId"`
+	PreviewOnly   bool                 `json:"previewOnly"`
+	TemplateIDHex string               `json:"templateIDHex"`
+	FriendlyName  string               `json:"friendlyName,omitempty"`
 }

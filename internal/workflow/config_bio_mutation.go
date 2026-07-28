@@ -60,11 +60,11 @@ func (r Runner) BioRename(
 	}
 
 	result := appconfig.BioMutationResult{
-		Operation:         appconfig.BioMutationRename,
-		DeviceFingerprint: r.env.Selected.Fingerprint,
-		PreviewOnly:       preview.PreviewOnly,
-		TemplateIDHex:     req.TemplateIDHex,
-		FriendlyName:      req.FriendlyName,
+		Operation:     appconfig.BioMutationRename,
+		AttachmentID:  r.env.Selected.Attachment.ID,
+		PreviewOnly:   preview.PreviewOnly,
+		TemplateIDHex: req.TemplateIDHex,
+		FriendlyName:  req.FriendlyName,
 	}
 
 	output.Result = &result
@@ -118,10 +118,10 @@ func (r Runner) BioRemove(
 		))
 	}
 	result := appconfig.BioMutationResult{
-		Operation:         appconfig.BioMutationRemove,
-		DeviceFingerprint: r.env.Selected.Fingerprint,
-		PreviewOnly:       preview.PreviewOnly,
-		TemplateIDHex:     req.TemplateIDHex,
+		Operation:     appconfig.BioMutationRemove,
+		AttachmentID:  r.env.Selected.Attachment.ID,
+		PreviewOnly:   preview.PreviewOnly,
+		TemplateIDHex: req.TemplateIDHex,
 	}
 
 	output.Result = &result

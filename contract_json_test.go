@@ -16,6 +16,7 @@ import (
 	"github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/report"
 	webauthn2 "github.com/go-ctap/kit/model/webauthn"
+	"github.com/go-ctap/kit/transport"
 )
 
 func TestOperationEventStagesHaveCountsWithoutPercent(t *testing.T) {
@@ -90,12 +91,12 @@ func TestInteractionRequestJSONIncludesPreviewAndResponseOmitsPIN(t *testing.T) 
 		Message:     "Factory reset fingerprint-1?",
 		Destructive: true,
 		Preview: map[string]any{
-			"deviceFingerprint": "fingerprint-1",
-			"warnings":          []string{"factory reset erases authenticator state"},
+			"attachmentId": "fingerprint-1",
+			"warnings":     []string{"factory reset erases authenticator state"},
 		},
 	}
 
-	assertJSON(t, request, `{"kind":"touch","message":"Factory reset fingerprint-1?","destructive":true,"preview":{"deviceFingerprint":"fingerprint-1","warnings":["factory reset erases authenticator state"]}}`)
+	assertJSON(t, request, `{"kind":"touch","message":"Factory reset fingerprint-1?","destructive":true,"preview":{"attachmentId":"fingerprint-1","warnings":["factory reset erases authenticator state"]}}`)
 	assertJSON(t, model.InteractionResponse{
 		PIN: []byte("123456"),
 	}, `{}`)
@@ -230,16 +231,16 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 					UserIDHex:       "0102",
 				},
 				Result: &credentials.DeleteResult{
-					DeviceFingerprint: "fingerprint-1",
-					CredentialIDHex:   "beef",
-					RPID:              "example.com",
-					UserIDHex:         "0102",
+					AttachmentID:    "fingerprint-1",
+					CredentialIDHex: "beef",
+					RPID:            "example.com",
+					UserIDHex:       "0102",
 				},
 			},
 			want: []string{
 				`"preview"`,
 				`"result"`,
-				`"deviceFingerprint":"fingerprint-1"`,
+				`"attachmentId":"fingerprint-1"`,
 				`"credentialIDHex":"beef"`,
 				`"rpID":"example.com"`,
 				`"userIDHex":"0102"`,
@@ -263,15 +264,15 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 					Proposed:        credentials.UserIdentity{UserIDHex: "0304"},
 				},
 				Result: &credentials.UpdateUserResult{
-					DeviceFingerprint: "fingerprint-1",
-					CredentialIDHex:   "beef",
-					RPID:              "example.com",
-					Previous:          credentials.UserIdentity{UserIDHex: "0102"},
-					Current:           credentials.UserIdentity{UserIDHex: "0304"},
+					AttachmentID:    "fingerprint-1",
+					CredentialIDHex: "beef",
+					RPID:            "example.com",
+					Previous:        credentials.UserIdentity{UserIDHex: "0102"},
+					Current:         credentials.UserIdentity{UserIDHex: "0304"},
 				},
 			},
 			want: []string{
-				`"deviceFingerprint":"fingerprint-1"`,
+				`"attachmentId":"fingerprint-1"`,
 				`"credentialIDHex":"beef"`,
 				`"rpID":"example.com"`,
 				`"userIDHex":"0304"`,
@@ -317,7 +318,7 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 			name: "WebAuthn outputs include CTAP artifact spellings",
 			value: webauthn2.MakeCredentialOutput{
 				Result: &webauthn2.MakeCredentialResult{
-					DeviceFingerprint:        "fingerprint-1",
+					AttachmentID:             "fingerprint-1",
 					RPID:                     "example.com",
 					Format:                   "packed",
 					CredentialIDHex:          "beef",
@@ -327,7 +328,7 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 				},
 			},
 			want: []string{
-				`"deviceFingerprint":"fingerprint-1"`,
+				`"attachmentId":"fingerprint-1"`,
 				`"rpID":"example.com"`,
 				`"credentialIDHex":"beef"`,
 				`"publicKeyCOSEHex":"a50102"`,
@@ -646,10 +647,12 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 
 func TestDeviceReportVendorMetadataJSON(t *testing.T) {
 	value := report.DeviceReport{
-		Fingerprint: "attachment-1",
-		Path:        "hid://one",
-		Vendor:      report.VendorYubico,
-		Metadata: &report.DeviceMetadata{
+		Attachment: report.AttachmentReport{
+			ID:        "attachment-1",
+			Transport: transport.ModeHID,
+		},
+		Identity: &report.DeviceIdentity{
+			Vendor:   report.VendorYubico,
 			Model:    "YubiKey 5C NFC",
 			Serial:   "12345678",
 			Firmware: "5.7.1",
@@ -659,9 +662,13 @@ func TestDeviceReportVendorMetadataJSON(t *testing.T) {
 				Enabled:   []report.Capability{report.CapabilityCTAP2},
 			}},
 		},
+		Resolution: report.IdentityResolution{
+			State:    report.IdentityResolved,
+			Provider: report.VendorYubico,
+		},
 	}
 
-	assertJSON(t, value, `{"fingerprint":"attachment-1","transport":"","path":"hid://one","vendorId":0,"productId":0,"vendor":"yubico","metadata":{"model":"YubiKey 5C NFC","serial":"12345678","firmware":"5.7.1","interfaces":[{"interface":"usb","supported":["u2f","ctap2"],"enabled":["ctap2"]}]}}`)
+	assertJSON(t, value, `{"attachment":{"id":"attachment-1","transport":"hid"},"identity":{"vendor":"yubico","model":"YubiKey 5C NFC","serial":"12345678","firmware":"5.7.1","interfaces":[{"interface":"usb","supported":["u2f","ctap2"],"enabled":["ctap2"]}]},"identityResolution":{"state":"resolved","provider":"yubico"}}`)
 }
 
 func TestCTAP23JSONPresenceContracts(t *testing.T) {

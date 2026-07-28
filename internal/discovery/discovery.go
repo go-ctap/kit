@@ -1,4 +1,4 @@
-package transport
+package discovery
 
 import (
 	"context"
@@ -12,30 +12,30 @@ import (
 	"github.com/go-ctap/kit/model/failure"
 )
 
-type Mode string
-
-const (
-	ModeAuto         Mode = "auto"
-	ModeHID          Mode = "hid"
-	ModeSmartCard    Mode = "smart-card"
-	ModeWindowsProxy Mode = "windows-proxy"
-)
-
 // Descriptor is the transport-layer view of a reachable authenticator.
 type Descriptor struct {
-	Transport    Mode
-	Path         string
-	Manufacturer string
-	Product      string
-	Serial       string
-	VendorID     uint16
-	ProductID    uint16
-	ATR          []byte
+	Transport      Mode
+	Path           string
+	Manufacturer   string
+	Product        string
+	Serial         string
+	VendorID       uint16
+	ProductID      uint16
+	ATR            []byte
+	InstanceID     string
+	ParentDeviceID string
 }
 
-// Discover returns FIDO devices reachable through the requested transport
-// policy.
-func Discover(ctx context.Context, requested Mode) ([]Descriptor, error) {
+// Discovery owns transport-source state for one long-lived inventory.
+type Discovery struct {
+	smartCards smartCardDiscovery
+}
+
+func New() *Discovery {
+	return &Discovery{}
+}
+
+func (d *Discovery) Discover(ctx context.Context, requested Mode) ([]Descriptor, error) {
 	if requested == "" {
 		requested = ModeAuto
 	}
@@ -51,7 +51,7 @@ func Discover(ctx context.Context, requested Mode) ([]Descriptor, error) {
 			func(ctx context.Context) ([]Descriptor, error) {
 				return discoverHID(ctx, hidMode)
 			},
-			discoverSmartCards,
+			d.discoverSmartCards,
 		)
 	case ModeHID, ModeWindowsProxy:
 		mode, err := resolveMode(requested)
@@ -61,7 +61,7 @@ func Discover(ctx context.Context, requested Mode) ([]Descriptor, error) {
 
 		return discoverHID(ctx, mode)
 	case ModeSmartCard:
-		return discoverSmartCards(ctx)
+		return d.discoverSmartCards(ctx)
 	default:
 		return nil, unsupportedModeError()
 	}
@@ -76,10 +76,7 @@ func discoverHID(ctx context.Context, mode Mode) ([]Descriptor, error) {
 	return descriptorsFromDeviceInfos(mode, infos), nil
 }
 
-// Events reports when the set of reachable FIDO devices may have changed.
-//
-//goland:noinspection GoUnusedExportedFunction
-func Events(ctx context.Context, requested Mode) (<-chan Event, error) {
+func (d *Discovery) Events(ctx context.Context, requested Mode) (<-chan Event, error) {
 	if requested == "" {
 		requested = ModeAuto
 	}
@@ -158,13 +155,15 @@ func descriptorsFromDeviceInfos(mode Mode, infos []*ghid.DeviceInfo) []Descripto
 	descriptors := make([]Descriptor, 0, len(infos))
 	for _, info := range infos {
 		descriptors = append(descriptors, Descriptor{
-			Transport:    mode,
-			Path:         info.Path,
-			Manufacturer: info.MfrStr,
-			Product:      info.ProductStr,
-			Serial:       info.SerialNbr,
-			VendorID:     info.VendorID,
-			ProductID:    info.ProductID,
+			Transport:      mode,
+			Path:           info.Path,
+			Manufacturer:   info.MfrStr,
+			Product:        info.ProductStr,
+			Serial:         info.SerialNbr,
+			VendorID:       info.VendorID,
+			ProductID:      info.ProductID,
+			InstanceID:     info.InstanceID,
+			ParentDeviceID: info.ParentDeviceID,
 		})
 	}
 

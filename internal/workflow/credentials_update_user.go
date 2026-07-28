@@ -72,12 +72,12 @@ func (r Runner) UpdateCredentialUser(
 		))
 	}
 	result := appcredentials.UpdateUserResult{
-		DeviceFingerprint: r.env.Selected.Fingerprint,
-		CredentialIDHex:   req.Target.Record.CredentialIDHex,
-		RPID:              req.Target.RP.ID,
-		RPName:            req.Target.RP.Name,
-		Previous:          req.Target.User,
-		Current:           preview.Proposed,
+		AttachmentID:    r.env.Selected.Attachment.ID,
+		CredentialIDHex: req.Target.Record.CredentialIDHex,
+		RPID:            req.Target.RP.ID,
+		RPName:          req.Target.RP.Name,
+		Previous:        req.Target.User,
+		Current:         preview.Proposed,
 	}
 
 	output.Result = &result

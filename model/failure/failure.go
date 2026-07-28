@@ -155,6 +155,7 @@ func canonicalPhase(phase Phase) Phase {
 		PhaseAuthenticatorCommand,
 		PhaseAssertionContinuation,
 		PhaseMetadata,
+		PhaseIdentity,
 		PhaseDecode,
 		PhaseCleanup:
 		return phase

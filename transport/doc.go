@@ -1,3 +1,2 @@
-// Package transport discovers HID, Windows proxy, and PC/SC smart-card
-// authenticators and reports topology changes.
+// Package transport defines the transport policy used by an Inventory.
 package transport

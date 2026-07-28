@@ -46,6 +46,7 @@ func Open(ctx context.Context, mode transport.Mode, path string) (*Opened, error
 		return &Opened{
 			Lifecycle:           device,
 			Info:                device,
+			Vendor:              device,
 			Tokens:              device,
 			CredentialInventory: device,
 			Credentials:         device,

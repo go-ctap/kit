@@ -38,7 +38,7 @@ func (r Runner) ResetFactory(
 
 	if _, err := r.env.Interactions.RequestInteraction(ctx, model.InteractionRequest{
 		Kind:        model.InteractionKindTouch,
-		Message:     "Touch authenticator " + r.env.Selected.Fingerprint + " to factory reset.",
+		Message:     "Touch authenticator " + string(r.env.Selected.Attachment.ID) + " to factory reset.",
 		Destructive: true,
 		Preview:     preview,
 	}); err != nil {
@@ -56,6 +56,6 @@ func (r Runner) ResetFactory(
 			protocol.AuthenticatorReset,
 		))
 	}
-	output.Result = new(rtconfig.ResetResultForDevice(r.env.Selected.Fingerprint))
+	output.Result = new(rtconfig.ResetResultForDevice(r.env.Selected.Attachment.ID))
 	return output, nil
 }

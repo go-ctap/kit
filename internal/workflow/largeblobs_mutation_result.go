@@ -11,7 +11,7 @@ func buildMutationResult(
 ) applargeblobs.MutationResult {
 	return applargeblobs.MutationResult{
 		Operation:                          operation,
-		DeviceFingerprint:                  state.selected.Fingerprint,
+		AttachmentID:                       state.selected.Attachment.ID,
 		CredentialIDHex:                    state.target.Record.CredentialIDHex,
 		RPID:                               state.target.RP.ID,
 		RPName:                             state.target.RP.Name,

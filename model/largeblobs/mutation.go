@@ -37,24 +37,24 @@ type MutationPreview struct {
 }
 
 type MutationResult struct {
-	Operation                          MutationOperation `json:"operation"`
-	DeviceFingerprint                  string            `json:"deviceFingerprint"`
-	CredentialIDHex                    string            `json:"credentialIDHex"`
-	RPID                               string            `json:"rpID"`
-	RPName                             string            `json:"rpName,omitempty"`
-	UserIDHex                          string            `json:"userIDHex,omitempty"`
-	UserName                           string            `json:"userName,omitempty"`
-	DisplayName                        string            `json:"displayName,omitempty"`
-	CurrentByteCount                   int               `json:"currentByteCount"`
-	ProposedByteCount                  int               `json:"proposedByteCount"`
-	SerializedLargeBlobArraySizeBefore int               `json:"serializedLargeBlobArraySizeBefore"`
-	SerializedLargeBlobArraySizeAfter  int               `json:"serializedLargeBlobArraySizeAfter"`
-	SerializedLargeBlobArrayLimit      uint              `json:"serializedLargeBlobArrayLimit,omitempty"`
-	BlobCountBefore                    int               `json:"blobCountBefore"`
-	BlobCountAfter                     int               `json:"blobCountAfter"`
-	MatchedBlobCount                   int               `json:"matchedBlobCount,omitempty"`
-	UnmatchedBlobCount                 int               `json:"unmatchedBlobCount,omitempty"`
-	DeletedBlobCount                   int               `json:"deletedBlobCount,omitempty"`
-	NoBlob                             bool              `json:"noBlob"`
-	Noop                               bool              `json:"noop,omitempty"`
+	Operation                          MutationOperation   `json:"operation"`
+	AttachmentID                       report.AttachmentID `json:"attachmentId"`
+	CredentialIDHex                    string              `json:"credentialIDHex"`
+	RPID                               string              `json:"rpID"`
+	RPName                             string              `json:"rpName,omitempty"`
+	UserIDHex                          string              `json:"userIDHex,omitempty"`
+	UserName                           string              `json:"userName,omitempty"`
+	DisplayName                        string              `json:"displayName,omitempty"`
+	CurrentByteCount                   int                 `json:"currentByteCount"`
+	ProposedByteCount                  int                 `json:"proposedByteCount"`
+	SerializedLargeBlobArraySizeBefore int                 `json:"serializedLargeBlobArraySizeBefore"`
+	SerializedLargeBlobArraySizeAfter  int                 `json:"serializedLargeBlobArraySizeAfter"`
+	SerializedLargeBlobArrayLimit      uint                `json:"serializedLargeBlobArrayLimit,omitempty"`
+	BlobCountBefore                    int                 `json:"blobCountBefore"`
+	BlobCountAfter                     int                 `json:"blobCountAfter"`
+	MatchedBlobCount                   int                 `json:"matchedBlobCount,omitempty"`
+	UnmatchedBlobCount                 int                 `json:"unmatchedBlobCount,omitempty"`
+	DeletedBlobCount                   int                 `json:"deletedBlobCount,omitempty"`
+	NoBlob                             bool                `json:"noBlob"`
+	Noop                               bool                `json:"noop,omitempty"`
 }

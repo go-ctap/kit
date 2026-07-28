@@ -41,7 +41,7 @@ type AuthenticatorConfigPreview struct {
 
 type AuthenticatorConfigResult struct {
 	Operation           AuthenticatorConfigOperation `json:"operation"`
-	DeviceFingerprint   string                       `json:"deviceFingerprint"`
+	AttachmentID        report.AttachmentID          `json:"attachmentId"`
 	Target              AlwaysUVTarget               `json:"target,omitempty"`
 	NewMinPINLength     *uint                        `json:"newMinPINLength,omitempty"`
 	MinPINLengthRPIDs   []string                     `json:"minPinLengthRPIDs,omitempty"`

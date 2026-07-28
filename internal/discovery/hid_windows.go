@@ -1,6 +1,6 @@
 //go:build windows
 
-package transport
+package discovery
 
 import (
 	"golang.org/x/sys/windows"

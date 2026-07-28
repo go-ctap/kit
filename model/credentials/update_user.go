@@ -1,6 +1,9 @@
 package credentials
 
-import "github.com/go-ctap/kit/model/safety"
+import (
+	"github.com/go-ctap/kit/model/report"
+	"github.com/go-ctap/kit/model/safety"
+)
 
 type UpdateUserPreview struct {
 	CredentialIDHex string           `json:"credentialIDHex"`
@@ -12,10 +15,10 @@ type UpdateUserPreview struct {
 }
 
 type UpdateUserResult struct {
-	DeviceFingerprint string       `json:"deviceFingerprint"`
-	CredentialIDHex   string       `json:"credentialIDHex"`
-	RPID              string       `json:"rpID"`
-	RPName            string       `json:"rpName,omitempty"`
-	Previous          UserIdentity `json:"previous"`
-	Current           UserIdentity `json:"current"`
+	AttachmentID    report.AttachmentID `json:"attachmentId"`
+	CredentialIDHex string              `json:"credentialIDHex"`
+	RPID            string              `json:"rpID"`
+	RPName          string              `json:"rpName,omitempty"`
+	Previous        UserIdentity        `json:"previous"`
+	Current         UserIdentity        `json:"current"`
 }

@@ -1,0 +1,188 @@
+package identity
+
+import (
+	"context"
+	"errors"
+	"strconv"
+
+	"github.com/go-ctap/kit/internal/authenticator"
+	"github.com/go-ctap/kit/internal/discovery"
+	"github.com/go-ctap/kit/model/report"
+	"github.com/go-ctap/kit/transport"
+	token2resolver "github.com/go-ctap/token2/resolver"
+	token2ctaphid "github.com/go-ctap/token2/transport/ctaphid"
+	"github.com/go-ctap/yubico"
+	yubicoctaphid "github.com/go-ctap/yubico/transport/ctaphid"
+)
+
+const (
+	yubicoVendorID uint16 = 0x1050
+	token2VendorID uint16 = 0x349e
+)
+
+// Resolver owns the built-in vendor identity providers. It returns one atomic
+// identity and never merges results from multiple providers.
+type Resolver struct {
+	token2 *token2resolver.Resolver
+	open   func(context.Context, transport.Mode, string) (*authenticator.Opened, error)
+}
+
+func NewResolver() *Resolver {
+	return &Resolver{
+		token2: token2resolver.NewLocal(),
+		open:   authenticator.Open,
+	}
+}
+
+// Provider returns the provider that may resolve descriptor.
+func (r *Resolver) Provider(descriptor discovery.Descriptor) report.Vendor {
+	switch {
+	case descriptor.VendorID == yubicoVendorID:
+		return report.VendorYubico
+	case descriptor.VendorID == token2VendorID,
+		descriptor.Transport == transport.ModeSmartCard:
+		return report.VendorToken2
+	default:
+		return report.VendorUnknown
+	}
+}
+
+// Resolve resolves one descriptor. applicable is false only when a
+// speculative smart-card Token2 probe proves that the card is not Token2.
+func (r *Resolver) Resolve(
+	ctx context.Context,
+	descriptor discovery.Descriptor,
+) (identity *report.DeviceIdentity, provider report.Vendor, applicable bool, err error) {
+	provider = r.Provider(descriptor)
+	switch provider {
+	case report.VendorYubico:
+		resolved, resolveErr := r.resolveYubico(ctx, descriptor)
+		return resolved, provider, true, resolveErr
+	case report.VendorToken2:
+		resolved, resolveErr := r.resolveToken2(ctx, descriptor)
+		if errors.Is(resolveErr, token2resolver.ErrNotApplicable) {
+			return nil, report.VendorUnknown, false, nil
+		}
+		if errors.Is(resolveErr, token2resolver.ErrIdentityUnavailable) ||
+			errors.Is(resolveErr, token2resolver.ErrAmbiguous) {
+			return nil, provider, false, nil
+		}
+		return resolved, provider, true, resolveErr
+	default:
+		return nil, report.VendorUnknown, false, nil
+	}
+}
+
+func (r *Resolver) resolveYubico(
+	ctx context.Context,
+	descriptor discovery.Descriptor,
+) (*report.DeviceIdentity, error) {
+	opened, err := r.open(ctx, descriptor.Transport, descriptor.Path)
+	if err != nil {
+		return nil, err
+	}
+	defer opened.Lifecycle.Close()
+
+	info, err := yubicoctaphid.GetDeviceInfo(ctx, opened.Vendor)
+	if err != nil {
+		return nil, err
+	}
+
+	identity := &report.DeviceIdentity{
+		Vendor:   report.VendorYubico,
+		Model:    info.ModelName(descriptor.Product),
+		Firmware: info.FirmwareVersion.String(),
+		Interfaces: []report.InterfaceReport{{
+			Interface: report.InterfaceUSB,
+			Supported: yubicoCapabilities(info.SupportedUSBCapabilities),
+			Enabled:   yubicoCapabilities(info.EnabledUSBCapabilities),
+		}},
+	}
+	if info.Serial != nil {
+		identity.Serial = strconv.FormatUint(uint64(*info.Serial), 10)
+	}
+	if info.HasNFC() {
+		var supported, enabled yubico.Capability
+		if info.SupportedNFCCapabilities != nil {
+			supported = *info.SupportedNFCCapabilities
+		}
+		if info.EnabledNFCCapabilities != nil {
+			enabled = *info.EnabledNFCCapabilities
+		}
+		identity.Interfaces = append(identity.Interfaces, report.InterfaceReport{
+			Interface: report.InterfaceNFC,
+			Supported: yubicoCapabilities(supported),
+			Enabled:   yubicoCapabilities(enabled),
+		})
+	}
+
+	return identity, nil
+}
+
+func (r *Resolver) resolveToken2(
+	ctx context.Context,
+	descriptor discovery.Descriptor,
+) (*report.DeviceIdentity, error) {
+	var (
+		result token2resolver.Result
+		err    error
+	)
+
+	switch descriptor.Transport {
+	case transport.ModeSmartCard:
+		result, err = r.token2.ResolveSmartCard(ctx, descriptor.Path)
+	default:
+		target := token2resolver.HIDTarget{
+			ReportedSerial: descriptor.Serial,
+			ProductID:      descriptor.ProductID,
+			InstanceID:     descriptor.InstanceID,
+			ParentDeviceID: descriptor.ParentDeviceID,
+		}
+
+		opened, openErr := r.open(ctx, descriptor.Transport, descriptor.Path)
+		if openErr == nil {
+			defer opened.Lifecycle.Close()
+			if atr, atrErr := token2ctaphid.ReadATR(ctx, opened.Vendor); atrErr == nil {
+				target.ATR = &atr
+			}
+		}
+
+		result, err = r.token2.ResolveHID(ctx, target)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	identity := &report.DeviceIdentity{
+		Vendor: report.VendorToken2,
+		Serial: result.Identity.SerialNumber,
+	}
+	if result.ModelKnown {
+		identity.Model = token2ModelName(result.Identity.Model)
+	}
+
+	return identity, nil
+}
+
+func yubicoCapabilities(value yubico.Capability) []report.Capability {
+	known := []struct {
+		vendor yubico.Capability
+		report report.Capability
+	}{
+		{yubico.CapabilityOTP, report.CapabilityOTP},
+		{yubico.CapabilityU2F, report.CapabilityU2F},
+		{yubico.CapabilityCCID, report.CapabilityCCID},
+		{yubico.CapabilityOpenPGP, report.CapabilityOpenPGP},
+		{yubico.CapabilityPIV, report.CapabilityPIV},
+		{yubico.CapabilityOATH, report.CapabilityOATH},
+		{yubico.CapabilityCTAP2, report.CapabilityCTAP2},
+	}
+
+	var result []report.Capability
+	for _, capability := range known {
+		if value&capability.vendor != 0 {
+			result = append(result, capability.report)
+		}
+	}
+	return result
+}

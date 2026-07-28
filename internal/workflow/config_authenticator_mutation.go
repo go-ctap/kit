@@ -54,7 +54,7 @@ func (r Runner) SetAlwaysUV(
 		))
 	}
 	output.Result = new(rtconfig.AlwaysUVResult(
-		r.env.Selected.Fingerprint,
+		r.env.Selected.Attachment.ID,
 		req.Target,
 		preview.RequestedAlwaysUV,
 	))
@@ -106,6 +106,6 @@ func (r Runner) SetMinPINLength(
 			protocol.ConfigSubCommandSetMinPINLength,
 		))
 	}
-	output.Result = new(rtconfig.MinPINLengthResult(r.env.Selected.Fingerprint, req))
+	output.Result = new(rtconfig.MinPINLengthResult(r.env.Selected.Attachment.ID, req))
 	return output, nil
 }

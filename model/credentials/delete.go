@@ -1,6 +1,9 @@
 package credentials
 
-import "github.com/go-ctap/kit/model/safety"
+import (
+	"github.com/go-ctap/kit/model/report"
+	"github.com/go-ctap/kit/model/safety"
+)
 
 type DeletePreview struct {
 	CredentialIDHex string           `json:"credentialIDHex"`
@@ -13,11 +16,11 @@ type DeletePreview struct {
 }
 
 type DeleteResult struct {
-	DeviceFingerprint string `json:"deviceFingerprint"`
-	CredentialIDHex   string `json:"credentialIDHex"`
-	RPID              string `json:"rpID"`
-	RPName            string `json:"rpName,omitempty"`
-	UserIDHex         string `json:"userIDHex,omitempty"`
-	UserName          string `json:"userName,omitempty"`
-	DisplayName       string `json:"displayName,omitempty"`
+	AttachmentID    report.AttachmentID `json:"attachmentId"`
+	CredentialIDHex string              `json:"credentialIDHex"`
+	RPID            string              `json:"rpID"`
+	RPName          string              `json:"rpName,omitempty"`
+	UserIDHex       string              `json:"userIDHex,omitempty"`
+	UserName        string              `json:"userName,omitempty"`
+	DisplayName     string              `json:"displayName,omitempty"`
 }

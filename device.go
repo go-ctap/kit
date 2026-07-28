@@ -1,101 +1,52 @@
 package ctapkit
 
 import (
-	"context"
-	"strconv"
-	"strings"
+	"bytes"
+	"encoding/hex"
 
 	rtdevice "github.com/go-ctap/kit/internal/device"
-	"github.com/go-ctap/kit/internal/vendorinfo"
-	"github.com/go-ctap/kit/model/failure"
+	"github.com/go-ctap/kit/internal/discovery"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
-	"github.com/samber/lo"
 )
 
-// Device is an opaque handle to one discovered authenticator.
-type Device struct {
-	report report.DeviceReport
-	valid  bool
+type attachment struct {
+	descriptor discovery.Descriptor
+	report     report.DeviceReport
 }
 
-// DiscoverDevices returns authenticators reachable through the configured transport policy.
-//
-//goland:noinspection GoUnusedExportedFunction
-func DiscoverDevices(ctx context.Context, mode transport.Mode) ([]Device, error) {
-	return discoverDevices(ctx, transport.Discover, mode)
+func attachmentReport(descriptor discovery.Descriptor) report.AttachmentReport {
+	attachment := report.AttachmentReport{
+		ID:        report.AttachmentID(rtdevice.AttachmentID(descriptor)),
+		Transport: descriptor.Transport,
+	}
+	if descriptor.Transport == transport.ModeSmartCard {
+		attachment.SmartCard = &report.SmartCardReport{
+			Reader: descriptor.Path,
+			ATR:    hex.EncodeToString(descriptor.ATR),
+		}
+	} else {
+		attachment.USB = &report.USBReport{
+			Manufacturer:   descriptor.Manufacturer,
+			Product:        descriptor.Product,
+			ReportedSerial: descriptor.Serial,
+			VendorID:       descriptor.VendorID,
+			ProductID:      descriptor.ProductID,
+		}
+	}
+
+	return attachment
 }
 
-// SelectDevice resolves a user-facing selector against one discovery snapshot.
-func SelectDevice(devices []Device, selector string) (Device, error) {
-	selector = strings.TrimSpace(selector)
-
-	switch {
-	case len(devices) == 0:
-		return Device{}, failure.New(failure.CodeDeviceUnavailable,
-			failure.WithPhase(failure.PhaseDiscovery),
-		)
-	case selector == "" && len(devices) == 1:
-		return devices[0], nil
-	case selector == "":
-		return Device{}, failure.New(failure.CodeDeviceSelectionRequired,
-			failure.WithPhase(failure.PhaseDiscovery),
-		)
-	}
-
-	device, ok := lo.Find(devices, func(device Device) bool {
-		r := device.Report()
-		return r.Fingerprint == selector || r.OrdinalAlias == selector
-	})
-	if ok {
-		return device, nil
-	}
-
-	return Device{}, failure.New(failure.CodeDeviceNotFound,
-		failure.WithPhase(failure.PhaseDiscovery),
-	)
-}
-
-// Report returns public metadata for a discovered authenticator.
-func (d Device) Report() report.DeviceReport {
-	if !d.valid {
-		return report.DeviceReport{}
-	}
-
-	return d.report
-}
-
-type discoverTransportFunc func(context.Context, transport.Mode) ([]transport.Descriptor, error)
-
-func discoverDevices(ctx context.Context, discover discoverTransportFunc, mode transport.Mode) ([]Device, error) {
-	if mode == "" {
-		mode = transport.ModeAuto
-	}
-
-	descriptors, err := discover(ctx, mode)
-	if err != nil {
-		return nil, err
-	}
-
-	return lo.Map(descriptors, func(descriptor transport.Descriptor, index int) Device {
-		return newDevice(index, descriptor)
-	}), nil
-}
-
-func newDevice(index int, descriptor transport.Descriptor) Device {
-	return Device{
-		report: report.DeviceReport{
-			Fingerprint:  rtdevice.Fingerprint(descriptor),
-			OrdinalAlias: strconv.Itoa(index + 1),
-			Transport:    descriptor.Transport,
-			Path:         descriptor.Path,
-			Manufacturer: descriptor.Manufacturer,
-			Product:      descriptor.Product,
-			Serial:       descriptor.Serial,
-			VendorID:     descriptor.VendorID,
-			ProductID:    descriptor.ProductID,
-			Vendor:       vendorinfo.Classify(descriptor.VendorID),
-		},
-		valid: true,
-	}
+func sameConnection(current, next discovery.Descriptor) bool {
+	return current.Transport == next.Transport &&
+		current.Path == next.Path &&
+		current.Manufacturer == next.Manufacturer &&
+		current.Product == next.Product &&
+		current.Serial == next.Serial &&
+		current.VendorID == next.VendorID &&
+		current.ProductID == next.ProductID &&
+		bytes.Equal(current.ATR, next.ATR) &&
+		current.InstanceID == next.InstanceID &&
+		current.ParentDeviceID == next.ParentDeviceID
 }
