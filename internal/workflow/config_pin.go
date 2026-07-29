@@ -20,7 +20,7 @@ func (r Runner) SetPIN(
 
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
-		return output, err
+		return appconfig.PINOutput{}, err
 	}
 	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 
@@ -31,7 +31,7 @@ func (r Runner) SetPIN(
 
 	preview, err := rtconfig.BuildSetPINPreview(status, mode)
 	if err != nil {
-		return output, err
+		return appconfig.PINOutput{}, err
 	}
 
 	output.Preview = preview
@@ -44,7 +44,7 @@ func (r Runner) SetPIN(
 	r.env.Tokens.Invalidate()
 
 	if err != nil {
-		return output, errornorm.Annotate(err, errornorm.WithClientPINSubCommand(
+		return appconfig.PINOutput{}, errornorm.Annotate(err, errornorm.WithClientPINSubCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.ClientPINSubCommandSetPIN,
 		))
@@ -62,7 +62,7 @@ func (r Runner) ChangePIN(
 
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
-		return output, err
+		return appconfig.PINOutput{}, err
 	}
 	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 
@@ -73,7 +73,7 @@ func (r Runner) ChangePIN(
 
 	preview, err := rtconfig.BuildChangePINPreview(status, mode)
 	if err != nil {
-		return output, err
+		return appconfig.PINOutput{}, err
 	}
 
 	output.Preview = preview
@@ -86,7 +86,7 @@ func (r Runner) ChangePIN(
 	r.env.Tokens.Invalidate()
 
 	if err != nil {
-		return output, errornorm.Annotate(err, errornorm.WithClientPINSubCommand(
+		return appconfig.PINOutput{}, errornorm.Annotate(err, errornorm.WithClientPINSubCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.ClientPINSubCommandChangePIN,
 		))

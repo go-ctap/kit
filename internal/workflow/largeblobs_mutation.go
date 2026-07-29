@@ -24,7 +24,7 @@ func (r Runner) WriteLargeBlob(
 		protocol.PermissionLargeBlobWrite,
 	)
 	if err != nil {
-		return output, err
+		return applargeblobs.MutationOutput{}, err
 	}
 
 	inventory, err := r.loadLargeBlobInventory(
@@ -34,34 +34,29 @@ func (r Runner) WriteLargeBlob(
 		inventoryPermission,
 	)
 	if err != nil {
-		return output, err
+		return applargeblobs.MutationOutput{}, err
 	}
 
 	state, err := r.loadTargetBlobState(ctx, device, inventory, req.CredentialIDHex)
 	if err != nil {
-		return output, err
+		return applargeblobs.MutationOutput{}, err
 	}
 
 	defer state.zero()
 
 	preview, err := buildWritePreviewFromState(state, req.Payload)
-	output.Preview = preview
-
 	if err != nil {
-		return output, err
+		return applargeblobs.MutationOutput{}, err
 	}
+	output.Preview = preview
 
 	if req.DryRun {
 		return output, nil
 	}
 
 	replacement, result, err := buildWriteMutation(state, req.Payload)
-	if err != nil && failure.IsCode(err, failure.CodeLargeBlobArrayTooLarge) && result.CredentialIDHex != "" {
-		output.Result = &result
-	}
-
 	if err != nil {
-		return output, err
+		return applargeblobs.MutationOutput{}, err
 	}
 
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
@@ -72,7 +67,7 @@ func (r Runner) WriteLargeBlob(
 		return device.SetLargeBlobs(ctx, token, replacement)
 	})
 	if err != nil {
-		return output, errornorm.Annotate(err, errornorm.WithCommand(
+		return applargeblobs.MutationOutput{}, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.AuthenticatorLargeBlobs,
 		))
@@ -99,7 +94,7 @@ func (r Runner) DeleteLargeBlob(
 		protocol.PermissionLargeBlobWrite,
 	)
 	if err != nil {
-		return output, err
+		return applargeblobs.MutationOutput{}, err
 	}
 
 	inventory, err := r.loadLargeBlobInventory(
@@ -109,19 +104,19 @@ func (r Runner) DeleteLargeBlob(
 		inventoryPermission,
 	)
 	if err != nil {
-		return output, err
+		return applargeblobs.MutationOutput{}, err
 	}
 
 	state, err := r.loadTargetBlobState(ctx, device, inventory, req.CredentialIDHex)
 	if err != nil {
-		return output, err
+		return applargeblobs.MutationOutput{}, err
 	}
 
 	defer state.zero()
 
 	preview, err := buildDeletePreviewFromState(state)
 	if err != nil {
-		return output, err
+		return applargeblobs.MutationOutput{}, err
 	}
 
 	output.Preview = preview
@@ -132,7 +127,7 @@ func (r Runner) DeleteLargeBlob(
 
 	replacement, result, noBlob, err := buildDeleteMutation(state)
 	if err != nil {
-		return output, err
+		return applargeblobs.MutationOutput{}, err
 	}
 
 	if noBlob {
@@ -149,7 +144,7 @@ func (r Runner) DeleteLargeBlob(
 		return device.SetLargeBlobs(ctx, token, replacement)
 	})
 	if err != nil {
-		return output, errornorm.Annotate(err, errornorm.WithCommand(
+		return applargeblobs.MutationOutput{}, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.AuthenticatorLargeBlobs,
 		))

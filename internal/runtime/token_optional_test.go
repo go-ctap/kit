@@ -97,7 +97,7 @@ func TestTokenServiceUseOptionalTriesWithoutTokenBeforeCachedToken(t *testing.T)
 		t.Fatalf("token uses = %d, want 1", uses)
 	}
 
-	if _, present, _ := cache.GetToken(key); !present {
+	if _, present := cache.GetToken(key); !present {
 		t.Fatal("unused cached token was invalidated")
 	}
 
@@ -142,7 +142,7 @@ func TestTokenServiceUseOptionalDoesNotReplayRejectedToken(t *testing.T) {
 		t.Fatalf("token uses = %d, want 2", uses)
 	}
 
-	if _, present, _ := cache.GetToken(key); present {
+	if _, present := cache.GetToken(key); present {
 		t.Fatal("rejected token remained cached")
 	}
 

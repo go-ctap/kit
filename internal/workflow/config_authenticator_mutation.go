@@ -21,7 +21,7 @@ func (r Runner) SetAlwaysUV(
 
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
-		return output, err
+		return appconfig.AuthenticatorConfigOutput{}, err
 	}
 	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 
@@ -32,7 +32,7 @@ func (r Runner) SetAlwaysUV(
 
 	preview, err := rtconfig.BuildAlwaysUVPreview(status, req.Target, mode)
 	if err != nil {
-		return output, err
+		return appconfig.AuthenticatorConfigOutput{}, err
 	}
 
 	output.Preview = preview
@@ -48,7 +48,7 @@ func (r Runner) SetAlwaysUV(
 		return device.ToggleAlwaysUV(ctx, token)
 	})
 	if err != nil {
-		return output, errornorm.Annotate(err, errornorm.WithConfigSubCommand(
+		return appconfig.AuthenticatorConfigOutput{}, errornorm.Annotate(err, errornorm.WithConfigSubCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.ConfigSubCommandToggleAlwaysUv,
 		))
@@ -70,7 +70,7 @@ func (r Runner) SetMinPINLength(
 
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
-		return output, err
+		return appconfig.AuthenticatorConfigOutput{}, err
 	}
 	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 	mode := safety.PreviewModeDryRun
@@ -80,7 +80,7 @@ func (r Runner) SetMinPINLength(
 
 	preview, err := rtconfig.BuildMinPINLengthPreview(status, req, mode)
 	if err != nil {
-		return output, err
+		return appconfig.AuthenticatorConfigOutput{}, err
 	}
 
 	output.Preview = preview
@@ -101,7 +101,7 @@ func (r Runner) SetMinPINLength(
 		})
 	})
 	if err != nil {
-		return output, errornorm.Annotate(err, errornorm.WithConfigSubCommand(
+		return appconfig.AuthenticatorConfigOutput{}, errornorm.Annotate(err, errornorm.WithConfigSubCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.ConfigSubCommandSetMinPINLength,
 		))

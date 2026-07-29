@@ -9,27 +9,33 @@ import (
 
 	rtauthenticator "github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/discovery"
+	rtidentity "github.com/go-ctap/kit/internal/identity"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 )
 
 type blockingIdentityResolver struct {
-	provider report.Vendor
-	identity *report.DeviceIdentity
-	err      error
-	started  chan struct{}
-	release  chan struct{}
-	calls    atomic.Int32
+	provider   report.Vendor
+	canResolve bool
+	identity   *report.DeviceIdentity
+	err        error
+	started    chan struct{}
+	release    chan struct{}
+	calls      atomic.Int32
 }
 
 func (r *blockingIdentityResolver) Provider(discovery.Descriptor) report.Vendor {
 	return r.provider
 }
 
+func (r *blockingIdentityResolver) CanResolve(discovery.Descriptor) bool {
+	return r.canResolve || r.provider != report.VendorUnknown
+}
+
 func (r *blockingIdentityResolver) Resolve(
 	ctx context.Context,
 	_ discovery.Descriptor,
-) (*report.DeviceIdentity, report.Vendor, bool, error) {
+) (rtidentity.Resolution, error) {
 	r.calls.Add(1)
 	select {
 	case r.started <- struct{}{}:
@@ -37,9 +43,16 @@ func (r *blockingIdentityResolver) Resolve(
 	}
 	select {
 	case <-r.release:
-		return r.identity, r.provider, true, r.err
+		if r.err != nil {
+			return rtidentity.Resolution{}, r.err
+		}
+
+		return rtidentity.Resolution{
+			Identity: r.identity,
+			Provider: r.provider,
+		}, nil
 	case <-ctx.Done():
-		return nil, r.provider, true, ctx.Err()
+		return rtidentity.Resolution{}, ctx.Err()
 	}
 }
 

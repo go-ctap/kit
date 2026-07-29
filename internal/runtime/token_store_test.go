@@ -29,11 +29,7 @@ func TestTokenStoreCompositeGrantCoversSubset(t *testing.T) {
 			protocol.PermissionLargeBlobWrite,
 	}, secret.New([]byte("token")))
 
-	token, ok, err := store.GetToken(TokenKey{Permission: protocol.PermissionLargeBlobWrite})
-	if err != nil {
-		t.Fatalf("GetToken: %v", err)
-	}
-
+	token, ok := store.GetToken(TokenKey{Permission: protocol.PermissionLargeBlobWrite})
 	defer secret.Zero(token)
 	if !ok {
 		t.Fatal("composite grant did not cover permission subset")
@@ -49,14 +45,10 @@ func TestTokenStoreInvalidateUnlessPermissionNarrowsGrant(t *testing.T) {
 
 	store.InvalidateTokenUnlessPermission(protocol.PermissionLargeBlobWrite)
 
-	if _, ok, _ := store.GetToken(TokenKey{Permission: protocol.PermissionCredentialManagement}); ok {
+	if _, ok := store.GetToken(TokenKey{Permission: protocol.PermissionCredentialManagement}); ok {
 		t.Fatal("removed permission remained available")
 	}
-	token, ok, err := store.GetToken(TokenKey{Permission: protocol.PermissionLargeBlobWrite})
-	if err != nil {
-		t.Fatalf("GetToken: %v", err)
-	}
-
+	token, ok := store.GetToken(TokenKey{Permission: protocol.PermissionLargeBlobWrite})
 	defer secret.Zero(token)
 	if !ok {
 		t.Fatal("retained permission was invalidated")

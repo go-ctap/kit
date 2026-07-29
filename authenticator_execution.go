@@ -31,7 +31,7 @@ func executeOperation[T any](
 			_ = a.Close()
 		}
 
-		return result, normalizeRunError(err, string(kind))
+		return nil, normalizeRunError(err, string(kind))
 	}
 
 	return result, nil
@@ -83,6 +83,9 @@ func executeSerializedOperation[T any](
 	if effects.InvalidatesLargeBlobSnapshot() {
 		a.largeBlobState.Clear()
 	}
+	if err != nil {
+		return nil, err
+	}
 
-	return &result, err
+	return &result, nil
 }

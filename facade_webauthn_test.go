@@ -204,7 +204,7 @@ func TestMakeCredentialAcquiresScopedTokenWhenCTAPRequiresIt(t *testing.T) {
 	}
 }
 
-func TestMakeCredentialKeepsPartialResultAndInvalidatesInventoryOnRefreshFailure(t *testing.T) {
+func TestMakeCredentialReturnsNoPartialResultAndInvalidatesInventoryOnRefreshFailure(t *testing.T) {
 	refreshErr := errors.New("getInfo refresh failed")
 	a := &webauthnTestAuthenticator{
 		makeCredentialUvNotRequired:         true,
@@ -233,8 +233,8 @@ func TestMakeCredentialKeepsPartialResultAndInvalidatesInventoryOnRefreshFailure
 		t.Fatalf("MakeCredential error = %v, want refresh error", err)
 	}
 
-	if result.Result == nil || result.Result.CredentialIDHex == "" {
-		t.Fatalf("partial output = %#v, want valid credential result", result)
+	if result != nil {
+		t.Fatalf("output = %#v, want nil on error", result)
 	}
 
 	a.makeCredentialErr = nil
@@ -242,7 +242,7 @@ func TestMakeCredentialKeepsPartialResultAndInvalidatesInventoryOnRefreshFailure
 		context.Background(),
 		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	); err != nil {
-		t.Fatalf("credentials after partial mutation: %v", err)
+		t.Fatalf("credentials after failed mutation: %v", err)
 	}
 
 	if a.metadataCalls != 2 {

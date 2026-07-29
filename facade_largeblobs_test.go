@@ -124,7 +124,7 @@ func TestLargeBlobWriteUsesSeparateGrantForReadOnlyInventory(t *testing.T) {
 	}
 }
 
-func TestLargeBlobWriteCapacityErrorKeepsPreview(t *testing.T) {
+func TestLargeBlobWriteCapacityErrorReturnsNoPartialPreview(t *testing.T) {
 	a := &largeBlobWriteEventAuthenticator{maxSerializedLargeBlobArray: 16}
 	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
@@ -136,15 +136,8 @@ func TestLargeBlobWriteCapacityErrorKeepsPreview(t *testing.T) {
 	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...)
 	requireFailureCode(t, err, failure.CodeLargeBlobArrayTooLarge)
 
-	if output.Preview.SerializedLargeBlobArrayLimit != 16 {
-		t.Fatalf("preview limit = %#v, want 16", output.Preview.SerializedLargeBlobArrayLimit)
-	}
-
-	if output.Preview.SerializedLargeBlobArraySizeAfter <= int(output.Preview.SerializedLargeBlobArrayLimit) {
-		t.Fatalf("preview size after = %d, want over limit %d",
-			output.Preview.SerializedLargeBlobArraySizeAfter,
-			output.Preview.SerializedLargeBlobArrayLimit,
-		)
+	if output != nil {
+		t.Fatalf("output = %#v, want nil on error", output)
 	}
 }
 

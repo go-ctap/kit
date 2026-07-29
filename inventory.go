@@ -38,10 +38,11 @@ type InventoryEvent struct {
 
 type identityResolver interface {
 	Provider(discovery.Descriptor) report.Vendor
+	CanResolve(discovery.Descriptor) bool
 	Resolve(
 		context.Context,
 		discovery.Descriptor,
-	) (*report.DeviceIdentity, report.Vendor, bool, error)
+	) (rtidentity.Resolution, error)
 }
 
 type inventoryDiscovery interface {
@@ -272,7 +273,7 @@ func (i *Inventory) applyDescriptors(descriptors []discovery.Descriptor) {
 		resolveCtx, cancel := context.WithCancel(i.ctx)
 		provider := i.identity.Provider(descriptor)
 		state := report.IdentityUnavailable
-		if provider != report.VendorUnknown {
+		if i.identity.CanResolve(descriptor) {
 			state = report.IdentityResolving
 		}
 		record := &inventoryRecord{
@@ -326,7 +327,7 @@ func (i *Inventory) resolveIdentity(
 	defer close(record.done)
 
 	resolveCtx, cancel := context.WithTimeout(record.resolveCtx, identityTimeout)
-	identity, provider, applicable, err := i.identity.Resolve(resolveCtx, descriptor)
+	resolved, err := i.identity.Resolve(resolveCtx, descriptor)
 	cancel()
 
 	i.mu.Lock()
@@ -336,19 +337,20 @@ func (i *Inventory) resolveIdentity(
 		return
 	}
 
-	resolution := report.IdentityResolution{Provider: provider}
-	switch {
-	case err != nil:
+	resolution := current.device.report.Resolution
+	if err != nil {
 		resolution.State = report.IdentityFailed
 		normalized := NormalizeError(err, failure.PhaseIdentity)
 		resolution.Error = failure.Snapshot(normalized)
-	case identity != nil:
-		resolution.State = report.IdentityResolved
-		current.device.report.Identity = identity
-	case !applicable:
-		resolution.State = report.IdentityUnavailable
-	default:
-		resolution.State = report.IdentityUnavailable
+	} else {
+		resolution.Provider = resolved.Provider
+		resolution.Error = nil
+		if resolved.Identity != nil {
+			resolution.State = report.IdentityResolved
+			current.device.report.Identity = resolved.Identity
+		} else {
+			resolution.State = report.IdentityUnavailable
+		}
 	}
 	current.device.report.Resolution = resolution
 	i.mu.Unlock()

@@ -23,7 +23,7 @@ func (r Runner) UpdateCredentialUser(
 
 	preview, err := rtcredentials.BuildUpdateUserPreview(req)
 	if err != nil {
-		return output, err
+		return appcredentials.UpdateUserOutput{}, err
 	}
 
 	output.Preview = preview
@@ -38,17 +38,17 @@ func (r Runner) UpdateCredentialUser(
 		protocol.PermissionCredentialManagement,
 	)
 	if err != nil {
-		return output, err
+		return appcredentials.UpdateUserOutput{}, err
 	}
 
 	userID, err := decodeCredentialHex(preview.Proposed.UserIDHex)
 	if err != nil {
-		return output, err
+		return appcredentials.UpdateUserOutput{}, err
 	}
 
 	descriptor, err := credentialDescriptor(req.Target.Record)
 	if err != nil {
-		return output, err
+		return appcredentials.UpdateUserOutput{}, err
 	}
 
 	updatedUser := credential.PublicKeyCredentialUserEntity{
@@ -65,7 +65,7 @@ func (r Runner) UpdateCredentialUser(
 		return device.UpdateUserInformation(ctx, token, descriptor, updatedUser)
 	})
 	if err != nil {
-		return output, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
+		return appcredentials.UpdateUserOutput{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 			failure.PhaseAuthenticatorCommand,
 			command,
 			protocol.CredentialManagementSubCommandUpdateUserInformation,

@@ -26,16 +26,16 @@ func (r Runner) MakeCredential(
 
 	input, err := rtwebauthn.NormalizeMakeCredentialInput(req.MakeCredentialInput)
 	if err != nil {
-		return output, err
+		return appwebauthn.MakeCredentialOutput{}, err
 	}
 
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
-		return output, err
+		return appwebauthn.MakeCredentialOutput{}, err
 	}
 	preview, err := rtwebauthn.BuildMakeCredentialPreview(r.env.Selected, info, input)
 	if err != nil {
-		return output, err
+		return appwebauthn.MakeCredentialOutput{}, err
 	}
 	output.Preview = preview
 
@@ -68,21 +68,14 @@ func (r Runner) MakeCredential(
 		return err
 	})
 	if err != nil {
-		if response.AuthData != nil && response.AuthData.AttestedCredentialData != nil {
-			if result, resultErr := makeCredentialResult(r.env.Selected.Attachment.ID, input.RP.ID, input.Extensions, response); resultErr == nil {
-				output.Result = &result
-				r.afterUserPresence(result.UserPresent)
-			}
-		}
-
-		return output, errornorm.Annotate(err, errornorm.WithCommand(
+		return appwebauthn.MakeCredentialOutput{}, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.AuthenticatorMakeCredential,
 		))
 	}
 	result, err := makeCredentialResult(r.env.Selected.Attachment.ID, input.RP.ID, input.Extensions, response)
 	if err != nil {
-		return output, err
+		return appwebauthn.MakeCredentialOutput{}, err
 	}
 	output.Result = &result
 	r.afterUserPresence(result.UserPresent)
@@ -99,16 +92,16 @@ func (r Runner) GetAssertion(
 
 	input, err := rtwebauthn.NormalizeGetAssertionInput(req.GetAssertionInput)
 	if err != nil {
-		return output, err
+		return appwebauthn.GetAssertionOutput{}, err
 	}
 
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
-		return output, err
+		return appwebauthn.GetAssertionOutput{}, err
 	}
 	preview, err := rtwebauthn.BuildGetAssertionPreview(r.env.Selected, info, input)
 	if err != nil {
-		return output, err
+		return appwebauthn.GetAssertionOutput{}, err
 	}
 	output.Preview = preview
 
@@ -157,7 +150,7 @@ func (r Runner) GetAssertion(
 		RPID:       input.RPID,
 		Optional:   true,
 	}, readAssertions); err != nil {
-		return output, err
+		return appwebauthn.GetAssertionOutput{}, err
 	}
 
 	output.Result = &result

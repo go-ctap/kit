@@ -26,7 +26,7 @@ func buildWriteMutation(state targetBlobState, payload []byte) ([]protocol.Large
 
 	result := buildMutationResult(state, operation, len(payload), sizeAfter, false)
 	if err := checkSerializedArrayLimit(state.support.MaxSerializedLargeBlobArray, sizeAfter); err != nil {
-		return nil, result, err
+		return nil, applargeblobs.MutationResult{}, err
 	}
 
 	return replacement, result, nil

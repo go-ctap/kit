@@ -26,11 +26,11 @@ func (r Runner) EnableLongTouchForReset(
 
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
-		return output, err
+		return appconfig.AuthenticatorConfigOutput{}, err
 	}
 	preview, err := rtconfig.BuildEnableLongTouchForResetPreview(rtconfig.BuildStatusReport(r.env.Selected, info), mode)
 	if err != nil {
-		return output, err
+		return appconfig.AuthenticatorConfigOutput{}, err
 	}
 	output.Preview = preview
 
@@ -45,7 +45,7 @@ func (r Runner) EnableLongTouchForReset(
 		return device.EnableLongTouchForReset(ctx, token)
 	})
 	if err != nil {
-		return output, errornorm.Annotate(err, errornorm.WithConfigSubCommand(
+		return appconfig.AuthenticatorConfigOutput{}, errornorm.Annotate(err, errornorm.WithConfigSubCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.ConfigSubCommandEnableLongTouchForReset,
 		))

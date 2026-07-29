@@ -13,6 +13,7 @@ import (
 	token2resolver "github.com/go-ctap/token2/resolver"
 	token2ctaphid "github.com/go-ctap/token2/transport/ctaphid"
 	"github.com/go-ctap/yubico"
+	yubicoresolver "github.com/go-ctap/yubico/resolver"
 	yubicoctaphid "github.com/go-ctap/yubico/transport/ctaphid"
 )
 
@@ -24,54 +25,123 @@ const (
 // Resolver owns the built-in vendor identity providers. It returns one atomic
 // identity and never merges results from multiple providers.
 type Resolver struct {
-	token2 *token2resolver.Resolver
+	token2 token2IdentityResolver
+	yubico yubicoIdentityResolver
 	open   func(context.Context, transport.Mode, string) (*authenticator.Opened, error)
+}
+
+type token2IdentityResolver interface {
+	ResolveSmartCard(context.Context, string) (token2resolver.Result, error)
+	ResolveHID(context.Context, token2resolver.HIDTarget) (token2resolver.Result, error)
+}
+
+type yubicoIdentityResolver interface {
+	ResolveSmartCard(context.Context, string) (yubico.DeviceInfo, error)
+}
+
+// Resolution is the complete successful outcome of resolving one descriptor.
+type Resolution struct {
+	Identity *report.DeviceIdentity
+	Provider report.Vendor
 }
 
 func NewResolver() *Resolver {
 	return &Resolver{
 		token2: token2resolver.NewLocal(),
+		yubico: yubicoresolver.NewLocal(),
 		open:   authenticator.Open,
 	}
 }
 
-// Provider returns the provider that may resolve descriptor.
+// Provider returns the provider proved by transport topology alone. Smart
+// cards require protocol probing and therefore have no provider at this stage.
 func (r *Resolver) Provider(descriptor discovery.Descriptor) report.Vendor {
 	switch {
 	case descriptor.VendorID == yubicoVendorID:
 		return report.VendorYubico
-	case descriptor.VendorID == token2VendorID,
-		descriptor.Transport == transport.ModeSmartCard:
+	case descriptor.VendorID == token2VendorID:
 		return report.VendorToken2
 	default:
 		return report.VendorUnknown
 	}
 }
 
-// Resolve resolves one descriptor. applicable is false only when a
-// speculative smart-card Token2 probe proves that the card is not Token2.
+// CanResolve reports whether at least one built-in identity provider applies
+// to descriptor. Every FIDO smart card is probed because PC/SC does not expose
+// the card vendor through USB topology.
+func (r *Resolver) CanResolve(descriptor discovery.Descriptor) bool {
+	return descriptor.Transport == transport.ModeSmartCard ||
+		r.Provider(descriptor) != report.VendorUnknown
+}
+
+// Resolve resolves one descriptor.
 func (r *Resolver) Resolve(
 	ctx context.Context,
 	descriptor discovery.Descriptor,
-) (identity *report.DeviceIdentity, provider report.Vendor, applicable bool, err error) {
-	provider = r.Provider(descriptor)
+) (Resolution, error) {
+	if descriptor.Transport == transport.ModeSmartCard {
+		return r.resolveSmartCard(ctx, descriptor)
+	}
+
+	provider := r.Provider(descriptor)
 	switch provider {
 	case report.VendorYubico:
-		resolved, resolveErr := r.resolveYubico(ctx, descriptor)
-		return resolved, provider, true, resolveErr
+		resolved, err := r.resolveYubico(ctx, descriptor)
+		if err != nil {
+			return Resolution{}, err
+		}
+
+		return Resolution{Identity: resolved, Provider: provider}, nil
 	case report.VendorToken2:
-		resolved, resolveErr := r.resolveToken2(ctx, descriptor)
-		if errors.Is(resolveErr, token2resolver.ErrNotApplicable) {
-			return nil, report.VendorUnknown, false, nil
+		resolved, err := r.resolveToken2(ctx, descriptor)
+		if errors.Is(err, token2resolver.ErrNotApplicable) {
+			return Resolution{Provider: report.VendorUnknown}, nil
 		}
-		if errors.Is(resolveErr, token2resolver.ErrIdentityUnavailable) ||
-			errors.Is(resolveErr, token2resolver.ErrAmbiguous) {
-			return nil, provider, false, nil
+		if errors.Is(err, token2resolver.ErrIdentityUnavailable) ||
+			errors.Is(err, token2resolver.ErrAmbiguous) {
+			return Resolution{Provider: provider}, nil
 		}
-		return resolved, provider, true, resolveErr
+		if err != nil {
+			return Resolution{}, err
+		}
+
+		return Resolution{Identity: resolved, Provider: provider}, nil
 	default:
-		return nil, report.VendorUnknown, false, nil
+		return Resolution{Provider: report.VendorUnknown}, nil
 	}
+}
+
+func (r *Resolver) resolveSmartCard(
+	ctx context.Context,
+	descriptor discovery.Descriptor,
+) (Resolution, error) {
+	info, err := r.yubico.ResolveSmartCard(ctx, descriptor.Path)
+	if err == nil {
+		return Resolution{
+			Identity: yubicoIdentity("", info),
+			Provider: report.VendorYubico,
+		}, nil
+	}
+	if !errors.Is(err, yubicoresolver.ErrNotApplicable) {
+		return Resolution{}, err
+	}
+
+	resolved, err := r.resolveToken2(ctx, descriptor)
+	if errors.Is(err, token2resolver.ErrNotApplicable) {
+		return Resolution{Provider: report.VendorUnknown}, nil
+	}
+	if errors.Is(err, token2resolver.ErrIdentityUnavailable) ||
+		errors.Is(err, token2resolver.ErrAmbiguous) {
+		return Resolution{Provider: report.VendorToken2}, nil
+	}
+	if err != nil {
+		return Resolution{}, err
+	}
+
+	return Resolution{
+		Identity: resolved,
+		Provider: report.VendorToken2,
+	}, nil
 }
 
 func (r *Resolver) resolveYubico(

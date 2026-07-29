@@ -37,7 +37,7 @@ func (r Runner) GarbageCollectLargeBlobs(
 		protocol.PermissionLargeBlobWrite,
 	)
 	if err != nil {
-		return output, err
+		return applargeblobs.MutationOutput{}, err
 	}
 
 	state, err := r.loadGarbageCollectState(
@@ -47,7 +47,7 @@ func (r Runner) GarbageCollectLargeBlobs(
 		inventoryPermission,
 	)
 	if err != nil {
-		return output, err
+		return applargeblobs.MutationOutput{}, err
 	}
 
 	preview := r.buildGarbageCollectPreview(state)
@@ -72,7 +72,7 @@ func (r Runner) GarbageCollectLargeBlobs(
 		return device.SetLargeBlobs(ctx, token, state.replacement)
 	})
 	if err != nil {
-		return output, errornorm.Annotate(err, errornorm.WithCommand(
+		return applargeblobs.MutationOutput{}, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.AuthenticatorLargeBlobs,
 		))

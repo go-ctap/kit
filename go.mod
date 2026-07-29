@@ -9,7 +9,7 @@ require (
 	github.com/go-ctap/iso7816 v0.1.0
 	github.com/go-ctap/pcsc v0.7.0
 	github.com/go-ctap/token2 v0.8.0
-	github.com/go-ctap/yubico v0.2.0
+	github.com/go-ctap/yubico v0.3.0
 	github.com/google/uuid v1.6.0
 	github.com/samber/lo v1.53.0
 	golang.org/x/sys v0.47.0

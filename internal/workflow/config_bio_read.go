@@ -29,8 +29,11 @@ func (r Runner) BioList(ctx context.Context, device BioDevice) (appconfig.BioLis
 
 		return err
 	})
+	if err != nil {
+		return appconfig.BioListReport{}, err
+	}
 
-	return report, err
+	return report, nil
 }
 
 func (r Runner) BioSensorInfo(ctx context.Context, device BioDevice) (appconfig.BioSensorReport, error) {

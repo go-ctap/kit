@@ -25,7 +25,7 @@ func (r Runner) DeleteCredential(
 		protocol.PermissionCredentialManagement,
 	)
 	if err != nil {
-		return output, err
+		return appcredentials.DeleteOutput{}, err
 	}
 
 	report, err := r.credentialInventory(
@@ -35,11 +35,11 @@ func (r Runner) DeleteCredential(
 		nil,
 	)
 	if err != nil {
-		return output, err
+		return appcredentials.DeleteOutput{}, err
 	}
 	preview, err := rtcredentials.BuildDeletePreview(report, req.CredentialIDHex)
 	if err != nil {
-		return output, err
+		return appcredentials.DeleteOutput{}, err
 	}
 
 	output.Preview = preview
@@ -50,12 +50,12 @@ func (r Runner) DeleteCredential(
 
 	publicTarget, err := rtcredentials.FindByHexID(report, req.CredentialIDHex)
 	if err != nil {
-		return output, err
+		return appcredentials.DeleteOutput{}, err
 	}
 
 	descriptor, err := credentialDescriptor(publicTarget.Record)
 	if err != nil {
-		return output, err
+		return appcredentials.DeleteOutput{}, err
 	}
 
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
@@ -66,7 +66,7 @@ func (r Runner) DeleteCredential(
 		return device.DeleteCredential(ctx, token, descriptor)
 	})
 	if err != nil {
-		return output, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
+		return appcredentials.DeleteOutput{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 			failure.PhaseAuthenticatorCommand,
 			command,
 			protocol.CredentialManagementSubCommandDeleteCredential,

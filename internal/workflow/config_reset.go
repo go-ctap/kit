@@ -22,7 +22,7 @@ func (r Runner) ResetFactory(
 
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
-		return output, err
+		return appconfig.ResetFactoryOutput{}, err
 	}
 	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 	preview := rtconfig.BuildResetFactoryPreview(status)
@@ -42,7 +42,7 @@ func (r Runner) ResetFactory(
 		Destructive: true,
 		Preview:     preview,
 	}); err != nil {
-		return output, err
+		return appconfig.ResetFactoryOutput{}, err
 	}
 
 	r.recordStateEffect(rtruntime.StateEffectAuthenticatorReset)
@@ -51,7 +51,7 @@ func (r Runner) ResetFactory(
 	r.env.Tokens.Invalidate()
 
 	if err != nil {
-		return output, errornorm.Annotate(err, errornorm.WithCommand(
+		return appconfig.ResetFactoryOutput{}, errornorm.Annotate(err, errornorm.WithCommand(
 			failure.PhaseAuthenticatorCommand,
 			protocol.AuthenticatorReset,
 		))

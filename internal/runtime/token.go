@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"slices"
 
 	ctapdevice "github.com/go-ctap/ctap/authenticator"
 	"github.com/go-ctap/ctap/protocol"
@@ -41,7 +42,7 @@ func (granted TokenKey) Covers(requested TokenKey) bool {
 }
 
 type TokenCache interface {
-	GetToken(TokenKey) ([]byte, bool, error)
+	GetToken(TokenKey) ([]byte, bool)
 	SetToken(TokenKey, *secret.Handle)
 	InvalidateToken()
 	InvalidateTokenUnlessPermission(protocol.Permission)
@@ -147,7 +148,7 @@ func (s *TokenService) acquire(
 		RPID:       rpID,
 	}
 
-	if token, ok, _ := s.cache.GetToken(key); ok {
+	if token, ok := s.cache.GetToken(key); ok {
 		return token, nil
 	}
 
@@ -273,11 +274,11 @@ func (s *TokenService) acquireUsingPIN(
 }
 
 func (s *TokenService) storeToken(key TokenKey, token []byte) []byte {
+	out := slices.Clone(token)
 	handle := secret.New(token)
 
 	s.cache.SetToken(key, handle)
 
-	out, _ := handle.Bytes()
 	return out
 }
 

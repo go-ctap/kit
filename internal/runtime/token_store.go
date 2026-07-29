@@ -20,12 +20,12 @@ func NewTokenStore() *TokenStore {
 	return &TokenStore{}
 }
 
-func (s *TokenStore) GetToken(key TokenKey) ([]byte, bool, error) {
+func (s *TokenStore) GetToken(key TokenKey) ([]byte, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.secret == nil || !s.key.Covers(key) {
-		return nil, false, nil
+		return nil, false
 	}
 
 	token, err := s.secret.Bytes()
@@ -33,10 +33,10 @@ func (s *TokenStore) GetToken(key TokenKey) ([]byte, bool, error) {
 		s.key = TokenKey{}
 		s.secret = nil
 
-		return nil, false, err
+		return nil, false
 	}
 
-	return token, true, nil
+	return token, true
 }
 
 func (s *TokenStore) SetToken(key TokenKey, token *secret.Handle) {

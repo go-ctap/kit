@@ -119,7 +119,7 @@ func TestTokenServiceUseInvalidatesRejectedTokenWithoutReplayingUnsafeConsumer(t
 		t.Fatalf("token uses = %d, want 1", uses)
 	}
 
-	if _, present, _ := cache.GetToken(key); present {
+	if _, present := cache.GetToken(key); present {
 		t.Fatal("rejected token remained cached")
 	}
 
@@ -181,7 +181,7 @@ func TestTokenServiceUseKeepsTokenAfterOtherConsumerFailures(t *testing.T) {
 				t.Fatalf("token uses = %d, want 1", uses)
 			}
 
-			if _, present, _ := cache.GetToken(key); !present {
+			if _, present := cache.GetToken(key); !present {
 				t.Fatal("cached token was invalidated")
 			}
 		})

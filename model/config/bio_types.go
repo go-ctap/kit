@@ -71,8 +71,6 @@ type BioEnrollResult struct {
 	Samples                []BioEnrollSample   `json:"samples,omitempty"`
 	LastEnrollSampleStatus string              `json:"lastEnrollSampleStatus,omitempty"`
 	RemainingSamples       *uint               `json:"remainingSamples,omitempty"`
-	CancelAttempted        bool                `json:"cancelAttempted"`
-	CancelSucceeded        bool                `json:"cancelSucceeded"`
 }
 
 type BioMutationPreview struct {

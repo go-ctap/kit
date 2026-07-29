@@ -26,7 +26,7 @@ func (r Runner) BioEnroll(
 
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
-		return output, err
+		return appconfig.BioEnrollOutput{}, err
 	}
 	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 
@@ -37,7 +37,7 @@ func (r Runner) BioEnroll(
 
 	preview, err := rtconfig.BuildBioEnrollPreview(status, req.TimeoutMilliseconds, mode)
 	if err != nil {
-		return output, err
+		return appconfig.BioEnrollOutput{}, err
 	}
 
 	output.Preview = preview
@@ -59,11 +59,18 @@ func (r Runner) BioEnroll(
 			bioEnrollmentCommand(status),
 			token,
 		)
+		if err != nil {
+			return err
+		}
 		output.Result = &result
 
-		return err
+		return nil
 	})
-	return output, err
+	if err != nil {
+		return appconfig.BioEnrollOutput{}, err
+	}
+
+	return output, nil
 }
 
 func (r Runner) bioEnrollmentProgress(ctx context.Context) rtconfig.BioEnrollProgress {
@@ -102,16 +109,11 @@ func (r Runner) runBioEnrollment(
 	}
 
 	cancelAfterFailure := func(cause error) (appconfig.BioEnrollResult, error) {
-		result.CancelAttempted = true
-
 		cancelCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), bioEnrollmentCancelTimeout)
 		defer cancel()
-		cancelErr := device.CancelCurrentEnrollment(cancelCtx)
-		if cancelErr == nil {
-			result.CancelSucceeded = true
-		}
+		_ = device.CancelCurrentEnrollment(cancelCtx)
 
-		return result, cause
+		return appconfig.BioEnrollResult{}, cause
 	}
 
 	recordSample := func(resp protocol.AuthenticatorBioEnrollmentResponse) error {

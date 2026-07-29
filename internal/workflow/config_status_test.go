@@ -14,12 +14,7 @@ func TestRetryStatePreservesClientPINFailure(t *testing.T) {
 		Command:    protocol.AuthenticatorClientPIN,
 		StatusCode: ctaptransport.CTAP2_ERR_PIN_INVALID,
 	}
-	state := retryState(
-		0,
-		nil,
-		raw,
-		protocol.ClientPINSubCommandGetPINRetries,
-	)
+	state := failedRetryState(raw, protocol.ClientPINSubCommandGetPINRetries)
 
 	if state.State != appconfig.StateUnknown {
 		t.Fatalf("state = %q, want unknown", state.State)

@@ -254,8 +254,8 @@ func TestBioEnrollmentCleanupUsesBoundedIndependentContext(t *testing.T) {
 		t.Fatalf("Run error = %v, want original capture error", err)
 	}
 
-	if result.Result == nil || !result.Result.CancelAttempted || result.Result.CancelSucceeded {
-		t.Fatalf("bio result = %#v, want failed cleanup attempt", result.Result)
+	if result != nil {
+		t.Fatalf("bio result = %#v, want nil on error", result)
 	}
 
 	if a.cleanupCtx == nil {
@@ -281,7 +281,7 @@ func TestBioEnrollmentCleanupUsesBoundedIndependentContext(t *testing.T) {
 	}
 }
 
-func TestBioEnrollmentSuccessfulCleanupIsReported(t *testing.T) {
+func TestBioEnrollmentSuccessfulCleanupReturnsNoPartialResult(t *testing.T) {
 	operationErr := errors.New("capture failed")
 	a := &bioCleanupAuthenticator{captureErr: operationErr}
 	session := openContractAuthenticator(t, nil, a)
@@ -296,12 +296,12 @@ func TestBioEnrollmentSuccessfulCleanupIsReported(t *testing.T) {
 		t.Fatalf("Run error = %v, want original capture error", err)
 	}
 
-	if result.Result == nil || !result.Result.CancelAttempted || !result.Result.CancelSucceeded {
-		t.Fatalf("bio result = %#v, want successful cleanup", result.Result)
+	if result != nil {
+		t.Fatalf("bio result = %#v, want nil on error", result)
 	}
 
-	if got, want := result.Result.LastEnrollSampleStatus, "CTAP2_ENROLL_FEEDBACK_FP_GOOD"; got != want {
-		t.Fatalf("last enrollment sample status = %q, want %q", got, want)
+	if a.cleanupCtx == nil {
+		t.Fatal("cleanup was not attempted")
 	}
 }
 

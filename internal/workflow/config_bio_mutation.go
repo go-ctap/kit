@@ -21,7 +21,7 @@ func (r Runner) BioRename(
 
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
-		return output, err
+		return appconfig.BioMutationOutput{}, err
 	}
 	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 
@@ -32,7 +32,7 @@ func (r Runner) BioRename(
 
 	preview, err := rtconfig.BuildBioRenamePreview(status, req.TemplateIDHex, req.FriendlyName, mode)
 	if err != nil {
-		return output, err
+		return appconfig.BioMutationOutput{}, err
 	}
 
 	output.Preview = preview
@@ -43,7 +43,7 @@ func (r Runner) BioRename(
 
 	templateID, err := rtconfig.DecodeTemplateID(req.TemplateIDHex)
 	if err != nil {
-		return output, err
+		return appconfig.BioMutationOutput{}, err
 	}
 
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
@@ -52,7 +52,7 @@ func (r Runner) BioRename(
 		return device.SetFriendlyName(ctx, token, templateID, req.FriendlyName)
 	})
 	if err != nil {
-		return output, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
+		return appconfig.BioMutationOutput{}, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 			failure.PhaseAuthenticatorCommand,
 			bioEnrollmentCommand(status),
 			protocol.BioEnrollmentSubCommandSetFriendlyName,
@@ -80,7 +80,7 @@ func (r Runner) BioRemove(
 
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
-		return output, err
+		return appconfig.BioMutationOutput{}, err
 	}
 	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 
@@ -91,7 +91,7 @@ func (r Runner) BioRemove(
 
 	preview, err := rtconfig.BuildBioRemovePreview(status, req.TemplateIDHex, mode)
 	if err != nil {
-		return output, err
+		return appconfig.BioMutationOutput{}, err
 	}
 
 	output.Preview = preview
@@ -102,7 +102,7 @@ func (r Runner) BioRemove(
 
 	templateID, err := rtconfig.DecodeTemplateID(req.TemplateIDHex)
 	if err != nil {
-		return output, err
+		return appconfig.BioMutationOutput{}, err
 	}
 
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
@@ -111,7 +111,7 @@ func (r Runner) BioRemove(
 		return device.RemoveEnrollment(ctx, token, templateID)
 	})
 	if err != nil {
-		return output, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
+		return appconfig.BioMutationOutput{}, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 			failure.PhaseAuthenticatorCommand,
 			bioEnrollmentCommand(status),
 			protocol.BioEnrollmentSubCommandRemoveEnrollment,

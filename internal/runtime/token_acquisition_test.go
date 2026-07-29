@@ -582,17 +582,17 @@ type testTokenCache struct {
 	secret *secret.Handle
 }
 
-func (c *testTokenCache) GetToken(key TokenKey) ([]byte, bool, error) {
+func (c *testTokenCache) GetToken(key TokenKey) ([]byte, bool) {
 	if c.secret == nil || !c.key.Covers(key) {
-		return nil, false, nil
+		return nil, false
 	}
 
 	token, err := c.secret.Bytes()
 	if err != nil {
-		return nil, false, err
+		return nil, false
 	}
 
-	return token, true, nil
+	return token, true
 }
 
 func (c *testTokenCache) SetToken(key TokenKey, token *secret.Handle) {

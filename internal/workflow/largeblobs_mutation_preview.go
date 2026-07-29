@@ -21,7 +21,7 @@ func buildWritePreviewFromState(state targetBlobState, payload []byte) (applarge
 
 	preview := buildMutationPreview(state, operation, len(payload), proposedSize, false)
 	if err := checkSerializedArrayLimit(state.support.MaxSerializedLargeBlobArray, proposedSize); err != nil {
-		return preview, err
+		return applargeblobs.MutationPreview{}, err
 	}
 
 	return preview, nil
@@ -60,7 +60,11 @@ func estimateSerializedArraySize(state targetBlobState, payload []byte, operatio
 		state.blobs[state.currentBlobIndex] = blob
 		size, sizeErr := serializedLargeBlobArraySize(state.blobs)
 		state.blobs[state.currentBlobIndex] = current
-		return size, sizeErr
+		if sizeErr != nil {
+			return 0, sizeErr
+		}
+
+		return size, nil
 	}
 
 	size, err := serializedLargeBlobArraySize(append(state.blobs, blob))

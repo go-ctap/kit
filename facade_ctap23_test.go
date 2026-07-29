@@ -105,7 +105,7 @@ func TestEnableLongTouchForResetDryRunAndRefreshFailureCacheEffects(t *testing.T
 		t.Fatalf("execute error = %v, want refresh failure", err)
 	}
 
-	if result.Result != nil || a.enableCalls.Load() != 1 {
+	if result != nil || a.enableCalls.Load() != 1 {
 		t.Fatalf("execute result/calls = %#v/%d", result, a.enableCalls.Load())
 	}
 
