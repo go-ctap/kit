@@ -711,6 +711,25 @@ func TestDeviceReportVendorDetailsJSON(t *testing.T) {
 	assertJSON(t, value, `{"attachment":{"id":"attachment-1","transport":"hid"},"identity":{"vendor":"yubico","model":"YubiKey 5C NFC","serial":"12345678","firmware":"5.7.1","interfaces":[{"interface":"usb","supported":["u2f","hsmauth","ctap2"],"enabled":["hsmauth","ctap2"]}],"details":{"yubico":{"partNumber":"5060405","formFactor":"usbCKeychain","isFIPS":true,"isSecurityKey":false,"effectiveFirmware":"5.8.0","versionQualifier":{"version":"5.8.0","releaseType":"beta","iteration":3},"autoEjectTimeout":10,"challengeResponseTimeout":20,"locked":true,"fipsCapable":["piv","hsmauth","ctap2"],"fipsApproved":["piv","ctap2"],"pinComplexity":true,"nfcRestricted":true,"resetBlocked":["u2f","hsmauth"],"fpsVersion":"1.2.3","stmVersion":"4.5.6"}}},"identityResolution":{"state":"resolved","provider":"yubico"}}`)
 }
 
+func TestDeviceReportSmartCardInterfaceJSON(t *testing.T) {
+	value := report.DeviceReport{
+		Attachment: report.AttachmentReport{
+			ID:        "attachment-1",
+			Transport: transport.ModeSmartCard,
+			SmartCard: &report.SmartCardReport{
+				Reader:    "reader-one",
+				ATR:       "3b80800101",
+				Interface: transport.SmartCardInterfaceContactless,
+			},
+		},
+		Resolution: report.IdentityResolution{
+			State: report.IdentityUnavailable,
+		},
+	}
+
+	assertJSON(t, value, `{"attachment":{"id":"attachment-1","transport":"smart-card","smartCard":{"reader":"reader-one","atr":"3b80800101","interface":"contactless"}},"identityResolution":{"state":"unavailable"}}`)
+}
+
 func TestCTAP23JSONPresenceContracts(t *testing.T) {
 	setMinPINLength := config.SetMinPINLengthOperation{
 		NewMinPINLength: new(uint(0)),

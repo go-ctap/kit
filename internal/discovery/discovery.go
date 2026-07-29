@@ -10,20 +10,22 @@ import (
 	"github.com/go-ctap/ctap/options"
 	ghid "github.com/go-ctap/hid"
 	"github.com/go-ctap/kit/model/failure"
+	"github.com/go-ctap/kit/transport"
 )
 
 // Descriptor is the transport-layer view of a reachable authenticator.
 type Descriptor struct {
-	Transport      Mode
-	Path           string
-	Manufacturer   string
-	Product        string
-	Serial         string
-	VendorID       uint16
-	ProductID      uint16
-	ATR            []byte
-	InstanceID     string
-	ParentDeviceID string
+	Transport          Mode
+	Path               string
+	Manufacturer       string
+	Product            string
+	Serial             string
+	VendorID           uint16
+	ProductID          uint16
+	ATR                []byte
+	SmartCardInterface transport.SmartCardInterface
+	InstanceID         string
+	ParentDeviceID     string
 }
 
 // Discovery owns transport-source state for one long-lived inventory.

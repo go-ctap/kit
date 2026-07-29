@@ -8,6 +8,7 @@ import (
 	ctapiso7816 "github.com/go-ctap/ctap/transport/iso7816"
 	baseiso7816 "github.com/go-ctap/iso7816"
 	"github.com/go-ctap/kit/model/failure"
+	"github.com/go-ctap/kit/transport"
 	"github.com/go-ctap/pcsc"
 )
 
@@ -21,7 +22,7 @@ type smartCardAttachment struct {
 	atr    string
 }
 
-type smartCardProbeFunc func(context.Context, string) (bool, error)
+type smartCardProbeFunc func(context.Context, string) (transport.SmartCardInterface, error)
 
 func (d *Discovery) discoverSmartCards(ctx context.Context) ([]Descriptor, error) {
 	readers, err := enumerateSmartCardReaders(ctx)
@@ -86,7 +87,7 @@ func (d *smartCardDiscovery) discover(
 			continue
 		}
 
-		supported, err := probe(ctx, reader.Name)
+		cardInterface, err := probe(ctx, reader.Name)
 		if err != nil {
 			if isNonFIDOCard(err) {
 				continue
@@ -101,11 +102,8 @@ func (d *smartCardDiscovery) discover(
 			probeErr = errors.Join(probeErr, err)
 			continue
 		}
-		if !supported {
-			continue
-		}
 
-		descriptor := smartCardDescriptor(reader)
+		descriptor := smartCardDescriptor(reader, cardInterface)
 		nextSupported[attachment] = descriptor
 		descriptors = append(descriptors, descriptor)
 	}
@@ -132,11 +130,15 @@ func (d *smartCardDiscovery) supportedByReader(reader string) (
 	return smartCardAttachment{}, Descriptor{}, false
 }
 
-func smartCardDescriptor(reader pcsc.ReaderInfo) Descriptor {
+func smartCardDescriptor(
+	reader pcsc.ReaderInfo,
+	cardInterface transport.SmartCardInterface,
+) Descriptor {
 	return Descriptor{
-		Transport: ModeSmartCard,
-		Path:      reader.Name,
-		ATR:       reader.ATR,
+		Transport:          ModeSmartCard,
+		Path:               reader.Name,
+		ATR:                reader.ATR,
+		SmartCardInterface: cardInterface,
 	}
 }
 
@@ -148,7 +150,10 @@ func failureCodeForSmartCard(err error) failure.Code {
 	return failure.CodeTransportFailure
 }
 
-func probeSmartCard(ctx context.Context, reader string) (bool, error) {
+func probeSmartCard(
+	ctx context.Context,
+	reader string,
+) (transport.SmartCardInterface, error) {
 	// A probe owns this connection and must leave no pending applet state behind
 	// when it releases the card.
 	card, err := pcsc.Open(
@@ -157,15 +162,31 @@ func probeSmartCard(ctx context.Context, reader string) (bool, error) {
 		pcsc.WithDisconnectDisposition(pcsc.DispositionResetCard),
 	)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 
-	transport, err := ctapiso7816.New(ctx, card)
+	cardInterface := smartCardInterface(card.Interface())
+	t, err := ctapiso7816.New(ctx, card)
 	if err != nil {
-		return false, errors.Join(err, card.Close())
+		return "", errors.Join(err, card.Close())
 	}
 
-	return true, transport.Close()
+	// Successful applet selection already proves support. Cleanup failure does
+	// not invalidate that result and there is no owned resource to return.
+	_ = t.Close()
+
+	return cardInterface, nil
+}
+
+func smartCardInterface(value pcsc.CardInterface) transport.SmartCardInterface {
+	switch value {
+	case pcsc.CardInterfaceContact:
+		return transport.SmartCardInterfaceContact
+	case pcsc.CardInterfaceContactless:
+		return transport.SmartCardInterfaceContactless
+	default:
+		return transport.SmartCardInterfaceUnknown
+	}
 }
 
 func isNonFIDOCard(err error) bool {

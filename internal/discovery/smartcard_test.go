@@ -8,6 +8,7 @@ import (
 	ctapiso7816 "github.com/go-ctap/ctap/transport/iso7816"
 	baseiso7816 "github.com/go-ctap/iso7816"
 	"github.com/go-ctap/kit/model/failure"
+	"github.com/go-ctap/kit/transport"
 	"github.com/go-ctap/pcsc"
 )
 
@@ -32,16 +33,54 @@ func TestSmartCardFailureCode(t *testing.T) {
 	}
 }
 
+func TestSmartCardInterface(t *testing.T) {
+	tests := []struct {
+		name  string
+		value pcsc.CardInterface
+		want  transport.SmartCardInterface
+	}{
+		{
+			name:  "contact",
+			value: pcsc.CardInterfaceContact,
+			want:  transport.SmartCardInterfaceContact,
+		},
+		{
+			name:  "contactless",
+			value: pcsc.CardInterfaceContactless,
+			want:  transport.SmartCardInterfaceContactless,
+		},
+		{
+			name:  "unknown",
+			value: pcsc.CardInterfaceUnknown,
+			want:  transport.SmartCardInterfaceUnknown,
+		},
+		{
+			name:  "future value",
+			value: pcsc.CardInterface("future"),
+			want:  transport.SmartCardInterfaceUnknown,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := smartCardInterface(tt.value); got != tt.want {
+				t.Fatalf("interface = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSmartCardDescriptorKeepsReaderOutOfCardIdentity(t *testing.T) {
 	reader := pcsc.ReaderInfo{
 		Name: "Token2 Smart Reader",
 		ATR:  []byte{0x01, 0x02},
 	}
 
-	descriptor := smartCardDescriptor(reader)
+	descriptor := smartCardDescriptor(reader, transport.SmartCardInterfaceContactless)
 	if descriptor.Transport != ModeSmartCard ||
 		descriptor.Path != reader.Name ||
 		descriptor.Product != "" ||
+		descriptor.SmartCardInterface != transport.SmartCardInterfaceContactless ||
 		string(descriptor.ATR) != string(reader.ATR) {
 		t.Fatalf("descriptor = %#v", descriptor)
 	}
@@ -55,26 +94,31 @@ func TestSmartCardDiscoveryRetainsKnownExclusiveCard(t *testing.T) {
 		ATR:   []byte{0x01, 0x02},
 	}
 	probes := 0
-	probe := func(context.Context, string) (bool, error) {
+	probe := func(context.Context, string) (transport.SmartCardInterface, error) {
 		probes++
 
-		return true, nil
+		return transport.SmartCardInterfaceUnknown, nil
 	}
 
 	first, err := discovery.discover(t.Context(), []pcsc.ReaderInfo{reader}, probe)
 	if err != nil {
 		t.Fatalf("initial discovery: %v", err)
 	}
-	if len(first) != 1 || probes != 1 {
+	if len(first) != 1 ||
+		first[0].SmartCardInterface != transport.SmartCardInterfaceUnknown ||
+		probes != 1 {
 		t.Fatalf("initial descriptors = %#v, probes = %d", first, probes)
 	}
 
 	reader.State |= pcsc.ReaderStateExclusive
 	reader.ATR = nil
-	second, err := discovery.discover(t.Context(), []pcsc.ReaderInfo{reader}, func(context.Context, string) (bool, error) {
+	second, err := discovery.discover(t.Context(), []pcsc.ReaderInfo{reader}, func(
+		context.Context,
+		string,
+	) (transport.SmartCardInterface, error) {
 		t.Fatal("exclusive known card was probed again")
 
-		return false, nil
+		return transport.SmartCardInterfaceUnknown, nil
 	})
 	if err != nil {
 		t.Fatalf("exclusive discovery: %v", err)
@@ -95,15 +139,21 @@ func TestSmartCardDiscoveryRetainsKnownCardAfterSharingViolation(t *testing.T) {
 		ATR:   []byte{0x01, 0x02},
 	}
 
-	_, err := discovery.discover(t.Context(), []pcsc.ReaderInfo{reader}, func(context.Context, string) (bool, error) {
-		return true, nil
+	_, err := discovery.discover(t.Context(), []pcsc.ReaderInfo{reader}, func(
+		context.Context,
+		string,
+	) (transport.SmartCardInterface, error) {
+		return transport.SmartCardInterfaceUnknown, nil
 	})
 	if err != nil {
 		t.Fatalf("initial discovery: %v", err)
 	}
 
-	descriptors, err := discovery.discover(t.Context(), []pcsc.ReaderInfo{reader}, func(context.Context, string) (bool, error) {
-		return false, pcsc.ErrSharingViolation
+	descriptors, err := discovery.discover(t.Context(), []pcsc.ReaderInfo{reader}, func(
+		context.Context,
+		string,
+	) (transport.SmartCardInterface, error) {
+		return "", pcsc.ErrSharingViolation
 	})
 	if err != nil {
 		t.Fatalf("sharing discovery: %v", err)
@@ -121,8 +171,11 @@ func TestSmartCardDiscoveryForgetsRemovedCard(t *testing.T) {
 		ATR:   []byte{0x01, 0x02},
 	}
 
-	_, err := discovery.discover(t.Context(), []pcsc.ReaderInfo{reader}, func(context.Context, string) (bool, error) {
-		return true, nil
+	_, err := discovery.discover(t.Context(), []pcsc.ReaderInfo{reader}, func(
+		context.Context,
+		string,
+	) (transport.SmartCardInterface, error) {
+		return transport.SmartCardInterfaceUnknown, nil
 	})
 	if err != nil {
 		t.Fatalf("initial discovery: %v", err)
@@ -132,8 +185,11 @@ func TestSmartCardDiscoveryForgetsRemovedCard(t *testing.T) {
 	}
 
 	reader.State |= pcsc.ReaderStateExclusive
-	descriptors, err := discovery.discover(t.Context(), []pcsc.ReaderInfo{reader}, func(context.Context, string) (bool, error) {
-		return false, pcsc.ErrSharingViolation
+	descriptors, err := discovery.discover(t.Context(), []pcsc.ReaderInfo{reader}, func(
+		context.Context,
+		string,
+	) (transport.SmartCardInterface, error) {
+		return "", pcsc.ErrSharingViolation
 	})
 	if err == nil {
 		t.Fatal("forgotten exclusive card did not require a successful probe")

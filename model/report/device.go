@@ -60,8 +60,9 @@ type USBReport struct {
 
 // SmartCardReport describes a PC/SC attachment separately from card identity.
 type SmartCardReport struct {
-	Reader string `json:"reader"`
-	ATR    string `json:"atr,omitempty"`
+	Reader    string                       `json:"reader"`
+	ATR       string                       `json:"atr,omitempty"`
+	Interface transport.SmartCardInterface `json:"interface"`
 }
 
 // AttachmentReport is the transport-layer view of one reachable CTAP

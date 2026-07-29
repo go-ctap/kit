@@ -22,8 +22,9 @@ func attachmentReport(descriptor discovery.Descriptor) report.AttachmentReport {
 	}
 	if descriptor.Transport == transport.ModeSmartCard {
 		attachment.SmartCard = &report.SmartCardReport{
-			Reader: descriptor.Path,
-			ATR:    hex.EncodeToString(descriptor.ATR),
+			Reader:    descriptor.Path,
+			ATR:       hex.EncodeToString(descriptor.ATR),
+			Interface: descriptor.SmartCardInterface,
 		}
 	} else {
 		attachment.USB = &report.USBReport{
@@ -47,6 +48,7 @@ func sameConnection(current, next discovery.Descriptor) bool {
 		current.VendorID == next.VendorID &&
 		current.ProductID == next.ProductID &&
 		bytes.Equal(current.ATR, next.ATR) &&
+		current.SmartCardInterface == next.SmartCardInterface &&
 		current.InstanceID == next.InstanceID &&
 		current.ParentDeviceID == next.ParentDeviceID
 }
