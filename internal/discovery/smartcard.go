@@ -71,6 +71,11 @@ func (d *smartCardDiscovery) discover(
 		if err := ctx.Err(); err != nil {
 			return nil, normalizeTransportError(err, failureCodeForSmartCard(err))
 		}
+		// A mute card is present but not usable. Dual-interface readers report
+		// this transiently while switching between contactless and contact.
+		if reader.State&pcsc.ReaderStateMute != 0 {
+			continue
+		}
 
 		attachment := smartCardAttachment{
 			reader: reader.Name,

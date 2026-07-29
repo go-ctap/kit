@@ -131,6 +131,46 @@ func TestSmartCardDiscoveryRetainsKnownExclusiveCard(t *testing.T) {
 	}
 }
 
+func TestSmartCardDiscoveryDropsKnownMuteCard(t *testing.T) {
+	discovery := &smartCardDiscovery{}
+	reader := pcsc.ReaderInfo{
+		Name:  "reader-one",
+		State: pcsc.ReaderStatePresent,
+		ATR:   []byte{0x01, 0x02},
+	}
+
+	_, err := discovery.discover(t.Context(), []pcsc.ReaderInfo{reader}, func(
+		context.Context,
+		string,
+	) (transport.SmartCardInterface, error) {
+		return transport.SmartCardInterfaceContactless, nil
+	})
+	if err != nil {
+		t.Fatalf("initial discovery: %v", err)
+	}
+
+	reader.State |= pcsc.ReaderStateMute
+	reader.ATR = nil
+	probes := 0
+	descriptors, err := discovery.discover(t.Context(), []pcsc.ReaderInfo{reader}, func(
+		context.Context,
+		string,
+	) (transport.SmartCardInterface, error) {
+		probes++
+
+		return "", pcsc.ErrSharingViolation
+	})
+	if err != nil {
+		t.Fatalf("mute discovery: %v", err)
+	}
+	if len(descriptors) != 0 {
+		t.Fatalf("mute descriptors = %#v, want none", descriptors)
+	}
+	if probes != 0 {
+		t.Fatalf("mute probes = %d, want 0", probes)
+	}
+}
+
 func TestSmartCardDiscoveryRetainsKnownCardAfterSharingViolation(t *testing.T) {
 	discovery := &smartCardDiscovery{}
 	reader := pcsc.ReaderInfo{
