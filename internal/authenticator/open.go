@@ -103,7 +103,13 @@ func openSmartCard(
 	reader string,
 	opts ...options.Option,
 ) (*ctapdevice.Device, error) {
-	card, err := pcsc.Open(reader, pcsc.WithShareMode(pcsc.ShareModeExclusive))
+	// Close may race the NFC cancel APDU during a device switch. Reset the card
+	// so a pending CTAP operation cannot survive the owned connection.
+	card, err := pcsc.Open(
+		reader,
+		pcsc.WithShareMode(pcsc.ShareModeExclusive),
+		pcsc.WithDisconnectDisposition(pcsc.DispositionResetCard),
+	)
 	if err != nil {
 		return nil, err
 	}

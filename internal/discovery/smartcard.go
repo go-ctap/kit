@@ -149,7 +149,13 @@ func failureCodeForSmartCard(err error) failure.Code {
 }
 
 func probeSmartCard(ctx context.Context, reader string) (bool, error) {
-	card, err := pcsc.Open(reader, pcsc.WithShareMode(pcsc.ShareModeExclusive))
+	// A probe owns this connection and must leave no pending applet state behind
+	// when it releases the card.
+	card, err := pcsc.Open(
+		reader,
+		pcsc.WithShareMode(pcsc.ShareModeExclusive),
+		pcsc.WithDisconnectDisposition(pcsc.DispositionResetCard),
+	)
 	if err != nil {
 		return false, err
 	}
