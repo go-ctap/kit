@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/go-ctap/kit/internal/discovery"
+	"github.com/go-ctap/kit/transport"
 )
 
 const attachmentIDLength = 16
@@ -16,6 +17,9 @@ func AttachmentID(descriptor discovery.Descriptor) string {
 		"ctapkit-attachment-v1",
 		string(descriptor.Transport),
 		strings.TrimSpace(descriptor.Path),
+	}
+	if descriptor.Transport == transport.ModeSmartCard {
+		parts = append(parts, string(descriptor.SmartCardInterface))
 	}
 	seed := strings.Join(parts, "\x00")
 	sum := sha256.Sum256([]byte(seed))

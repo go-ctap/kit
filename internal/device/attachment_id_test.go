@@ -89,14 +89,29 @@ func TestAttachmentIDNormalizesEndpoint(t *testing.T) {
 
 func TestAttachmentIDIgnoresSmartCardATR(t *testing.T) {
 	first := discovery.Descriptor{
-		Transport: transport.ModeSmartCard,
-		Path:      "PC/SC Reader",
-		ATR:       []byte{0x01},
+		Transport:          transport.ModeSmartCard,
+		Path:               "PC/SC Reader",
+		ATR:                []byte{0x01},
+		SmartCardInterface: transport.SmartCardInterfaceContact,
 	}
 	second := first
 	second.ATR = []byte{0x02}
 
 	if AttachmentID(first) != AttachmentID(second) {
 		t.Fatal("attachment ID changed with the card ATR")
+	}
+}
+
+func TestAttachmentIDDistinguishesSmartCardInterface(t *testing.T) {
+	contact := discovery.Descriptor{
+		Transport:          transport.ModeSmartCard,
+		Path:               "PC/SC Reader",
+		SmartCardInterface: transport.SmartCardInterfaceContact,
+	}
+	contactless := contact
+	contactless.SmartCardInterface = transport.SmartCardInterfaceContactless
+
+	if AttachmentID(contact) == AttachmentID(contactless) {
+		t.Fatal("attachment ID did not change with the smart-card interface")
 	}
 }
