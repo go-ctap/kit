@@ -13,9 +13,10 @@ import (
 )
 
 type retryFailureDevice struct {
-	info   protocol.AuthenticatorGetInfoResponse
-	pinErr error
-	uvErr  error
+	info     protocol.AuthenticatorGetInfoResponse
+	pinErr   error
+	uvErr    error
+	pinCalls *int
 }
 
 func (d retryFailureDevice) GetInfo(context.Context) (protocol.AuthenticatorGetInfoResponse, error) {
@@ -27,6 +28,10 @@ func (d retryFailureDevice) GetInfoCached() (protocol.AuthenticatorGetInfoRespon
 }
 
 func (d retryFailureDevice) GetPINRetries(context.Context) (uint, *bool, error) {
+	if d.pinCalls != nil {
+		*d.pinCalls++
+	}
+
 	return 7, new(false), d.pinErr
 }
 
@@ -89,5 +94,30 @@ func TestConfigStatusRetryFailureReturnsZeroReport(t *testing.T) {
 				t.Fatalf("CTAP detail = %#v, want subcommand %d", snapshot.CTAP, tt.subCommand)
 			}
 		})
+	}
+}
+
+func TestConfigStatusSkipsPINRetriesWhenPINIsNotConfigured(t *testing.T) {
+	pinCalls := 0
+	device := retryFailureDevice{
+		info: protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{
+			protocol.OptionClientPIN: false,
+		}},
+		pinErr:   &ctaptransport.CTAPError{StatusCode: ctaptransport.CTAP2_ERR_PIN_NOT_SET},
+		pinCalls: &pinCalls,
+	}
+
+	report, err := (Runner{}).ConfigStatus(t.Context(), device)
+	if err != nil {
+		t.Fatalf("ConfigStatus: %v", err)
+	}
+	if pinCalls != 0 {
+		t.Fatalf("GetPINRetries calls = %d, want 0", pinCalls)
+	}
+	if !report.PIN.Supported || report.PIN.Configured == nil || *report.PIN.Configured {
+		t.Fatalf("PIN status = %#v, want supported and not configured", report.PIN)
+	}
+	if report.PIN.Retries.State != appconfig.StateUnknown {
+		t.Fatalf("PIN retry state = %q, want %q", report.PIN.Retries.State, appconfig.StateUnknown)
 	}
 }

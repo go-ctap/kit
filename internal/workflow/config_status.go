@@ -27,7 +27,7 @@ func (r Runner) statusWithRetries(
 		return appconfig.StatusReport{}, err
 	}
 	rep := rtconfig.BuildStatusReport(r.env.Selected, info)
-	if rep.PIN.Supported {
+	if rep.PIN.Configured != nil && *rep.PIN.Configured {
 		retries, powerCycle, err := device.GetPINRetries(ctx)
 		if err != nil {
 			return appconfig.StatusReport{}, errornorm.Annotate(
