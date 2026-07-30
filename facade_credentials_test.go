@@ -162,9 +162,9 @@ func TestCredentialInventoryWorkflowReturnsZeroAfterMidstreamFailureAndWipesStag
 	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
-	output, err := newContractWorkflowRunner(session).ListCredentials(
+	output, err := session.ListCredentials(
 		context.Background(),
-		a,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	)
 	if !errors.Is(err, cause) {
 		t.Fatalf("ListCredentials error = %v, want %v", err, cause)

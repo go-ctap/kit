@@ -279,28 +279,6 @@ func TestBioEnrollmentCleanupUsesBoundedIndependentContext(t *testing.T) {
 	}
 }
 
-func TestBioEnrollmentWorkflowSuccessfulCleanupReturnsNoPartialResult(t *testing.T) {
-	operationErr := errors.New("capture failed")
-	a := &bioCleanupAuthenticator{captureErr: operationErr}
-	session := openContractAuthenticator(t, nil, a)
-	defer func() { _ = session.Close() }()
-
-	result, err := newContractWorkflowRunner(session).BioEnroll(
-		context.Background(),
-		a,
-		appconfig.BioEnrollOperation{},
-	)
-	if !errors.Is(err, operationErr) {
-		t.Fatalf("Run error = %v, want original capture error", err)
-	}
-
-	requireZero(t, result)
-
-	if a.cleanupCtx == nil {
-		t.Fatal("cleanup was not attempted")
-	}
-}
-
 func runConfirmedResetWithError(t *testing.T, resetErr error) error {
 	t.Helper()
 

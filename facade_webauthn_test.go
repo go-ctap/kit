@@ -341,9 +341,8 @@ func TestGetAssertionWorkflowReturnsZeroAfterMidstreamFailure(t *testing.T) {
 	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
-	output, err := newContractWorkflowRunner(session).GetAssertion(
+	output, err := session.GetAssertion(
 		context.Background(),
-		a,
 		sampleGetAssertionOperation(),
 	)
 	if !errors.Is(err, cause) {

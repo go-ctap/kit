@@ -7,14 +7,21 @@ import (
 	"iter"
 	"sync/atomic"
 
+	"github.com/go-ctap/ctap/attestation"
 	ctapdevice "github.com/go-ctap/ctap/authenticator"
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/ctap/transport/ctaphid"
+	"github.com/go-ctap/ctap/webauthn"
 	"github.com/go-ctap/kit/model"
 )
 
-type contractAuthenticator struct{}
+type contractAuthenticator struct {
+	contractCredentialManager
+	contractConfigManager
+	contractBioEnrollmentManager
+}
 
 func (a *contractAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{}}, true
@@ -28,12 +35,58 @@ func (a *contractAuthenticator) GetInfo(context.Context) (protocol.Authenticator
 
 func (a *contractAuthenticator) Close() error { return nil }
 
+func (a *contractAuthenticator) Vendor(
+	context.Context,
+	ctaphid.Command,
+	[]byte,
+) (ctaphid.VendorResponse, error) {
+	return ctaphid.VendorResponse{}, errors.New("not implemented")
+}
+
 func (a *contractAuthenticator) GetPinUvAuthTokenUsingPIN(context.Context, string, protocol.Permission, string) ([]byte, error) {
 	return nil, errors.New("not implemented")
 }
 
 func (a *contractAuthenticator) GetPinUvAuthTokenUsingUV(context.Context, protocol.Permission, string) ([]byte, error) {
 	return nil, errors.New("not implemented")
+}
+
+func (a *contractAuthenticator) MakeCredential(
+	context.Context,
+	[]byte,
+	[]byte,
+	credential.PublicKeyCredentialRpEntity,
+	credential.PublicKeyCredentialUserEntity,
+	[]credential.PublicKeyCredentialParameters,
+	[]credential.PublicKeyCredentialDescriptor,
+	*webauthn.CreateAuthenticationExtensionsClientInputs,
+	map[protocol.Option]bool,
+	uint,
+	[]attestation.AttestationStatementFormatIdentifier,
+) (protocol.AuthenticatorMakeCredentialResponse, error) {
+	return protocol.AuthenticatorMakeCredentialResponse{}, errors.New("not implemented")
+}
+
+func (a *contractAuthenticator) GetAssertion(
+	context.Context,
+	[]byte,
+	string,
+	[]byte,
+	[]credential.PublicKeyCredentialDescriptor,
+	*webauthn.GetAuthenticationExtensionsClientInputs,
+	map[protocol.Option]bool,
+) iter.Seq2[protocol.AuthenticatorGetAssertionResponse, error] {
+	return func(yield func(protocol.AuthenticatorGetAssertionResponse, error) bool) {
+		yield(protocol.AuthenticatorGetAssertionResponse{}, errors.New("not implemented"))
+	}
+}
+
+func (a *contractAuthenticator) GetLargeBlobs(context.Context) ([]protocol.LargeBlob, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (a *contractAuthenticator) SetLargeBlobs(context.Context, []byte, []protocol.LargeBlob) error {
+	return errors.New("not implemented")
 }
 
 type contractCredentialManager struct{}
