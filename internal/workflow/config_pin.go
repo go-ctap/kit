@@ -16,8 +16,6 @@ func (r Runner) SetPIN(
 	device ConfigDevice,
 	req appconfig.SetPINOperation,
 ) (appconfig.PINOutput, error) {
-	var output appconfig.PINOutput
-
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
 		return appconfig.PINOutput{}, err
@@ -34,10 +32,8 @@ func (r Runner) SetPIN(
 		return appconfig.PINOutput{}, err
 	}
 
-	output.Preview = preview
-
 	if req.DryRun {
-		return output, nil
+		return appconfig.PINOutput{Preview: preview}, nil
 	}
 
 	err = device.SetPIN(ctx, req.NewPIN)
@@ -49,8 +45,12 @@ func (r Runner) SetPIN(
 			protocol.ClientPINSubCommandSetPIN,
 		))
 	}
-	output.Result = new(rtconfig.PINSetResult(r.env.Selected.Attachment.ID))
-	return output, nil
+	result := rtconfig.PINSetResult(r.env.Selected.Attachment.ID)
+
+	return appconfig.PINOutput{
+		Preview: preview,
+		Result:  &result,
+	}, nil
 }
 
 func (r Runner) ChangePIN(
@@ -58,8 +58,6 @@ func (r Runner) ChangePIN(
 	device ConfigDevice,
 	req appconfig.ChangePINOperation,
 ) (appconfig.PINOutput, error) {
-	var output appconfig.PINOutput
-
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
 		return appconfig.PINOutput{}, err
@@ -76,10 +74,8 @@ func (r Runner) ChangePIN(
 		return appconfig.PINOutput{}, err
 	}
 
-	output.Preview = preview
-
 	if req.DryRun {
-		return output, nil
+		return appconfig.PINOutput{Preview: preview}, nil
 	}
 
 	err = device.ChangePIN(ctx, req.CurrentPIN, req.NewPIN)
@@ -91,6 +87,10 @@ func (r Runner) ChangePIN(
 			protocol.ClientPINSubCommandChangePIN,
 		))
 	}
-	output.Result = new(rtconfig.PINChangeResult(r.env.Selected.Attachment.ID))
-	return output, nil
+	result := rtconfig.PINChangeResult(r.env.Selected.Attachment.ID)
+
+	return appconfig.PINOutput{
+		Preview: preview,
+		Result:  &result,
+	}, nil
 }

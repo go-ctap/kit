@@ -3,6 +3,9 @@ package ctapkit
 import (
 	"bytes"
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"encoding/binary"
 	"encoding/json"
 	"reflect"
 	"slices"
@@ -68,8 +71,8 @@ func TestLargeBlobWriteEventsFollowInteractionAndInventoryOrder(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 
-	if result == nil {
-		t.Fatal("result = nil, want output")
+	if result.Result == nil {
+		t.Fatal("result.Result = nil, want execution result")
 	}
 
 	want := []model.OperationStage{
@@ -136,9 +139,7 @@ func TestLargeBlobWriteCapacityErrorReturnsNoPartialPreview(t *testing.T) {
 	}, session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...)
 	requireFailureCode(t, err, failure.CodeLargeBlobArrayTooLarge)
 
-	if output != nil {
-		t.Fatalf("output = %#v, want nil on error", output)
-	}
+	requireZero(t, output)
 }
 
 func TestLargeBlobWriteZeroCapacityMeansUnknownLimit(t *testing.T) {
@@ -236,6 +237,27 @@ func TestLargeBlobEditUsesOneInventoryReadBeforeRefresh(t *testing.T) {
 	}
 }
 
+func TestLargeBlobReadWithMissingKeyDoesNotFetchSharedArray(t *testing.T) {
+	a := &largeBlobWriteEventAuthenticator{omitLargeBlobKey: true}
+	session := openContractAuthenticator(t, nil, a)
+	defer func() { _ = session.Close() }()
+
+	report, err := session.ReadLargeBlob(
+		t.Context(),
+		applargeblobs.ReadOperation{CredentialIDHex: "c05e"},
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
+	)
+	if err != nil {
+		t.Fatalf("ReadLargeBlob: %v", err)
+	}
+	if report.State != applargeblobs.ReadStateMissing {
+		t.Fatalf("state = %q, want %q", report.State, applargeblobs.ReadStateMissing)
+	}
+	if got := a.largeBlobReads.Load(); got != 0 {
+		t.Fatalf("large-blob array reads = %d, want 0", got)
+	}
+}
+
 func TestLargeBlobListReadsFreshReport(t *testing.T) {
 	a := &largeBlobWriteEventAuthenticator{}
 	session := openContractAuthenticator(t, nil, a)
@@ -282,7 +304,7 @@ func TestLargeBlobListAlwaysObservesCurrentAuthenticatorState(t *testing.T) {
 		t.Fatalf("refreshed ListLargeBlobs: %v", err)
 	}
 
-	if len(output.Credentials) != 1 || !output.Credentials[0].BlobPresent {
+	if len(output.Entries) != 1 || output.Entries[0].State != applargeblobs.EntryStateMatched {
 		t.Fatalf("refreshed large blob output = %#v, want one present credential blob", output)
 	}
 
@@ -291,7 +313,7 @@ func TestLargeBlobListAlwaysObservesCurrentAuthenticatorState(t *testing.T) {
 		t.Fatalf("cached ListLargeBlobs after refresh: %v", err)
 	}
 
-	if len(cachedOutput.Credentials) != 1 || !cachedOutput.Credentials[0].BlobPresent {
+	if len(cachedOutput.Entries) != 1 || cachedOutput.Entries[0].State != applargeblobs.EntryStateMatched {
 		t.Fatalf("cached large blob output = %#v, want refreshed report", cachedOutput)
 	}
 
@@ -365,6 +387,47 @@ func TestLargeBlobDeleteLastBlobWritesEmptyArray(t *testing.T) {
 	}
 }
 
+func TestLargeBlobWriteReplacesAuthenticatedEntryWithCorruptCompressedData(t *testing.T) {
+	a := &largeBlobWriteEventAuthenticator{
+		largeBlobs: []protocol.LargeBlob{
+			authenticatedCorruptLargeBlob(t, 0x01, []byte("not-deflate"), 7),
+		},
+	}
+	session := openContractAuthenticator(t, nil, a)
+	defer func() { _ = session.Close() }()
+
+	output, err := session.WriteLargeBlob(
+		t.Context(),
+		applargeblobs.WriteOperation{
+			CredentialIDHex: "c05e",
+			Payload:         []byte("replacement"),
+		},
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
+	)
+	if err != nil {
+		t.Fatalf("WriteLargeBlob: %v", err)
+	}
+	if output.Result == nil {
+		t.Fatal("result = nil")
+	}
+	if output.Result.Operation != applargeblobs.MutationReplace ||
+		output.Result.CurrentByteCount != 7 ||
+		output.Result.BlobCountAfter != 1 {
+		t.Fatalf("result = %#v, want one replaced entry with declared previous size 7", output.Result)
+	}
+	if len(a.lastSetLargeBlobs) != 1 {
+		t.Fatalf("written blobs = %d, want 1", len(a.lastSetLargeBlobs))
+	}
+
+	raw, err := crypto.DecryptLargeBlob(bytes.Repeat([]byte{0x01}, 32), a.lastSetLargeBlobs[0])
+	if err != nil {
+		t.Fatalf("DecryptLargeBlob replacement: %v", err)
+	}
+	if !bytes.Equal(raw, []byte("replacement")) {
+		t.Fatalf("replacement payload = %q", raw)
+	}
+}
+
 func TestLargeBlobGarbageCollectResults(t *testing.T) {
 	nonConforming := protocol.LargeBlob{
 		Ciphertext: []byte("not-a-gcm-ciphertext"),
@@ -372,31 +435,54 @@ func TestLargeBlobGarbageCollectResults(t *testing.T) {
 		OrigSize:   4,
 	}
 	tests := []struct {
-		name          string
-		blobs         []protocol.LargeBlob
-		wantNoop      bool
-		wantDeleted   int
-		wantAfter     int
-		wantUnmatched int
-		wantWrites    int32
+		name              string
+		blobs             []protocol.LargeBlob
+		omitLargeBlobKey  bool
+		wantNoop          bool
+		wantDeleted       int
+		wantAfter         int
+		wantMatched       int
+		wantOrphaned      int
+		wantNonconforming int
+		wantWrites        int32
 	}{
 		{
-			name:      "matched blob is a noop",
-			blobs:     []protocol.LargeBlob{encryptedLargeBlob(t, 0x01, "current")},
-			wantNoop:  true,
-			wantAfter: 1,
+			name:        "matched blob is a noop",
+			blobs:       []protocol.LargeBlob{encryptedLargeBlob(t, 0x01, "current")},
+			wantNoop:    true,
+			wantAfter:   1,
+			wantMatched: 1,
 		},
 		{
-			name:      "non-conforming blob is preserved",
-			blobs:     []protocol.LargeBlob{nonConforming},
-			wantNoop:  true,
-			wantAfter: 1,
+			name:              "non-conforming blob is preserved",
+			blobs:             []protocol.LargeBlob{nonConforming},
+			wantNoop:          true,
+			wantAfter:         1,
+			wantNonconforming: 1,
+		},
+		{
+			name:        "authenticated corrupt blob is preserved",
+			blobs:       []protocol.LargeBlob{authenticatedCorruptLargeBlob(t, 0x01, []byte("not-deflate"), 7)},
+			wantNoop:    true,
+			wantAfter:   1,
+			wantMatched: 1,
+		},
+		{
+			name:             "missing enumerated key does not defer orphan collection",
+			blobs:            []protocol.LargeBlob{encryptedLargeBlob(t, 0x01, "orphaned")},
+			omitLargeBlobKey: true,
+			wantDeleted:      1,
+			wantOrphaned:     1,
+			wantWrites:       1,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := &largeBlobWriteEventAuthenticator{largeBlobs: tt.blobs}
+			a := &largeBlobWriteEventAuthenticator{
+				largeBlobs:       tt.blobs,
+				omitLargeBlobKey: tt.omitLargeBlobKey,
+			}
 			session := openContractAuthenticator(t, nil, a)
 			t.Cleanup(func() { _ = session.Close() })
 
@@ -416,17 +502,23 @@ func TestLargeBlobGarbageCollectResults(t *testing.T) {
 			if result.Noop != tt.wantNoop ||
 				result.DeletedBlobCount != tt.wantDeleted ||
 				result.BlobCountAfter != tt.wantAfter ||
-				result.UnmatchedBlobCount != tt.wantUnmatched {
+				result.MatchedBlobCount != tt.wantMatched ||
+				result.OrphanedBlobCount != tt.wantOrphaned ||
+				result.NonconformingBlobCount != tt.wantNonconforming {
 				t.Fatalf(
-					"result = {noop:%t deleted:%d after:%d unmatched:%d}, want {noop:%t deleted:%d after:%d unmatched:%d}",
+					"result = {noop:%t deleted:%d after:%d matched:%d orphaned:%d nonconforming:%d}, want {noop:%t deleted:%d after:%d matched:%d orphaned:%d nonconforming:%d}",
 					result.Noop,
 					result.DeletedBlobCount,
 					result.BlobCountAfter,
-					result.UnmatchedBlobCount,
+					result.MatchedBlobCount,
+					result.OrphanedBlobCount,
+					result.NonconformingBlobCount,
 					tt.wantNoop,
 					tt.wantDeleted,
 					tt.wantAfter,
-					tt.wantUnmatched,
+					tt.wantMatched,
+					tt.wantOrphaned,
+					tt.wantNonconforming,
 				)
 			}
 			if got := a.largeBlobWrites.Load(); got != tt.wantWrites {
@@ -528,6 +620,35 @@ func encryptedLargeBlob(t *testing.T, keyByte byte, payload string) protocol.Lar
 	return blob
 }
 
+func authenticatedCorruptLargeBlob(
+	t *testing.T,
+	keyByte byte,
+	compressed []byte,
+	originalSize uint,
+) protocol.LargeBlob {
+	t.Helper()
+
+	block, err := aes.NewCipher(bytes.Repeat([]byte{keyByte}, 32))
+	if err != nil {
+		t.Fatalf("NewCipher: %v", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatalf("NewGCM: %v", err)
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	originalSizeBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(originalSizeBytes, uint64(originalSize))
+	additionalData := append([]byte("blob"), originalSizeBytes...)
+
+	return protocol.LargeBlob{
+		Ciphertext: gcm.Seal(nil, nonce, compressed, additionalData),
+		Nonce:      nonce,
+		OrigSize:   originalSize,
+	}
+}
+
 func TestLargeBlobWritePINOnlyFlowDoesNotRequestUserVerification(t *testing.T) {
 	events := &recordingEventSink{}
 	a := &pinOnlyLargeBlobWriteEventAuthenticator{
@@ -550,8 +671,8 @@ func TestLargeBlobWritePINOnlyFlowDoesNotRequestUserVerification(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 
-	if result == nil {
-		t.Fatal("result = nil, want output")
+	if result.Result == nil {
+		t.Fatal("result.Result = nil, want execution result")
 	}
 
 	if got := a.pinCalls.Load(); got != 1 {

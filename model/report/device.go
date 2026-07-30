@@ -1,9 +1,6 @@
 package report
 
-import (
-	"github.com/go-ctap/kit/model/failure"
-	"github.com/go-ctap/kit/transport"
-)
+import "github.com/go-ctap/kit/transport"
 
 // AttachmentID identifies one currently reachable transport endpoint. It is
 // not a physical-device identity and is never derived from hardware identity.
@@ -154,12 +151,11 @@ const (
 	IdentityFailed      IdentityResolutionState = "failed"
 )
 
-// IdentityResolution exposes identity progress without turning it into a
-// discovery or authenticator failure.
+// IdentityResolution exposes identity progress. Failure details are emitted
+// through Inventory events rather than retained in device snapshots.
 type IdentityResolution struct {
 	State    IdentityResolutionState `json:"state"`
 	Provider Vendor                  `json:"provider,omitempty"`
-	Error    *failure.Failure        `json:"error,omitempty"`
 }
 
 // DeviceReport joins one selectable attachment with optional hardware

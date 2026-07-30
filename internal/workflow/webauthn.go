@@ -22,8 +22,6 @@ func (r Runner) MakeCredential(
 	device authenticator.WebAuthnManager,
 	req appwebauthn.MakeCredentialOperation,
 ) (appwebauthn.MakeCredentialOutput, error) {
-	var output appwebauthn.MakeCredentialOutput
-
 	input, err := rtwebauthn.NormalizeMakeCredentialInput(req.MakeCredentialInput)
 	if err != nil {
 		return appwebauthn.MakeCredentialOutput{}, err
@@ -37,10 +35,8 @@ func (r Runner) MakeCredential(
 	if err != nil {
 		return appwebauthn.MakeCredentialOutput{}, err
 	}
-	output.Preview = preview
-
 	if req.DryRun {
-		return output, nil
+		return appwebauthn.MakeCredentialOutput{Preview: preview}, nil
 	}
 
 	var response protocol.AuthenticatorMakeCredentialResponse
@@ -51,7 +47,7 @@ func (r Runner) MakeCredential(
 	}, func(token []byte) error {
 		r.recordStateEffect(rtruntime.StateEffectCredentialInventoryChanged)
 
-		response, err = device.MakeCredential(
+		current, err := device.MakeCredential(
 			ctx,
 			token,
 			input.ClientDataJSON,
@@ -64,8 +60,13 @@ func (r Runner) MakeCredential(
 			input.EnterpriseAttestation,
 			input.AttestationFormatsPreference,
 		)
+		if err != nil {
+			return err
+		}
 
-		return err
+		response = current
+
+		return nil
 	})
 	if err != nil {
 		return appwebauthn.MakeCredentialOutput{}, errornorm.Annotate(err, errornorm.WithCommand(
@@ -77,10 +78,12 @@ func (r Runner) MakeCredential(
 	if err != nil {
 		return appwebauthn.MakeCredentialOutput{}, err
 	}
-	output.Result = &result
 	r.afterUserPresence(result.UserPresent)
 
-	return output, nil
+	return appwebauthn.MakeCredentialOutput{
+		Preview: preview,
+		Result:  &result,
+	}, nil
 }
 
 func (r Runner) GetAssertion(
@@ -88,8 +91,6 @@ func (r Runner) GetAssertion(
 	device authenticator.WebAuthnManager,
 	req appwebauthn.GetAssertionOperation,
 ) (appwebauthn.GetAssertionOutput, error) {
-	var output appwebauthn.GetAssertionOutput
-
 	input, err := rtwebauthn.NormalizeGetAssertionInput(req.GetAssertionInput)
 	if err != nil {
 		return appwebauthn.GetAssertionOutput{}, err
@@ -103,16 +104,11 @@ func (r Runner) GetAssertion(
 	if err != nil {
 		return appwebauthn.GetAssertionOutput{}, err
 	}
-	output.Preview = preview
-
 	if req.DryRun {
-		return output, nil
+		return appwebauthn.GetAssertionOutput{Preview: preview}, nil
 	}
 
-	result := appwebauthn.GetAssertionResult{
-		AttachmentID: r.env.Selected.Attachment.ID,
-		RPID:         input.RPID,
-	}
+	var responses []protocol.AuthenticatorGetAssertionResponse
 
 	readAssertions := func(token []byte) error {
 		if input.Extensions != nil &&
@@ -121,7 +117,7 @@ func (r Runner) GetAssertion(
 			r.recordStateEffect(rtruntime.StateEffectLargeBlobArrayChanged)
 		}
 
-		var index uint
+		var current []protocol.AuthenticatorGetAssertionResponse
 		for response, err := range device.GetAssertion(
 			ctx,
 			token,
@@ -138,9 +134,10 @@ func (r Runner) GetAssertion(
 				))
 			}
 
-			result.Assertions = append(result.Assertions, assertionResult(index, response))
-			index++
+			current = append(current, response)
 		}
+
+		responses = current
 
 		return nil
 	}
@@ -153,7 +150,14 @@ func (r Runner) GetAssertion(
 		return appwebauthn.GetAssertionOutput{}, err
 	}
 
-	output.Result = &result
+	result := appwebauthn.GetAssertionResult{
+		AttachmentID: r.env.Selected.Attachment.ID,
+		RPID:         input.RPID,
+		Assertions:   make([]appwebauthn.Assertion, 0, len(responses)),
+	}
+	for index, response := range responses {
+		result.Assertions = append(result.Assertions, assertionResult(uint(index), response))
+	}
 	for _, assertion := range result.Assertions {
 		if assertion.UserPresent {
 			r.afterUserPresence(true)
@@ -162,7 +166,10 @@ func (r Runner) GetAssertion(
 		}
 	}
 
-	return output, nil
+	return appwebauthn.GetAssertionOutput{
+		Preview: preview,
+		Result:  &result,
+	}, nil
 }
 
 func (r Runner) afterUserPresence(present bool) {
@@ -227,11 +234,16 @@ func attestationObjectCBOR(response protocol.AuthenticatorMakeCredentialResponse
 		return nil, err
 	}
 
-	return encMode.Marshal(map[string]any{
+	encoded, err := encMode.Marshal(map[string]any{
 		"fmt":      response.Format,
 		"authData": response.AuthDataRaw,
 		"attStmt":  attestationStatement,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return encoded, nil
 }
 
 func assertionResult(

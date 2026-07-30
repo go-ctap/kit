@@ -2,7 +2,6 @@ package model
 
 import (
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/model/failure"
 )
 
 type InteractionKind string
@@ -24,9 +23,9 @@ type InteractionRequest struct {
 }
 
 type PINInteractionState struct {
-	Failure          *failure.Failure `json:"failure,omitempty"`
-	RetriesRemaining *uint            `json:"retriesRemaining,omitempty"`
-	PowerCycleState  *bool            `json:"powerCycleState,omitempty"`
+	PreviousAttemptInvalid bool  `json:"previousAttemptInvalid,omitempty"`
+	RetriesRemaining       *uint `json:"retriesRemaining,omitempty"`
+	PowerCycleState        *bool `json:"powerCycleState,omitempty"`
 }
 
 type InteractionResponse struct {

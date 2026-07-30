@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	warningEnterpriseAttestation    = "config.enterprise_attestation.enable"
 	warningAlwaysUVEnable           = "config.always_uv.enable"
 	warningAlwaysUVDisable          = "config.always_uv.disable"
 	warningMinPINLengthPolicy       = "config.min_pin_length.policy"
@@ -18,6 +19,37 @@ const (
 	warningPINComplexityPolicy      = "config.pin_complexity_policy.enable"
 	warningLongTouchForReset        = "config.long_touch_for_reset.enable"
 )
+
+func BuildEnableEnterpriseAttestationPreview(status appconfig.StatusReport, mode safety.PreviewMode) (appconfig.AuthenticatorConfigPreview, error) {
+	capability := status.AuthenticatorConfig.EnterpriseAttestation
+	if !status.AuthenticatorConfig.Supported || !capability.Supported || capability.Configured == nil {
+		return appconfig.AuthenticatorConfigPreview{}, failure.New(
+			failure.CodeAuthenticatorConfigUnsupported,
+			failure.WithPhase(failure.PhaseValidation),
+		)
+	}
+
+	if *capability.Configured {
+		return appconfig.AuthenticatorConfigPreview{}, failure.New(
+			failure.CodeAuthenticatorOperationNotAllowed,
+			failure.WithPhase(failure.PhaseValidation),
+		)
+	}
+
+	return appconfig.AuthenticatorConfigPreview{
+		Operation:                      appconfig.AuthenticatorConfigEnterprise,
+		Device:                         status.Device,
+		Authenticator:                  status.AuthenticatorConfig,
+		CurrentEnterpriseAttestation:   capability.Configured,
+		RequestedEnterpriseAttestation: true,
+		Mode:                           mode,
+		Warnings: []safety.Warning{{
+			Severity: safety.SeverityWarning,
+			Code:     warningEnterpriseAttestation,
+			Message:  "Enabling enterprise attestation permits enterprise-scoped uniquely identifying attestations; CTAP provides no command to disable it, and authenticator reset restores the preconfigured default.",
+		}},
+	}, nil
+}
 
 func BuildAlwaysUVPreview(status appconfig.StatusReport, target appconfig.AlwaysUVTarget, mode safety.PreviewMode) (appconfig.AuthenticatorConfigPreview, error) {
 	requested := target == appconfig.AlwaysUVTargetEnable

@@ -6,7 +6,15 @@ import (
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
 )
 
-func buildWriteMutation(state targetBlobState, payload []byte) ([]protocol.LargeBlob, applargeblobs.MutationResult, error) {
+type largeBlobMutationPlan struct {
+	replacement []protocol.LargeBlob
+	operation   applargeblobs.MutationOperation
+	byteCount   int
+	sizeAfter   int
+	noop        bool
+}
+
+func buildWriteMutationPlan(state targetBlobState, payload []byte) (largeBlobMutationPlan, error) {
 	operation := applargeblobs.MutationCreate
 	if state.currentBlobIndex >= 0 {
 		operation = applargeblobs.MutationReplace
@@ -14,39 +22,61 @@ func buildWriteMutation(state targetBlobState, payload []byte) ([]protocol.Large
 
 	encrypted, err := crypto.EncryptLargeBlob(state.key, payload)
 	if err != nil {
-		return nil, applargeblobs.MutationResult{}, err
+		return largeBlobMutationPlan{}, err
 	}
 
 	replacement := replaceBlob(state.blobs, state.currentBlobIndex, encrypted, operation)
 
 	sizeAfter, err := serializedLargeBlobArraySize(replacement)
 	if err != nil {
-		return nil, applargeblobs.MutationResult{}, err
+		return largeBlobMutationPlan{}, err
 	}
 
-	result := buildMutationResult(state, operation, len(payload), sizeAfter, false)
 	if err := checkSerializedArrayLimit(state.support.MaxSerializedLargeBlobArray, sizeAfter); err != nil {
-		return nil, applargeblobs.MutationResult{}, err
+		return largeBlobMutationPlan{}, err
 	}
 
-	return replacement, result, nil
+	return largeBlobMutationPlan{
+		replacement: replacement,
+		operation:   operation,
+		byteCount:   len(payload),
+		sizeAfter:   sizeAfter,
+	}, nil
 }
 
-func buildDeleteMutation(state targetBlobState) ([]protocol.LargeBlob, applargeblobs.MutationResult, bool, error) {
+func buildDeleteMutationPlan(state targetBlobState) (largeBlobMutationPlan, error) {
 	if state.currentBlobIndex < 0 {
-		return nil, buildMutationResult(state, applargeblobs.MutationNoBlob, 0, state.serializedArraySizeBefore, true), true, nil
+		return largeBlobMutationPlan{
+			operation: applargeblobs.MutationNoBlob,
+			sizeAfter: state.serializedArraySizeBefore,
+			noop:      true,
+		}, nil
 	}
 
 	replacement := removeBlobAt(state.blobs, state.currentBlobIndex)
 
 	sizeAfter, err := serializedLargeBlobArraySize(replacement)
 	if err != nil {
-		return nil, applargeblobs.MutationResult{}, false, err
+		return largeBlobMutationPlan{}, err
 	}
 
 	if err := checkSerializedArrayLimit(state.support.MaxSerializedLargeBlobArray, sizeAfter); err != nil {
-		return nil, applargeblobs.MutationResult{}, false, err
+		return largeBlobMutationPlan{}, err
 	}
 
-	return replacement, buildMutationResult(state, applargeblobs.MutationDelete, 0, sizeAfter, false), false, nil
+	return largeBlobMutationPlan{
+		replacement: replacement,
+		operation:   applargeblobs.MutationDelete,
+		sizeAfter:   sizeAfter,
+	}, nil
+}
+
+func (plan largeBlobMutationPlan) result(state targetBlobState) applargeblobs.MutationResult {
+	return buildMutationResult(
+		state,
+		plan.operation,
+		plan.byteCount,
+		plan.sizeAfter,
+		plan.noop,
+	)
 }

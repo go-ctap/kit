@@ -9,6 +9,7 @@ import (
 
 	ctapdevice "github.com/go-ctap/ctap/authenticator"
 	"github.com/go-ctap/ctap/credential"
+	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/model"
 )
@@ -71,6 +72,9 @@ func (contractConfigManager) ChangePIN(context.Context, string, string) error {
 	return errors.New("not implemented")
 }
 func (contractConfigManager) Reset(context.Context) error { return errors.New("not implemented") }
+func (contractConfigManager) EnableEnterpriseAttestation(context.Context, []byte) error {
+	return errors.New("not implemented")
+}
 func (contractConfigManager) ToggleAlwaysUV(context.Context, []byte) error {
 	return errors.New("not implemented")
 }
@@ -249,6 +253,7 @@ func (a *largeBlobWriteEventAuthenticator) GetInfoCached() (protocol.Authenticat
 	}
 
 	return protocol.AuthenticatorGetInfoResponse{
+		Extensions:                  []extension.ExtensionIdentifier{extension.ExtensionIdentifierLargeBlobKey},
 		Options:                     options,
 		MaxSerializedLargeBlobArray: a.maxSerializedLargeBlobArray,
 	}, true
@@ -342,6 +347,7 @@ type pinOnlyLargeBlobWriteEventAuthenticator struct {
 
 func (a *pinOnlyLargeBlobWriteEventAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{
+		Extensions: []extension.ExtensionIdentifier{extension.ExtensionIdentifierLargeBlobKey},
 		Options: map[protocol.Option]bool{
 			protocol.OptionCredentialManagement: true,
 			protocol.OptionLargeBlobs:           true,

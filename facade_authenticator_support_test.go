@@ -2,26 +2,62 @@ package ctapkit
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
+	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/discovery"
 	kitlog "github.com/go-ctap/kit/internal/logging"
+	rtruntime "github.com/go-ctap/kit/internal/runtime"
+	"github.com/go-ctap/kit/internal/workflow"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 )
 
+func requireZero[T any](t *testing.T, value T) {
+	t.Helper()
+
+	var zero T
+	if !reflect.DeepEqual(value, zero) {
+		t.Fatalf("value = %#v, want zero value", value)
+	}
+}
+
+type contractWorkflowTokenService struct{}
+
+func (contractWorkflowTokenService) Use(
+	_ context.Context,
+	_ rtruntime.TokenUse,
+	use func([]byte) error,
+) error {
+	return use([]byte("token"))
+}
+
+func (contractWorkflowTokenService) Invalidate() {}
+
+func (contractWorkflowTokenService) InvalidateUnlessPermission(protocol.Permission) {}
+
+func newContractWorkflowRunner(session *contractAuthenticatorHandle) workflow.Runner {
+	return workflow.NewRunner(workflow.Environment{
+		Selected: session.Device(),
+		Events:   rtruntime.NewEventDispatcher(nil),
+		Tokens:   contractWorkflowTokenService{},
+		Effects:  rtruntime.NewStateEffects(),
+	})
+}
+
 func TestOpenAuthenticatorAllowsIndependentChannelsForSameDevice(t *testing.T) {
 	opens := 0
-	open := func(context.Context, transport.Mode, string) (any, error) {
+	open := func(context.Context, transport.Mode, string) (*authenticator.Opened, error) {
 		opens++
 
-		return &contractAuthenticator{}, nil
+		return contractOpened(&contractAuthenticator{}), nil
 	}
 	device := newContractDevice()
 
-	first, err := openAuthenticatorHandle(t.Context(), device, adaptContractAuthenticatorOpen(open))
+	first, err := openAuthenticatorHandle(t.Context(), device, open)
 	if err != nil {
 		t.Fatalf("open first opened: %v", err)
 	}
@@ -31,7 +67,7 @@ func TestOpenAuthenticatorAllowsIndependentChannelsForSameDevice(t *testing.T) {
 		}
 	}()
 
-	second, err := openAuthenticatorHandle(t.Context(), device, adaptContractAuthenticatorOpen(open))
+	second, err := openAuthenticatorHandle(t.Context(), device, open)
 	if err != nil {
 		t.Fatalf("open second opened: %v", err)
 	}
@@ -48,16 +84,16 @@ func TestOpenAuthenticatorAllowsIndependentChannelsForSameDevice(t *testing.T) {
 
 func TestOpenAuthenticatorMakesJournalAvailableWhileOpeningAuthenticator(t *testing.T) {
 	journal := NewLogJournal()
-	open := func(ctx context.Context, _ transport.Mode, _ string) (any, error) {
+	open := func(ctx context.Context, _ transport.Mode, _ string) (*authenticator.Opened, error) {
 		kitlog.RecorderFrom(ctx).Append(model.LogEntry{Command: "open-command"})
 
-		return &contractAuthenticator{}, nil
+		return contractOpened(&contractAuthenticator{}), nil
 	}
 
 	opened, err := openAuthenticatorHandle(
 		t.Context(),
 		newContractDevice(),
-		adaptContractAuthenticatorOpen(open),
+		open,
 		WithLogJournal(journal),
 	)
 	if err != nil {
@@ -73,18 +109,6 @@ func TestOpenAuthenticatorMakesJournalAvailableWhileOpeningAuthenticator(t *test
 	}
 }
 
-func TestContractAuthenticatorBaseExposesOnlyRuntimeCapabilities(t *testing.T) {
-	opened := adaptContractAuthenticator(&contractAuthenticator{})
-
-	if opened.Lifecycle == nil || opened.Info == nil || opened.Tokens == nil || opened.ConfigStatus == nil {
-		t.Fatalf("runtime capabilities are incomplete: %#v", opened)
-	}
-	if opened.CredentialInventory != nil || opened.Credentials != nil || opened.WebAuthn != nil ||
-		opened.LargeBlobs != nil || opened.Config != nil || opened.Bio != nil {
-		t.Fatalf("base fake exposes unrelated domain capabilities: %#v", opened)
-	}
-}
-
 type contractAuthenticatorHandle struct {
 	*Authenticator
 	events EventSink
@@ -97,8 +121,6 @@ func (a *contractAuthenticatorHandle) operationOptions(opts ...OperationOption) 
 
 	return opts
 }
-
-type contractAuthenticatorOpenFunc func(context.Context, transport.Mode, string) (any, error)
 
 func openContractAuthenticator(
 	t *testing.T,
@@ -116,7 +138,7 @@ func openContractAuthenticator(
 		context.Background(),
 		newContractDevice(),
 		func(context.Context, transport.Mode, string) (*authenticator.Opened, error) {
-			return adaptContractAuthenticator(implementation), nil
+			return contractOpened(implementation), nil
 		},
 		opts...,
 	)
@@ -127,18 +149,7 @@ func openContractAuthenticator(
 	return &contractAuthenticatorHandle{Authenticator: opened, events: events}
 }
 
-func adaptContractAuthenticatorOpen(open contractAuthenticatorOpenFunc) authenticatorOpenFunc {
-	return func(ctx context.Context, mode transport.Mode, path string) (*authenticator.Opened, error) {
-		implementation, err := open(ctx, mode, path)
-		if err != nil {
-			return nil, err
-		}
-
-		return adaptContractAuthenticator(implementation), nil
-	}
-}
-
-func adaptContractAuthenticator(implementation any) *authenticator.Opened {
+func contractOpened(implementation any) *authenticator.Opened {
 	if opened, ok := implementation.(*authenticator.Opened); ok {
 		return opened
 	}

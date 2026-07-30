@@ -18,8 +18,6 @@ func (r Runner) ResetFactory(
 	device ConfigDevice,
 	req appconfig.ResetFactoryOperation,
 ) (appconfig.ResetFactoryOutput, error) {
-	var output appconfig.ResetFactoryOutput
-
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
 		return appconfig.ResetFactoryOutput{}, err
@@ -27,13 +25,10 @@ func (r Runner) ResetFactory(
 	status := rtconfig.BuildStatusReport(r.env.Selected, info)
 	preview := rtconfig.BuildResetFactoryPreview(status)
 
-	output.Preview = preview
-
 	if req.DryRun {
 		preview.Mode = safety.PreviewModeDryRun
-		output.Preview = preview
 
-		return output, nil
+		return appconfig.ResetFactoryOutput{Preview: preview}, nil
 	}
 
 	if _, err := r.env.Interactions.RequestInteraction(ctx, model.InteractionRequest{
@@ -56,6 +51,10 @@ func (r Runner) ResetFactory(
 			protocol.AuthenticatorReset,
 		))
 	}
-	output.Result = new(rtconfig.ResetResultForDevice(r.env.Selected.Attachment.ID))
-	return output, nil
+	result := rtconfig.ResetResultForDevice(r.env.Selected.Attachment.ID)
+
+	return appconfig.ResetFactoryOutput{
+		Preview: preview,
+		Result:  &result,
+	}, nil
 }

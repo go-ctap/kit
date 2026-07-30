@@ -233,9 +233,7 @@ func TestMakeCredentialReturnsNoPartialResultAndInvalidatesInventoryOnRefreshFai
 		t.Fatalf("MakeCredential error = %v, want refresh error", err)
 	}
 
-	if result != nil {
-		t.Fatalf("output = %#v, want nil on error", result)
-	}
+	requireZero(t, result)
 
 	a.makeCredentialErr = nil
 	if _, err := session.ListCredentials(
@@ -332,6 +330,26 @@ func TestGetAssertionReturnsAllAssertionsInOrder(t *testing.T) {
 	if len(a.tokenRPIDs) != 0 {
 		t.Fatalf("token rpIDs = %v, want none without UV option", a.tokenRPIDs)
 	}
+}
+
+func TestGetAssertionWorkflowReturnsZeroAfterMidstreamFailure(t *testing.T) {
+	cause := errors.New("assertion enumeration failed")
+	a := &webauthnTestAuthenticator{
+		getAssertionErr:           cause,
+		getAssertionErrAfterFirst: true,
+	}
+	session := openContractAuthenticator(t, nil, a)
+	defer func() { _ = session.Close() }()
+
+	output, err := newContractWorkflowRunner(session).GetAssertion(
+		context.Background(),
+		a,
+		sampleGetAssertionOperation(),
+	)
+	if !errors.Is(err, cause) {
+		t.Fatalf("GetAssertion error = %v, want %v", err, cause)
+	}
+	requireZero(t, output)
 }
 
 func TestGetAssertionUsesBuiltInUVWhenRequested(t *testing.T) {
@@ -592,13 +610,14 @@ type webauthnTestAuthenticator struct {
 	makeCredentialEnterpriseAttestation uint
 	makeCredentialAttestationFormats    []attestation.AttestationStatementFormatIdentifier
 
-	getAssertionErr        error
-	getAssertionCalls      int
-	tokenErr               error
-	getAssertionToken      []byte
-	getAssertionClientData []byte
-	getAssertionExtensions *webauthn.GetAuthenticationExtensionsClientInputs
-	getAssertionOptions    map[protocol.Option]bool
+	getAssertionErr           error
+	getAssertionErrAfterFirst bool
+	getAssertionCalls         int
+	tokenErr                  error
+	getAssertionToken         []byte
+	getAssertionClientData    []byte
+	getAssertionExtensions    *webauthn.GetAuthenticationExtensionsClientInputs
+	getAssertionOptions       map[protocol.Option]bool
 
 	metadataCalls int
 }
@@ -700,13 +719,19 @@ func (a *webauthnTestAuthenticator) GetAssertion(
 			return
 		}
 
-		if a.getAssertionErr != nil {
+		if a.getAssertionErr != nil && !a.getAssertionErrAfterFirst {
 			yield(protocol.AuthenticatorGetAssertionResponse{}, a.getAssertionErr)
 
 			return
 		}
 
 		if !yield(sampleAssertionResponse([]byte{0xc0, 0x5e}, []byte{0xaa, 0xbb}, []byte("user-1"), 2), nil) {
+			return
+		}
+
+		if a.getAssertionErr != nil {
+			yield(protocol.AuthenticatorGetAssertionResponse{}, a.getAssertionErr)
+
 			return
 		}
 

@@ -19,10 +19,12 @@ func executeOperation[T any](
 	kind appoperation.Kind,
 	call workflowCall[T],
 	opts ...OperationOption,
-) (*T, error) {
+) (T, error) {
 	config, err := newOperationConfig(opts...)
 	if err != nil {
-		return nil, normalizeRunError(err, string(kind))
+		var zero T
+
+		return zero, normalizeRunError(err, string(kind))
 	}
 
 	result, err := executeSerializedOperation(a, ctx, kind, config, call)
@@ -31,7 +33,9 @@ func executeOperation[T any](
 			_ = a.Close()
 		}
 
-		return nil, normalizeRunError(err, string(kind))
+		var zero T
+
+		return zero, normalizeRunError(err, string(kind))
 	}
 
 	return result, nil
@@ -43,14 +47,16 @@ func executeSerializedOperation[T any](
 	kind appoperation.Kind,
 	config operationConfig,
 	call workflowCall[T],
-) (*T, error) {
+) (T, error) {
 	// Invalidated-device cleanup stays in executeOperation: Close also takes
 	// runMu, so it must run only after this locked section has returned.
 	a.runMu.Lock()
 	defer a.runMu.Unlock()
 
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		var zero T
+
+		return zero, err
 	}
 
 	childCtx, cancel := context.WithCancel(ctx)
@@ -58,7 +64,9 @@ func executeSerializedOperation[T any](
 	childCtx = logging.WithOperation(childCtx, kind)
 
 	if err := a.start(cancel); err != nil {
-		return nil, err
+		var zero T
+
+		return zero, err
 	}
 	defer a.finish()
 
@@ -84,8 +92,10 @@ func executeSerializedOperation[T any](
 		a.largeBlobState.Clear()
 	}
 	if err != nil {
-		return nil, err
+		var zero T
+
+		return zero, err
 	}
 
-	return &result, nil
+	return result, nil
 }

@@ -217,8 +217,8 @@ func TestPINInteractionHandlerReceivesRequestAndValidPINContinues(t *testing.T) 
 		t.Fatalf("Run: %v", err)
 	}
 
-	if result == nil {
-		t.Fatal("result = nil, want large blob mutation output")
+	if result.Result == nil {
+		t.Fatal("result.Result = nil, want large blob mutation result")
 	}
 
 	if len(requests) != 1 {

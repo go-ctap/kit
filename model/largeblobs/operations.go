@@ -1,8 +1,7 @@
 package largeblobs
 
 type ReadOperation struct {
-	CredentialIDHex string     `json:"credentialIDHex"`
-	DecodeMode      DecodeMode `json:"decodeMode,omitempty"`
+	CredentialIDHex string `json:"credentialIDHex"`
 }
 
 type WriteOperation struct {

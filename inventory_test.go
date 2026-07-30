@@ -10,6 +10,7 @@ import (
 	rtauthenticator "github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/discovery"
 	rtidentity "github.com/go-ctap/kit/internal/identity"
+	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 )
@@ -149,6 +150,38 @@ func TestInventoryPublishesAttachmentBeforeIdentity(t *testing.T) {
 	if after.Devices[0].Identity == nil ||
 		after.Devices[0].Identity.Serial != "66202208969539" {
 		t.Fatalf("resolved identity = %#v", after.Devices[0].Identity)
+	}
+}
+
+func TestInventoryIdentityFailureUsesEventError(t *testing.T) {
+	resolver := &blockingIdentityResolver{
+		provider: report.VendorToken2,
+		err:      errors.New("optional identity failed"),
+		started:  make(chan struct{}, 1),
+		release:  make(chan struct{}),
+	}
+	inventory := newTestInventory(t, resolver, nil)
+	inventory.applyDescriptors([]discovery.Descriptor{{
+		Transport: transport.ModeHID,
+		Path:      "hid-1",
+		VendorID:  0x349e,
+	}})
+
+	<-resolver.started
+	close(resolver.release)
+	event := <-inventory.Events()
+
+	if event.Trigger != InventoryTriggerIdentity {
+		t.Fatalf("trigger = %q, want identity", event.Trigger)
+	}
+	if event.Error == nil ||
+		event.Error.Code != failure.CodeInternalError ||
+		event.Error.Phase != failure.PhaseIdentity {
+		t.Fatalf("event error = %#v, want identity failure", event.Error)
+	}
+	if len(event.Snapshot.Devices) != 1 ||
+		event.Snapshot.Devices[0].Resolution.State != report.IdentityFailed {
+		t.Fatalf("snapshot = %#v, want failed identity state", event.Snapshot)
 	}
 }
 

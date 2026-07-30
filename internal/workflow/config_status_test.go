@@ -1,53 +1,93 @@
 package workflow
 
 import (
+	"context"
+	"reflect"
 	"testing"
 
 	"github.com/go-ctap/ctap/protocol"
 	ctaptransport "github.com/go-ctap/ctap/transport"
+	"github.com/go-ctap/kit/internal/errornorm"
 	appconfig "github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/failure"
 )
 
-func TestRetryStatePreservesClientPINFailure(t *testing.T) {
+type retryFailureDevice struct {
+	info   protocol.AuthenticatorGetInfoResponse
+	pinErr error
+	uvErr  error
+}
+
+func (d retryFailureDevice) GetInfo(context.Context) (protocol.AuthenticatorGetInfoResponse, error) {
+	return d.info, nil
+}
+
+func (d retryFailureDevice) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
+	return d.info, true
+}
+
+func (d retryFailureDevice) GetPINRetries(context.Context) (uint, *bool, error) {
+	return 7, new(false), d.pinErr
+}
+
+func (d retryFailureDevice) GetUVRetries(context.Context) (uint, error) {
+	return 5, d.uvErr
+}
+
+func TestConfigStatusRetryFailureReturnsZeroReport(t *testing.T) {
 	raw := &ctaptransport.CTAPError{
 		Command:    protocol.AuthenticatorClientPIN,
 		StatusCode: ctaptransport.CTAP2_ERR_PIN_INVALID,
 	}
-	state := failedRetryState(raw, protocol.ClientPINSubCommandGetPINRetries)
-
-	if state.State != appconfig.StateUnknown {
-		t.Fatalf("state = %q, want unknown", state.State)
+	tests := []struct {
+		name       string
+		device     retryFailureDevice
+		subCommand protocol.ClientPINSubCommand
+	}{
+		{
+			name: "PIN retries",
+			device: retryFailureDevice{
+				info: protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{
+					protocol.OptionClientPIN: true,
+				}},
+				pinErr: raw,
+			},
+			subCommand: protocol.ClientPINSubCommandGetPINRetries,
+		},
+		{
+			name: "UV retries",
+			device: retryFailureDevice{
+				info: protocol.AuthenticatorGetInfoResponse{Options: map[protocol.Option]bool{
+					protocol.OptionUserVerification: true,
+				}},
+				uvErr: raw,
+			},
+			subCommand: protocol.ClientPINSubCommandGetUVRetries,
+		},
 	}
 
-	if state.Failure == nil {
-		t.Fatal("failure = nil")
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			report, err := (Runner{}).ConfigStatus(t.Context(), tt.device)
+			if err == nil {
+				t.Fatal("ConfigStatus error = nil")
+			}
+			if !reflect.DeepEqual(report, appconfig.StatusReport{}) {
+				t.Fatalf("ConfigStatus report = %#v, want zero", report)
+			}
 
-	if state.Failure.Code != failure.CodePINInvalid {
-		t.Fatalf("failure code = %s, want %s", state.Failure.Code, failure.CodePINInvalid)
-	}
-
-	if state.Failure.Phase != failure.PhaseAuthenticatorCommand {
-		t.Fatalf("failure phase = %q", state.Failure.Phase)
-	}
-
-	if state.Failure.CTAP == nil {
-		t.Fatal("CTAP detail = nil")
-	}
-
-	detail := state.Failure.CTAP
-	if detail.Command != "authenticatorClientPIN" ||
-		detail.CommandCode != uint8(protocol.AuthenticatorClientPIN) ||
-		detail.Status != "CTAP2_ERR_PIN_INVALID" ||
-		detail.StatusCode != uint8(ctaptransport.CTAP2_ERR_PIN_INVALID) {
-		t.Fatalf("CTAP detail = %#v", detail)
-	}
-
-	if detail.SubCommandFamily != "clientPIN" ||
-		detail.SubCommand != "getPINRetries" ||
-		detail.SubCommandCode == nil ||
-		*detail.SubCommandCode != uint64(protocol.ClientPINSubCommandGetPINRetries) {
-		t.Fatalf("CTAP subcommand detail = %#v", detail)
+			snapshot := failure.Snapshot(errornorm.Normalize(err, ""))
+			if snapshot == nil || snapshot.Code != failure.CodePINInvalid {
+				t.Fatalf("failure = %#v, want %s", snapshot, failure.CodePINInvalid)
+			}
+			if snapshot.Phase != failure.PhaseAuthenticatorCommand {
+				t.Fatalf("failure phase = %q, want %q", snapshot.Phase, failure.PhaseAuthenticatorCommand)
+			}
+			if snapshot.CTAP == nil ||
+				snapshot.CTAP.SubCommandCode == nil ||
+				*snapshot.CTAP.SubCommandCode != uint64(tt.subCommand) {
+				t.Fatalf("CTAP detail = %#v, want subcommand %d", snapshot.CTAP, tt.subCommand)
+			}
+		})
 	}
 }

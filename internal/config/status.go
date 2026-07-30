@@ -1,6 +1,8 @@
 package config
 
 import (
+	"strconv"
+
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
 	"github.com/go-ctap/kit/internal/getinfo"
@@ -27,11 +29,13 @@ func BuildStatusReport(device report.DeviceReport, info protocol.AuthenticatorGe
 			UVBioEnroll: appconfig.CapabilityState{State: appconfig.StateUnknown},
 		},
 		AuthenticatorConfig: appconfig.AuthenticatorConfigStatus{
-			State:             appconfig.StateUnknown,
-			UVAcfg:            appconfig.CapabilityState{State: appconfig.StateUnknown},
-			AlwaysUV:          appconfig.CapabilityState{State: appconfig.StateUnknown},
-			SetMinPINLength:   appconfig.CapabilityState{State: appconfig.StateUnknown},
-			LongTouchForReset: appconfig.CapabilityState{State: appconfig.StateUnknown},
+			State:                 appconfig.StateUnknown,
+			UVAcfg:                appconfig.CapabilityState{State: appconfig.StateUnknown},
+			EnterpriseAttestation: appconfig.CapabilityState{State: appconfig.StateUnknown},
+			AlwaysUV:              appconfig.CapabilityState{State: appconfig.StateUnknown},
+			SetMinPINLength:       appconfig.CapabilityState{State: appconfig.StateUnknown},
+			LongTouchForReset:     appconfig.CapabilityState{State: appconfig.StateUnknown},
+			VendorPrototype:       appconfig.CapabilityState{State: appconfig.StateUnknown},
 		},
 		ResetHints: appconfig.ResetHints{LongTouchForReset: appconfig.StateUnknown},
 	}
@@ -49,10 +53,15 @@ func BuildStatusReport(device report.DeviceReport, info protocol.AuthenticatorGe
 	r.Bio.UVBioEnroll = factCapability(assessment, appinspect.FactIDUvBioEnroll, false)
 	r.AuthenticatorConfig = buildAuthenticatorConfigStatus(factCapability(assessment, appinspect.FactIDAuthenticatorConfig, false))
 	r.AuthenticatorConfig.UVAcfg = factCapability(assessment, appinspect.FactIDUvAuthenticatorConfig, false)
+	r.AuthenticatorConfig.EnterpriseAttestation = factCapability(assessment, appinspect.FactIDEnterpriseAttestation, false)
 	r.AuthenticatorConfig.AlwaysUV = factCapability(assessment, appinspect.FactIDAlwaysUV, false)
 	r.AuthenticatorConfig.SetMinPINLength = factCapability(assessment, appinspect.FactIDSetMinPINLength, false)
 	longTouchForReset := factCapability(assessment, appinspect.FactIDLongTouchForReset, false)
 	r.AuthenticatorConfig.LongTouchForReset = longTouchForReset
+	r.AuthenticatorConfig.VendorPrototype = vendorPrototypeCapability(info)
+	r.AuthenticatorConfig.VendorPrototypeConfigCommands = lo.Map(info.VendorPrototypeConfigCommands, func(value protocol.VendorCommandID, _ int) string {
+		return strconv.FormatUint(uint64(value), 10)
+	})
 	r.ResetHints.LongTouchForReset = longTouchForReset.State
 	r.Limits = buildLimitsStatus(info, assessment)
 
@@ -109,14 +118,27 @@ func buildBioStatus(capability appconfig.CapabilityState) appconfig.BioStatus {
 
 func buildAuthenticatorConfigStatus(capability appconfig.CapabilityState) appconfig.AuthenticatorConfigStatus {
 	return appconfig.AuthenticatorConfigStatus{
-		State:             capability.State,
-		Supported:         capability.Supported,
-		Configured:        capability.Configured,
-		PreviewOnly:       capability.PreviewOnly,
-		UVAcfg:            appconfig.CapabilityState{State: appconfig.StateUnknown},
-		AlwaysUV:          appconfig.CapabilityState{State: appconfig.StateUnknown},
-		SetMinPINLength:   appconfig.CapabilityState{State: appconfig.StateUnknown},
-		LongTouchForReset: appconfig.CapabilityState{State: appconfig.StateUnknown},
+		State:                 capability.State,
+		Supported:             capability.Supported,
+		Configured:            capability.Configured,
+		PreviewOnly:           capability.PreviewOnly,
+		UVAcfg:                appconfig.CapabilityState{State: appconfig.StateUnknown},
+		EnterpriseAttestation: appconfig.CapabilityState{State: appconfig.StateUnknown},
+		AlwaysUV:              appconfig.CapabilityState{State: appconfig.StateUnknown},
+		SetMinPINLength:       appconfig.CapabilityState{State: appconfig.StateUnknown},
+		LongTouchForReset:     appconfig.CapabilityState{State: appconfig.StateUnknown},
+		VendorPrototype:       appconfig.CapabilityState{State: appconfig.StateUnknown},
+	}
+}
+
+func vendorPrototypeCapability(info protocol.AuthenticatorGetInfoResponse) appconfig.CapabilityState {
+	if info.VendorPrototypeConfigCommands == nil {
+		return appconfig.CapabilityState{State: appconfig.StateUnsupported}
+	}
+
+	return appconfig.CapabilityState{
+		State:     appconfig.StateSupported,
+		Supported: true,
 	}
 }
 

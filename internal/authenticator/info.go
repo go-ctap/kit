@@ -13,5 +13,10 @@ func ResolveInfo(ctx context.Context, provider InfoProvider) (protocol.Authentic
 		return info, nil
 	}
 
-	return provider.GetInfo(ctx)
+	info, err := provider.GetInfo(ctx)
+	if err != nil {
+		return protocol.AuthenticatorGetInfoResponse{}, err
+	}
+
+	return info, nil
 }

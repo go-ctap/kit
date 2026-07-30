@@ -35,9 +35,9 @@ func TestLargeBlobMutationWarningsDescribeFirstMatchingEntry(t *testing.T) {
 func TestGarbageCollectionWarningDistinguishesNoop(t *testing.T) {
 	runner := Runner{}
 
-	preview := runner.buildGarbageCollectPreview(garbageCollectState{unmatchedCount: 1})
+	preview := runner.buildGarbageCollectPreview(garbageCollectState{orphanedCount: 1})
 	if got := preview.Warnings[0]; got.Severity != safety.SeverityDestructive ||
-		!strings.Contains(got.Message, "malformed entries are retained") {
+		!strings.Contains(got.Message, "nonconforming entries are retained") {
 		t.Fatalf("destructive GC warning = %#v", got)
 	}
 

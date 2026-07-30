@@ -371,10 +371,7 @@ func TestRunAfterAuthenticatorCloseIsRejected(t *testing.T) {
 
 	result, err := opened.ConfigStatus(context.Background(), opened.operationOptions()...)
 	requireFailureCode(t, err, failure.CodeAuthenticatorClosed)
-
-	if result != nil {
-		t.Fatalf("result = %#v, want nil", result)
-	}
+	requireZero(t, result)
 }
 
 func TestTransportConnectionFailureClosesAuthenticator(t *testing.T) {

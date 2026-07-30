@@ -22,6 +22,31 @@ func (r Runner) ListCredentials(ctx context.Context, device authenticator.Creden
 	return r.credentialInventory(ctx, device, protocol.PermissionNone, nil)
 }
 
+type credentialInventorySnapshot struct {
+	info     protocol.AuthenticatorGetInfoResponse
+	metadata protocol.AuthenticatorCredentialManagementResponse
+	groups   []credentialInventoryGroupSnapshot
+}
+
+type credentialInventoryGroupSnapshot struct {
+	rp          protocol.AuthenticatorCredentialManagementResponse
+	credentials []protocol.AuthenticatorCredentialManagementResponse
+}
+
+func (snapshot *credentialInventorySnapshot) zeroLargeBlobKeys() {
+	if snapshot == nil {
+		return
+	}
+
+	for groupIndex := range snapshot.groups {
+		for credentialIndex := range snapshot.groups[groupIndex].credentials {
+			credential := &snapshot.groups[groupIndex].credentials[credentialIndex]
+			secret.Zero(credential.LargeBlobKey)
+			credential.LargeBlobKey = nil
+		}
+	}
+}
+
 func (r Runner) credentialInventory(
 	ctx context.Context,
 	device authenticator.CredentialInventoryReader,
@@ -48,35 +73,34 @@ func (r Runner) credentialInventory(
 		)
 	}
 
-	var report appcredentials.InventoryReport
+	var snapshot credentialInventorySnapshot
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
 		Permission: grantPermission,
 		ReplaySafe: true,
 	}, func(token []byte) error {
-		current, err := r.buildCredentialInventory(ctx, device, token, permission, keys)
+		current, err := r.readCredentialInventorySnapshot(ctx, device, token)
 		if err != nil {
-			keys.zero()
-
 			return err
 		}
 
 		if err := ctx.Err(); err != nil {
-			keys.zero()
+			current.zeroLargeBlobKeys()
 
 			return errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseDiscovery))
 		}
 
-		report = current
+		snapshot = current
 
 		return nil
 	})
 	if err != nil {
+		snapshot.zeroLargeBlobKeys()
 		keys.zero()
 
 		return appcredentials.InventoryReport{}, err
 	}
 
-	return report, nil
+	return r.buildCredentialInventoryReport(snapshot, permission, keys), nil
 }
 
 func grantCoversInventoryPermission(
@@ -91,25 +115,23 @@ func grantCoversInventoryPermission(
 		grantPermission&protocol.PermissionCredentialManagement != 0
 }
 
-func (r Runner) buildCredentialInventory(
+func (r Runner) readCredentialInventorySnapshot(
 	ctx context.Context,
 	device authenticator.CredentialInventoryReader,
 	token []byte,
-	permission protocol.Permission,
-	keys largeBlobKeyStore,
-) (appcredentials.InventoryReport, error) {
+) (credentialInventorySnapshot, error) {
 	if err := ctx.Err(); err != nil {
-		return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseMetadata))
+		return credentialInventorySnapshot{}, errornorm.Annotate(err, errornorm.WithPhase(failure.PhaseMetadata))
 	}
 
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
-		return appcredentials.InventoryReport{}, err
+		return credentialInventorySnapshot{}, err
 	}
 
 	metadata, err := device.GetCredsMetadata(ctx, token)
 	if err != nil {
-		return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
+		return credentialInventorySnapshot{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 			failure.PhaseMetadata,
 			credentialManagementCommand(info),
 			protocol.CredentialManagementSubCommandGetCredsMetadata,
@@ -117,7 +139,7 @@ func (r Runner) buildCredentialInventory(
 	}
 
 	if err := ctx.Err(); err != nil {
-		return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
+		return credentialInventorySnapshot{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 			failure.PhaseMetadata,
 			credentialManagementCommand(info),
 			protocol.CredentialManagementSubCommandGetCredsMetadata,
@@ -126,31 +148,29 @@ func (r Runner) buildCredentialInventory(
 
 	if metadata.ExistingResidentCredentialsCount == nil ||
 		metadata.MaxPossibleRemainingResidentCredentialsCount == nil {
-		return appcredentials.InventoryReport{}, failure.New(
+		return credentialInventorySnapshot{}, failure.New(
 			failure.CodeCTAPSpecViolation,
 			failure.WithPhase(failure.PhaseMetadata),
 		)
 	}
 
-	report := appcredentials.InventoryReport{
-		Device: r.env.Selected,
-		Support: appcredentials.SupportReport{
-			CredentialManagement: true,
-			PreviewOnly:          info.Versions.IsPreviewOnly(),
-			ReadOnlyPermission:   permission == protocol.PermissionPersistentCredentialManagementReadOnly,
-		},
-		Summary: appcredentials.InventorySummary{
-			ExistingResidentCredentialsCount:             *metadata.ExistingResidentCredentialsCount,
-			MaxPossibleRemainingResidentCredentialsCount: *metadata.MaxPossibleRemainingResidentCredentialsCount,
-		},
+	snapshot := credentialInventorySnapshot{
+		info:     info,
+		metadata: metadata,
 	}
+	complete := false
+	defer func() {
+		if !complete {
+			snapshot.zeroLargeBlobKeys()
+		}
+	}()
+
 	if *metadata.ExistingResidentCredentialsCount == 0 {
-		report.Groups = []appcredentials.CredentialGroup{}
+		complete = true
 
-		return report, nil
+		return snapshot, nil
 	}
 
-	rpResponses := make([]protocol.AuthenticatorCredentialManagementResponse, 0)
 	var rpTotal uint64
 
 	for rpResponse, err := range device.EnumerateRPs(ctx, token) {
@@ -160,106 +180,140 @@ func (r Runner) buildCredentialInventory(
 
 		if err != nil {
 			subCommand := protocol.CredentialManagementSubCommandEnumerateRPsBegin
-			if len(rpResponses) > 0 {
+			if len(snapshot.groups) > 0 {
 				subCommand = protocol.CredentialManagementSubCommandEnumerateRPsGetNextRP
 			}
 
-			return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
+			return credentialInventorySnapshot{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 				failure.PhaseDiscovery,
 				credentialManagementCommand(info),
 				subCommand,
 			))
 		}
 
-		if len(rpResponses) == 0 {
+		if len(snapshot.groups) == 0 {
 			rpTotal = uint64(rpResponse.TotalRPs)
 		}
 
-		rpResponses = append(rpResponses, rpResponse)
+		snapshot.groups = append(snapshot.groups, credentialInventoryGroupSnapshot{rp: rpResponse})
 
 		r.env.Events.Emit(ctx, model.OperationEvent{
 			Stage:     model.OperationStageEnumeratingRPs,
-			Completed: new(uint64(len(rpResponses))),
+			Completed: new(uint64(len(snapshot.groups))),
 			Total:     &rpTotal,
 		})
 	}
 
-	report.Groups = make([]appcredentials.CredentialGroup, 0, len(rpResponses))
 	credentialsTotal := uint64(*metadata.ExistingResidentCredentialsCount)
+	var credentialsCompleted uint64
 
-	for _, rpResponse := range rpResponses {
+	for groupIndex := range snapshot.groups {
+		group := &snapshot.groups[groupIndex]
 		if err := ctx.Err(); err != nil {
-			return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
+			return credentialInventorySnapshot{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 				failure.PhaseDiscovery,
 				credentialManagementCommand(info),
 				protocol.CredentialManagementSubCommandEnumerateCredentialsBegin,
 			))
 		}
 
-		report.Groups = append(report.Groups, appcredentials.CredentialGroup{
-			RPID:        strings.TrimSpace(rpResponse.RP.ID),
-			RPName:      strings.TrimSpace(rpResponse.RP.Name),
-			RPIDHashHex: hex.EncodeToString(rpResponse.RPIDHash),
-		})
-		group := &report.Groups[len(report.Groups)-1]
-
-		for credentialResponse, err := range device.EnumerateCredentials(ctx, token, rpResponse.RPIDHash) {
+		for credentialResponse, err := range device.EnumerateCredentials(ctx, token, group.rp.RPIDHash) {
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				err = ctxErr
 			}
 
 			if err != nil {
+				secret.Zero(credentialResponse.LargeBlobKey)
+
 				subCommand := protocol.CredentialManagementSubCommandEnumerateCredentialsBegin
-				if len(group.Credentials) > 0 {
+				if len(group.credentials) > 0 {
 					subCommand = protocol.CredentialManagementSubCommandEnumerateCredentialsGetNextCredential
 				}
 
-				return appcredentials.InventoryReport{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
+				return credentialInventorySnapshot{}, errornorm.Annotate(err, errornorm.WithCredentialManagementSubCommand(
 					failure.PhaseDiscovery,
 					credentialManagementCommand(info),
 					subCommand,
 				))
 			}
 
-			credentialIDHex := hex.EncodeToString(credentialResponse.CredentialID.ID)
+			group.credentials = append(group.credentials, credentialResponse)
+			credentialsCompleted++
+
+			r.env.Events.Emit(ctx, model.OperationEvent{
+				Stage:     model.OperationStageEnumeratingCredentials,
+				Completed: new(credentialsCompleted),
+				Total:     &credentialsTotal,
+			})
+		}
+	}
+
+	complete = true
+
+	return snapshot, nil
+}
+
+func (r Runner) buildCredentialInventoryReport(
+	snapshot credentialInventorySnapshot,
+	permission protocol.Permission,
+	keys largeBlobKeyStore,
+) appcredentials.InventoryReport {
+	report := appcredentials.InventoryReport{
+		Device: r.env.Selected,
+		Support: appcredentials.SupportReport{
+			CredentialManagement: true,
+			PreviewOnly:          snapshot.info.Versions.IsPreviewOnly(),
+			ReadOnlyPermission:   permission == protocol.PermissionPersistentCredentialManagementReadOnly,
+		},
+		Summary: appcredentials.InventorySummary{
+			ExistingResidentCredentialsCount:             *snapshot.metadata.ExistingResidentCredentialsCount,
+			MaxPossibleRemainingResidentCredentialsCount: *snapshot.metadata.MaxPossibleRemainingResidentCredentialsCount,
+		},
+		Groups: make([]appcredentials.CredentialGroup, 0, len(snapshot.groups)),
+	}
+
+	for _, rawGroup := range snapshot.groups {
+		group := appcredentials.CredentialGroup{
+			RPID:        strings.TrimSpace(rawGroup.rp.RP.ID),
+			RPName:      strings.TrimSpace(rawGroup.rp.RP.Name),
+			RPIDHashHex: hex.EncodeToString(rawGroup.rp.RPIDHash),
+			Credentials: make([]appcredentials.CredentialRecord, 0, len(rawGroup.credentials)),
+		}
+
+		for _, response := range rawGroup.credentials {
+			credentialIDHex := hex.EncodeToString(response.CredentialID.ID)
 			record := appcredentials.CredentialRecord{
 				CredentialIDHex:      credentialIDHex,
-				CredentialType:       string(credentialResponse.CredentialID.Type),
-				CredentialTransports: credentialTransports(credentialResponse.CredentialID.Transports),
-				UserIDHex:            hex.EncodeToString(credentialResponse.User.ID),
-				UserName:             strings.TrimSpace(credentialResponse.User.Name),
-				DisplayName:          strings.TrimSpace(credentialResponse.User.DisplayName),
-				CredProtect:          credentialResponse.CredProtect,
-				ThirdPartyPayment:    credentialResponse.ThirdPartyPayment,
+				CredentialType:       string(response.CredentialID.Type),
+				CredentialTransports: credentialTransports(response.CredentialID.Transports),
+				UserIDHex:            hex.EncodeToString(response.User.ID),
+				UserName:             strings.TrimSpace(response.User.Name),
+				DisplayName:          strings.TrimSpace(response.User.DisplayName),
+				CredProtect:          response.CredProtect,
+				ThirdPartyPayment:    response.ThirdPartyPayment,
+				LargeBlobKeyState:    "missing",
 			}
 
-			if len(credentialResponse.LargeBlobKey) > 0 {
+			if len(response.LargeBlobKey) > 0 {
 				record.LargeBlobKeyState = "available"
 				if keys == nil {
-					secret.Zero(credentialResponse.LargeBlobKey)
+					secret.Zero(response.LargeBlobKey)
 				} else {
-					keys.add(group.RPIDHashHex, credentialIDHex, credentialResponse.LargeBlobKey)
+					keys.add(group.RPIDHashHex, credentialIDHex, response.LargeBlobKey)
 				}
-			} else {
-				record.LargeBlobKeyState = "missing"
 			}
 
 			group.Credentials = append(group.Credentials, record)
 			report.Summary.TotalCredentials++
-
-			r.env.Events.Emit(ctx, model.OperationEvent{
-				Stage:     model.OperationStageEnumeratingCredentials,
-				Completed: new(uint64(report.Summary.TotalCredentials)),
-				Total:     &credentialsTotal,
-			})
 		}
 
+		report.Groups = append(report.Groups, group)
 	}
 
 	sortInventoryGroups(report.Groups)
 	report.Summary.TotalRPs = uint(len(report.Groups))
 
-	return report, nil
+	return report
 }
 
 func credentialManagementCommand(info protocol.AuthenticatorGetInfoResponse) protocol.Command {

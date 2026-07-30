@@ -15,8 +15,6 @@ const (
 	warningBioRemoveMutation = "bio.remove.destructive"
 )
 
-type BioEnrollProgress func(appconfig.BioEnrollSample) error
-
 func BuildBioEnrollPreview(
 	status appconfig.StatusReport,
 	timeoutMilliseconds uint,

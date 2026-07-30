@@ -1,0 +1,231 @@
+package workflow
+
+import (
+	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"encoding/binary"
+	"reflect"
+	"testing"
+
+	"github.com/go-ctap/ctap/crypto"
+	"github.com/go-ctap/ctap/extension"
+	"github.com/go-ctap/ctap/protocol"
+	appcredentials "github.com/go-ctap/kit/model/credentials"
+	"github.com/go-ctap/kit/model/failure"
+	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
+)
+
+func TestReadLargeBlobFollowsPerCredentialReadAlgorithm(t *testing.T) {
+	key := make([]byte, 32)
+	key[0] = 1
+	present := encryptedWorkflowLargeBlob(t, key, []byte("payload"))
+	corrupt := authenticatedCorruptWorkflowLargeBlob(t, key, []byte("not-deflate"), 7)
+	nonconforming := protocol.LargeBlob{
+		Ciphertext: []byte("ciphertext"),
+		Nonce:      []byte("short"),
+		OrigSize:   7,
+	}
+
+	tests := []struct {
+		name         string
+		supported    bool
+		keyExtension bool
+		key          []byte
+		blobs        []protocol.LargeBlob
+		wantState    applargeblobs.ReadState
+		wantPayload  []byte
+		wantFailure  failure.Code
+		wantReads    int
+	}{
+		{
+			name:         "large blobs unsupported",
+			key:          key,
+			keyExtension: true,
+			wantFailure:  failure.CodeLargeBlobUnsupported,
+		},
+		{
+			name:        "large blob key extension unsupported",
+			supported:   true,
+			key:         key,
+			wantFailure: failure.CodeLargeBlobUnsupported,
+		},
+		{
+			name:         "key missing means blob missing",
+			supported:    true,
+			keyExtension: true,
+			wantState:    applargeblobs.ReadStateMissing,
+		},
+		{
+			name:         "key invalid",
+			supported:    true,
+			keyExtension: true,
+			key:          []byte{1},
+			wantFailure:  failure.CodeLargeBlobKeyInvalid,
+		},
+		{
+			name:         "blob missing",
+			supported:    true,
+			keyExtension: true,
+			key:          key,
+			wantState:    applargeblobs.ReadStateMissing,
+			wantReads:    1,
+		},
+		{
+			name:         "nonconforming entry skipped",
+			supported:    true,
+			keyExtension: true,
+			key:          key,
+			blobs:        []protocol.LargeBlob{nonconforming},
+			wantState:    applargeblobs.ReadStateMissing,
+			wantReads:    1,
+		},
+		{
+			name:         "blob present",
+			supported:    true,
+			keyExtension: true,
+			key:          key,
+			blobs:        []protocol.LargeBlob{present},
+			wantState:    applargeblobs.ReadStatePresent,
+			wantPayload:  []byte("payload"),
+			wantReads:    1,
+		},
+		{
+			name:         "authenticated blob with corrupt compressed data",
+			supported:    true,
+			keyExtension: true,
+			key:          key,
+			blobs:        []protocol.LargeBlob{corrupt},
+			wantFailure:  failure.CodeLargeBlobIntegrityFailure,
+			wantReads:    1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			options := map[protocol.Option]bool{}
+			if tt.supported {
+				options[protocol.OptionLargeBlobs] = true
+			}
+			var extensions []extension.ExtensionIdentifier
+			if tt.keyExtension {
+				extensions = []extension.ExtensionIdentifier{extension.ExtensionIdentifierLargeBlobKey}
+			}
+
+			device := &largeBlobReadDeviceStub{
+				inspectDeviceStub: inspectDeviceStub{info: protocol.AuthenticatorGetInfoResponse{
+					Extensions: extensions,
+					Options:    options,
+				}},
+				blobs: tt.blobs,
+			}
+			report, err := (Runner{}).readLargeBlobFromInventory(
+				t.Context(),
+				device,
+				applargeblobs.ReadOperation{CredentialIDHex: "c05e"},
+				workflowLargeBlobInventory(tt.key, tt.blobs),
+			)
+			if device.reads != tt.wantReads {
+				t.Fatalf("large-blob array reads = %d, want %d", device.reads, tt.wantReads)
+			}
+			if tt.wantFailure != "" {
+				if !failure.IsCode(err, tt.wantFailure) {
+					t.Fatalf("error = %v, want code %q", err, tt.wantFailure)
+				}
+				if !reflect.DeepEqual(report, applargeblobs.ReadReport{}) {
+					t.Fatalf("report = %#v, want zero value", report)
+				}
+
+				return
+			}
+			if err != nil {
+				t.Fatalf("ReadLargeBlob: %v", err)
+			}
+			if report.State != tt.wantState {
+				t.Fatalf("state = %q, want %q", report.State, tt.wantState)
+			}
+			if !reflect.DeepEqual(report.RawBytes, tt.wantPayload) {
+				t.Fatalf("raw bytes = %x, want %x", report.RawBytes, tt.wantPayload)
+			}
+		})
+	}
+}
+
+type largeBlobReadDeviceStub struct {
+	inspectDeviceStub
+	blobs []protocol.LargeBlob
+	err   error
+	reads int
+}
+
+func (s *largeBlobReadDeviceStub) GetLargeBlobs(context.Context) ([]protocol.LargeBlob, error) {
+	s.reads++
+
+	return s.blobs, s.err
+}
+
+func workflowLargeBlobInventory(key []byte, blobs []protocol.LargeBlob) *largeBlobInventory {
+	keys := make(largeBlobKeyStore)
+	if key != nil {
+		keys.add("rp-hash", "c05e", key)
+	}
+
+	return &largeBlobInventory{
+		credentials: appcredentials.InventoryReport{
+			Summary: appcredentials.InventorySummary{TotalCredentials: 1},
+			Groups: []appcredentials.CredentialGroup{{
+				RPID:        "example.com",
+				RPIDHashHex: "rp-hash",
+				Credentials: []appcredentials.CredentialRecord{{
+					CredentialIDHex: "c05e",
+				}},
+			}},
+		},
+		keys:  keys,
+		blobs: blobs,
+	}
+}
+
+func encryptedWorkflowLargeBlob(
+	t *testing.T,
+	key []byte,
+	payload []byte,
+) protocol.LargeBlob {
+	t.Helper()
+
+	blob, err := crypto.EncryptLargeBlob(key, payload)
+	if err != nil {
+		t.Fatalf("EncryptLargeBlob: %v", err)
+	}
+
+	return blob
+}
+
+func authenticatedCorruptWorkflowLargeBlob(
+	t *testing.T,
+	key []byte,
+	compressed []byte,
+	originalSize uint,
+) protocol.LargeBlob {
+	t.Helper()
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatalf("NewCipher: %v", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatalf("NewGCM: %v", err)
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	originalSizeBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(originalSizeBytes, uint64(originalSize))
+	additionalData := append([]byte("blob"), originalSizeBytes...)
+
+	return protocol.LargeBlob{
+		Ciphertext: gcm.Seal(nil, nonce, compressed, additionalData),
+		Nonce:      nonce,
+		OrigSize:   originalSize,
+	}
+}

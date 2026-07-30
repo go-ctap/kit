@@ -17,8 +17,6 @@ func (r Runner) SetAlwaysUV(
 	device ConfigDevice,
 	req appconfig.SetAlwaysUVOperation,
 ) (appconfig.AuthenticatorConfigOutput, error) {
-	var output appconfig.AuthenticatorConfigOutput
-
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
 		return appconfig.AuthenticatorConfigOutput{}, err
@@ -35,10 +33,8 @@ func (r Runner) SetAlwaysUV(
 		return appconfig.AuthenticatorConfigOutput{}, err
 	}
 
-	output.Preview = preview
-
 	if req.DryRun {
-		return output, nil
+		return appconfig.AuthenticatorConfigOutput{Preview: preview}, nil
 	}
 
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
@@ -53,12 +49,16 @@ func (r Runner) SetAlwaysUV(
 			protocol.ConfigSubCommandToggleAlwaysUv,
 		))
 	}
-	output.Result = new(rtconfig.AlwaysUVResult(
+	result := rtconfig.AlwaysUVResult(
 		r.env.Selected.Attachment.ID,
 		req.Target,
 		preview.RequestedAlwaysUV,
-	))
-	return output, nil
+	)
+
+	return appconfig.AuthenticatorConfigOutput{
+		Preview: preview,
+		Result:  &result,
+	}, nil
 }
 
 func (r Runner) SetMinPINLength(
@@ -66,8 +66,6 @@ func (r Runner) SetMinPINLength(
 	device ConfigDevice,
 	req appconfig.SetMinPINLengthOperation,
 ) (appconfig.AuthenticatorConfigOutput, error) {
-	var output appconfig.AuthenticatorConfigOutput
-
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
 		return appconfig.AuthenticatorConfigOutput{}, err
@@ -83,10 +81,8 @@ func (r Runner) SetMinPINLength(
 		return appconfig.AuthenticatorConfigOutput{}, err
 	}
 
-	output.Preview = preview
-
 	if req.DryRun {
-		return output, nil
+		return appconfig.AuthenticatorConfigOutput{Preview: preview}, nil
 	}
 
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
@@ -106,6 +102,10 @@ func (r Runner) SetMinPINLength(
 			protocol.ConfigSubCommandSetMinPINLength,
 		))
 	}
-	output.Result = new(rtconfig.MinPINLengthResult(r.env.Selected.Attachment.ID, req))
-	return output, nil
+	result := rtconfig.MinPINLengthResult(r.env.Selected.Attachment.ID, req)
+
+	return appconfig.AuthenticatorConfigOutput{
+		Preview: preview,
+		Result:  &result,
+	}, nil
 }

@@ -153,11 +153,26 @@ packages.
 | Configuration   | `ConfigStatus`, `SetPIN`, `ChangePIN`, `SetAlwaysUV`, `SetMinPINLength`, `EnableLongTouchForReset`, `ResetFactory` |
 | Biometrics      | `BioSensorInfo`, `BioList`, `BioEnroll`, `BioRename`, `BioRemove`                                                  |
 | Credentials     | `ListCredentials`, `CredentialStoreState`, `DeleteCredential`, `UpdateCredentialUser`                              |
-| Large blobs     | `ReadLargeBlob`, `ListLargeBlobs`, `WriteLargeBlob`, `DeleteLargeBlob`, `GarbageCollectLargeBlobs`                 |
+| Large blobs     | `ReadLargeBlob`, `ListLargeBlobs`, `WriteLargeBlob`, `DeleteLargeBlob`, `GarbageCollectLargeBlobs`, `DecodeLargeBlob` |
 | WebAuthn        | `MakeCredential`, `GetAssertion`, `VerifyMakeCredential`, `VerifyGetAssertion`                                     |
 
-Operation methods return pointers to concrete result types. A nil pointer means that the workflow did not start. A
-non-nil value may contain a preview or other partial data together with an error.
+Operation methods return concrete result values. When an operation returns an error, its result is always the zero
+value, regardless of whether the workflow had already started. A populated result is returned only for a successful
+workflow, including preview-only dry runs; outputs may leave a nested mutation result nil for previews.
+
+Large-blob behavior follows CTAP 2.3 section 6.10. `ReadLargeBlob` returns the credential's opaque bytes without
+interpreting their application format. A successful `missing` state means either that no `largeBlobKey` was returned
+for the credential or that no conforming array entry authenticated with that key. Once an entry authenticates, a
+DEFLATE or `origSize` failure is an operation error and the read report is zero.
+
+`DecodeLargeBlob` is a pure helper for interpreting successfully read bytes as UTF-8, JSON, or CBOR. Decode failures
+return a zero decode result. `ListLargeBlobs` is the diagnostic array view: entries are `matched`, `orphaned`,
+`nonconforming`, or `corrupt`. Here `corrupt` means that AEAD authentication matched an enumerated credential but
+DEFLATE or `origSize` validation failed. Garbage collection follows the narrower CTAP rule: it retains every
+AEAD-matched entry, including one with corrupt compressed data, and removes each conforming entry that fails
+authentication with all valid enumerated `largeBlobKey` values.
+If the serialized array's trailing integrity hash is invalid, the runtime discards it and observes the CTAP initial empty
+array, as required for a corrupt or torn write.
 
 ## Interactions and verification
 

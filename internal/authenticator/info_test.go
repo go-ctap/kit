@@ -48,11 +48,17 @@ func TestResolveInfoRefreshesInvalidCacheOnce(t *testing.T) {
 
 func TestResolveInfoReturnsRefreshFailure(t *testing.T) {
 	want := errors.New("getInfo failed")
-	provider := &infoProviderStub{freshErr: want}
+	provider := &infoProviderStub{
+		current:  protocol.AuthenticatorGetInfoResponse{Versions: protocol.Versions{protocol.FIDO_2_3}},
+		freshErr: want,
+	}
 
-	_, err := ResolveInfo(t.Context(), provider)
+	info, err := ResolveInfo(t.Context(), provider)
 	if !errors.Is(err, want) {
 		t.Fatalf("ResolveInfo error = %v, want %v", err, want)
+	}
+	if len(info.Versions) != 0 {
+		t.Fatalf("ResolveInfo response = %#v, want zero value", info)
 	}
 }
 
@@ -71,7 +77,7 @@ func (p *infoProviderStub) GetInfoCached() (protocol.AuthenticatorGetInfoRespons
 func (p *infoProviderStub) GetInfo(context.Context) (protocol.AuthenticatorGetInfoResponse, error) {
 	p.freshCalls++
 	if p.freshErr != nil {
-		return protocol.AuthenticatorGetInfoResponse{}, p.freshErr
+		return p.current, p.freshErr
 	}
 
 	p.cached = p.current

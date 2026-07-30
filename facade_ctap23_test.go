@@ -105,7 +105,8 @@ func TestEnableLongTouchForResetDryRunAndRefreshFailureCacheEffects(t *testing.T
 		t.Fatalf("execute error = %v, want refresh failure", err)
 	}
 
-	if result != nil || a.enableCalls.Load() != 1 {
+	requireZero(t, result)
+	if a.enableCalls.Load() != 1 {
 		t.Fatalf("execute result/calls = %#v/%d", result, a.enableCalls.Load())
 	}
 
@@ -135,6 +136,25 @@ func TestEnableLongTouchForResetSuccess(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatalf("EnableLongTouchForReset: %v", err)
+	}
+
+	if result.Result == nil || result.Result.State != "configured" || a.enableCalls.Load() != 1 {
+		t.Fatalf("output/calls = %#v/%d", result, a.enableCalls.Load())
+	}
+}
+
+func TestEnableEnterpriseAttestationSuccess(t *testing.T) {
+	a := &enterpriseAttestationAuthenticator{}
+	session := openContractAuthenticator(t, nil, a)
+	defer func() { _ = session.Close() }()
+
+	result, err := session.EnableEnterpriseAttestation(
+		context.Background(),
+		appconfig.EnableEnterpriseAttestationOperation{},
+		session.operationOptions()...,
+	)
+	if err != nil {
+		t.Fatalf("EnableEnterpriseAttestation: %v", err)
 	}
 
 	if result.Result == nil || result.Result.State != "configured" || a.enableCalls.Load() != 1 {
@@ -267,6 +287,36 @@ type longTouchAuthenticator struct {
 	enableCalls atomic.Int32
 	enabled     atomic.Bool
 	enableErr   error
+}
+
+type enterpriseAttestationAuthenticator struct {
+	contractAuthenticator
+	contractConfigManager
+	enableCalls atomic.Int32
+	enabled     atomic.Bool
+}
+
+func (a *enterpriseAttestationAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
+	return protocol.AuthenticatorGetInfoResponse{
+		Options: map[protocol.Option]bool{
+			protocol.OptionAuthenticatorConfig:   true,
+			protocol.OptionEnterpriseAttestation: a.enabled.Load(),
+		},
+		AuthenticatorConfigCommands: []protocol.ConfigSubCommand{protocol.ConfigSubCommandEnableEnterpriseAttestation},
+	}, true
+}
+
+func (a *enterpriseAttestationAuthenticator) GetInfo(context.Context) (protocol.AuthenticatorGetInfoResponse, error) {
+	info, _ := a.GetInfoCached()
+
+	return info, nil
+}
+
+func (a *enterpriseAttestationAuthenticator) EnableEnterpriseAttestation(context.Context, []byte) error {
+	a.enableCalls.Add(1)
+	a.enabled.Store(true)
+
+	return nil
 }
 
 type missingTotalsAuthenticator struct {

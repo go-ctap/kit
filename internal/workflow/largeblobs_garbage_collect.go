@@ -14,13 +14,14 @@ import (
 )
 
 type garbageCollectState struct {
-	support        applargeblobs.SupportReport
-	blobs          []protocol.LargeBlob
-	replacement    []protocol.LargeBlob
-	matchedCount   int
-	unmatchedCount int
-	sizeBefore     int
-	sizeAfter      int
+	support            applargeblobs.SupportReport
+	blobs              []protocol.LargeBlob
+	replacement        []protocol.LargeBlob
+	matchedCount       int
+	orphanedCount      int
+	nonconformingCount int
+	sizeBefore         int
+	sizeAfter          int
 }
 
 func (r Runner) GarbageCollectLargeBlobs(
@@ -29,8 +30,6 @@ func (r Runner) GarbageCollectLargeBlobs(
 	largeBlobState *LargeBlobState,
 	req applargeblobs.GarbageCollectOperation,
 ) (applargeblobs.MutationOutput, error) {
-	var output applargeblobs.MutationOutput
-
 	inventoryPermission, mutationPermission, _, err := r.inventoryMutationPermissions(
 		ctx,
 		device,
@@ -51,17 +50,18 @@ func (r Runner) GarbageCollectLargeBlobs(
 	}
 
 	preview := r.buildGarbageCollectPreview(state)
-	output.Preview = preview
 
 	if req.DryRun {
-		return output, nil
+		return applargeblobs.MutationOutput{Preview: preview}, nil
 	}
 
-	result := r.buildGarbageCollectResult(state)
-	if state.unmatchedCount == 0 {
-		output.Result = &result
+	if state.orphanedCount == 0 {
+		result := r.buildGarbageCollectResult(state)
 
-		return output, nil
+		return applargeblobs.MutationOutput{
+			Preview: preview,
+			Result:  &result,
+		}, nil
 	}
 
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
@@ -80,9 +80,12 @@ func (r Runner) GarbageCollectLargeBlobs(
 
 	largeBlobState.replaceBlobs(state.replacement)
 	r.recordStateEffect(rtruntime.StateEffectLargeBlobSnapshotSynchronized)
-	output.Result = &result
+	result := r.buildGarbageCollectResult(state)
 
-	return output, nil
+	return applargeblobs.MutationOutput{
+		Preview: preview,
+		Result:  &result,
+	}, nil
 }
 
 func (r Runner) loadGarbageCollectState(
@@ -112,22 +115,25 @@ func (r Runner) loadGarbageCollectState(
 		return garbageCollectState{}, err
 	}
 
-	keys := validLargeBlobKeys(inventory.keys)
+	keys := listCredentialKeys(inventory)
 	replacement := make([]protocol.LargeBlob, 0, len(inventory.blobs))
-	var matchedCount, unmatchedCount int
+	var matchedCount, orphanedCount, nonconformingCount int
 	for _, blob := range inventory.blobs {
 		if !largeBlobMapConforming(blob) {
+			nonconformingCount++
 			replacement = append(replacement, blob)
+
 			continue
 		}
 
-		if blobMatchesAnyKey(blob, keys) {
+		if largeBlobAuthenticatesWithAnyKey(blob, keys) {
 			matchedCount++
 			replacement = append(replacement, blob)
+
 			continue
 		}
 
-		unmatchedCount++
+		orphanedCount++
 	}
 
 	sizeAfter, err := serializedLargeBlobArraySize(replacement)
@@ -140,27 +146,28 @@ func (r Runner) loadGarbageCollectState(
 	}
 
 	return garbageCollectState{
-		support:        support,
-		blobs:          inventory.blobs,
-		replacement:    replacement,
-		matchedCount:   matchedCount,
-		unmatchedCount: unmatchedCount,
-		sizeBefore:     sizeBefore,
-		sizeAfter:      sizeAfter,
+		support:            support,
+		blobs:              inventory.blobs,
+		replacement:        replacement,
+		matchedCount:       matchedCount,
+		orphanedCount:      orphanedCount,
+		nonconformingCount: nonconformingCount,
+		sizeBefore:         sizeBefore,
+		sizeAfter:          sizeAfter,
 	}, nil
 }
 
 func (r Runner) buildGarbageCollectPreview(state garbageCollectState) applargeblobs.MutationPreview {
 	warning := safety.Warning{
 		Severity: safety.SeverityDestructive,
-		Code:     "large_blob.garbage_collect_unmatched",
-		Message:  "Every conforming large-blob entry that cannot be decrypted with any largeBlobKey in the current discoverable-credential inventory will be removed; malformed entries are retained.",
+		Code:     "large_blob.garbage_collect_orphaned",
+		Message:  "Every conforming large-blob entry that cannot be authenticated with any valid largeBlobKey returned for the enumerated discoverable credentials will be removed; nonconforming entries are retained.",
 	}
-	if state.unmatchedCount == 0 {
+	if state.orphanedCount == 0 {
 		warning = safety.Warning{
 			Severity: safety.SeverityInfo,
 			Code:     "large_blob.garbage_collect_noop",
-			Message:  "Every conforming large-blob entry matches a current discoverable credential; garbage collection is a no-op and malformed entries are retained.",
+			Message:  "No orphaned conforming large-blob entries were found; garbage collection is a no-op.",
 		}
 	}
 
@@ -174,8 +181,9 @@ func (r Runner) buildGarbageCollectPreview(state garbageCollectState) applargebl
 		BlobCountBefore:                    len(state.blobs),
 		BlobCountAfter:                     len(state.replacement),
 		MatchedBlobCount:                   state.matchedCount,
-		UnmatchedBlobCount:                 state.unmatchedCount,
-		Noop:                               state.unmatchedCount == 0,
+		OrphanedBlobCount:                  state.orphanedCount,
+		NonconformingBlobCount:             state.nonconformingCount,
+		Noop:                               state.orphanedCount == 0,
 		Warnings:                           []safety.Warning{warning},
 	}
 }
@@ -190,35 +198,23 @@ func (r Runner) buildGarbageCollectResult(state garbageCollectState) applargeblo
 		BlobCountBefore:                    len(state.blobs),
 		BlobCountAfter:                     len(state.replacement),
 		MatchedBlobCount:                   state.matchedCount,
-		UnmatchedBlobCount:                 state.unmatchedCount,
-		DeletedBlobCount:                   state.unmatchedCount,
-		Noop:                               state.unmatchedCount == 0,
+		OrphanedBlobCount:                  state.orphanedCount,
+		NonconformingBlobCount:             state.nonconformingCount,
+		DeletedBlobCount:                   state.orphanedCount,
+		Noop:                               state.orphanedCount == 0,
 	}
 }
 
-func validLargeBlobKeys(store largeBlobKeyStore) [][]byte {
-	keys := make([][]byte, 0, len(store))
-	for _, key := range store {
-		if len(key) == 32 {
-			keys = append(keys, key)
+func largeBlobAuthenticatesWithAnyKey(blob protocol.LargeBlob, keys []listCredentialKey) bool {
+	for _, candidate := range keys {
+		compressed, err := crypto.OpenLargeBlob(candidate.key, blob)
+		if err != nil {
+			continue
 		}
-	}
 
-	return keys
-}
+		secret.Zero(compressed)
 
-func blobMatchesAnyKey(blob protocol.LargeBlob, keys [][]byte) bool {
-	if !largeBlobMapConforming(blob) {
-		return false
-	}
-
-	for _, key := range keys {
-		raw, err := crypto.DecryptLargeBlob(key, blob)
-		if err == nil {
-			secret.Zero(raw)
-
-			return true
-		}
+		return true
 	}
 
 	return false

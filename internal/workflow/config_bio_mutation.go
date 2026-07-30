@@ -17,8 +17,6 @@ func (r Runner) BioRename(
 	device BioDevice,
 	req appconfig.BioRenameOperation,
 ) (appconfig.BioMutationOutput, error) {
-	var output appconfig.BioMutationOutput
-
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
 		return appconfig.BioMutationOutput{}, err
@@ -35,10 +33,8 @@ func (r Runner) BioRename(
 		return appconfig.BioMutationOutput{}, err
 	}
 
-	output.Preview = preview
-
 	if req.DryRun {
-		return output, nil
+		return appconfig.BioMutationOutput{Preview: preview}, nil
 	}
 
 	templateID, err := rtconfig.DecodeTemplateID(req.TemplateIDHex)
@@ -67,8 +63,10 @@ func (r Runner) BioRename(
 		FriendlyName:  req.FriendlyName,
 	}
 
-	output.Result = &result
-	return output, nil
+	return appconfig.BioMutationOutput{
+		Preview: preview,
+		Result:  &result,
+	}, nil
 }
 
 func (r Runner) BioRemove(
@@ -76,8 +74,6 @@ func (r Runner) BioRemove(
 	device BioDevice,
 	req appconfig.BioRemoveOperation,
 ) (appconfig.BioMutationOutput, error) {
-	var output appconfig.BioMutationOutput
-
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
 		return appconfig.BioMutationOutput{}, err
@@ -94,10 +90,8 @@ func (r Runner) BioRemove(
 		return appconfig.BioMutationOutput{}, err
 	}
 
-	output.Preview = preview
-
 	if req.DryRun {
-		return output, nil
+		return appconfig.BioMutationOutput{Preview: preview}, nil
 	}
 
 	templateID, err := rtconfig.DecodeTemplateID(req.TemplateIDHex)
@@ -124,6 +118,8 @@ func (r Runner) BioRemove(
 		TemplateIDHex: req.TemplateIDHex,
 	}
 
-	output.Result = &result
-	return output, nil
+	return appconfig.BioMutationOutput{
+		Preview: preview,
+		Result:  &result,
+	}, nil
 }

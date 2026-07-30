@@ -33,7 +33,9 @@ type InventorySnapshot struct {
 type InventoryEvent struct {
 	Trigger  InventoryTrigger  `json:"trigger"`
 	Snapshot InventorySnapshot `json:"snapshot"`
-	Error    *failure.Failure  `json:"error,omitempty"`
+	// Error is the failure carried by an asynchronous monitor or identity event.
+	// Synchronous Refresh failures are returned directly and are not published.
+	Error *failure.Failure `json:"error,omitempty"`
 }
 
 type identityResolver interface {
@@ -338,13 +340,13 @@ func (i *Inventory) resolveIdentity(
 	}
 
 	resolution := current.device.report.Resolution
+	var failed *failure.Failure
 	if err != nil {
 		resolution.State = report.IdentityFailed
 		normalized := NormalizeError(err, failure.PhaseIdentity)
-		resolution.Error = failure.Snapshot(normalized)
+		failed = failure.Snapshot(normalized)
 	} else {
 		resolution.Provider = resolved.Provider
-		resolution.Error = nil
 		if resolved.Identity != nil {
 			resolution.State = report.IdentityResolved
 			current.device.report.Identity = resolved.Identity
@@ -355,7 +357,7 @@ func (i *Inventory) resolveIdentity(
 	current.device.report.Resolution = resolution
 	i.mu.Unlock()
 
-	i.publish(InventoryTriggerIdentity, nil)
+	i.publish(InventoryTriggerIdentity, failed)
 }
 
 func (i *Inventory) runMonitor() {

@@ -18,7 +18,7 @@ func buildMutationResult(
 		UserIDHex:                          state.target.User.UserIDHex,
 		UserName:                           state.target.User.Name,
 		DisplayName:                        state.target.User.DisplayName,
-		CurrentByteCount:                   len(state.currentBytes),
+		CurrentByteCount:                   state.currentByteCount,
 		ProposedByteCount:                  proposedByteCount,
 		SerializedLargeBlobArraySizeBefore: state.serializedArraySizeBefore,
 		SerializedLargeBlobArraySizeAfter:  sizeAfter,

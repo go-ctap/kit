@@ -22,8 +22,6 @@ func (r Runner) BioEnroll(
 	device BioDevice,
 	req appconfig.BioEnrollOperation,
 ) (appconfig.BioEnrollOutput, error) {
-	var output appconfig.BioEnrollOutput
-
 	info, err := r.getAuthenticatorInfo(ctx, device)
 	if err != nil {
 		return appconfig.BioEnrollOutput{}, err
@@ -40,29 +38,27 @@ func (r Runner) BioEnroll(
 		return appconfig.BioEnrollOutput{}, err
 	}
 
-	output.Preview = preview
-
 	if req.DryRun {
-		return output, nil
+		return appconfig.BioEnrollOutput{Preview: preview}, nil
 	}
 
+	var responses []protocol.AuthenticatorBioEnrollmentResponse
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
 		Permission: protocol.PermissionBioEnrollment,
 	}, func(token []byte) error {
-		result, err := r.runBioEnrollment(
+		current, err := r.runBioEnrollment(
 			ctx,
 			device,
 			appconfig.BioEnrollRequest{
 				TimeoutMilliseconds: req.TimeoutMilliseconds,
 			},
-			preview,
 			bioEnrollmentCommand(status),
 			token,
 		)
 		if err != nil {
 			return err
 		}
-		output.Result = &result
+		responses = current
 
 		return nil
 	})
@@ -70,27 +66,32 @@ func (r Runner) BioEnroll(
 		return appconfig.BioEnrollOutput{}, err
 	}
 
-	return output, nil
+	result := buildBioEnrollmentResult(preview, responses)
+
+	return appconfig.BioEnrollOutput{
+		Preview: preview,
+		Result:  &result,
+	}, nil
 }
 
-func (r Runner) bioEnrollmentProgress(ctx context.Context) rtconfig.BioEnrollProgress {
+func (r Runner) bioEnrollmentProgress(
+	ctx context.Context,
+) func(protocol.AuthenticatorBioEnrollmentResponse) {
 	var completed uint64
 
-	return func(sample appconfig.BioEnrollSample) error {
+	return func(response protocol.AuthenticatorBioEnrollmentResponse) {
 		completed++
 		event := model.OperationEvent{
 			Stage:        model.OperationStageCapturingBioSample,
 			Completed:    new(completed),
-			SampleStatus: sample.Status,
+			SampleStatus: bioEnrollmentSampleStatus(response),
 		}
 
-		if sample.RemainingSamples != nil {
-			total := completed + uint64(*sample.RemainingSamples)
+		if response.RemainingSamples != nil {
+			total := completed + uint64(*response.RemainingSamples)
 			event.Total = new(total)
 		}
 		r.env.Events.Emit(ctx, event)
-
-		return nil
 	}
 }
 
@@ -98,61 +99,33 @@ func (r Runner) runBioEnrollment(
 	ctx context.Context,
 	device BioDevice,
 	req appconfig.BioEnrollRequest,
-	preview appconfig.BioEnrollPreview,
 	command protocol.Command,
 	token []byte,
-) (appconfig.BioEnrollResult, error) {
+) ([]protocol.AuthenticatorBioEnrollmentResponse, error) {
 	progress := r.bioEnrollmentProgress(ctx)
-	result := appconfig.BioEnrollResult{
-		AttachmentID: preview.Device.Attachment.ID,
-		PreviewOnly:  preview.PreviewOnly,
-	}
 
-	cancelAfterFailure := func(cause error) (appconfig.BioEnrollResult, error) {
+	cancelAfterFailure := func(cause error) ([]protocol.AuthenticatorBioEnrollmentResponse, error) {
 		cancelCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), bioEnrollmentCancelTimeout)
 		defer cancel()
 		_ = device.CancelCurrentEnrollment(cancelCtx)
 
-		return appconfig.BioEnrollResult{}, cause
-	}
-
-	recordSample := func(resp protocol.AuthenticatorBioEnrollmentResponse) error {
-		if len(resp.TemplateID) > 0 {
-			result.TemplateIDHex = hex.EncodeToString(resp.TemplateID)
-		}
-
-		if resp.LastEnrollSampleStatus != nil {
-			result.LastEnrollSampleStatus = resp.LastEnrollSampleStatus.String()
-		}
-		result.RemainingSamples = snapshotPtr(resp.RemainingSamples)
-		sample := appconfig.BioEnrollSample{
-			Status:           result.LastEnrollSampleStatus,
-			RemainingSamples: result.RemainingSamples,
-		}
-
-		result.Samples = append(result.Samples, sample)
-
-		if progress != nil {
-			return progress(sample)
-		}
-
-		return nil
+		return nil, cause
 	}
 
 	begin, err := device.EnrollBegin(ctx, token, req.TimeoutMilliseconds)
 	if err != nil {
-		return appconfig.BioEnrollResult{}, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
+		return nil, errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 			failure.PhaseAuthenticatorCommand,
 			command,
 			protocol.BioEnrollmentSubCommandEnrollBegin,
 		))
 	}
 
-	if err := recordSample(begin); err != nil {
-		return cancelAfterFailure(err)
-	}
+	responses := []protocol.AuthenticatorBioEnrollmentResponse{begin}
+	progress(begin)
 
-	for result.RemainingSamples != nil && *result.RemainingSamples > 0 {
+	remaining := begin.RemainingSamples
+	for remaining != nil && *remaining > 0 {
 		if err := ctx.Err(); err != nil {
 			return cancelAfterFailure(errornorm.Annotate(err, errornorm.WithBioEnrollmentSubCommand(
 				failure.PhaseAuthenticatorCommand,
@@ -170,10 +143,46 @@ func (r Runner) runBioEnrollment(
 			)))
 		}
 
-		if err := recordSample(next); err != nil {
-			return cancelAfterFailure(err)
-		}
+		responses = append(responses, next)
+		remaining = next.RemainingSamples
+		progress(next)
 	}
 
-	return result, nil
+	return responses, nil
+}
+
+func buildBioEnrollmentResult(
+	preview appconfig.BioEnrollPreview,
+	responses []protocol.AuthenticatorBioEnrollmentResponse,
+) appconfig.BioEnrollResult {
+	result := appconfig.BioEnrollResult{
+		AttachmentID: preview.Device.Attachment.ID,
+		PreviewOnly:  preview.PreviewOnly,
+		Samples:      make([]appconfig.BioEnrollSample, 0, len(responses)),
+	}
+
+	for _, response := range responses {
+		if len(response.TemplateID) > 0 {
+			result.TemplateIDHex = hex.EncodeToString(response.TemplateID)
+		}
+
+		result.LastEnrollSampleStatus = bioEnrollmentSampleStatus(response)
+		result.RemainingSamples = snapshotPtr(response.RemainingSamples)
+		result.Samples = append(result.Samples, appconfig.BioEnrollSample{
+			Status:           result.LastEnrollSampleStatus,
+			RemainingSamples: result.RemainingSamples,
+		})
+	}
+
+	return result
+}
+
+func bioEnrollmentSampleStatus(
+	response protocol.AuthenticatorBioEnrollmentResponse,
+) string {
+	if response.LastEnrollSampleStatus == nil {
+		return ""
+	}
+
+	return response.LastEnrollSampleStatus.String()
 }

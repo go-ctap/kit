@@ -16,19 +16,21 @@ import (
 func TestBuildStatusReportMatchesCtaphidOptionSemantics(t *testing.T) {
 	info := protocol.AuthenticatorGetInfoResponse{
 		Options: map[protocol.Option]bool{
-			protocol.OptionClientPIN:           false,
-			protocol.OptionUserVerification:    false,
-			protocol.OptionBioEnroll:           false,
-			protocol.OptionUvBioEnroll:         false,
-			protocol.OptionAuthenticatorConfig: true,
-			protocol.OptionUvAcfg:              false,
-			protocol.OptionAlwaysUv:            false,
-			protocol.OptionSetMinPINLength:     false,
+			protocol.OptionClientPIN:             false,
+			protocol.OptionUserVerification:      false,
+			protocol.OptionBioEnroll:             false,
+			protocol.OptionUvBioEnroll:           false,
+			protocol.OptionAuthenticatorConfig:   true,
+			protocol.OptionUvAcfg:                false,
+			protocol.OptionEnterpriseAttestation: false,
+			protocol.OptionAlwaysUv:              false,
+			protocol.OptionSetMinPINLength:       false,
 		},
 		LongTouchForReset: new(false),
 		AuthenticatorConfigCommands: []protocol.ConfigSubCommand{
 			protocol.ConfigSubCommandEnableLongTouchForReset,
 		},
+		VendorPrototypeConfigCommands: []protocol.VendorCommandID{7, 0x1_0000_0000},
 	}
 
 	r := BuildStatusReport(nilDevice(), info)
@@ -65,6 +67,17 @@ func TestBuildStatusReportMatchesCtaphidOptionSemantics(t *testing.T) {
 		r.AuthenticatorConfig.AlwaysUV.Configured == nil ||
 		*r.AuthenticatorConfig.AlwaysUV.Configured {
 		t.Fatalf("alwaysUv false should mean supported but disabled: %#v", r.AuthenticatorConfig.AlwaysUV)
+	}
+
+	if !r.AuthenticatorConfig.EnterpriseAttestation.Supported ||
+		r.AuthenticatorConfig.EnterpriseAttestation.Configured == nil ||
+		*r.AuthenticatorConfig.EnterpriseAttestation.Configured {
+		t.Fatalf("ep false should mean supported but disabled: %#v", r.AuthenticatorConfig.EnterpriseAttestation)
+	}
+
+	if !r.AuthenticatorConfig.VendorPrototype.Supported ||
+		!reflect.DeepEqual(r.AuthenticatorConfig.VendorPrototypeConfigCommands, []string{"7", "4294967296"}) {
+		t.Fatalf("vendor prototype inventory = %#v", r.AuthenticatorConfig)
 	}
 
 	if r.AuthenticatorConfig.SetMinPINLength.Supported ||
@@ -211,14 +224,15 @@ func TestBuildStatusReportUsesEffectivePINLimitsAndOmitsOtherAbsentNullableLimit
 func TestBuildStatusReportUsesResolvedGetInfoFacts(t *testing.T) {
 	info := protocol.AuthenticatorGetInfoResponse{
 		Options: map[protocol.Option]bool{
-			protocol.OptionClientPIN:           false,
-			protocol.OptionUserVerification:    true,
-			protocol.OptionBioEnroll:           false,
-			protocol.OptionUvBioEnroll:         true,
-			protocol.OptionAuthenticatorConfig: true,
-			protocol.OptionUvAcfg:              true,
-			protocol.OptionAlwaysUv:            false,
-			protocol.OptionSetMinPINLength:     true,
+			protocol.OptionClientPIN:             false,
+			protocol.OptionUserVerification:      true,
+			protocol.OptionBioEnroll:             false,
+			protocol.OptionUvBioEnroll:           true,
+			protocol.OptionAuthenticatorConfig:   true,
+			protocol.OptionUvAcfg:                true,
+			protocol.OptionEnterpriseAttestation: true,
+			protocol.OptionAlwaysUv:              false,
+			protocol.OptionSetMinPINLength:       true,
 		},
 		MinPINLength:      8,
 		MaxPINLength:      64,
@@ -237,6 +251,7 @@ func TestBuildStatusReportUsesResolvedGetInfoFacts(t *testing.T) {
 	assertCapabilityMatchesFact(t, status.Bio.UVBioEnroll.State, status.Bio.UVBioEnroll.Supported, status.Bio.UVBioEnroll.Configured, assessment, appinspect.FactIDUvBioEnroll)
 	assertCapabilityMatchesFact(t, status.AuthenticatorConfig.State, status.AuthenticatorConfig.Supported, status.AuthenticatorConfig.Configured, assessment, appinspect.FactIDAuthenticatorConfig)
 	assertCapabilityMatchesFact(t, status.AuthenticatorConfig.UVAcfg.State, status.AuthenticatorConfig.UVAcfg.Supported, status.AuthenticatorConfig.UVAcfg.Configured, assessment, appinspect.FactIDUvAuthenticatorConfig)
+	assertCapabilityMatchesFact(t, status.AuthenticatorConfig.EnterpriseAttestation.State, status.AuthenticatorConfig.EnterpriseAttestation.Supported, status.AuthenticatorConfig.EnterpriseAttestation.Configured, assessment, appinspect.FactIDEnterpriseAttestation)
 	assertCapabilityMatchesFact(t, status.AuthenticatorConfig.AlwaysUV.State, status.AuthenticatorConfig.AlwaysUV.Supported, status.AuthenticatorConfig.AlwaysUV.Configured, assessment, appinspect.FactIDAlwaysUV)
 	assertCapabilityMatchesFact(t, status.AuthenticatorConfig.SetMinPINLength.State, status.AuthenticatorConfig.SetMinPINLength.Supported, status.AuthenticatorConfig.SetMinPINLength.Configured, assessment, appinspect.FactIDSetMinPINLength)
 	assertCapabilityMatchesFact(t, status.AuthenticatorConfig.LongTouchForReset.State, status.AuthenticatorConfig.LongTouchForReset.Supported, status.AuthenticatorConfig.LongTouchForReset.Configured, assessment, appinspect.FactIDLongTouchForReset)

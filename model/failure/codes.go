@@ -76,12 +76,12 @@ const (
 
 	CodeLargeBlobUnsupported           Code = "LARGE_BLOB_UNSUPPORTED"
 	CodeLargeBlobKeyMissing            Code = "LARGE_BLOB_KEY_MISSING"
+	CodeLargeBlobKeyInvalid            Code = "LARGE_BLOB_KEY_INVALID"
 	CodeLargeBlobArrayTooLarge         Code = "LARGE_BLOB_ARRAY_TOO_LARGE"
 	CodeLargeBlobStorageFull           Code = "LARGE_BLOB_STORAGE_FULL"
 	CodeLargeBlobArrayInvalid          Code = "LARGE_BLOB_ARRAY_INVALID"
 	CodeLargeBlobWriteSequenceInvalid  Code = "LARGE_BLOB_WRITE_SEQUENCE_INVALID"
 	CodeLargeBlobIntegrityFailure      Code = "LARGE_BLOB_INTEGRITY_FAILURE"
-	CodeLargeBlobMissing               Code = "LARGE_BLOB_MISSING"
 	CodeLargeBlobUTF8Invalid           Code = "LARGE_BLOB_UTF8_INVALID"
 	CodeLargeBlobJSONInvalid           Code = "LARGE_BLOB_JSON_INVALID"
 	CodeLargeBlobCBORInvalid           Code = "LARGE_BLOB_CBOR_INVALID"

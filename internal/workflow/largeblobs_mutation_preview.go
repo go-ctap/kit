@@ -19,12 +19,11 @@ func buildWritePreviewFromState(state targetBlobState, payload []byte) (applarge
 		return applargeblobs.MutationPreview{}, err
 	}
 
-	preview := buildMutationPreview(state, operation, len(payload), proposedSize, false)
 	if err := checkSerializedArrayLimit(state.support.MaxSerializedLargeBlobArray, proposedSize); err != nil {
 		return applargeblobs.MutationPreview{}, err
 	}
 
-	return preview, nil
+	return buildMutationPreview(state, operation, len(payload), proposedSize, false), nil
 }
 
 func buildDeletePreviewFromState(state targetBlobState) (applargeblobs.MutationPreview, error) {
@@ -134,7 +133,7 @@ func buildMutationPreview(
 			User:            state.target.User,
 		},
 		LargeBlobKeyState:                  applargeblobs.LargeBlobKeyAvailable,
-		CurrentByteCount:                   len(state.currentBytes),
+		CurrentByteCount:                   state.currentByteCount,
 		ProposedByteCount:                  proposedByteCount,
 		SerializedLargeBlobArraySizeBefore: state.serializedArraySizeBefore,
 		SerializedLargeBlobArraySizeAfter:  sizeAfter,

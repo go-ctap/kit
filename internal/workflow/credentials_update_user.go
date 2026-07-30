@@ -19,17 +19,13 @@ func (r Runner) UpdateCredentialUser(
 	device authenticator.CredentialManager,
 	req appcredentials.UpdateUserOperation,
 ) (appcredentials.UpdateUserOutput, error) {
-	var output appcredentials.UpdateUserOutput
-
 	preview, err := rtcredentials.BuildUpdateUserPreview(req)
 	if err != nil {
 		return appcredentials.UpdateUserOutput{}, err
 	}
 
-	output.Preview = preview
-
 	if req.DryRun {
-		return output, nil
+		return appcredentials.UpdateUserOutput{Preview: preview}, nil
 	}
 
 	_, mutationPermission, command, err := r.inventoryMutationPermissions(
@@ -80,9 +76,10 @@ func (r Runner) UpdateCredentialUser(
 		Current:         preview.Proposed,
 	}
 
-	output.Result = &result
-
-	return output, nil
+	return appcredentials.UpdateUserOutput{
+		Preview: preview,
+		Result:  &result,
+	}, nil
 }
 
 func decodeCredentialHex(value string) ([]byte, error) {

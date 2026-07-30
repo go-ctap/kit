@@ -20,6 +20,10 @@ type SetAlwaysUVOperation struct {
 	DryRun bool           `json:"dryRun,omitempty"`
 }
 
+type EnableEnterpriseAttestationOperation struct {
+	DryRun bool `json:"dryRun,omitempty"`
+}
+
 type SetMinPINLengthOperation struct {
 	NewMinPINLength     *uint    `json:"newMinPINLength,omitempty"`
 	MinPINLengthRPIDs   []string `json:"minPinLengthRPIDs,omitempty"`

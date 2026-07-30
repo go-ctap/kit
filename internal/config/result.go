@@ -31,6 +31,14 @@ func AlwaysUVResult(attachmentID report.AttachmentID, target appconfig.AlwaysUVT
 	}
 }
 
+func EnterpriseAttestationResult(attachmentID report.AttachmentID) appconfig.AuthenticatorConfigResult {
+	return appconfig.AuthenticatorConfigResult{
+		Operation:    appconfig.AuthenticatorConfigEnterprise,
+		AttachmentID: attachmentID,
+		State:        appconfig.StateConfigured,
+	}
+}
+
 func MinPINLengthResult(attachmentID report.AttachmentID, operation appconfig.SetMinPINLengthOperation) appconfig.AuthenticatorConfigResult {
 	return appconfig.AuthenticatorConfigResult{
 		Operation:           appconfig.AuthenticatorConfigMinPINLength,

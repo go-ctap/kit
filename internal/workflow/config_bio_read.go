@@ -24,10 +24,14 @@ func (r Runner) BioList(ctx context.Context, device BioDevice) (appconfig.BioLis
 		Permission: protocol.PermissionBioEnrollment,
 		ReplaySafe: true,
 	}, func(token []byte) error {
-		var err error
-		report, err = r.bioListReport(ctx, device, status, token)
+		current, err := r.bioListReport(ctx, device, status, token)
+		if err != nil {
+			return err
+		}
 
-		return err
+		report = current
+
+		return nil
 	})
 	if err != nil {
 		return appconfig.BioListReport{}, err

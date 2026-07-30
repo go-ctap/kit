@@ -12,7 +12,6 @@ import (
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/config"
 	"github.com/go-ctap/kit/model/credentials"
-	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/model/largeblobs"
 	"github.com/go-ctap/kit/model/report"
 	webauthn2 "github.com/go-ctap/kit/model/webauthn"
@@ -63,14 +62,11 @@ func TestPINInteractionJSON(t *testing.T) {
 		{
 			name: "retry state",
 			state: model.PINInteractionState{
-				Failure: failure.Snapshot(failure.New(
-					failure.CodePINInvalid,
-					failure.WithPhase(failure.PhaseTokenAcquisition),
-				)),
-				RetriesRemaining: new(uint(6)),
-				PowerCycleState:  &powerCycleState,
+				PreviousAttemptInvalid: true,
+				RetriesRemaining:       new(uint(6)),
+				PowerCycleState:        &powerCycleState,
 			},
-			want: `{"kind":"pin","permission":"credentialManagement","pinState":{"failure":{"code":"PIN_INVALID","category":"invalid-state","phase":"token-acquisition"},"retriesRemaining":6,"powerCycleState":false}}`,
+			want: `{"kind":"pin","permission":"credentialManagement","pinState":{"previousAttemptInvalid":true,"retriesRemaining":6,"powerCycleState":false}}`,
 		},
 	}
 
@@ -534,7 +530,7 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 		{
 			name: "large blob read output uses credential target spellings",
 			value: largeblobs.ReadReport{
-				LargeBlobKeyState: largeblobs.LargeBlobKeyAvailable,
+				State: largeblobs.ReadStatePresent,
 				Target: largeblobs.BlobTarget{
 					CredentialIDHex: "beef",
 					RP:              credentials.RelyingParty{ID: "example.com", IDHashHex: "abcd"},
@@ -570,21 +566,27 @@ func TestPublicDTOJSONContractsUseCTAP23Spellings(t *testing.T) {
 		{
 			name: "large blob list output uses credential ID spelling",
 			value: largeblobs.ListReport{
-				Credentials: []largeblobs.ListCredential{
+				Array: largeblobs.ListArraySummary{NonconformingBlobCount: 1},
+				Entries: []largeblobs.ArrayEntry{
 					{
-						CredentialIDHex:   "beef",
-						LargeBlobKeyState: largeblobs.LargeBlobKeyAvailable,
-						User:              credentials.UserIdentity{UserIDHex: "0102"},
+						State: largeblobs.EntryStateMatched,
+						Target: &largeblobs.BlobTarget{
+							CredentialIDHex: "beef",
+							User:            credentials.UserIdentity{UserIDHex: "0102"},
+						},
 					},
 				},
 			},
 			want: []string{
 				`"credentialIDHex":"beef"`,
 				`"userIDHex":"0102"`,
+				`"nonconformingBlobCount":1`,
 			},
 			reject: []string{
 				`"credentialIdHex"`,
 				`"userIdHex"`,
+				`"malformedBlobCount"`,
+				`"unresolvedBlobCount"`,
 			},
 		},
 		{

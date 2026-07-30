@@ -30,13 +30,18 @@ func (r Runner) statusWithRetries(
 	if rep.PIN.Supported {
 		retries, powerCycle, err := device.GetPINRetries(ctx)
 		if err != nil {
-			rep.PIN.Retries = failedRetryState(err, protocol.ClientPINSubCommandGetPINRetries)
-		} else {
-			rep.PIN.Retries = appconfig.RetryState{
-				State:           appconfig.StateSupported,
-				Remaining:       new(retries),
-				PowerCycleState: powerCycle,
-			}
+			return appconfig.StatusReport{}, errornorm.Annotate(
+				err,
+				errornorm.WithClientPINSubCommand(
+					failure.PhaseAuthenticatorCommand,
+					protocol.ClientPINSubCommandGetPINRetries,
+				),
+			)
+		}
+		rep.PIN.Retries = appconfig.RetryState{
+			State:           appconfig.StateSupported,
+			Remaining:       new(retries),
+			PowerCycleState: powerCycle,
 		}
 	}
 
@@ -45,29 +50,19 @@ func (r Runner) statusWithRetries(
 		*rep.UV.Configured {
 		retries, err := device.GetUVRetries(ctx)
 		if err != nil {
-			rep.UV.Retries = failedRetryState(err, protocol.ClientPINSubCommandGetUVRetries)
-		} else {
-			rep.UV.Retries = appconfig.RetryState{
-				State:     appconfig.StateSupported,
-				Remaining: new(retries),
-			}
+			return appconfig.StatusReport{}, errornorm.Annotate(
+				err,
+				errornorm.WithClientPINSubCommand(
+					failure.PhaseAuthenticatorCommand,
+					protocol.ClientPINSubCommandGetUVRetries,
+				),
+			)
+		}
+		rep.UV.Retries = appconfig.RetryState{
+			State:     appconfig.StateSupported,
+			Remaining: new(retries),
 		}
 	}
 
 	return rep, nil
-}
-
-func failedRetryState(
-	err error,
-	subCommand protocol.ClientPINSubCommand,
-) appconfig.RetryState {
-	normalized := errornorm.Normalize(errornorm.Annotate(
-		err,
-		errornorm.WithClientPINSubCommand(failure.PhaseAuthenticatorCommand, subCommand),
-	), "")
-
-	return appconfig.RetryState{
-		State:   appconfig.StateUnknown,
-		Failure: failure.Snapshot(normalized),
-	}
 }

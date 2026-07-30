@@ -29,7 +29,8 @@ type MutationPreview struct {
 	BlobCountBefore                    int                 `json:"blobCountBefore"`
 	BlobCountAfter                     int                 `json:"blobCountAfter"`
 	MatchedBlobCount                   int                 `json:"matchedBlobCount,omitempty"`
-	UnmatchedBlobCount                 int                 `json:"unmatchedBlobCount,omitempty"`
+	OrphanedBlobCount                  int                 `json:"orphanedBlobCount,omitempty"`
+	NonconformingBlobCount             int                 `json:"nonconformingBlobCount,omitempty"`
 	DeletedBlobCount                   int                 `json:"deletedBlobCount,omitempty"`
 	NoBlob                             bool                `json:"noBlob"`
 	Noop                               bool                `json:"noop,omitempty"`
@@ -53,7 +54,8 @@ type MutationResult struct {
 	BlobCountBefore                    int                 `json:"blobCountBefore"`
 	BlobCountAfter                     int                 `json:"blobCountAfter"`
 	MatchedBlobCount                   int                 `json:"matchedBlobCount,omitempty"`
-	UnmatchedBlobCount                 int                 `json:"unmatchedBlobCount,omitempty"`
+	OrphanedBlobCount                  int                 `json:"orphanedBlobCount,omitempty"`
+	NonconformingBlobCount             int                 `json:"nonconformingBlobCount,omitempty"`
 	DeletedBlobCount                   int                 `json:"deletedBlobCount,omitempty"`
 	NoBlob                             bool                `json:"noBlob"`
 	Noop                               bool                `json:"noop,omitempty"`

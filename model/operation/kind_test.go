@@ -26,6 +26,7 @@ func TestParseCanonicalKinds(t *testing.T) {
 		{ResetFactory, "config.reset.factory"},
 		{SetPIN, "config.pin.set"},
 		{ChangePIN, "config.pin.change"},
+		{EnableEnterpriseAttestation, "config.enterpriseAttestation.enable"},
 		{SetAlwaysUV, "config.alwaysUv.set"},
 		{SetMinPINLength, "config.minPinLength.set"},
 		{EnableLongTouchForReset, "config.longTouchForReset.enable"},

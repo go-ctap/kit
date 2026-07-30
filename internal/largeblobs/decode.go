@@ -12,75 +12,57 @@ import (
 	"github.com/samber/lo"
 )
 
-func Decode(raw []byte, blobPresent bool, mode applargeblobs.DecodeMode) applargeblobs.DecodeStatus {
-	if mode == "" {
-		mode = applargeblobs.DecodeModeNone
-	}
-
-	status := applargeblobs.DecodeStatus{
-		Requested: mode != applargeblobs.DecodeModeNone,
-		Mode:      mode,
-	}
-
-	if !status.Requested {
-		return status
-	}
-
-	status.Label = "user-requested interpretation of opaque RP-defined bytes"
-	if !blobPresent {
-		status.Failure = decodeFailure(failure.CodeLargeBlobMissing)
-
-		return status
-	}
-
+func Decode(
+	raw []byte,
+	mode applargeblobs.DecodeMode,
+) (applargeblobs.DecodeResult, error) {
 	switch mode {
 	case applargeblobs.DecodeModeUTF8:
 		if !utf8.Valid(raw) {
-			status.Failure = decodeFailure(failure.CodeLargeBlobUTF8Invalid)
-
-			return status
+			return applargeblobs.DecodeResult{}, failure.New(
+				failure.CodeLargeBlobUTF8Invalid,
+				failure.WithPhase(failure.PhaseDecode),
+			)
 		}
 
-		status.Success = true
-		status.DecodedText = string(raw)
-
-		return status
+		return applargeblobs.DecodeResult{
+			Mode: mode,
+			Text: string(raw),
+		}, nil
 	case applargeblobs.DecodeModeJSON:
 		var value any
 		if err := json.Unmarshal(raw, &value); err != nil {
-			status.Failure = decodeFailure(failure.CodeLargeBlobJSONInvalid)
-
-			return status
+			return applargeblobs.DecodeResult{}, failure.Wrap(
+				failure.CodeLargeBlobJSONInvalid,
+				err,
+				failure.WithPhase(failure.PhaseDecode),
+			)
 		}
 
-		status.Success = true
-		status.DecodedValue = value
-
-		return status
+		return applargeblobs.DecodeResult{
+			Mode:  mode,
+			Value: value,
+		}, nil
 	case applargeblobs.DecodeModeCBOR:
 		var value any
 		if err := cbor.Unmarshal(raw, &value); err != nil {
-			status.Failure = decodeFailure(failure.CodeLargeBlobCBORInvalid)
-
-			return status
+			return applargeblobs.DecodeResult{}, failure.Wrap(
+				failure.CodeLargeBlobCBORInvalid,
+				err,
+				failure.WithPhase(failure.PhaseDecode),
+			)
 		}
 
-		status.Success = true
-		status.DecodedValue = jsonFriendlyDecodedValue(value)
-
-		return status
+		return applargeblobs.DecodeResult{
+			Mode:  mode,
+			Value: jsonFriendlyDecodedValue(value),
+		}, nil
 	default:
-		status.Failure = decodeFailure(failure.CodeLargeBlobDecodeModeUnsupported)
-
-		return status
+		return applargeblobs.DecodeResult{}, failure.New(
+			failure.CodeLargeBlobDecodeModeUnsupported,
+			failure.WithPhase(failure.PhaseDecode),
+		)
 	}
-}
-
-func decodeFailure(code failure.Code) *failure.Failure {
-	err := failure.New(code, failure.WithPhase(failure.PhaseDecode))
-	snapshot := err.Failure
-
-	return &snapshot
 }
 
 func jsonFriendlyDecodedValue(value any) any {

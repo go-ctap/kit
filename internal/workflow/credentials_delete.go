@@ -17,8 +17,6 @@ func (r Runner) DeleteCredential(
 	device authenticator.CredentialManager,
 	req appcredentials.DeleteOperation,
 ) (appcredentials.DeleteOutput, error) {
-	var output appcredentials.DeleteOutput
-
 	inventoryPermission, mutationPermission, command, err := r.inventoryMutationPermissions(
 		ctx,
 		device,
@@ -42,10 +40,8 @@ func (r Runner) DeleteCredential(
 		return appcredentials.DeleteOutput{}, err
 	}
 
-	output.Preview = preview
-
 	if req.DryRun {
-		return output, nil
+		return appcredentials.DeleteOutput{Preview: preview}, nil
 	}
 
 	publicTarget, err := rtcredentials.FindByHexID(report, req.CredentialIDHex)
@@ -82,7 +78,8 @@ func (r Runner) DeleteCredential(
 		DisplayName:     publicTarget.User.DisplayName,
 	}
 
-	output.Result = &result
-
-	return output, nil
+	return appcredentials.DeleteOutput{
+		Preview: preview,
+		Result:  &result,
+	}, nil
 }

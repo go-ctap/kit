@@ -103,6 +103,33 @@ func TestAlwaysUVWarningCodesDistinguishTargetState(t *testing.T) {
 	}
 }
 
+func TestEnterpriseAttestationPreviewIsOneWayAndWarns(t *testing.T) {
+	configured := false
+	status := StatusReport{AuthenticatorConfig: AuthenticatorConfigStatus{
+		Supported: true,
+		EnterpriseAttestation: CapabilityState{
+			Supported:  true,
+			Configured: &configured,
+			State:      StateNotConfigured,
+		},
+	}}
+
+	preview, err := BuildEnableEnterpriseAttestationPreview(status, safety.PreviewModeDryRun)
+	if err != nil {
+		t.Fatalf("BuildEnableEnterpriseAttestationPreview: %v", err)
+	}
+	if preview.Operation != AuthenticatorConfigEnterprise ||
+		!preview.RequestedEnterpriseAttestation ||
+		preview.CurrentEnterpriseAttestation == nil ||
+		*preview.CurrentEnterpriseAttestation {
+		t.Fatalf("preview = %#v", preview)
+	}
+	if got := preview.Warnings[0]; got.Code != warningEnterpriseAttestation ||
+		!strings.Contains(got.Message, "no command to disable") {
+		t.Fatalf("warning = %#v", got)
+	}
+}
+
 func TestResetAndLongTouchWarningsStateNormativeTiming(t *testing.T) {
 	reset := BuildResetFactoryPreview(StatusReport{})
 	if got := reset.Warnings[2].Message; !strings.Contains(got, "displayless authenticator") ||

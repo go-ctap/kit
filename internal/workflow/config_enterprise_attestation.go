@@ -12,10 +12,10 @@ import (
 	"github.com/go-ctap/kit/model/safety"
 )
 
-func (r Runner) EnableLongTouchForReset(
+func (r Runner) EnableEnterpriseAttestation(
 	ctx context.Context,
 	device ConfigDevice,
-	req appconfig.EnableLongTouchForResetOperation,
+	req appconfig.EnableEnterpriseAttestationOperation,
 ) (appconfig.AuthenticatorConfigOutput, error) {
 	mode := safety.PreviewModeDryRun
 	if !req.DryRun {
@@ -26,7 +26,7 @@ func (r Runner) EnableLongTouchForReset(
 	if err != nil {
 		return appconfig.AuthenticatorConfigOutput{}, err
 	}
-	preview, err := rtconfig.BuildEnableLongTouchForResetPreview(rtconfig.BuildStatusReport(r.env.Selected, info), mode)
+	preview, err := rtconfig.BuildEnableEnterpriseAttestationPreview(rtconfig.BuildStatusReport(r.env.Selected, info), mode)
 	if err != nil {
 		return appconfig.AuthenticatorConfigOutput{}, err
 	}
@@ -39,15 +39,15 @@ func (r Runner) EnableLongTouchForReset(
 		Permission: protocol.PermissionAuthenticatorConfiguration,
 		Optional:   true,
 	}, func(token []byte) error {
-		return device.EnableLongTouchForReset(ctx, token)
+		return device.EnableEnterpriseAttestation(ctx, token)
 	})
 	if err != nil {
 		return appconfig.AuthenticatorConfigOutput{}, errornorm.Annotate(err, errornorm.WithConfigSubCommand(
 			failure.PhaseAuthenticatorCommand,
-			protocol.ConfigSubCommandEnableLongTouchForReset,
+			protocol.ConfigSubCommandEnableEnterpriseAttestation,
 		))
 	}
-	result := rtconfig.LongTouchForResetResult(r.env.Selected.Attachment.ID)
+	result := rtconfig.EnterpriseAttestationResult(r.env.Selected.Attachment.ID)
 
 	return appconfig.AuthenticatorConfigOutput{
 		Preview: preview,

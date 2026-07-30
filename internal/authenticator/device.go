@@ -90,6 +90,7 @@ type ConfigManager interface {
 	SetPIN(ctx context.Context, pin string) error
 	ChangePIN(ctx context.Context, currentPin, newPin string) error
 	Reset(ctx context.Context) error
+	EnableEnterpriseAttestation(ctx context.Context, pinUvAuthToken []byte) error
 	ToggleAlwaysUV(ctx context.Context, pinUvAuthToken []byte) error
 	SetMinPINLength(ctx context.Context, pinUvAuthToken []byte, params protocol.SetMinPINLengthConfigSubCommandParams) error
 	EnableLongTouchForReset(ctx context.Context, pinUvAuthToken []byte) error

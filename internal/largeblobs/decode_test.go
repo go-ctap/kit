@@ -1,8 +1,7 @@
 package largeblobs
 
 import (
-	"encoding/json"
-	"strings"
+	"reflect"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
@@ -19,77 +18,53 @@ func TestDecodeLargeBlob(t *testing.T) {
 	tests := []struct {
 		name        string
 		raw         []byte
-		present     bool
 		mode        DecodeMode
-		wantRequest bool
-		wantSuccess bool
+		wantText    string
+		wantValue   any
 		wantFailure failure.Code
 	}{
-		{name: "raw default", raw: []byte("opaque"), present: true, mode: DecodeModeNone},
-		{name: "utf8", raw: []byte("hello"), present: true, mode: DecodeModeUTF8, wantRequest: true, wantSuccess: true},
-		{name: "json", raw: []byte(`{"ok":true}`), present: true, mode: DecodeModeJSON, wantRequest: true, wantSuccess: true},
-		{name: "cbor", raw: cborPayload, present: true, mode: DecodeModeCBOR, wantRequest: true, wantSuccess: true},
-		{name: "malformed utf8", raw: []byte{0xff}, present: true, mode: DecodeModeUTF8, wantRequest: true, wantFailure: failure.CodeLargeBlobUTF8Invalid},
-		{name: "malformed json", raw: []byte(`{"ok"`), present: true, mode: DecodeModeJSON, wantRequest: true, wantFailure: failure.CodeLargeBlobJSONInvalid},
-		{name: "malformed cbor", raw: []byte{0xff}, present: true, mode: DecodeModeCBOR, wantRequest: true, wantFailure: failure.CodeLargeBlobCBORInvalid},
-		{name: "unsupported", raw: []byte("opaque"), present: true, mode: DecodeMode("future"), wantRequest: true, wantFailure: failure.CodeLargeBlobDecodeModeUnsupported},
+		{name: "utf8", raw: []byte("hello"), mode: DecodeModeUTF8, wantText: "hello"},
+		{name: "empty utf8", mode: DecodeModeUTF8},
+		{name: "json", raw: []byte(`{"ok":true}`), mode: DecodeModeJSON, wantValue: map[string]any{"ok": true}},
+		{name: "cbor", raw: cborPayload, mode: DecodeModeCBOR, wantValue: map[string]any{"ok": true, "count": uint64(2)}},
+		{name: "malformed utf8", raw: []byte{0xff}, mode: DecodeModeUTF8, wantFailure: failure.CodeLargeBlobUTF8Invalid},
+		{name: "malformed json", raw: []byte(`{"ok"`), mode: DecodeModeJSON, wantFailure: failure.CodeLargeBlobJSONInvalid},
+		{name: "malformed cbor", raw: []byte{0xff}, mode: DecodeModeCBOR, wantFailure: failure.CodeLargeBlobCBORInvalid},
+		{name: "empty mode", raw: []byte("opaque"), wantFailure: failure.CodeLargeBlobDecodeModeUnsupported},
+		{name: "unsupported", raw: []byte("opaque"), mode: DecodeMode("future"), wantFailure: failure.CodeLargeBlobDecodeModeUnsupported},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			status := Decode(tt.raw, tt.present, tt.mode)
-			if status.Requested != tt.wantRequest {
-				t.Fatalf("Requested = %v, want %v", status.Requested, tt.wantRequest)
-			}
-
-			if status.Success != tt.wantSuccess {
-				t.Fatalf("Success = %v, want %v (failure %#v)", status.Success, tt.wantSuccess, status.Failure)
-			}
-
-			if tt.wantFailure == "" {
-				if status.Failure != nil {
-					t.Fatalf("Failure = %#v, want nil", status.Failure)
+			result, err := Decode(tt.raw, tt.mode)
+			if tt.wantFailure != "" {
+				if !failure.IsCode(err, tt.wantFailure) {
+					t.Fatalf("Decode error = %v, want %s", err, tt.wantFailure)
 				}
-			} else if status.Failure == nil || status.Failure.Code != tt.wantFailure {
-				t.Fatalf("Failure = %#v, want code %s", status.Failure, tt.wantFailure)
-			} else if status.Failure.Phase != failure.PhaseDecode {
-				t.Fatalf("Failure phase = %q, want %q", status.Failure.Phase, failure.PhaseDecode)
+				if !reflect.DeepEqual(result, DecodeResult{}) {
+					t.Fatalf("Decode result = %#v, want zero", result)
+				}
+
+				snapshot := failure.Snapshot(err)
+				if snapshot == nil || snapshot.Phase != failure.PhaseDecode {
+					t.Fatalf("failure = %#v, want decode phase", snapshot)
+				}
+
+				return
 			}
 
-			if tt.wantRequest && status.Label == "" {
-				t.Fatal("Label empty for requested decode")
+			if err != nil {
+				t.Fatalf("Decode: %v", err)
+			}
+			if result.Mode != tt.mode {
+				t.Fatalf("Mode = %q, want %q", result.Mode, tt.mode)
+			}
+			if result.Text != tt.wantText {
+				t.Fatalf("Text = %q, want %q", result.Text, tt.wantText)
+			}
+			if !reflect.DeepEqual(result.Value, tt.wantValue) {
+				t.Fatalf("Value = %#v, want %#v", result.Value, tt.wantValue)
 			}
 		})
-	}
-}
-
-func TestDecodeMissingBlobIsState(t *testing.T) {
-	status := Decode(nil, false, DecodeModeJSON)
-	if !status.Requested {
-		t.Fatal("Requested = false, want true")
-	}
-
-	if status.Success {
-		t.Fatal("Success = true, want false")
-	}
-
-	if status.Failure == nil || status.Failure.Code != failure.CodeLargeBlobMissing {
-		t.Fatalf("Failure = %#v, want code %s", status.Failure, failure.CodeLargeBlobMissing)
-	}
-}
-
-func TestSupportReportJSONOmitsLargeBlobArrayLimitWhenUnset(t *testing.T) {
-	for _, report := range []SupportReport{
-		{LargeBlobs: true},
-		{LargeBlobs: true, LargeBlobKeyExtension: true},
-	} {
-		raw, err := json.Marshal(report)
-		if err != nil {
-			t.Fatalf("Marshal(%#v): %v", report, err)
-		}
-
-		if strings.Contains(string(raw), "maxSerializedLargeBlobArray") {
-			t.Fatalf("JSON included unset large blob limit: %s", raw)
-		}
 	}
 }

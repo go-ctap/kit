@@ -20,7 +20,7 @@ type targetBlobState struct {
 	key                       []byte
 	blobs                     []protocol.LargeBlob
 	currentBlobIndex          int
-	currentBytes              []byte
+	currentByteCount          int
 	serializedArraySizeBefore int
 }
 
@@ -44,7 +44,7 @@ func (r Runner) loadTargetBlobState(
 		return targetBlobState{}, err
 	}
 	support := buildLargeBlobSupportReport(info)
-	if !support.LargeBlobs {
+	if !support.LargeBlobs || !support.LargeBlobKeyExtension {
 		return targetBlobState{}, failure.New(failure.CodeLargeBlobUnsupported,
 			failure.WithPhase(failure.PhaseDiscovery),
 		)
@@ -53,6 +53,11 @@ func (r Runner) loadTargetBlobState(
 	largeBlobKey := inventory.keys.get(target.RP.IDHashHex, target.Record.CredentialIDHex)
 	if len(largeBlobKey) == 0 {
 		return targetBlobState{}, failure.New(failure.CodeLargeBlobKeyMissing,
+			failure.WithPhase(failure.PhaseDiscovery),
+		)
+	}
+	if len(largeBlobKey) != 32 {
+		return targetBlobState{}, failure.New(failure.CodeLargeBlobKeyInvalid,
 			failure.WithPhase(failure.PhaseDiscovery),
 		)
 	}
@@ -73,20 +78,21 @@ func (r Runner) loadTargetBlobState(
 	}
 
 	for index, candidate := range inventory.blobs {
-		raw, err := crypto.DecryptLargeBlob(largeBlobKey, candidate)
-		if err != nil {
+		if !largeBlobMapConforming(candidate) {
 			continue
 		}
 
+		compressed, err := crypto.OpenLargeBlob(largeBlobKey, candidate)
+		if err != nil {
+			continue
+		}
+		secret.Zero(compressed)
+
 		state.currentBlobIndex = index
-		state.currentBytes = raw
+		state.currentByteCount = int(candidate.OrigSize)
 
 		break
 	}
 
 	return state, nil
-}
-
-func (state *targetBlobState) zero() {
-	secret.Zero(state.currentBytes)
 }

@@ -16,8 +16,6 @@ func (r Runner) WriteLargeBlob(
 	largeBlobState *LargeBlobState,
 	req applargeblobs.WriteOperation,
 ) (applargeblobs.MutationOutput, error) {
-	var output applargeblobs.MutationOutput
-
 	inventoryPermission, mutationPermission, _, err := r.inventoryMutationPermissions(
 		ctx,
 		device,
@@ -42,19 +40,16 @@ func (r Runner) WriteLargeBlob(
 		return applargeblobs.MutationOutput{}, err
 	}
 
-	defer state.zero()
-
 	preview, err := buildWritePreviewFromState(state, req.Payload)
 	if err != nil {
 		return applargeblobs.MutationOutput{}, err
 	}
-	output.Preview = preview
 
 	if req.DryRun {
-		return output, nil
+		return applargeblobs.MutationOutput{Preview: preview}, nil
 	}
 
-	replacement, result, err := buildWriteMutation(state, req.Payload)
+	plan, err := buildWriteMutationPlan(state, req.Payload)
 	if err != nil {
 		return applargeblobs.MutationOutput{}, err
 	}
@@ -64,7 +59,7 @@ func (r Runner) WriteLargeBlob(
 	}, func(token []byte) error {
 		r.recordStateEffect(rtruntime.StateEffectLargeBlobArrayChanged)
 
-		return device.SetLargeBlobs(ctx, token, replacement)
+		return device.SetLargeBlobs(ctx, token, plan.replacement)
 	})
 	if err != nil {
 		return applargeblobs.MutationOutput{}, errornorm.Annotate(err, errornorm.WithCommand(
@@ -73,11 +68,14 @@ func (r Runner) WriteLargeBlob(
 		))
 	}
 
-	largeBlobState.replaceBlobs(replacement)
+	largeBlobState.replaceBlobs(plan.replacement)
 	r.recordStateEffect(rtruntime.StateEffectLargeBlobSnapshotSynchronized)
-	output.Result = &result
+	result := plan.result(state)
 
-	return output, nil
+	return applargeblobs.MutationOutput{
+		Preview: preview,
+		Result:  &result,
+	}, nil
 }
 
 func (r Runner) DeleteLargeBlob(
@@ -86,8 +84,6 @@ func (r Runner) DeleteLargeBlob(
 	largeBlobState *LargeBlobState,
 	req applargeblobs.DeleteOperation,
 ) (applargeblobs.MutationOutput, error) {
-	var output applargeblobs.MutationOutput
-
 	inventoryPermission, mutationPermission, _, err := r.inventoryMutationPermissions(
 		ctx,
 		device,
@@ -112,28 +108,27 @@ func (r Runner) DeleteLargeBlob(
 		return applargeblobs.MutationOutput{}, err
 	}
 
-	defer state.zero()
-
 	preview, err := buildDeletePreviewFromState(state)
 	if err != nil {
 		return applargeblobs.MutationOutput{}, err
 	}
 
-	output.Preview = preview
-
 	if req.DryRun {
-		return output, nil
+		return applargeblobs.MutationOutput{Preview: preview}, nil
 	}
 
-	replacement, result, noBlob, err := buildDeleteMutation(state)
+	plan, err := buildDeleteMutationPlan(state)
 	if err != nil {
 		return applargeblobs.MutationOutput{}, err
 	}
 
-	if noBlob {
-		output.Result = &result
+	if plan.noop {
+		result := plan.result(state)
 
-		return output, nil
+		return applargeblobs.MutationOutput{
+			Preview: preview,
+			Result:  &result,
+		}, nil
 	}
 
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
@@ -141,7 +136,7 @@ func (r Runner) DeleteLargeBlob(
 	}, func(token []byte) error {
 		r.recordStateEffect(rtruntime.StateEffectLargeBlobArrayChanged)
 
-		return device.SetLargeBlobs(ctx, token, replacement)
+		return device.SetLargeBlobs(ctx, token, plan.replacement)
 	})
 	if err != nil {
 		return applargeblobs.MutationOutput{}, errornorm.Annotate(err, errornorm.WithCommand(
@@ -150,9 +145,12 @@ func (r Runner) DeleteLargeBlob(
 		))
 	}
 
-	largeBlobState.replaceBlobs(replacement)
+	largeBlobState.replaceBlobs(plan.replacement)
 	r.recordStateEffect(rtruntime.StateEffectLargeBlobSnapshotSynchronized)
-	output.Result = &result
+	result := plan.result(state)
 
-	return output, nil
+	return applargeblobs.MutationOutput{
+		Preview: preview,
+		Result:  &result,
+	}, nil
 }

@@ -95,13 +95,14 @@ func TestCredentialInventoryRejectedToken(t *testing.T) {
 		session := openContractAuthenticator(t, nil, a)
 		defer func() { _ = session.Close() }()
 
-		_, err := session.ListCredentials(
+		output, err := session.ListCredentials(
 			context.Background(),
 			session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 		)
 		if !failure.IsCode(err, failure.CodePINUVAuthInvalid) {
 			t.Fatalf("ListCredentials error = %v, want %s", err, failure.CodePINUVAuthInvalid)
 		}
+		requireZero(t, output)
 
 		assertRejectedCredentialTokens(t, a)
 	})
@@ -149,6 +150,30 @@ func TestCredentialInventoryProgressEventsIncludeCounts(t *testing.T) {
 		{model.OperationStageEnumeratingCredentials, 2, 3},
 		{model.OperationStageEnumeratingCredentials, 3, 3},
 	})
+}
+
+func TestCredentialInventoryWorkflowReturnsZeroAfterMidstreamFailureAndWipesStagedKey(t *testing.T) {
+	cause := errors.New("credential enumeration failed")
+	stagedKey := bytes.Repeat([]byte{0x5a}, 32)
+	a := &progressCredentialAuthenticator{
+		credentialErr:      cause,
+		stagedLargeBlobKey: stagedKey,
+	}
+	session := openContractAuthenticator(t, nil, a)
+	defer func() { _ = session.Close() }()
+
+	output, err := newContractWorkflowRunner(session).ListCredentials(
+		context.Background(),
+		a,
+	)
+	if !errors.Is(err, cause) {
+		t.Fatalf("ListCredentials error = %v, want %v", err, cause)
+	}
+	requireZero(t, output)
+
+	if !bytes.Equal(stagedKey, make([]byte, len(stagedKey))) {
+		t.Fatalf("staged large-blob key = %x, want wiped buffer", stagedKey)
+	}
 }
 
 func TestCredentialMutationsUseUnscopedGrant(t *testing.T) {
@@ -263,6 +288,8 @@ func credentialMutationTarget() appcredentials.CredentialTarget {
 
 type progressCredentialAuthenticator struct {
 	contractAuthenticator
+	credentialErr      error
+	stagedLargeBlobKey []byte
 }
 
 type emptyCredentialAuthenticator struct {
@@ -450,7 +477,7 @@ func runCredentialList(t *testing.T, session *contractAuthenticatorHandle) appcr
 		t.Fatalf("ListCredentials: %v", err)
 	}
 
-	return *output
+	return output
 }
 
 func credentialIDFromInventory(t *testing.T, output appcredentials.InventoryReport) string {
@@ -499,7 +526,15 @@ func (a *progressCredentialAuthenticator) EnumerateCredentials(
 ) iter.Seq2[protocol.AuthenticatorCredentialManagementResponse, error] {
 	return func(yield func(protocol.AuthenticatorCredentialManagementResponse, error) bool) {
 		if bytes.Equal(rpIDHash, []byte("alpha-rp-hash")) {
-			if !yield(progressCredentialResponse("alpha-user-1", []byte{0xa1}, 2), nil) {
+			first := progressCredentialResponse("alpha-user-1", []byte{0xa1}, 2)
+			first.LargeBlobKey = a.stagedLargeBlobKey
+			if !yield(first, nil) {
+				return
+			}
+
+			if a.credentialErr != nil {
+				yield(protocol.AuthenticatorCredentialManagementResponse{}, a.credentialErr)
+
 				return
 			}
 

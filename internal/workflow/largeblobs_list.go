@@ -5,12 +5,12 @@ import (
 
 	"github.com/go-ctap/ctap/crypto"
 	"github.com/go-ctap/ctap/protocol"
+	"github.com/go-ctap/kit/internal/authenticator"
 	"github.com/go-ctap/kit/internal/errornorm"
 	"github.com/go-ctap/kit/internal/secret"
 	appcredentials "github.com/go-ctap/kit/model/credentials"
 	"github.com/go-ctap/kit/model/failure"
 	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
-	modelreport "github.com/go-ctap/kit/model/report"
 )
 
 func (r Runner) ListLargeBlobs(
@@ -28,26 +28,17 @@ func (r Runner) ListLargeBlobs(
 		return applargeblobs.ListReport{}, err
 	}
 
-	if err := ctx.Err(); err != nil {
-		return applargeblobs.ListReport{}, errornorm.Annotate(
-			err,
-			errornorm.WithPhase(failure.PhaseDiscovery),
-		)
-	}
-
 	return report, nil
 }
 
-type listBuildContext struct {
-	selected           modelreport.DeviceReport
-	support            applargeblobs.SupportReport
-	blobs              []protocol.LargeBlob
-	matchedBlobIndexes map[int]bool
+type listCredentialKey struct {
+	target applargeblobs.BlobTarget
+	key    []byte
 }
 
 func (r Runner) listLargeBlobsFromInventory(
 	ctx context.Context,
-	device LargeBlobDevice,
+	device authenticator.InfoProvider,
 	inventory *largeBlobInventory,
 ) (applargeblobs.ListReport, error) {
 	if err := ctx.Err(); err != nil {
@@ -59,107 +50,109 @@ func (r Runner) listLargeBlobsFromInventory(
 		return applargeblobs.ListReport{}, err
 	}
 	support := buildLargeBlobSupportReport(info)
-	report := applargeblobs.ListReport{
+	summary := applargeblobs.ListArraySummary{}
+	var entries []applargeblobs.ArrayEntry
+	if support.LargeBlobs {
+		keys := listCredentialKeys(inventory)
+		entries = make([]applargeblobs.ArrayEntry, 0, len(inventory.blobs))
+		summary.Read = true
+		summary.BlobCount = len(inventory.blobs)
+
+		for index, blob := range inventory.blobs {
+			entry := classifyLargeBlobEntry(index, blob, keys)
+			entries = append(entries, entry)
+
+			switch entry.State {
+			case applargeblobs.EntryStateMatched:
+				summary.MatchedBlobCount++
+			case applargeblobs.EntryStateOrphaned:
+				summary.OrphanedBlobCount++
+			case applargeblobs.EntryStateNonconforming:
+				summary.NonconformingBlobCount++
+			case applargeblobs.EntryStateCorrupt:
+				summary.CorruptBlobCount++
+			}
+		}
+	}
+
+	return applargeblobs.ListReport{
 		Device:  r.env.Selected,
 		Support: support,
-	}
-
-	if support.LargeBlobs {
-		report.Array.Read = true
-		report.Array.BlobCount = len(inventory.blobs)
-	}
-
-	matchedBlobIndexes := make(map[int]bool)
-	buildCtx := listBuildContext{
-		selected:           r.env.Selected,
-		support:            support,
-		blobs:              inventory.blobs,
-		matchedBlobIndexes: matchedBlobIndexes,
-	}
-
-	report.Credentials = make([]applargeblobs.ListCredential, 0, int(inventory.credentials.Summary.TotalCredentials))
-	for _, group := range inventory.credentials.Groups {
-		for _, record := range group.Credentials {
-			row, err := buildListCredentialRow(
-				buildCtx,
-				group,
-				record,
-				inventory.keys.get(group.RPIDHashHex, record.CredentialIDHex),
-			)
-			if err != nil {
-				return applargeblobs.ListReport{}, err
-			}
-
-			report.Credentials = append(report.Credentials, row)
-		}
-	}
-
-	report.Array.MatchedBlobCount = len(matchedBlobIndexes)
-
-	report.Array.UnmatchedBlobCount = report.Array.BlobCount - report.Array.MatchedBlobCount
-	if report.Array.UnmatchedBlobCount < 0 {
-		report.Array.UnmatchedBlobCount = 0
-	}
-
-	return report, nil
+		Array:   summary,
+		Entries: entries,
+	}, nil
 }
 
-func buildListCredentialRow(
-	ctx listBuildContext,
-	group appcredentials.CredentialGroup,
-	record appcredentials.CredentialRecord,
-	largeBlobKey []byte,
-) (applargeblobs.ListCredential, error) {
-	row := applargeblobs.ListCredential{
-		AttachmentID:    ctx.selected.Attachment.ID,
-		CredentialIDHex: record.CredentialIDHex,
-		RP: appcredentials.RelyingParty{
-			ID:        group.RPID,
-			Name:      group.RPName,
-			IDHashHex: group.RPIDHashHex,
-		},
-		User: appcredentials.UserIdentity{
-			UserIDHex:   record.UserIDHex,
-			Name:        record.UserName,
-			DisplayName: record.DisplayName,
-		},
-		LargeBlobKeyState: applargeblobs.LargeBlobKeyMissing,
-		BlobState:         applargeblobs.BlobStateUnsupported,
-	}
+func listCredentialKeys(inventory *largeBlobInventory) []listCredentialKey {
+	keys := make([]listCredentialKey, 0, inventory.credentials.Summary.TotalCredentials)
+	for _, group := range inventory.credentials.Groups {
+		for _, record := range group.Credentials {
+			key := inventory.keys.get(group.RPIDHashHex, record.CredentialIDHex)
+			if len(key) != 32 {
+				continue
+			}
 
-	if len(largeBlobKey) == 0 {
-		if ctx.support.LargeBlobs {
-			row.BlobState = applargeblobs.BlobStateUnknownKeyMissing
+			keys = append(keys, listCredentialKey{
+				target: applargeblobs.BlobTarget{
+					CredentialIDHex: record.CredentialIDHex,
+					RP: appcredentials.RelyingParty{
+						ID:        group.RPID,
+						Name:      group.RPName,
+						IDHashHex: group.RPIDHashHex,
+					},
+					User: appcredentials.UserIdentity{
+						UserIDHex:   record.UserIDHex,
+						Name:        record.UserName,
+						DisplayName: record.DisplayName,
+					},
+				},
+				key: key,
+			})
 		}
-
-		return row, nil
 	}
 
-	row.LargeBlobKeyState = applargeblobs.LargeBlobKeyAvailable
+	return keys
+}
 
-	if !ctx.support.LargeBlobs {
-		return row, nil
+func classifyLargeBlobEntry(
+	index int,
+	blob protocol.LargeBlob,
+	keys []listCredentialKey,
+) applargeblobs.ArrayEntry {
+	entry := applargeblobs.ArrayEntry{
+		Index:                    index,
+		State:                    applargeblobs.EntryStateNonconforming,
+		CiphertextByteCount:      len(blob.Ciphertext),
+		DeclaredPayloadByteCount: blob.OrigSize,
+	}
+	if !largeBlobMapConforming(blob) {
+		return entry
 	}
 
-	row.BlobState = applargeblobs.BlobStateMissing
-
-	for index, candidate := range ctx.blobs {
-		if ctx.matchedBlobIndexes[index] {
-			continue
-		}
-
-		raw, err := crypto.DecryptLargeBlob(largeBlobKey, candidate)
+	for _, candidate := range keys {
+		compressed, err := crypto.OpenLargeBlob(candidate.key, blob)
 		if err != nil {
 			continue
 		}
-		ctx.matchedBlobIndexes[index] = true
-		row.BlobPresent = true
-		row.BlobState = applargeblobs.BlobStatePresent
-		row.BlobByteCount = len(raw)
+
+		target := candidate.target
+		entry.Target = &target
+		raw, err := crypto.DecompressLargeBlobData(compressed, blob.OrigSize)
+		secret.Zero(compressed)
+		if err != nil {
+			entry.State = applargeblobs.EntryStateCorrupt
+
+			return entry
+		}
+
+		entry.State = applargeblobs.EntryStateMatched
+		entry.PayloadByteCount = len(raw)
 		secret.Zero(raw)
 
-		break
+		return entry
 	}
 
-	return row, nil
+	entry.State = applargeblobs.EntryStateOrphaned
+
+	return entry
 }

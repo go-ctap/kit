@@ -254,9 +254,7 @@ func TestBioEnrollmentCleanupUsesBoundedIndependentContext(t *testing.T) {
 		t.Fatalf("Run error = %v, want original capture error", err)
 	}
 
-	if result != nil {
-		t.Fatalf("bio result = %#v, want nil on error", result)
-	}
+	requireZero(t, result)
 
 	if a.cleanupCtx == nil {
 		t.Fatal("cleanup context was not recorded")
@@ -281,24 +279,22 @@ func TestBioEnrollmentCleanupUsesBoundedIndependentContext(t *testing.T) {
 	}
 }
 
-func TestBioEnrollmentSuccessfulCleanupReturnsNoPartialResult(t *testing.T) {
+func TestBioEnrollmentWorkflowSuccessfulCleanupReturnsNoPartialResult(t *testing.T) {
 	operationErr := errors.New("capture failed")
 	a := &bioCleanupAuthenticator{captureErr: operationErr}
 	session := openContractAuthenticator(t, nil, a)
 	defer func() { _ = session.Close() }()
 
-	result, err := session.BioEnroll(
+	result, err := newContractWorkflowRunner(session).BioEnroll(
 		context.Background(),
+		a,
 		appconfig.BioEnrollOperation{},
-		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
 	)
 	if !errors.Is(err, operationErr) {
 		t.Fatalf("Run error = %v, want original capture error", err)
 	}
 
-	if result != nil {
-		t.Fatalf("bio result = %#v, want nil on error", result)
-	}
+	requireZero(t, result)
 
 	if a.cleanupCtx == nil {
 		t.Fatal("cleanup was not attempted")
@@ -468,16 +464,14 @@ func TestPINMutationsRejectEmptyPINAtSessionRun(t *testing.T) {
 			session := openContractAuthenticator(t, nil, a)
 			defer func() { _ = session.Close() }()
 
-			var result *appconfig.PINOutput
+			var result appconfig.PINOutput
 			var err error
 			if tt.set != nil {
 				result, err = session.SetPIN(context.Background(), *tt.set, session.operationOptions()...)
 			} else {
 				result, err = session.ChangePIN(context.Background(), *tt.change, session.operationOptions()...)
 			}
-			if result != nil {
-				t.Fatalf("result = %#v, want nil", result)
-			}
+			requireZero(t, result)
 
 			requireFailureCode(t, err, failure.CodePINRequired)
 
@@ -513,8 +507,8 @@ func TestUVTokenAcquisitionRequestsUserVerificationInteraction(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 
-	if result == nil {
-		t.Fatal("result = nil, want output")
+	if result.Result == nil {
+		t.Fatal("result.Result = nil, want execution result")
 	}
 
 	if !a.uvCalled.Load() {

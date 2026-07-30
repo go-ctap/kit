@@ -51,8 +51,8 @@ func TestTokenServicePINInvalidRequestsAnotherPINWithRetryState(t *testing.T) {
 		t.Fatal("initial PIN interaction state = nil")
 	}
 
-	if initial.Failure != nil {
-		t.Fatalf("initial PIN failure = %#v, want nil", initial.Failure)
+	if initial.PreviousAttemptInvalid {
+		t.Fatal("initial PIN interaction marks a previous attempt invalid")
 	}
 
 	if initial.RetriesRemaining == nil || *initial.RetriesRemaining != 7 {
@@ -68,16 +68,8 @@ func TestTokenServicePINInvalidRequestsAnotherPINWithRetryState(t *testing.T) {
 		t.Fatal("retry PIN interaction state = nil")
 	}
 
-	if retry.Failure == nil || retry.Failure.Code != failure.CodePINInvalid {
-		t.Fatalf("retry failure = %#v, want %s", retry.Failure, failure.CodePINInvalid)
-	}
-
-	if retry.Failure.Phase != failure.PhaseTokenAcquisition {
-		t.Fatalf("retry failure phase = %s, want %s", retry.Failure.Phase, failure.PhaseTokenAcquisition)
-	}
-
-	if retry.Failure.CTAP == nil || retry.Failure.CTAP.StatusCode != uint8(ctaptransport.CTAP2_ERR_PIN_INVALID) {
-		t.Fatalf("retry CTAP failure = %#v, want PIN_INVALID provenance", retry.Failure.CTAP)
+	if !retry.PreviousAttemptInvalid {
+		t.Fatal("retry PIN interaction does not mark the previous attempt invalid")
 	}
 
 	if retry.RetriesRemaining == nil || *retry.RetriesRemaining != 6 {

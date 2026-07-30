@@ -202,13 +202,13 @@ func (s *TokenService) acquire(
 		)
 	}
 
-	var previousFailure *failure.Failure
+	previousAttemptInvalid := false
 	for {
 		pinInteraction, err := s.readPINInteractionState(ctx)
 		if err != nil {
 			return nil, err
 		}
-		pinInteraction.Failure = previousFailure
+		pinInteraction.PreviousAttemptInvalid = previousAttemptInvalid
 
 		token, err = s.acquireUsingPIN(ctx, permission, key.RPID, pinInteraction)
 		if err == nil {
@@ -220,7 +220,7 @@ func (s *TokenService) acquire(
 			return nil, normalized
 		}
 
-		previousFailure = failure.Snapshot(normalized)
+		previousAttemptInvalid = true
 	}
 }
 
