@@ -74,29 +74,16 @@ import (
 func main() {
 	ctx := context.Background()
 
-	inventory, err := ctapkit.OpenInventory(ctx, transport.ModeAuto)
+	devices, err := ctapkit.NewDeviceManager(ctx, transport.ModeAuto)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer inventory.Close()
+	defer devices.Close()
 
-	snapshot := inventory.Snapshot()
-	if len(snapshot.Devices) == 0 {
+	authenticator := devices.State().Selected
+	if authenticator == nil {
 		log.Fatal("no FIDO2 authenticator found")
 	}
-
-	authenticator, err := inventory.OpenAuthenticator(
-		ctx,
-		snapshot.Devices[0].Attachment.ID,
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func() {
-		if err := authenticator.Close(); err != nil {
-			log.Printf("close authenticator: %v", err)
-		}
-	}()
 
 	inspection, err := authenticator.Inspect(ctx)
 	if err != nil {
@@ -109,27 +96,24 @@ func main() {
 }
 ```
 
-`Inventory.Snapshot` publishes attachments immediately. Vendor identity arrives
-later through full snapshot events from `Inventory.Events` without changing the
-attachment ID or list order. HID authenticators can open while that optional
-identity is still resolving. Smart-card opens wait for the resolver to release
-its exclusive PC/SC access. `DeviceIdentity.Details` is a tagged collection of
-provider-specific reports; the Yubico section includes device-information
-properties that do not belong in the normalized identity fields.
+`DeviceManager` watches FIDO HID attachments and inserted PC/SC cards. It keeps
+the current selection open, selects the first available attachment when the
+selection is empty, and publishes complete snapshots through `Updates`.
 
 ## Runtime lifecycle
 
 A normal application follows this lifecycle:
 
-1. Open one `ctapkit.Inventory` for a fixed transport mode.
-2. Choose an attachment from its snapshot.
-3. Open it with `Inventory.OpenAuthenticator`.
-4. Run typed operations on the returned `*ctapkit.Authenticator`.
-5. Close the authenticator when selection changes, then close the inventory when the application exits.
+1. Create one `ctapkit.DeviceManager` for a fixed transport mode.
+2. Read `State` and use the automatically selected authenticator.
+3. Call `Select` when the user chooses another attachment.
+4. Run typed operations on `State().Selected`.
+5. Close the manager when the application exits.
 
-An `Inventory` owns transport monitoring and independent identity-resolution tasks for its attachments. An
-`Authenticator` owns one open transport channel, its token cache, and its close and cancellation state. It runs one
-complete workflow at a time. This prevents two multi-command operations on the same channel from mixing with each other.
+The manager owns the selected `Authenticator`; callers must not close it.
+Selection changes and manager shutdown close it automatically. An
+`Authenticator` owns one open transport channel, its token cache, and its close
+and cancellation state. It runs one complete workflow at a time.
 
 Credential-list and configuration workflows read current state per operation. Large-blob workflows are the deliberate
 exception: `ListLargeBlobs` refreshes private in-memory inventory for the selected open authenticator, and read,
@@ -248,19 +232,20 @@ described in
 
 ## Diagnostic journal
 
-Create a journal and pass it when the authenticator is opened:
+Create a journal and pass it when the device manager is created:
 
 ```go
 journal := ctapkit.NewLogJournal()
 
-authenticator, err := ctapkit.OpenAuthenticator(
+devices, err := ctapkit.NewDeviceManager(
 	ctx,
-	device,
+	transport.ModeAuto,
 	ctapkit.WithLogJournal(journal),
 )
 if err != nil {
 	return err
 }
+authenticator := devices.State().Selected
 
 batch := journal.Read(0)
 ```

@@ -1,6 +1,6 @@
 package transport
 
-// Mode selects the transport policy for an Inventory.
+// Mode selects the transport policy for a DeviceManager.
 type Mode string
 
 const (

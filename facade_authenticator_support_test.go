@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/go-ctap/kit/internal/authenticator"
-	"github.com/go-ctap/kit/internal/discovery"
 	kitlog "github.com/go-ctap/kit/internal/logging"
 	"github.com/go-ctap/kit/model"
 	"github.com/go-ctap/kit/model/report"
@@ -154,17 +153,18 @@ func contractOpened(implementation contractDevice) *authenticator.Opened {
 }
 
 func newContractDevice() attachment {
-	descriptor := discovery.Descriptor{
-		Transport: transport.ModeHID,
-		Path:      "contract-path",
-		VendorID:  1,
-		ProductID: 2,
-	}
 	return attachment{
-		descriptor: descriptor,
+		mode: transport.ModeHID,
+		path: "contract-path",
 		report: report.DeviceReport{
-			Attachment: attachmentReport(descriptor),
-			Resolution: report.IdentityResolution{State: report.IdentityUnavailable},
+			Attachment: report.AttachmentReport{
+				ID:        "hid:contract-path",
+				Transport: transport.ModeHID,
+				USB: &report.USBReport{
+					VendorID:  1,
+					ProductID: 2,
+				},
+			},
 		},
 	}
 }

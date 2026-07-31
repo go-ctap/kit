@@ -120,8 +120,8 @@ func openAuthenticatorHandle(
 	selected := device.report
 	opened, err := open(
 		logging.WithRecorder(ctx, recorder),
-		device.descriptor.Transport,
-		device.descriptor.Path,
+		device.mode,
+		device.path,
 	)
 	if err != nil {
 		return nil, err

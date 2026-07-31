@@ -1,54 +1,50 @@
 package ctapkit
 
 import (
-	"bytes"
 	"encoding/hex"
 
-	rtdevice "github.com/go-ctap/kit/internal/device"
-	"github.com/go-ctap/kit/internal/discovery"
+	"github.com/go-ctap/kit/internal/devicewatch"
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 )
 
 type attachment struct {
-	descriptor discovery.Descriptor
-	report     report.DeviceReport
+	mode   transport.Mode
+	path   string
+	report report.DeviceReport
 }
 
-func attachmentReport(descriptor discovery.Descriptor) report.AttachmentReport {
-	attachment := report.AttachmentReport{
-		ID:        report.AttachmentID(rtdevice.AttachmentID(descriptor)),
-		Transport: descriptor.Transport,
+func newAttachment(candidate devicewatch.Candidate) attachment {
+	id := report.AttachmentID(string(candidate.Transport) + ":" + candidate.Path)
+	attachmentReport := report.AttachmentReport{
+		ID:        id,
+		Transport: candidate.Transport,
 	}
-	if descriptor.Transport == transport.ModeSmartCard {
-		attachment.SmartCard = &report.SmartCardReport{
-			Reader:    descriptor.Path,
-			ATR:       hex.EncodeToString(descriptor.ATR),
-			Interface: descriptor.SmartCardInterface,
+	if candidate.Transport == transport.ModeSmartCard {
+		attachmentReport.SmartCard = &report.SmartCardReport{
+			Reader:    candidate.Path,
+			Interface: transport.SmartCardInterfaceUnknown,
 		}
-	} else {
-		attachment.USB = &report.USBReport{
-			Manufacturer:   descriptor.Manufacturer,
-			Product:        descriptor.Product,
-			ReportedSerial: descriptor.Serial,
-			VendorID:       descriptor.VendorID,
-			ProductID:      descriptor.ProductID,
+		if candidate.SmartCard != nil {
+			attachmentReport.SmartCard.ATR = hex.EncodeToString(
+				candidate.SmartCard.ATR,
+			)
+		}
+	} else if candidate.HID != nil {
+		attachmentReport.USB = &report.USBReport{
+			Manufacturer:   candidate.HID.MfrStr,
+			Product:        candidate.HID.ProductStr,
+			ReportedSerial: candidate.HID.SerialNbr,
+			VendorID:       candidate.HID.VendorID,
+			ProductID:      candidate.HID.ProductID,
 		}
 	}
 
-	return attachment
-}
-
-func sameConnection(current, next discovery.Descriptor) bool {
-	return current.Transport == next.Transport &&
-		current.Path == next.Path &&
-		current.Manufacturer == next.Manufacturer &&
-		current.Product == next.Product &&
-		current.Serial == next.Serial &&
-		current.VendorID == next.VendorID &&
-		current.ProductID == next.ProductID &&
-		bytes.Equal(current.ATR, next.ATR) &&
-		current.SmartCardInterface == next.SmartCardInterface &&
-		current.InstanceID == next.InstanceID &&
-		current.ParentDeviceID == next.ParentDeviceID
+	return attachment{
+		mode: candidate.Transport,
+		path: candidate.Path,
+		report: report.DeviceReport{
+			Attachment: attachmentReport,
+		},
+	}
 }
