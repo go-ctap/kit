@@ -2,6 +2,7 @@ package ctapkit
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 	"sync/atomic"
@@ -14,6 +15,7 @@ import (
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 	"github.com/go-ctap/pcsc"
+	"github.com/go-ctap/yubico"
 )
 
 type fakeDeviceWatcher struct {
@@ -262,6 +264,99 @@ func TestDeviceManagerRetriesReplacedCardOnly(t *testing.T) {
 	)
 }
 
+func TestDeviceManagerRestoresMetadataForMatchingAttachment(t *testing.T) {
+	candidate := hidCandidate("hid-a")
+	candidate.HID.VendorID = yubicoVendorID
+	candidate.HID.ProductID = 1
+	attached := newAttachment(candidate)
+	id := attached.report.Attachment.ID
+	serial := uint32(12345678)
+	manager := &DeviceManager{
+		metadata: map[report.AttachmentID]cachedDeviceMetadata{
+			id: {
+				Attachment: attached.report.Attachment,
+				Metadata: deviceMetadata{Yubico: &yubico.DeviceInfo{
+					Serial:          &serial,
+					FirmwareVersion: yubico.FirmwareVersion{Major: 5, Minor: 7, Build: 1},
+					FormFactor:      yubico.FormFactorUSBCKeychain,
+				}},
+			},
+		},
+	}
+	record := &deviceRecord{attachment: newAttachment(candidate)}
+
+	manager.restoreDeviceMetadata(record)
+
+	identity := record.attachment.report.Identity
+	if identity == nil || identity.Name != "YubiKey 5C" || identity.SerialNumber != "12345678" {
+		t.Fatalf("restored identity = %#v", identity)
+	}
+
+	candidate.HID.ProductID = 2
+	manager.restoreDeviceMetadata(&deviceRecord{attachment: newAttachment(candidate)})
+	if _, ok := manager.metadata[id]; ok {
+		t.Fatal("metadata for changed attachment was retained")
+	}
+	if !manager.metadataDirty {
+		t.Fatal("metadata cache was not marked dirty")
+	}
+}
+
+func TestDeviceManagerSerializesMetadataCache(t *testing.T) {
+	candidate := hidCandidate("hid-a")
+	candidate.HID.VendorID = yubicoVendorID
+	candidate.HID.ProductID = 1
+	attached := newAttachment(candidate)
+	id := attached.report.Attachment.ID
+	serial := uint32(12345678)
+	manager := &DeviceManager{
+		metadata: map[report.AttachmentID]cachedDeviceMetadata{
+			id: {
+				Attachment: attached.report.Attachment,
+				Metadata: deviceMetadata{Yubico: &yubico.DeviceInfo{
+					Serial:          &serial,
+					FirmwareVersion: yubico.FirmwareVersion{Major: 5, Minor: 7, Build: 1},
+					FormFactor:      yubico.FormFactorUSBCKeychain,
+					UnknownFields:   map[byte][]byte{0x99: {1, 2, 3}},
+				}},
+			},
+		},
+		metadataDirty: true,
+		updates:       make(chan DeviceUpdate, 1),
+	}
+	manager.publish(map[report.AttachmentID]*deviceRecord{
+		id: {attachment: attached},
+	}, nil)
+	data := (<-manager.updates).DeviceMetadataCache
+
+	var cached deviceMetadataCacheFile
+	if err := json.Unmarshal(data, &cached); err != nil {
+		t.Fatalf("decode metadata cache: %v", err)
+	}
+	entry := cached.Attachments[id]
+	if !sameAttachment(entry.Attachment, newAttachment(candidate).report.Attachment) {
+		t.Fatalf("persisted attachment = %#v", entry.Attachment)
+	}
+	info := entry.Metadata.Yubico
+	if info == nil || len(info.UnknownFields[0x99]) != 3 {
+		t.Fatalf("persisted Yubico metadata = %#v", info)
+	}
+
+	secondWatcher := &fakeDeviceWatcher{
+		snapshot: devicewatch.Snapshot{Candidates: []devicewatch.Candidate{candidate}},
+		events:   make(chan devicewatch.Event),
+	}
+	second := newTestDeviceManager(
+		t,
+		secondWatcher,
+		func(context.Context, transport.Mode, string) (*rtauthenticator.Opened, error) {
+			return openedDevice(nil), nil
+		},
+		WithDeviceMetadataCache(data),
+	)
+	requireSelectedIdentity(t, second, "YubiKey 5C", "12345678")
+}
+
 func TestDeviceManagerCloseClosesSelection(t *testing.T) {
 	watcher := &fakeDeviceWatcher{
 		snapshot: devicewatch.Snapshot{Candidates: []devicewatch.Candidate{
@@ -305,11 +400,12 @@ func newTestDeviceManager(
 	t *testing.T,
 	watcher devicewatch.Watcher,
 	open authenticatorOpenFunc,
+	options ...AuthenticatorOption,
 ) *DeviceManager {
 	t.Helper()
 
 	ctx, cancel := context.WithCancel(t.Context())
-	manager := newDeviceManager(ctx, cancel, watcher, open, nil)
+	manager := newDeviceManager(ctx, cancel, watcher, open, options)
 	<-manager.ready
 	t.Cleanup(func() {
 		if err := manager.Close(); err != nil {
@@ -375,6 +471,20 @@ func waitForSelected(
 	waitForDeviceManager(t, func() bool {
 		return manager.State().Snapshot.Selected == id
 	})
+}
+
+func requireSelectedIdentity(
+	t *testing.T,
+	manager *DeviceManager,
+	name string,
+	serial string,
+) {
+	t.Helper()
+
+	identity := manager.State().Selected.Device().Identity
+	if identity == nil || identity.Name != name || identity.SerialNumber != serial {
+		t.Fatalf("selected identity = %#v", identity)
+	}
 }
 
 func waitForDeviceManager(t *testing.T, condition func() bool) {

@@ -19,7 +19,8 @@ type authenticatorOpenFunc func(context.Context, transport.Mode, string) (*authe
 type AuthenticatorOption func(*authenticatorConfig)
 
 type authenticatorConfig struct {
-	journal *LogJournal
+	journal             *LogJournal
+	deviceMetadataCache []byte
 }
 
 type OperationOption func(*operationConfig)
@@ -68,6 +69,14 @@ func WithLogJournal(journal *LogJournal) AuthenticatorOption {
 	}
 }
 
+// WithDeviceMetadataCache restores complete Yubico and Token2 metadata from a
+// JSON snapshot previously returned in DeviceUpdate.DeviceMetadataCache.
+func WithDeviceMetadataCache(data []byte) AuthenticatorOption {
+	return func(config *authenticatorConfig) {
+		config.deviceMetadataCache = data
+	}
+}
+
 func WithVerificationFlow(flow VerificationFlow) OperationOption {
 	return func(config *operationConfig) {
 		config.verificationFlow = flow
@@ -79,6 +88,7 @@ func WithVerificationFlow(flow VerificationFlow) OperationOption {
 type Authenticator struct {
 	selected            report.DeviceReport
 	lifecycle           authenticator.Lifecycle
+	vendor              authenticator.VendorProvider
 	info                authenticator.InfoProvider
 	tokenProvider       authenticator.TokenProvider
 	credentialInventory authenticator.CredentialInventoryReader
@@ -130,6 +140,7 @@ func openAuthenticatorHandle(
 	return &Authenticator{
 		selected:            selected,
 		lifecycle:           opened.Lifecycle,
+		vendor:              opened.Vendor,
 		info:                opened.Info,
 		tokenProvider:       opened.Tokens,
 		credentialInventory: opened.CredentialInventory,

@@ -9,9 +9,11 @@ import (
 )
 
 type attachment struct {
-	mode   transport.Mode
-	path   string
-	report report.DeviceReport
+	mode          transport.Mode
+	path          string
+	hidInstanceID string
+	hidParentID   string
+	report        report.DeviceReport
 }
 
 func newAttachment(candidate devicewatch.Candidate) attachment {
@@ -40,11 +42,17 @@ func newAttachment(candidate devicewatch.Candidate) attachment {
 		}
 	}
 
-	return attachment{
+	result := attachment{
 		mode: candidate.Transport,
 		path: candidate.Path,
 		report: report.DeviceReport{
 			Attachment: attachmentReport,
 		},
 	}
+	if candidate.HID != nil {
+		result.hidInstanceID = candidate.HID.InstanceID
+		result.hidParentID = candidate.HID.ParentDeviceID
+	}
+
+	return result
 }

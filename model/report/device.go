@@ -32,7 +32,25 @@ type AttachmentReport struct {
 	SmartCard *SmartCardReport `json:"smartCard,omitempty"`
 }
 
-// DeviceReport describes one selectable transport attachment.
+type DeviceVendor string
+
+const (
+	DeviceVendorYubico DeviceVendor = "yubico"
+	DeviceVendorToken2 DeviceVendor = "token2"
+)
+
+// DeviceIdentityReport is the stable identity summary derived from vendor
+// metadata.
+type DeviceIdentityReport struct {
+	Vendor       DeviceVendor `json:"vendor"`
+	Name         string       `json:"name,omitempty"`
+	SerialNumber string       `json:"serialNumber,omitempty"`
+}
+
+// DeviceReport describes one selectable transport attachment and any cached
+// physical-device identity resolved for it.
 type DeviceReport struct {
-	Attachment AttachmentReport `json:"attachment"`
+	Attachment     AttachmentReport      `json:"attachment"`
+	Identity       *DeviceIdentityReport `json:"identity,omitempty"`
+	VendorMetadata *DeviceVendorMetadata `json:"vendorMetadata,omitempty"`
 }

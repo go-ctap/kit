@@ -3,6 +3,7 @@ package ctapkit
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 	"sync"
@@ -23,9 +24,12 @@ type DeviceSnapshot struct {
 
 // DeviceUpdate is one atomic view of device topology and selection.
 type DeviceUpdate struct {
-	Snapshot DeviceSnapshot   `json:"snapshot"`
-	Selected *Authenticator   `json:"-"`
-	Error    *failure.Failure `json:"error,omitempty"`
+	Snapshot DeviceSnapshot `json:"snapshot"`
+	Selected *Authenticator `json:"-"`
+	// DeviceMetadataCache is the complete JSON persistence snapshot when the
+	// runtime-owned metadata cache changes. It is excluded from DeviceUpdate JSON.
+	DeviceMetadataCache []byte           `json:"-"`
+	Error               *failure.Failure `json:"error,omitempty"`
 }
 
 // DeviceManager owns live device topology and the selected Authenticator.
@@ -41,8 +45,10 @@ type DeviceManager struct {
 	ready    chan struct{}
 	done     chan struct{}
 
-	state    atomic.Pointer[DeviceUpdate]
-	selected *Authenticator
+	state         atomic.Pointer[DeviceUpdate]
+	selected      *Authenticator
+	metadata      map[report.AttachmentID]cachedDeviceMetadata
+	metadataDirty bool
 
 	closeOnce sync.Once
 	closeErr  error
@@ -93,6 +99,22 @@ func newDeviceManager(
 	open authenticatorOpenFunc,
 	options []AuthenticatorOption,
 ) *DeviceManager {
+	var config authenticatorConfig
+	for _, option := range options {
+		if option != nil {
+			option(&config)
+		}
+	}
+	metadata := make(map[report.AttachmentID]cachedDeviceMetadata)
+	if len(config.deviceMetadataCache) != 0 {
+		var cache deviceMetadataCacheFile
+		if err := json.Unmarshal(config.deviceMetadataCache, &cache); err == nil &&
+			cache.Version == deviceMetadataCacheVersion &&
+			cache.Attachments != nil {
+			metadata = cache.Attachments
+		}
+	}
+
 	manager := &DeviceManager{
 		ctx:      ctx,
 		cancel:   cancel,
@@ -103,6 +125,7 @@ func newDeviceManager(
 		updates:  make(chan DeviceUpdate, 1),
 		ready:    make(chan struct{}),
 		done:     make(chan struct{}),
+		metadata: metadata,
 	}
 
 	go manager.run(watcher.Snapshot())
@@ -170,6 +193,7 @@ func (m *DeviceManager) run(initial devicewatch.Snapshot) {
 	records := make(map[report.AttachmentID]*deviceRecord)
 	for _, candidate := range initial.Candidates {
 		record := &deviceRecord{attachment: newAttachment(candidate)}
+		m.restoreDeviceMetadata(record)
 		records[record.attachment.report.Attachment.ID] = record
 	}
 
@@ -224,8 +248,11 @@ func (m *DeviceManager) applyEvent(
 	if event.Connected {
 		if current := records[id]; current != nil {
 			current.attachment = attached
+			m.restoreDeviceMetadata(current)
 		} else {
-			records[id] = &deviceRecord{attachment: attached}
+			record := &deviceRecord{attachment: attached}
+			m.restoreDeviceMetadata(record)
+			records[id] = record
 		}
 		if m.selected == nil {
 			return m.selectFirst(records)
@@ -310,6 +337,16 @@ func (m *DeviceManager) openRecord(
 	ctx context.Context,
 	record *deviceRecord,
 ) error {
+	id := record.attachment.report.Attachment.ID
+	metadata := m.metadata[id].Metadata
+	if deviceMetadataEmpty(metadata) && record.attachment.mode == transport.ModeSmartCard {
+		var err error
+		metadata, err = resolveDeviceMetadata(ctx, record.attachment, nil)
+		if err != nil {
+			return NormalizeError(err, failure.PhaseAuthenticator)
+		}
+	}
+
 	authenticator, err := openAuthenticatorHandle(
 		ctx,
 		record.attachment,
@@ -319,10 +356,44 @@ func (m *DeviceManager) openRecord(
 	if err != nil {
 		return err
 	}
+	if deviceMetadataEmpty(metadata) && record.attachment.mode != transport.ModeSmartCard {
+		metadata, err = resolveDeviceMetadata(ctx, record.attachment, authenticator.vendor)
+		if err != nil {
+			return errors.Join(
+				NormalizeError(err, failure.PhaseAuthenticator),
+				authenticator.Close(),
+			)
+		}
+	}
+	if !deviceMetadataEmpty(metadata) {
+		applyDeviceMetadata(&authenticator.selected, metadata)
+		m.metadata[id] = cachedDeviceMetadata{
+			Attachment: record.attachment.report.Attachment,
+			Metadata:   metadata,
+		}
+		m.metadataDirty = true
+	}
+	record.attachment.report = authenticator.Device()
 
 	m.selected = authenticator
 
 	return nil
+}
+
+func (m *DeviceManager) restoreDeviceMetadata(record *deviceRecord) {
+	id := record.attachment.report.Attachment.ID
+	cached, ok := m.metadata[id]
+	if !ok {
+		return
+	}
+	if !sameAttachment(cached.Attachment, record.attachment.report.Attachment) {
+		delete(m.metadata, id)
+		m.metadataDirty = true
+
+		return
+	}
+
+	applyDeviceMetadata(&record.attachment.report, cached.Metadata)
 }
 
 func (m *DeviceManager) closeSelected() error {
@@ -351,6 +422,17 @@ func (m *DeviceManager) publish(
 		update.Selected = m.selected
 	}
 
+	if m.metadataDirty {
+		cache, cacheErr := json.Marshal(deviceMetadataCacheFile{
+			Version:     deviceMetadataCacheVersion,
+			Attachments: m.metadata,
+		})
+		err = errors.Join(err, cacheErr)
+		if cacheErr == nil {
+			update.DeviceMetadataCache = append(cache, '\n')
+			m.metadataDirty = false
+		}
+	}
 	if err != nil {
 		update.Error = failure.Snapshot(
 			NormalizeError(err, failure.PhaseAuthenticator),
@@ -360,9 +442,14 @@ func (m *DeviceManager) publish(
 	select {
 	case m.updates <- update:
 	default:
+		var previous DeviceUpdate
 		select {
-		case <-m.updates:
+		case previous = <-m.updates:
 		default:
+		}
+		if len(update.DeviceMetadataCache) == 0 {
+			update.DeviceMetadataCache = previous.DeviceMetadataCache
+			m.state.Store(&update)
 		}
 		m.updates <- update
 	}

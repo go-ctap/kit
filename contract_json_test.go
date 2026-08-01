@@ -16,6 +16,7 @@ import (
 	"github.com/go-ctap/kit/model/report"
 	webauthn2 "github.com/go-ctap/kit/model/webauthn"
 	"github.com/go-ctap/kit/transport"
+	"github.com/go-ctap/token2"
 )
 
 func TestOperationEventStagesHaveCountsWithoutPercent(t *testing.T) {
@@ -661,6 +662,41 @@ func TestDeviceReportSmartCardInterfaceJSON(t *testing.T) {
 	}
 
 	assertJSON(t, value, `{"attachment":{"id":"attachment-1","transport":"smart-card","smartCard":{"reader":"reader-one","atr":"3b80800101","interface":"contactless"}}}`)
+}
+
+func TestDeviceReportIdentityJSON(t *testing.T) {
+	value := report.DeviceReport{
+		Attachment: report.AttachmentReport{
+			ID:        "hid:one",
+			Transport: transport.ModeHID,
+		},
+		Identity: &report.DeviceIdentityReport{
+			Vendor:       report.DeviceVendorToken2,
+			Name:         "Token2 USB-C NFC",
+			SerialNumber: "86104012345678",
+		},
+	}
+
+	assertJSON(t, value, `{"attachment":{"id":"hid:one","transport":"hid"},"identity":{"vendor":"token2","name":"Token2 USB-C NFC","serialNumber":"86104012345678"}}`)
+}
+
+func TestDeviceReportUsesToken2ProviderTypesJSON(t *testing.T) {
+	value := report.DeviceReport{
+		Attachment: report.AttachmentReport{
+			ID:        "hid:token2",
+			Transport: transport.ModeHID,
+		},
+		VendorMetadata: &report.DeviceVendorMetadata{
+			Token2: &token2.DeviceInfo{
+				SerialNumber: "72103654095303",
+				Release:      "R3.2",
+				FormFactor:   "Bio3 Dual A+C PIN+",
+				Branding:     "Token2",
+			},
+		},
+	}
+
+	assertJSON(t, value, `{"attachment":{"id":"hid:token2","transport":"hid"},"vendorMetadata":{"token2":{"serialNumber":"72103654095303","release":"R3.2","formFactor":"Bio3 Dual A+C PIN+","branding":"Token2","interfaceStateKnown":false,"fidoEnabled":false,"hotpKeystrokeEnabled":false,"ccidEnabled":false,"capabilitiesKnown":false,"fidoPINSet":false,"fidoPINLocked":false,"supportsHOTP":false,"supportsTOTP":false,"supportsNFC":false,"supportsCCID":false,"supportsFIDO21":false,"hasFingerprintSensor":false,"supportsFingerprintRegistration":false,"supportsMandatoryFingerprint":false,"otpRequiresFingerprint":false,"supportsButtonHOTP":false,"buttonHOTPConfigured":false,"buttonHOTPSendsEnter":false,"buttonHOTPRequiresLongPress":false,"buttonHOTPUsesNumericKeypad":false}}}`)
 }
 
 func TestCTAP23JSONPresenceContracts(t *testing.T) {
