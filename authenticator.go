@@ -19,8 +19,7 @@ type authenticatorOpenFunc func(context.Context, transport.Mode, string) (*authe
 type AuthenticatorOption func(*authenticatorConfig)
 
 type authenticatorConfig struct {
-	journal             *LogJournal
-	deviceMetadataCache []byte
+	journal *LogJournal
 }
 
 type OperationOption func(*operationConfig)
@@ -66,14 +65,6 @@ func WithInteractionHandler(handler InteractionHandler) OperationOption {
 func WithLogJournal(journal *LogJournal) AuthenticatorOption {
 	return func(config *authenticatorConfig) {
 		config.journal = journal
-	}
-}
-
-// WithDeviceMetadataCache restores complete Yubico and Token2 metadata from a
-// JSON snapshot previously returned in DeviceUpdate.DeviceMetadataCache.
-func WithDeviceMetadataCache(data []byte) AuthenticatorOption {
-	return func(config *authenticatorConfig) {
-		config.deviceMetadataCache = data
 	}
 }
 

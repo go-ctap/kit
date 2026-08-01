@@ -2,7 +2,6 @@ package ctapkit
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"sync"
 	"sync/atomic"
@@ -15,6 +14,7 @@ import (
 	"github.com/go-ctap/kit/model/report"
 	"github.com/go-ctap/kit/transport"
 	"github.com/go-ctap/pcsc"
+	"github.com/go-ctap/token2"
 	"github.com/go-ctap/yubico"
 )
 
@@ -75,6 +75,12 @@ func TestDeviceManagerSelectsFirstHIDAndStaysSticky(t *testing.T) {
 	if got := <-opened; got != attachmentID(transport.ModeHID, "hid-a") {
 		t.Fatalf("initial open = %q, want hid-a", got)
 	}
+	if got := <-opened; got != attachmentID(transport.ModeHID, "hid-b") {
+		t.Fatalf("second inspected attachment = %q, want hid-b", got)
+	}
+	if got := <-opened; got != attachmentID(transport.ModeSmartCard, "reader-a") {
+		t.Fatalf("third inspected attachment = %q, want reader-a", got)
+	}
 	selected := manager.State().Selected
 	watcher.events <- devicewatch.Event{
 		Connected: true,
@@ -96,10 +102,8 @@ func TestDeviceManagerSelectsFirstHIDAndStaysSticky(t *testing.T) {
 	if update.Selected != selected || len(update.Snapshot.Devices) != 4 {
 		t.Fatalf("topology update = %#v", update.Snapshot)
 	}
-	select {
-	case id := <-opened:
-		t.Fatalf("sticky selection opened %q", id)
-	default:
+	if got := <-opened; got != attachmentID(transport.ModeHID, "hid-0") {
+		t.Fatalf("connected attachment inspection = %q, want hid-0", got)
 	}
 }
 
@@ -170,12 +174,18 @@ func TestDeviceManagerClosesBeforeOpeningReplacement(t *testing.T) {
 	if got := <-order; got != "open-hid-a" {
 		t.Fatalf("initial action = %q", got)
 	}
+	if got := <-order; got != "open-hid-b" {
+		t.Fatalf("second action = %q, want open-hid-b", got)
+	}
+	if got := <-order; got != "close-hid-b" {
+		t.Fatalf("third action = %q, want close-hid-b", got)
+	}
 	watcher.events <- devicewatch.Event{Candidate: hidCandidate("hid-a")}
 	if got := <-order; got != "close-hid-a" {
-		t.Fatalf("second action = %q, want close-hid-a", got)
+		t.Fatalf("disconnect action = %q, want close-hid-a", got)
 	}
 	if got := <-order; got != "open-hid-b" {
-		t.Fatalf("third action = %q, want open-hid-b", got)
+		t.Fatalf("replacement action = %q, want open-hid-b", got)
 	}
 	waitForSelected(t, manager, attachmentID(transport.ModeHID, "hid-b"))
 }
@@ -203,6 +213,9 @@ func TestDeviceManagerManualFailureFallsBack(t *testing.T) {
 	})
 	if got := <-opened; got != "hid-a" {
 		t.Fatalf("initial open = %q", got)
+	}
+	if got := <-opened; got != "hid-b" {
+		t.Fatalf("initial inspection = %q, want hid-b", got)
 	}
 
 	err := manager.Select(
@@ -264,97 +277,78 @@ func TestDeviceManagerRetriesReplacedCardOnly(t *testing.T) {
 	)
 }
 
-func TestDeviceManagerRestoresMetadataForMatchingAttachment(t *testing.T) {
-	candidate := hidCandidate("hid-a")
-	candidate.HID.VendorID = yubicoVendorID
-	candidate.HID.ProductID = 1
-	attached := newAttachment(candidate)
-	id := attached.report.Attachment.ID
-	serial := uint32(12345678)
-	manager := &DeviceManager{
-		metadata: map[report.AttachmentID]cachedDeviceMetadata{
-			id: {
-				Attachment: attached.report.Attachment,
-				Metadata: deviceMetadata{Yubico: &yubico.DeviceInfo{
-					Serial:          &serial,
-					FirmwareVersion: yubico.FirmwareVersion{Major: 5, Minor: 7, Build: 1},
-					FormFactor:      yubico.FormFactorUSBCKeychain,
-				}},
-			},
-		},
+func TestDeviceManagerPublishesFullyEnrichedInitialSnapshot(t *testing.T) {
+	card := smartCardCandidate("reader-a", 1)
+	hid := hidCandidate("hid-a")
+	hid.HID.VendorID = yubicoVendorID
+	watcher := &fakeDeviceWatcher{
+		snapshot: devicewatch.Snapshot{Candidates: []devicewatch.Candidate{
+			hid,
+			card,
+		}},
+		events: make(chan devicewatch.Event),
 	}
-	record := &deviceRecord{attachment: newAttachment(candidate)}
-
-	manager.restoreDeviceMetadata(record)
-
-	identity := record.attachment.report.Identity
-	if identity == nil || identity.Name != "YubiKey 5C" || identity.SerialNumber != "12345678" {
-		t.Fatalf("restored identity = %#v", identity)
-	}
-
-	candidate.HID.ProductID = 2
-	manager.restoreDeviceMetadata(&deviceRecord{attachment: newAttachment(candidate)})
-	if _, ok := manager.metadata[id]; ok {
-		t.Fatal("metadata for changed attachment was retained")
-	}
-	if !manager.metadataDirty {
-		t.Fatal("metadata cache was not marked dirty")
-	}
-}
-
-func TestDeviceManagerSerializesMetadataCache(t *testing.T) {
-	candidate := hidCandidate("hid-a")
-	candidate.HID.VendorID = yubicoVendorID
-	candidate.HID.ProductID = 1
-	attached := newAttachment(candidate)
-	id := attached.report.Attachment.ID
-	serial := uint32(12345678)
-	manager := &DeviceManager{
-		metadata: map[report.AttachmentID]cachedDeviceMetadata{
-			id: {
-				Attachment: attached.report.Attachment,
-				Metadata: deviceMetadata{Yubico: &yubico.DeviceInfo{
-					Serial:          &serial,
-					FirmwareVersion: yubico.FirmwareVersion{Major: 5, Minor: 7, Build: 1},
-					FormFactor:      yubico.FormFactorUSBCKeychain,
-					UnknownFields:   map[byte][]byte{0x99: {1, 2, 3}},
-				}},
-			},
-		},
-		metadataDirty: true,
-		updates:       make(chan DeviceUpdate, 1),
-	}
-	manager.publish(map[report.AttachmentID]*deviceRecord{
-		id: {attachment: attached},
-	}, nil)
-	data := (<-manager.updates).DeviceMetadataCache
-
-	var cached deviceMetadataCacheFile
-	if err := json.Unmarshal(data, &cached); err != nil {
-		t.Fatalf("decode metadata cache: %v", err)
-	}
-	entry := cached.Attachments[id]
-	if !sameAttachment(entry.Attachment, newAttachment(candidate).report.Attachment) {
-		t.Fatalf("persisted attachment = %#v", entry.Attachment)
-	}
-	info := entry.Metadata.Yubico
-	if info == nil || len(info.UnknownFields[0x99]) != 3 {
-		t.Fatalf("persisted Yubico metadata = %#v", info)
-	}
-
-	secondWatcher := &fakeDeviceWatcher{
-		snapshot: devicewatch.Snapshot{Candidates: []devicewatch.Candidate{candidate}},
-		events:   make(chan devicewatch.Event),
-	}
-	second := newTestDeviceManager(
+	manager := newTestDeviceManagerWithResolver(
 		t,
-		secondWatcher,
+		watcher,
 		func(context.Context, transport.Mode, string) (*rtauthenticator.Opened, error) {
 			return openedDevice(nil), nil
 		},
-		WithDeviceMetadataCache(data),
+		func(
+			_ context.Context,
+			target attachment,
+			_ rtauthenticator.VendorProvider,
+		) (deviceMetadata, error) {
+			if target.mode == transport.ModeSmartCard {
+				return deviceMetadata{Token2: &token2.DeviceInfo{
+					SerialNumber: "76202000000001",
+					Branding:     "Token2",
+					FormFactor:   "FIDO Card",
+				}}, nil
+			}
+
+			serial := uint32(12345678)
+			return deviceMetadata{Yubico: &yubico.DeviceInfo{
+				Serial:          &serial,
+				FirmwareVersion: yubico.FirmwareVersion{Major: 5, Minor: 7, Build: 1},
+				FormFactor:      yubico.FormFactorUSBCKeychain,
+			}}, nil
+		},
 	)
-	requireSelectedIdentity(t, second, "YubiKey 5C", "12345678")
+
+	update := <-manager.Updates()
+	if update.Snapshot.Selected != attachmentID(transport.ModeHID, "hid-a") {
+		t.Fatalf("selected = %q", update.Snapshot.Selected)
+	}
+	want := map[report.AttachmentID]string{
+		attachmentID(transport.ModeHID, hid.Path):        "12345678",
+		attachmentID(transport.ModeSmartCard, card.Path): "76202000000001",
+	}
+	for _, device := range update.Snapshot.Devices {
+		if device.Attachment.Transport == transport.ModeSmartCard &&
+			device.Attachment.SmartCard.Interface != transport.SmartCardInterfaceContactless {
+			t.Fatalf(
+				"smart-card interface = %q, want contactless",
+				device.Attachment.SmartCard.Interface,
+			)
+		}
+		serial, ok := want[device.Attachment.ID]
+		if !ok {
+			t.Fatalf("unexpected device %q", device.Attachment.ID)
+		}
+		if device.Identity == nil || device.Identity.SerialNumber != serial {
+			t.Fatalf("device %q identity = %#v", device.Attachment.ID, device.Identity)
+		}
+		delete(want, device.Attachment.ID)
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing enriched devices: %v", want)
+	}
+	select {
+	case extra := <-manager.Updates():
+		t.Fatalf("unexpected intermediate update: %#v", extra.Snapshot)
+	default:
+	}
 }
 
 func TestDeviceManagerCloseClosesSelection(t *testing.T) {
@@ -379,6 +373,7 @@ func TestDeviceManagerCloseClosesSelection(t *testing.T) {
 				closed <- struct{}{}
 			}), nil
 		},
+		noDeviceMetadataResolver,
 		nil,
 	)
 	<-manager.ready
@@ -402,10 +397,26 @@ func newTestDeviceManager(
 	open authenticatorOpenFunc,
 	options ...AuthenticatorOption,
 ) *DeviceManager {
+	return newTestDeviceManagerWithResolver(
+		t,
+		watcher,
+		open,
+		noDeviceMetadataResolver,
+		options...,
+	)
+}
+
+func newTestDeviceManagerWithResolver(
+	t *testing.T,
+	watcher devicewatch.Watcher,
+	open authenticatorOpenFunc,
+	resolve deviceMetadataResolveFunc,
+	options ...AuthenticatorOption,
+) *DeviceManager {
 	t.Helper()
 
 	ctx, cancel := context.WithCancel(t.Context())
-	manager := newDeviceManager(ctx, cancel, watcher, open, options)
+	manager := newDeviceManager(ctx, cancel, watcher, open, resolve, options)
 	<-manager.ready
 	t.Cleanup(func() {
 		if err := manager.Close(); err != nil {
@@ -414,6 +425,14 @@ func newTestDeviceManager(
 	})
 
 	return manager
+}
+
+func noDeviceMetadataResolver(
+	context.Context,
+	attachment,
+	rtauthenticator.VendorProvider,
+) (deviceMetadata, error) {
+	return deviceMetadata{}, nil
 }
 
 func openedDevice(closed func()) *rtauthenticator.Opened {
@@ -432,8 +451,9 @@ func hidCandidate(path string) devicewatch.Candidate {
 
 func smartCardCandidate(reader string, atr byte) devicewatch.Candidate {
 	return devicewatch.Candidate{
-		Transport: transport.ModeSmartCard,
-		Path:      reader,
+		Transport:          transport.ModeSmartCard,
+		Path:               reader,
+		SmartCardInterface: transport.SmartCardInterfaceContactless,
 		SmartCard: &pcsc.ReaderInfo{
 			Name:  reader,
 			State: pcsc.ReaderStatePresent,
@@ -471,20 +491,6 @@ func waitForSelected(
 	waitForDeviceManager(t, func() bool {
 		return manager.State().Snapshot.Selected == id
 	})
-}
-
-func requireSelectedIdentity(
-	t *testing.T,
-	manager *DeviceManager,
-	name string,
-	serial string,
-) {
-	t.Helper()
-
-	identity := manager.State().Selected.Device().Identity
-	if identity == nil || identity.Name != name || identity.SerialNumber != serial {
-		t.Fatalf("selected identity = %#v", identity)
-	}
 }
 
 func waitForDeviceManager(t *testing.T, condition func() bool) {

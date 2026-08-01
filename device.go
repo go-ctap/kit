@@ -25,7 +25,7 @@ func newAttachment(candidate devicewatch.Candidate) attachment {
 	if candidate.Transport == transport.ModeSmartCard {
 		attachmentReport.SmartCard = &report.SmartCardReport{
 			Reader:    candidate.Path,
-			Interface: transport.SmartCardInterfaceUnknown,
+			Interface: candidate.SmartCardInterface,
 		}
 		if candidate.SmartCard != nil {
 			attachmentReport.SmartCard.ATR = hex.EncodeToString(

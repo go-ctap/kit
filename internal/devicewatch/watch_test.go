@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/go-ctap/kit/transport"
 	"github.com/go-ctap/pcsc"
 )
 
@@ -50,10 +51,14 @@ func TestWatcherPublishesOnlyFIDOSmartCards(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("events = %#v, want FIDO connect and disconnect", got)
 	}
-	if !got[0].Connected || got[0].Candidate.Path != "fido-reader" {
+	if !got[0].Connected ||
+		got[0].Candidate.Path != "fido-reader" ||
+		got[0].Candidate.SmartCardInterface != transport.SmartCardInterfaceContactless {
 		t.Fatalf("connected event = %#v, want fido-reader", got[0])
 	}
-	if got[1].Connected || got[1].Candidate.Path != "fido-reader" {
+	if got[1].Connected ||
+		got[1].Candidate.Path != "fido-reader" ||
+		got[1].Candidate.SmartCardInterface != transport.SmartCardInterfaceContactless {
 		t.Fatalf("disconnected event = %#v, want fido-reader", got[1])
 	}
 }
@@ -72,17 +77,60 @@ func TestWatcherInitialSmartCardsIncludeOnlyFIDO(t *testing.T) {
 	if !ok {
 		t.Fatal("FIDO smart card was rejected")
 	}
+	if candidate.SmartCardInterface != transport.SmartCardInterfaceContactless {
+		t.Fatalf("smart-card interface = %q", candidate.SmartCardInterface)
+	}
 	if current := w.pcscCurrent["fido-reader"]; current.Path != candidate.Path {
 		t.Fatalf("current candidate = %#v, want %#v", current, candidate)
 	}
 }
 
-func fakeSmartCardProbe(accepted string) func(context.Context, string) error {
-	return func(_ context.Context, reader string) error {
+func TestSmartCardInterface(t *testing.T) {
+	tests := []struct {
+		name  string
+		value pcsc.CardInterface
+		want  transport.SmartCardInterface
+	}{
+		{
+			name:  "contact",
+			value: pcsc.CardInterfaceContact,
+			want:  transport.SmartCardInterfaceContact,
+		},
+		{
+			name:  "contactless",
+			value: pcsc.CardInterfaceContactless,
+			want:  transport.SmartCardInterfaceContactless,
+		},
+		{
+			name:  "unknown",
+			value: pcsc.CardInterfaceUnknown,
+			want:  transport.SmartCardInterfaceUnknown,
+		},
+		{
+			name:  "future",
+			value: pcsc.CardInterface("future"),
+			want:  transport.SmartCardInterfaceUnknown,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := smartCardInterface(tt.value); got != tt.want {
+				t.Fatalf("interface = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func fakeSmartCardProbe(accepted string) func(
+	context.Context,
+	string,
+) (transport.SmartCardInterface, error) {
+	return func(_ context.Context, reader string) (transport.SmartCardInterface, error) {
 		if reader != accepted {
-			return errors.New("FIDO applet unavailable")
+			return "", errors.New("FIDO applet unavailable")
 		}
 
-		return nil
+		return transport.SmartCardInterfaceContactless, nil
 	}
 }

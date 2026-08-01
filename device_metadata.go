@@ -16,22 +16,17 @@ import (
 )
 
 const (
-	deviceMetadataCacheVersion        = 1
-	yubicoVendorID             uint16 = 0x1050
-	token2VendorID             uint16 = 0x349e
+	yubicoVendorID uint16 = 0x1050
+	token2VendorID uint16 = 0x349e
 )
 
 type deviceMetadata = report.DeviceVendorMetadata
 
-type cachedDeviceMetadata struct {
-	Attachment report.AttachmentReport `json:"attachment"`
-	Metadata   deviceMetadata          `json:"metadata"`
-}
-
-type deviceMetadataCacheFile struct {
-	Version     int                                          `json:"version"`
-	Attachments map[report.AttachmentID]cachedDeviceMetadata `json:"attachments"`
-}
+type deviceMetadataResolveFunc func(
+	context.Context,
+	attachment,
+	rtauthenticator.VendorProvider,
+) (deviceMetadata, error)
 
 func resolveDeviceMetadata(
 	ctx context.Context,
@@ -140,21 +135,6 @@ func deviceMetadataIdentity(
 	default:
 		return nil
 	}
-}
-
-func sameAttachment(left, right report.AttachmentReport) bool {
-	return left.ID == right.ID &&
-		left.Transport == right.Transport &&
-		equalOptionalValue(left.USB, right.USB) &&
-		equalOptionalValue(left.SmartCard, right.SmartCard)
-}
-
-func equalOptionalValue[T comparable](left, right *T) bool {
-	if left == nil || right == nil {
-		return left == right
-	}
-
-	return *left == *right
 }
 
 func applyDeviceMetadata(device *report.DeviceReport, metadata deviceMetadata) {

@@ -47,8 +47,8 @@ type DeviceIdentityReport struct {
 	SerialNumber string       `json:"serialNumber,omitempty"`
 }
 
-// DeviceReport describes one selectable transport attachment and any cached
-// physical-device identity resolved for it.
+// DeviceReport describes one selectable transport attachment and its resolved
+// physical-device identity and vendor metadata.
 type DeviceReport struct {
 	Attachment     AttachmentReport      `json:"attachment"`
 	Identity       *DeviceIdentityReport `json:"identity,omitempty"`

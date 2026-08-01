@@ -21,10 +21,11 @@ import (
 const hidSettleDelay = 100 * time.Millisecond
 
 type Candidate struct {
-	Transport transport.Mode
-	Path      string
-	HID       *ghid.DeviceInfo
-	SmartCard *pcsc.ReaderInfo
+	Transport          transport.Mode
+	Path               string
+	HID                *ghid.DeviceInfo
+	SmartCard          *pcsc.ReaderInfo
+	SmartCardInterface transport.SmartCardInterface
 }
 
 type Event struct {
@@ -60,7 +61,10 @@ type watcher struct {
 	pcscWatcher   pcsc.Watcher
 	reconcileOnce bool
 
-	probeSmartCard func(context.Context, string) error
+	probeSmartCard func(
+		context.Context,
+		string,
+	) (transport.SmartCardInterface, error)
 
 	closeOnce sync.Once
 	runErr    error
@@ -288,11 +292,12 @@ func (w *watcher) openSmartCards() error {
 }
 
 func (w *watcher) connectSmartCard(reader *pcsc.ReaderInfo) (Candidate, bool) {
-	if err := w.probeSmartCard(w.ctx, reader.Name); err != nil {
+	cardInterface, err := w.probeSmartCard(w.ctx, reader.Name)
+	if err != nil {
 		return Candidate{}, false
 	}
 
-	candidate := smartCardCandidate(reader)
+	candidate := smartCardCandidate(reader, cardInterface)
 	w.pcscCurrent[candidate.Path] = candidate
 
 	return candidate, true
@@ -398,34 +403,53 @@ func enumerateHID(
 	return candidates, nil
 }
 
-func smartCardCandidate(reader *pcsc.ReaderInfo) Candidate {
+func smartCardCandidate(
+	reader *pcsc.ReaderInfo,
+	cardInterface transport.SmartCardInterface,
+) Candidate {
 	return Candidate{
-		Transport: transport.ModeSmartCard,
-		Path:      reader.Name,
-		SmartCard: reader,
+		Transport:          transport.ModeSmartCard,
+		Path:               reader.Name,
+		SmartCard:          reader,
+		SmartCardInterface: cardInterface,
 	}
 }
 
-func probeSmartCard(ctx context.Context, reader string) error {
+func probeSmartCard(
+	ctx context.Context,
+	reader string,
+) (transport.SmartCardInterface, error) {
 	card, err := pcsc.Open(
 		reader,
 		pcsc.WithShareMode(pcsc.ShareModeExclusive),
 		pcsc.WithDisconnectDisposition(pcsc.DispositionResetCard),
 	)
 	if err != nil {
-		return err
+		return "", err
 	}
 
+	cardInterface := smartCardInterface(card.Interface())
 	ctapTransport, err := ctapiso7816.New(ctx, card)
 	if err != nil {
-		return errors.Join(err, card.Close())
+		return "", errors.Join(err, card.Close())
 	}
 
 	// Successful applet selection proves that this is a CTAP attachment.
 	// Cleanup errors do not change that fact.
 	_ = ctapTransport.Close()
 
-	return nil
+	return cardInterface, nil
+}
+
+func smartCardInterface(value pcsc.CardInterface) transport.SmartCardInterface {
+	switch value {
+	case pcsc.CardInterfaceContact:
+		return transport.SmartCardInterfaceContact
+	case pcsc.CardInterfaceContactless:
+		return transport.SmartCardInterfaceContactless
+	default:
+		return transport.SmartCardInterfaceUnknown
+	}
 }
 
 func incompleteHID(info *ghid.DeviceInfo) bool {
