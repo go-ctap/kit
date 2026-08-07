@@ -19,91 +19,6 @@ import (
 
 // Open opens the private CTAP authenticator implementation for a transport path.
 func Open(ctx context.Context, mode transport.Mode, path string) (*Opened, error) {
-	var opts []options.Option
-
-	switch mode {
-	case transport.ModeHID, transport.ModeWindowsProxy, transport.ModeSmartCard:
-	default:
-		return nil, failure.New(failure.CodeTransportModeUnsupported,
-			failure.WithPhase(failure.PhaseAuthenticator),
-		)
-	}
-
-	if recorder := kitlog.RecorderFrom(ctx); recorder != nil {
-		opts = append(opts, options.WithDiagnosticSink(kitlog.NewCTAPSink(recorder)))
-	}
-
-	var (
-		device *ctapdevice.Device
-		err    error
-	)
-	if mode == transport.ModeSmartCard {
-		device, err = openSmartCard(ctx, path, opts...)
-	} else {
-		device, err = openHID(ctx, mode, path, opts...)
-	}
-	if err == nil {
-		return &Opened{
-			Lifecycle:           device,
-			Info:                device,
-			Vendor:              device,
-			Tokens:              device,
-			CredentialInventory: device,
-			Credentials:         device,
-			WebAuthn:            device,
-			LargeBlobs:          device,
-			ConfigStatus:        device,
-			Config:              device,
-			Bio:                 device,
-		}, nil
-	}
-
-	switch {
-	case errors.Is(err, context.Canceled):
-		return nil, failure.Wrap(
-			failure.CodeOperationCanceled,
-			err,
-			failure.WithPhase(failure.PhaseAuthenticator),
-		)
-	case errors.Is(err, context.DeadlineExceeded):
-		return nil, failure.Wrap(
-			failure.CodeOperationTimeout,
-			err,
-			failure.WithPhase(failure.PhaseAuthenticator),
-		)
-	case errors.Is(err, fs.ErrPermission):
-		return nil, failure.Wrap(
-			failure.CodeTransportPermissionDenied,
-			err,
-			failure.WithPhase(failure.PhaseAuthenticator),
-		)
-	case errors.Is(err, pcsc.ErrNoAccess):
-		return nil, failure.Wrap(
-			failure.CodeTransportPermissionDenied,
-			err,
-			failure.WithPhase(failure.PhaseAuthenticator),
-		)
-	case mode == transport.ModeWindowsProxy:
-		return nil, failure.Wrap(
-			failure.CodeTransportProxyUnavailable,
-			err,
-			failure.WithPhase(failure.PhaseAuthenticator),
-		)
-	default:
-		return nil, failure.Wrap(
-			failure.CodeTransportFailure,
-			err,
-			failure.WithPhase(failure.PhaseAuthenticator),
-		)
-	}
-}
-
-func openHID(
-	ctx context.Context,
-	mode transport.Mode,
-	path string,
-	opts ...options.Option,
-) (*ctapdevice.Device, error) {
 	var (
 		deviceTransport ctaptransport.Device
 		err             error
@@ -113,35 +28,55 @@ func openHID(
 		deviceTransport, err = directhid.Open(ctx, path)
 	case transport.ModeWindowsProxy:
 		deviceTransport, err = hidproxy.Open(ctx, path)
+	case transport.ModeSmartCard:
+		deviceTransport, err = ctappcsc.Open(ctx, path)
 	default:
-		panic("authenticator: invalid HID transport mode: " + string(mode))
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	device, err := ctapdevice.New(ctx, deviceTransport, opts...)
-	if err != nil {
-		return nil, errors.Join(err, deviceTransport.Close())
+		return nil, failure.New(failure.CodeTransportModeUnsupported,
+			failure.WithPhase(failure.PhaseAuthenticator),
+		)
 	}
 
-	return device, nil
-}
-
-func openSmartCard(
-	ctx context.Context,
-	reader string,
-	opts ...options.Option,
-) (*ctapdevice.Device, error) {
-	deviceTransport, err := ctappcsc.Open(ctx, reader)
-	if err != nil {
-		return nil, err
+	var opts []options.Option
+	if recorder := kitlog.RecorderFrom(ctx); recorder != nil {
+		opts = append(opts, options.WithDiagnosticSink(kitlog.NewCTAPSink(recorder)))
 	}
 
-	device, err := ctapdevice.New(ctx, deviceTransport, opts...)
-	if err != nil {
-		return nil, errors.Join(err, deviceTransport.Close())
+	if err == nil {
+		device, newErr := ctapdevice.New(ctx, deviceTransport, opts...)
+		if newErr != nil {
+			err = errors.Join(newErr, deviceTransport.Close())
+		} else {
+			return &Opened{
+				Lifecycle:           device,
+				Info:                device,
+				Vendor:              device,
+				Tokens:              device,
+				CredentialInventory: device,
+				Credentials:         device,
+				WebAuthn:            device,
+				LargeBlobs:          device,
+				ConfigStatus:        device,
+				Config:              device,
+				Bio:                 device,
+			}, nil
+		}
 	}
 
-	return device, nil
+	code := failure.CodeTransportFailure
+	switch {
+	case errors.Is(err, context.Canceled):
+		code = failure.CodeOperationCanceled
+	case errors.Is(err, context.DeadlineExceeded):
+		code = failure.CodeOperationTimeout
+	case errors.Is(err, fs.ErrPermission), errors.Is(err, pcsc.ErrNoAccess):
+		code = failure.CodeTransportPermissionDenied
+	case mode == transport.ModeWindowsProxy:
+		code = failure.CodeTransportProxyUnavailable
+	}
+
+	return nil, failure.Wrap(
+		code,
+		err,
+		failure.WithPhase(failure.PhaseAuthenticator),
+	)
 }
