@@ -6,8 +6,11 @@ import (
 	"io/fs"
 
 	ctapdevice "github.com/go-ctap/ctap/authenticator"
+	directhid "github.com/go-ctap/ctap/backend/hid"
+	"github.com/go-ctap/ctap/backend/hidproxy"
+	ctappcsc "github.com/go-ctap/ctap/backend/pcsc"
 	"github.com/go-ctap/ctap/options"
-	ctapiso7816 "github.com/go-ctap/ctap/transport/iso7816"
+	ctaptransport "github.com/go-ctap/ctap/transport"
 	kitlog "github.com/go-ctap/kit/internal/logging"
 	"github.com/go-ctap/kit/model/failure"
 	"github.com/go-ctap/kit/transport"
@@ -19,10 +22,7 @@ func Open(ctx context.Context, mode transport.Mode, path string) (*Opened, error
 	var opts []options.Option
 
 	switch mode {
-	case transport.ModeHID:
-	case transport.ModeWindowsProxy:
-		opts = append(opts, options.WithUseNamedPipes())
-	case transport.ModeSmartCard:
+	case transport.ModeHID, transport.ModeWindowsProxy, transport.ModeSmartCard:
 	default:
 		return nil, failure.New(failure.CodeTransportModeUnsupported,
 			failure.WithPhase(failure.PhaseAuthenticator),
@@ -40,7 +40,7 @@ func Open(ctx context.Context, mode transport.Mode, path string) (*Opened, error
 	if mode == transport.ModeSmartCard {
 		device, err = openSmartCard(ctx, path, opts...)
 	} else {
-		device, err = ctapdevice.OpenHID(ctx, path, opts...)
+		device, err = openHID(ctx, mode, path, opts...)
 	}
 	if err == nil {
 		return &Opened{
@@ -98,30 +98,49 @@ func Open(ctx context.Context, mode transport.Mode, path string) (*Opened, error
 	}
 }
 
+func openHID(
+	ctx context.Context,
+	mode transport.Mode,
+	path string,
+	opts ...options.Option,
+) (*ctapdevice.Device, error) {
+	var (
+		deviceTransport ctaptransport.Device
+		err             error
+	)
+	switch mode {
+	case transport.ModeHID:
+		deviceTransport, err = directhid.Open(ctx, path)
+	case transport.ModeWindowsProxy:
+		deviceTransport, err = hidproxy.Open(ctx, path)
+	default:
+		panic("authenticator: invalid HID transport mode: " + string(mode))
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	device, err := ctapdevice.New(ctx, deviceTransport, opts...)
+	if err != nil {
+		return nil, errors.Join(err, deviceTransport.Close())
+	}
+
+	return device, nil
+}
+
 func openSmartCard(
 	ctx context.Context,
 	reader string,
 	opts ...options.Option,
 ) (*ctapdevice.Device, error) {
-	// Close may race the NFC cancel APDU during a device switch. Reset the card
-	// so a pending CTAP operation cannot survive the owned connection.
-	card, err := pcsc.Open(
-		reader,
-		pcsc.WithShareMode(pcsc.ShareModeExclusive),
-		pcsc.WithDisconnectDisposition(pcsc.DispositionResetCard),
-	)
+	deviceTransport, err := ctappcsc.Open(ctx, reader)
 	if err != nil {
 		return nil, err
 	}
 
-	isoTransport, err := ctapiso7816.New(ctx, card)
+	device, err := ctapdevice.New(ctx, deviceTransport, opts...)
 	if err != nil {
-		return nil, errors.Join(err, card.Close())
-	}
-
-	device, err := ctapdevice.New(ctx, isoTransport, opts...)
-	if err != nil {
-		return nil, errors.Join(err, isoTransport.Close())
+		return nil, errors.Join(err, deviceTransport.Close())
 	}
 
 	return device, nil

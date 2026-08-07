@@ -4,14 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"maps"
 	"slices"
 	"sync"
 	"time"
 
-	"github.com/go-ctap/ctap/authenticator"
-	"github.com/go-ctap/ctap/hidproxy"
-	"github.com/go-ctap/ctap/options"
+	directhid "github.com/go-ctap/ctap/backend/hid"
+	"github.com/go-ctap/ctap/backend/hidproxy"
 	ctapiso7816 "github.com/go-ctap/ctap/transport/iso7816"
 	ghid "github.com/go-ctap/hid"
 	"github.com/go-ctap/kit/transport"
@@ -383,13 +383,18 @@ func enumerateHID(
 	ctx context.Context,
 	mode transport.Mode,
 ) (map[string]Candidate, error) {
-	var opts []options.Option
-	if mode == transport.ModeWindowsProxy {
-		opts = append(opts, options.WithUseNamedPipes())
+	var enumerate func(context.Context) iter.Seq2[*ghid.DeviceInfo, error]
+	switch mode {
+	case transport.ModeHID:
+		enumerate = directhid.Devices
+	case transport.ModeWindowsProxy:
+		enumerate = hidproxy.Devices
+	default:
+		panic("devicewatch: invalid HID transport mode: " + string(mode))
 	}
 
 	candidates := make(map[string]Candidate)
-	for info, err := range authenticator.Enumerate(ctx, opts...) {
+	for info, err := range enumerate(ctx) {
 		if err != nil {
 			return nil, err
 		}
