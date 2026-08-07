@@ -13,7 +13,7 @@ import (
 	"github.com/go-ctap/kit/model"
 )
 
-func TestTokenServiceUseOptionalAcquiresOnlyWhenRequired(t *testing.T) {
+func TestTokenServiceUseTryWithoutTokenAcquiresOnlyWhenRequired(t *testing.T) {
 	var requests []model.InteractionRequest
 	authenticator := &recordingTokenDevice{info: uvTokenInfo()}
 	tokens := NewTokenService(
@@ -27,9 +27,9 @@ func TestTokenServiceUseOptionalAcquiresOnlyWhenRequired(t *testing.T) {
 	err := tokens.Use(
 		context.Background(),
 		TokenUse{
-			Permission: protocol.PermissionMakeCredential,
-			RPID:       "example.com",
-			Optional:   true,
+			Permission:      protocol.PermissionMakeCredential,
+			RPID:            "example.com",
+			TryWithoutToken: true,
 		},
 		func(token []byte) error {
 			usedTokens = append(usedTokens, token)
@@ -65,7 +65,7 @@ func TestTokenServiceUseOptionalAcquiresOnlyWhenRequired(t *testing.T) {
 	}
 }
 
-func TestTokenServiceUseOptionalTriesWithoutTokenBeforeCachedToken(t *testing.T) {
+func TestTokenServiceUseTryWithoutTokenBeforeCachedToken(t *testing.T) {
 	cache := &testTokenCache{}
 	key := TokenKey{Permission: protocol.PermissionMakeCredential, RPID: "example.com"}
 	cache.SetToken(key, secret.New([]byte("cached-token")))
@@ -76,9 +76,9 @@ func TestTokenServiceUseOptionalTriesWithoutTokenBeforeCachedToken(t *testing.T)
 	err := tokens.Use(
 		context.Background(),
 		TokenUse{
-			Permission: protocol.PermissionMakeCredential,
-			RPID:       "example.com",
-			Optional:   true,
+			Permission:      protocol.PermissionMakeCredential,
+			RPID:            "example.com",
+			TryWithoutToken: true,
 		},
 		func(token []byte) error {
 			uses++
@@ -106,7 +106,7 @@ func TestTokenServiceUseOptionalTriesWithoutTokenBeforeCachedToken(t *testing.T)
 	}
 }
 
-func TestTokenServiceUseOptionalDoesNotReplayRejectedToken(t *testing.T) {
+func TestTokenServiceUseTryWithoutTokenDoesNotReplayRejectedToken(t *testing.T) {
 	cache := &testTokenCache{}
 	key := TokenKey{Permission: protocol.PermissionMakeCredential, RPID: "example.com"}
 	cache.SetToken(key, secret.New([]byte("cached-token")))
@@ -121,9 +121,9 @@ func TestTokenServiceUseOptionalDoesNotReplayRejectedToken(t *testing.T) {
 	err := tokens.Use(
 		context.Background(),
 		TokenUse{
-			Permission: protocol.PermissionMakeCredential,
-			RPID:       "example.com",
-			Optional:   true,
+			Permission:      protocol.PermissionMakeCredential,
+			RPID:            "example.com",
+			TryWithoutToken: true,
 		},
 		func(token []byte) error {
 			uses++

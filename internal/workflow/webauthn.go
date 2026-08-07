@@ -43,9 +43,9 @@ func (r Runner) MakeCredential(
 
 	var response protocol.AuthenticatorMakeCredentialResponse
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
-		Permission: protocol.PermissionMakeCredential,
-		RPID:       input.RP.ID,
-		Optional:   makeCredentialTokenOptional(info, input),
+		Permission:      protocol.PermissionMakeCredential,
+		RPID:            input.RP.ID,
+		TryWithoutToken: makeCredentialShouldTryWithoutToken(info, input),
 	}, func(token []byte) error {
 		r.recordStateEffect(rtruntime.StateEffectCredentialInventoryChanged)
 
@@ -88,7 +88,7 @@ func (r Runner) MakeCredential(
 	}, nil
 }
 
-func makeCredentialTokenOptional(
+func makeCredentialShouldTryWithoutToken(
 	info protocol.AuthenticatorGetInfoResponse,
 	input appwebauthn.MakeCredentialInput,
 ) bool {
@@ -166,9 +166,9 @@ func (r Runner) GetAssertion(
 	}
 
 	if err := r.env.Tokens.Use(ctx, rtruntime.TokenUse{
-		Permission: protocol.PermissionGetAssertion,
-		RPID:       input.RPID,
-		Optional:   true,
+		Permission:      protocol.PermissionGetAssertion,
+		RPID:            input.RPID,
+		TryWithoutToken: true,
 	}, readAssertions); err != nil {
 		return appwebauthn.GetAssertionOutput{}, err
 	}

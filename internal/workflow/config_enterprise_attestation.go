@@ -36,8 +36,8 @@ func (r Runner) EnableEnterpriseAttestation(
 	}
 
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
-		Permission: protocol.PermissionAuthenticatorConfiguration,
-		Optional:   true,
+		Permission:      protocol.PermissionAuthenticatorConfiguration,
+		TryWithoutToken: true,
 	}, func(token []byte) error {
 		return device.EnableEnterpriseAttestation(ctx, token)
 	})

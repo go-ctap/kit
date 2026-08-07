@@ -36,8 +36,8 @@ func (r Runner) EnableLongTouchForReset(
 	}
 
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
-		Permission: protocol.PermissionAuthenticatorConfiguration,
-		Optional:   true,
+		Permission:      protocol.PermissionAuthenticatorConfiguration,
+		TryWithoutToken: true,
 	}, func(token []byte) error {
 		return device.EnableLongTouchForReset(ctx, token)
 	})

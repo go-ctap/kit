@@ -38,8 +38,8 @@ func (r Runner) SetAlwaysUV(
 	}
 
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
-		Permission: protocol.PermissionAuthenticatorConfiguration,
-		Optional:   true,
+		Permission:      protocol.PermissionAuthenticatorConfiguration,
+		TryWithoutToken: true,
 	}, func(token []byte) error {
 		return device.ToggleAlwaysUV(ctx, token)
 	})
@@ -86,8 +86,8 @@ func (r Runner) SetMinPINLength(
 	}
 
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
-		Permission: protocol.PermissionAuthenticatorConfiguration,
-		Optional:   true,
+		Permission:      protocol.PermissionAuthenticatorConfiguration,
+		TryWithoutToken: true,
 	}, func(token []byte) error {
 		return device.SetMinPINLength(ctx, token, protocol.SetMinPINLengthConfigSubCommandParams{
 			NewMinPINLength:     req.NewMinPINLength,

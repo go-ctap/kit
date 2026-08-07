@@ -50,10 +50,10 @@ type TokenCache interface {
 
 // TokenUse describes the authorization needed by one token consumer.
 type TokenUse struct {
-	Permission protocol.Permission
-	RPID       string
-	Optional   bool
-	ReplaySafe bool
+	Permission      protocol.Permission
+	RPID            string
+	TryWithoutToken bool
+	ReplaySafe      bool
 }
 
 func (s *TokenService) Invalidate() {
@@ -90,8 +90,9 @@ func NewTokenService(
 }
 
 // Use runs a token consumer while owning token acquisition, caller-copy
-// wiping, and rejected-token invalidation. An optional use first runs without
-// a token and acquires one only when the authenticator requires it.
+// wiping, and rejected-token invalidation. TryWithoutToken first runs the
+// consumer without a token and acquires one only when the authenticator
+// requires it.
 //
 // ReplaySafe permits one reacquisition after PIN_UV_AUTH_INVALID. Callers must
 // enable it only when replaying the entire consumer is safe.
@@ -100,7 +101,7 @@ func (s *TokenService) Use(
 	request TokenUse,
 	use func([]byte) error,
 ) error {
-	if request.Optional {
+	if request.TryWithoutToken {
 		err := use(nil)
 		if !tokenRequired(err) {
 			return err

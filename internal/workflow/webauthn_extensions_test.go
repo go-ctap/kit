@@ -9,7 +9,7 @@ import (
 	appwebauthn "github.com/go-ctap/kit/model/webauthn"
 )
 
-func TestMakeCredentialTokenOptionalForPRFEvaluation(t *testing.T) {
+func TestMakeCredentialShouldTryWithoutTokenForPRFEvaluation(t *testing.T) {
 	prfEvaluation := func() appwebauthn.MakeCredentialInput {
 		return appwebauthn.MakeCredentialInput{
 			Extensions: &ctapwebauthn.CreateAuthenticationExtensionsClientInputs{
@@ -100,8 +100,8 @@ func TestMakeCredentialTokenOptionalForPRFEvaluation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := makeCredentialTokenOptional(test.info, test.input); got != test.want {
-				t.Fatalf("makeCredentialTokenOptional() = %t, want %t", got, test.want)
+			if got := makeCredentialShouldTryWithoutToken(test.info, test.input); got != test.want {
+				t.Fatalf("makeCredentialShouldTryWithoutToken() = %t, want %t", got, test.want)
 			}
 		})
 	}
