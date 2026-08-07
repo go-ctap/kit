@@ -3,8 +3,10 @@ package workflow
 import (
 	"context"
 	"encoding/hex"
+	"slices"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
 	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
 	"github.com/go-ctap/kit/internal/authenticator"
@@ -43,7 +45,7 @@ func (r Runner) MakeCredential(
 	err = r.env.Tokens.Use(ctx, rtruntime.TokenUse{
 		Permission: protocol.PermissionMakeCredential,
 		RPID:       input.RP.ID,
-		Optional:   true,
+		Optional:   makeCredentialTokenOptional(info, input),
 	}, func(token []byte) error {
 		r.recordStateEffect(rtruntime.StateEffectCredentialInventoryChanged)
 
@@ -84,6 +86,27 @@ func (r Runner) MakeCredential(
 		Preview: preview,
 		Result:  &result,
 	}, nil
+}
+
+func makeCredentialTokenOptional(
+	info protocol.AuthenticatorGetInfoResponse,
+	input appwebauthn.MakeCredentialInput,
+) bool {
+	extensions := input.Extensions
+	if extensions == nil || extensions.PRFInputs == nil || extensions.PRF.Eval.First == nil {
+		return true
+	}
+	if !slices.Contains(info.Extensions, extension.ExtensionIdentifierHMACSecret) ||
+		!slices.Contains(info.Extensions, extension.ExtensionIdentifierHMACSecretMC) {
+		return true
+	}
+
+	uvTokenAvailable := info.Options[protocol.OptionUserVerification] &&
+		info.Options[protocol.OptionPinUvAuthToken]
+	pinTokenAvailable := info.Options[protocol.OptionClientPIN] &&
+		!info.Options[protocol.OptionNoMcGaPermissionsWithClientPin]
+
+	return !uvTokenAvailable && !pinTokenAvailable
 }
 
 func (r Runner) GetAssertion(

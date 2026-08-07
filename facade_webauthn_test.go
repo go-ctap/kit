@@ -14,6 +14,7 @@ import (
 	ctapdevice "github.com/go-ctap/ctap/authenticator"
 	"github.com/go-ctap/ctap/cose"
 	"github.com/go-ctap/ctap/credential"
+	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
 	ctaptransport "github.com/go-ctap/ctap/transport"
 	"github.com/go-ctap/ctap/webauthn"
@@ -475,6 +476,43 @@ func TestWebAuthnDelegatesPRFRoutingToCTAP(t *testing.T) {
 	}
 }
 
+func TestMakeCredentialAcquiresTokenForRegistrationPRFEvaluation(t *testing.T) {
+	a := &webauthnTestAuthenticator{
+		makeCredentialUvNotRequired: true,
+		extensions: []extension.ExtensionIdentifier{
+			extension.ExtensionIdentifierHMACSecret,
+			extension.ExtensionIdentifierHMACSecretMC,
+		},
+	}
+	session := openContractAuthenticator(t, nil, a)
+	defer func() { _ = session.Close() }()
+
+	operation := sampleMakeCredentialOperation(false)
+	operation.Extensions = &webauthn.CreateAuthenticationExtensionsClientInputs{
+		PRFInputs: &webauthn.PRFInputs{PRF: webauthn.AuthenticationExtensionsPRFInputs{
+			Eval: webauthn.AuthenticationExtensionsPRFValues{First: []byte{}},
+		}},
+	}
+
+	if _, err := session.MakeCredential(
+		context.Background(),
+		operation,
+		session.operationOptions(WithInteractionHandler(userVerificationHandler(t)))...,
+	); err != nil {
+		t.Fatalf("MakeCredential: %v", err)
+	}
+
+	if !slices.Equal(a.tokenRPIDs, []string{"example.com"}) {
+		t.Fatalf("token rpIDs = %v, want scoped RP ID", a.tokenRPIDs)
+	}
+	if string(a.makeCredentialToken) != "token:example.com" {
+		t.Fatalf("MakeCredential token = %q, want scoped token", a.makeCredentialToken)
+	}
+	if a.makeCredentialCalls != 1 {
+		t.Fatalf("MakeCredential calls = %d, want one authorized call", a.makeCredentialCalls)
+	}
+}
+
 func TestWebAuthnCTAPStatusMapsCodes(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -590,6 +628,7 @@ type webauthnTestAuthenticator struct {
 	contractAuthenticator
 	makeCredentialUvNotRequired   bool
 	alwaysUV                      bool
+	extensions                    []extension.ExtensionIdentifier
 	makeCredentialRequiresToken   bool
 	getAssertionRequiresToken     bool
 	getAssertionRequiresBuiltInUV bool
@@ -623,6 +662,7 @@ type webauthnTestAuthenticator struct {
 
 func (a *webauthnTestAuthenticator) GetInfoCached() (protocol.AuthenticatorGetInfoResponse, bool) {
 	return protocol.AuthenticatorGetInfoResponse{
+		Extensions: a.extensions,
 		Options: map[protocol.Option]bool{
 			protocol.OptionCredentialManagement:        true,
 			protocol.OptionPinUvAuthToken:              true,

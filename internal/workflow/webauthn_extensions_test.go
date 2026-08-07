@@ -6,7 +6,106 @@ import (
 	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
 	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
+	appwebauthn "github.com/go-ctap/kit/model/webauthn"
 )
+
+func TestMakeCredentialTokenOptionalForPRFEvaluation(t *testing.T) {
+	prfEvaluation := func() appwebauthn.MakeCredentialInput {
+		return appwebauthn.MakeCredentialInput{
+			Extensions: &ctapwebauthn.CreateAuthenticationExtensionsClientInputs{
+				PRFInputs: &ctapwebauthn.PRFInputs{PRF: ctapwebauthn.AuthenticationExtensionsPRFInputs{
+					Eval: ctapwebauthn.AuthenticationExtensionsPRFValues{First: []byte{}},
+				}},
+			},
+		}
+	}
+	prfSupported := []extension.ExtensionIdentifier{
+		extension.ExtensionIdentifierHMACSecret,
+		extension.ExtensionIdentifierHMACSecretMC,
+	}
+
+	tests := []struct {
+		name  string
+		info  protocol.AuthenticatorGetInfoResponse
+		input appwebauthn.MakeCredentialInput
+		want  bool
+	}{
+		{
+			name: "UV token",
+			info: protocol.AuthenticatorGetInfoResponse{
+				Extensions: prfSupported,
+				Options: map[protocol.Option]bool{
+					protocol.OptionUserVerification: true,
+					protocol.OptionPinUvAuthToken:   true,
+				},
+			},
+			input: prfEvaluation(),
+			want:  false,
+		},
+		{
+			name: "PIN token",
+			info: protocol.AuthenticatorGetInfoResponse{
+				Extensions: prfSupported,
+				Options: map[protocol.Option]bool{
+					protocol.OptionClientPIN: true,
+				},
+			},
+			input: prfEvaluation(),
+			want:  false,
+		},
+		{
+			name: "hmac-secret-mc absent",
+			info: protocol.AuthenticatorGetInfoResponse{
+				Extensions: []extension.ExtensionIdentifier{extension.ExtensionIdentifierHMACSecret},
+				Options:    map[protocol.Option]bool{protocol.OptionClientPIN: true},
+			},
+			input: prfEvaluation(),
+			want:  true,
+		},
+		{
+			name: "PIN not configured",
+			info: protocol.AuthenticatorGetInfoResponse{
+				Extensions: prfSupported,
+				Options:    map[protocol.Option]bool{protocol.OptionClientPIN: false},
+			},
+			input: prfEvaluation(),
+			want:  true,
+		},
+		{
+			name: "PIN token lacks MakeCredential permission",
+			info: protocol.AuthenticatorGetInfoResponse{
+				Extensions: prfSupported,
+				Options: map[protocol.Option]bool{
+					protocol.OptionClientPIN:                      true,
+					protocol.OptionNoMcGaPermissionsWithClientPin: true,
+				},
+			},
+			input: prfEvaluation(),
+			want:  true,
+		},
+		{
+			name: "eval absent",
+			info: protocol.AuthenticatorGetInfoResponse{
+				Extensions: prfSupported,
+				Options:    map[protocol.Option]bool{protocol.OptionClientPIN: true},
+			},
+			input: appwebauthn.MakeCredentialInput{
+				Extensions: &ctapwebauthn.CreateAuthenticationExtensionsClientInputs{
+					PRFInputs: &ctapwebauthn.PRFInputs{},
+				},
+			},
+			want: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := makeCredentialTokenOptional(test.info, test.input); got != test.want {
+				t.Fatalf("makeCredentialTokenOptional() = %t, want %t", got, test.want)
+			}
+		})
+	}
+}
 
 func TestMakeCredentialExtensionResultsKeepRawOutputsAndMapLevel3Results(t *testing.T) {
 	residentKey := false
