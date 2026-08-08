@@ -3,11 +3,11 @@ package workflow
 import (
 	"context"
 
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/errornorm"
-	"github.com/go-ctap/kit/internal/secret"
-	appcredentials "github.com/go-ctap/kit/model/credentials"
-	"github.com/go-ctap/kit/model/failure"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/internal/errornorm"
+	"github.com/telesma-app/kit/internal/secret"
+	appcredentials "github.com/telesma-app/kit/model/credentials"
+	"github.com/telesma-app/kit/model/failure"
 )
 
 // LargeBlobState owns the inventory loaded for the selected authenticator.

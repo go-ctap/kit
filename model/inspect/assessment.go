@@ -1,6 +1,6 @@
 package inspect
 
-import "github.com/go-ctap/kit/conformance"
+import "github.com/telesma-app/kit/conformance"
 
 // Assessment is the deterministic, presentation-neutral interpretation of an
 // authenticatorGetInfo response.

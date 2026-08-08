@@ -9,12 +9,12 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/go-ctap/ctap/credential"
-	"github.com/go-ctap/ctap/protocol"
-	ctaptransport "github.com/go-ctap/ctap/transport"
-	"github.com/go-ctap/kit/model"
-	appcredentials "github.com/go-ctap/kit/model/credentials"
-	"github.com/go-ctap/kit/model/failure"
+	"github.com/telesma-app/ctap/credential"
+	"github.com/telesma-app/ctap/protocol"
+	ctaptransport "github.com/telesma-app/ctap/transport"
+	"github.com/telesma-app/kit/model"
+	appcredentials "github.com/telesma-app/kit/model/credentials"
+	"github.com/telesma-app/kit/model/failure"
 )
 
 func TestCredentialInventoryReadsFreshStateAndReusesToken(t *testing.T) {

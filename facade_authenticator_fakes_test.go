@@ -7,14 +7,14 @@ import (
 	"iter"
 	"sync/atomic"
 
-	"github.com/go-ctap/ctap/attestation"
-	ctapdevice "github.com/go-ctap/ctap/authenticator"
-	"github.com/go-ctap/ctap/credential"
-	"github.com/go-ctap/ctap/extension"
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/ctap/transport/ctaphid"
-	"github.com/go-ctap/ctap/webauthn"
-	"github.com/go-ctap/kit/model"
+	"github.com/telesma-app/ctap/attestation"
+	ctapdevice "github.com/telesma-app/ctap/authenticator"
+	"github.com/telesma-app/ctap/credential"
+	"github.com/telesma-app/ctap/extension"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/ctap/transport/ctaphid"
+	"github.com/telesma-app/ctap/webauthn"
+	"github.com/telesma-app/kit/model"
 )
 
 type contractAuthenticator struct {

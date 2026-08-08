@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/go-ctap/kit/transport"
-	"github.com/go-ctap/pcsc"
+	"github.com/telesma-app/kit/transport"
+	"github.com/telesma-app/pcsc"
 )
 
 func TestWatcherPublishesOnlyFIDOSmartCards(t *testing.T) {

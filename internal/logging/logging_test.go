@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	ctaptransport "github.com/go-ctap/ctap/transport"
-	"github.com/go-ctap/kit/model"
-	"github.com/go-ctap/kit/model/failure"
+	ctaptransport "github.com/telesma-app/ctap/transport"
+	"github.com/telesma-app/kit/model"
+	"github.com/telesma-app/kit/model/failure"
 )
 
 func TestFinishElapsedAddsBoundedTransportErrorMessage(t *testing.T) {

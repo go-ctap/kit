@@ -12,12 +12,12 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/go-ctap/ctap/crypto"
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/model"
-	appcredentials "github.com/go-ctap/kit/model/credentials"
-	"github.com/go-ctap/kit/model/failure"
-	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
+	"github.com/telesma-app/ctap/crypto"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/model"
+	appcredentials "github.com/telesma-app/kit/model/credentials"
+	"github.com/telesma-app/kit/model/failure"
+	applargeblobs "github.com/telesma-app/kit/model/largeblobs"
 )
 
 func TestCredentialInventoryDoesNotExposeLargeBlobKey(t *testing.T) {

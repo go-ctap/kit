@@ -7,13 +7,13 @@ import (
 	"strconv"
 
 	"github.com/fxamacker/cbor/v2"
-	ctapauthenticator "github.com/go-ctap/ctap/authenticator"
-	"github.com/go-ctap/ctap/extension"
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/authenticator"
-	"github.com/go-ctap/kit/internal/errornorm"
-	"github.com/go-ctap/kit/model/failure"
-	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
+	ctapauthenticator "github.com/telesma-app/ctap/authenticator"
+	"github.com/telesma-app/ctap/extension"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/internal/authenticator"
+	"github.com/telesma-app/kit/internal/errornorm"
+	"github.com/telesma-app/kit/model/failure"
+	applargeblobs "github.com/telesma-app/kit/model/largeblobs"
 	"github.com/samber/lo"
 )
 

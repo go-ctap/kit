@@ -1,8 +1,8 @@
 package largeblobs
 
 import (
-	"github.com/go-ctap/kit/model/report"
-	"github.com/go-ctap/kit/model/safety"
+	"github.com/telesma-app/kit/model/report"
+	"github.com/telesma-app/kit/model/safety"
 )
 
 type MutationOperation string

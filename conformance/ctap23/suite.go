@@ -1,9 +1,9 @@
 package ctap23
 
 import (
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/conformance"
-	"github.com/go-ctap/kit/conformance/upstream"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/conformance"
+	"github.com/telesma-app/kit/conformance/upstream"
 )
 
 const (

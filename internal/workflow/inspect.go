@@ -3,9 +3,9 @@ package workflow
 import (
 	"context"
 
-	"github.com/go-ctap/kit/internal/authenticator"
-	rtinspect "github.com/go-ctap/kit/internal/inspect"
-	appinspect "github.com/go-ctap/kit/model/inspect"
+	"github.com/telesma-app/kit/internal/authenticator"
+	rtinspect "github.com/telesma-app/kit/internal/inspect"
+	appinspect "github.com/telesma-app/kit/model/inspect"
 )
 
 func (r Runner) Inspect(ctx context.Context, device authenticator.InfoProvider) (appinspect.Result, error) {

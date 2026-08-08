@@ -8,11 +8,11 @@ import (
 	"sync"
 	"sync/atomic"
 
-	rtauthenticator "github.com/go-ctap/kit/internal/authenticator"
-	"github.com/go-ctap/kit/internal/devicewatch"
-	"github.com/go-ctap/kit/model/failure"
-	"github.com/go-ctap/kit/model/report"
-	"github.com/go-ctap/kit/transport"
+	rtauthenticator "github.com/telesma-app/kit/internal/authenticator"
+	"github.com/telesma-app/kit/internal/devicewatch"
+	"github.com/telesma-app/kit/model/failure"
+	"github.com/telesma-app/kit/model/report"
+	"github.com/telesma-app/kit/transport"
 )
 
 // DeviceSnapshot is the complete current attachment and selection state.

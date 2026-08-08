@@ -3,10 +3,10 @@ package workflow
 import (
 	"context"
 
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/authenticator"
-	"github.com/go-ctap/kit/internal/errornorm"
-	"github.com/go-ctap/kit/model/failure"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/internal/authenticator"
+	"github.com/telesma-app/kit/internal/errornorm"
+	"github.com/telesma-app/kit/model/failure"
 )
 
 func (r Runner) getAuthenticatorInfo(

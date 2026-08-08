@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	ctapauthenticator "github.com/go-ctap/ctap/authenticator"
+	ctapauthenticator "github.com/telesma-app/ctap/authenticator"
 )
 
 func TestReadLargeBlobArrayTreatsChecksumFailureAsInitialArray(t *testing.T) {

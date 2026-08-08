@@ -3,9 +3,9 @@ package ctapkit
 import (
 	"context"
 
-	"github.com/go-ctap/kit/internal/workflow"
-	"github.com/go-ctap/kit/model/largeblobs"
-	appoperation "github.com/go-ctap/kit/model/operation"
+	"github.com/telesma-app/kit/internal/workflow"
+	"github.com/telesma-app/kit/model/largeblobs"
+	appoperation "github.com/telesma-app/kit/model/operation"
 )
 
 func (a *Authenticator) ReadLargeBlob(

@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	ghid "github.com/go-ctap/hid"
-	rtauthenticator "github.com/go-ctap/kit/internal/authenticator"
-	"github.com/go-ctap/kit/internal/devicewatch"
-	"github.com/go-ctap/kit/model/report"
-	"github.com/go-ctap/kit/transport"
-	"github.com/go-ctap/pcsc"
-	"github.com/go-ctap/token2"
-	"github.com/go-ctap/yubico"
+	ghid "github.com/telesma-app/hid"
+	rtauthenticator "github.com/telesma-app/kit/internal/authenticator"
+	"github.com/telesma-app/kit/internal/devicewatch"
+	"github.com/telesma-app/kit/model/report"
+	"github.com/telesma-app/kit/transport"
+	"github.com/telesma-app/pcsc"
+	"github.com/telesma-app/token2"
+	"github.com/telesma-app/yubico"
 )
 
 type fakeDeviceWatcher struct {

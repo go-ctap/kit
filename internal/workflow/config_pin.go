@@ -3,12 +3,12 @@ package workflow
 import (
 	"context"
 
-	"github.com/go-ctap/ctap/protocol"
-	rtconfig "github.com/go-ctap/kit/internal/config"
-	"github.com/go-ctap/kit/internal/errornorm"
-	appconfig "github.com/go-ctap/kit/model/config"
-	"github.com/go-ctap/kit/model/failure"
-	"github.com/go-ctap/kit/model/safety"
+	"github.com/telesma-app/ctap/protocol"
+	rtconfig "github.com/telesma-app/kit/internal/config"
+	"github.com/telesma-app/kit/internal/errornorm"
+	appconfig "github.com/telesma-app/kit/model/config"
+	"github.com/telesma-app/kit/model/failure"
+	"github.com/telesma-app/kit/model/safety"
 )
 
 func (r Runner) SetPIN(

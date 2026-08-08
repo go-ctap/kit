@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-ctap/kit/conformance/ctap23"
-	"github.com/go-ctap/kit/conformance/upstream"
+	"github.com/telesma-app/kit/conformance/ctap23"
+	"github.com/telesma-app/kit/conformance/upstream"
 )
 
 func TestCurrentManifestPinsExtractedCorpusAndPortMapping(t *testing.T) {

@@ -6,11 +6,11 @@ import (
 	"slices"
 	"testing"
 
-	ctapdevice "github.com/go-ctap/ctap/authenticator"
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/secret"
-	"github.com/go-ctap/kit/model"
-	"github.com/go-ctap/kit/model/failure"
+	ctapdevice "github.com/telesma-app/ctap/authenticator"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/internal/secret"
+	"github.com/telesma-app/kit/model"
+	"github.com/telesma-app/kit/model/failure"
 	"github.com/samber/lo"
 )
 

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/go-ctap/kit/model/failure"
+	"github.com/telesma-app/kit/model/failure"
 )
 
 func requireFailureCode(t *testing.T, err error, code failure.Code) {

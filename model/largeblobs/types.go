@@ -1,6 +1,6 @@
 package largeblobs
 
-import "github.com/go-ctap/kit/model/credentials"
+import "github.com/telesma-app/kit/model/credentials"
 
 type LargeBlobKeyState string
 

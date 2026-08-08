@@ -5,11 +5,11 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/go-ctap/kit/internal/authenticator"
-	kitlog "github.com/go-ctap/kit/internal/logging"
-	"github.com/go-ctap/kit/model"
-	"github.com/go-ctap/kit/model/report"
-	"github.com/go-ctap/kit/transport"
+	"github.com/telesma-app/kit/internal/authenticator"
+	kitlog "github.com/telesma-app/kit/internal/logging"
+	"github.com/telesma-app/kit/model"
+	"github.com/telesma-app/kit/model/report"
+	"github.com/telesma-app/kit/transport"
 )
 
 func requireZero[T any](t *testing.T, value T) {

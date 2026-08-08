@@ -5,8 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 
-	"github.com/go-ctap/ctap/protocol"
-	appwebauthn "github.com/go-ctap/kit/model/webauthn"
+	"github.com/telesma-app/ctap/protocol"
+	appwebauthn "github.com/telesma-app/kit/model/webauthn"
 )
 
 func VerifyGetAssertion(

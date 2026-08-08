@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/go-ctap/kit/model"
+	"github.com/telesma-app/kit/model"
 )
 
 type interactionHandlerFunc func(model.InteractionRequest) (model.InteractionResponse, error)

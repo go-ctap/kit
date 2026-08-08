@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	ctapdevice "github.com/go-ctap/ctap/authenticator"
-	"github.com/go-ctap/ctap/protocol"
-	ctaptransport "github.com/go-ctap/ctap/transport"
-	"github.com/go-ctap/kit/model"
-	appconfig "github.com/go-ctap/kit/model/config"
-	"github.com/go-ctap/kit/model/failure"
-	"github.com/go-ctap/kit/model/operation"
+	ctapdevice "github.com/telesma-app/ctap/authenticator"
+	"github.com/telesma-app/ctap/protocol"
+	ctaptransport "github.com/telesma-app/ctap/transport"
+	"github.com/telesma-app/kit/model"
+	appconfig "github.com/telesma-app/kit/model/config"
+	"github.com/telesma-app/kit/model/failure"
+	"github.com/telesma-app/kit/model/operation"
 )
 
 type closeCountingAuthenticator struct {

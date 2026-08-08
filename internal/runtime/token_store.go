@@ -3,8 +3,8 @@ package runtime
 import (
 	"sync"
 
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/secret"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/internal/secret"
 )
 
 // TokenStore owns the single pinUvAuthToken associated with an opened

@@ -1,8 +1,8 @@
 package report
 
 import (
-	"github.com/go-ctap/token2"
-	"github.com/go-ctap/yubico"
+	"github.com/telesma-app/token2"
+	"github.com/telesma-app/yubico"
 )
 
 // DeviceVendorMetadata is an extensible tagged union of metadata returned by

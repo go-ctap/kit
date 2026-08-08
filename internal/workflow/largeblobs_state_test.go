@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/go-ctap/ctap/protocol"
+	"github.com/telesma-app/ctap/protocol"
 )
 
 func TestLargeBlobStateRetainsInventory(t *testing.T) {

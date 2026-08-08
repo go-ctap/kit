@@ -3,9 +3,9 @@ package ctapkit
 import (
 	"encoding/hex"
 
-	"github.com/go-ctap/kit/internal/devicewatch"
-	"github.com/go-ctap/kit/model/report"
-	"github.com/go-ctap/kit/transport"
+	"github.com/telesma-app/kit/internal/devicewatch"
+	"github.com/telesma-app/kit/model/report"
+	"github.com/telesma-app/kit/transport"
 )
 
 type attachment struct {

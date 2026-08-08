@@ -3,7 +3,7 @@ package conformance
 import (
 	"slices"
 
-	"github.com/go-ctap/ctap/protocol"
+	"github.com/telesma-app/ctap/protocol"
 )
 
 func configRules() []getInfoRule {

@@ -1,8 +1,8 @@
 package credentials
 
 import (
-	appcredentials "github.com/go-ctap/kit/model/credentials"
-	"github.com/go-ctap/kit/model/safety"
+	appcredentials "github.com/telesma-app/kit/model/credentials"
+	"github.com/telesma-app/kit/model/safety"
 )
 
 func BuildDeletePreview(

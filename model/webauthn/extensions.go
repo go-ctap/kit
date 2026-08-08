@@ -1,8 +1,8 @@
 package webauthn
 
 import (
-	"github.com/go-ctap/ctap/extension"
-	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
+	"github.com/telesma-app/ctap/extension"
+	ctapwebauthn "github.com/telesma-app/ctap/webauthn"
 )
 
 type CredentialProtectionOutput struct {

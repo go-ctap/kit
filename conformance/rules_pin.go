@@ -3,8 +3,8 @@ package conformance
 import (
 	"slices"
 
-	"github.com/go-ctap/ctap/extension"
-	"github.com/go-ctap/ctap/protocol"
+	"github.com/telesma-app/ctap/extension"
+	"github.com/telesma-app/ctap/protocol"
 )
 
 func pinRules() []getInfoRule {

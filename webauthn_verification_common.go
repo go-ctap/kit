@@ -7,9 +7,9 @@ import (
 	"errors"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/go-ctap/ctap/cose"
-	"github.com/go-ctap/ctap/credential"
-	appwebauthn "github.com/go-ctap/kit/model/webauthn"
+	"github.com/telesma-app/ctap/cose"
+	"github.com/telesma-app/ctap/credential"
+	appwebauthn "github.com/telesma-app/kit/model/webauthn"
 )
 
 type verificationOutcome struct {

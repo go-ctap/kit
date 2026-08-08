@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-ctap/ctap/diagnostic"
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/model"
-	"github.com/go-ctap/kit/model/operation"
+	"github.com/telesma-app/ctap/diagnostic"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/model"
+	"github.com/telesma-app/kit/model/operation"
 )
 
 func TestCTAPSinkAppendsOperationExchange(t *testing.T) {

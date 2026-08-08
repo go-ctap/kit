@@ -3,14 +3,14 @@ package workflow
 import (
 	"context"
 
-	"github.com/go-ctap/ctap/crypto"
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/authenticator"
-	"github.com/go-ctap/kit/internal/errornorm"
-	"github.com/go-ctap/kit/internal/secret"
-	appcredentials "github.com/go-ctap/kit/model/credentials"
-	"github.com/go-ctap/kit/model/failure"
-	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
+	"github.com/telesma-app/ctap/crypto"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/internal/authenticator"
+	"github.com/telesma-app/kit/internal/errornorm"
+	"github.com/telesma-app/kit/internal/secret"
+	appcredentials "github.com/telesma-app/kit/model/credentials"
+	"github.com/telesma-app/kit/model/failure"
+	applargeblobs "github.com/telesma-app/kit/model/largeblobs"
 )
 
 func (r Runner) ListLargeBlobs(

@@ -6,10 +6,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/go-ctap/ctap/protocol"
-	ctaptransport "github.com/go-ctap/ctap/transport"
-	"github.com/go-ctap/kit/internal/secret"
-	"github.com/go-ctap/kit/model"
+	"github.com/telesma-app/ctap/protocol"
+	ctaptransport "github.com/telesma-app/ctap/transport"
+	"github.com/telesma-app/kit/internal/secret"
+	"github.com/telesma-app/kit/model"
 )
 
 func TestTokenServiceCachedPINFlowPerformsNoInteraction(t *testing.T) {

@@ -4,10 +4,10 @@ package webauthn
 import (
 	"slices"
 
-	"github.com/go-ctap/ctap/extension"
-	"github.com/go-ctap/ctap/protocol"
-	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
-	"github.com/go-ctap/kit/model/safety"
+	"github.com/telesma-app/ctap/extension"
+	"github.com/telesma-app/ctap/protocol"
+	ctapwebauthn "github.com/telesma-app/ctap/webauthn"
+	"github.com/telesma-app/kit/model/safety"
 )
 
 func makeCredentialExtensionWarnings(

@@ -3,13 +3,13 @@ package errornorm
 import (
 	"errors"
 
-	ctapclient "github.com/go-ctap/ctap/client"
-	ctaptransport "github.com/go-ctap/ctap/transport"
-	"github.com/go-ctap/ctap/transport/ctaphid"
-	ctapiso7816 "github.com/go-ctap/ctap/transport/iso7816"
-	ctaptoken2 "github.com/go-ctap/ctap/transport/token2"
-	baseiso7816 "github.com/go-ctap/iso7816"
-	"github.com/go-ctap/kit/model/failure"
+	ctapclient "github.com/telesma-app/ctap/client"
+	ctaptransport "github.com/telesma-app/ctap/transport"
+	"github.com/telesma-app/ctap/transport/ctaphid"
+	ctapiso7816 "github.com/telesma-app/ctap/transport/iso7816"
+	ctaptoken2 "github.com/telesma-app/ctap/transport/token2"
+	baseiso7816 "github.com/telesma-app/iso7816"
+	"github.com/telesma-app/kit/model/failure"
 )
 
 func transportCode(err error) (failure.Code, bool) {

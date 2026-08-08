@@ -10,9 +10,9 @@ import (
 	"strings"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/go-ctap/ctap/protocol"
-	ctaptransport "github.com/go-ctap/ctap/transport"
-	"github.com/go-ctap/kit/conformance"
+	"github.com/telesma-app/ctap/protocol"
+	ctaptransport "github.com/telesma-app/ctap/transport"
+	"github.com/telesma-app/kit/conformance"
 )
 
 const getInfoSourcePath = "tests/CTAP2/Protocol/Authr-Generic-1.js"

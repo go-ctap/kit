@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/runtime"
-	"github.com/go-ctap/kit/model/report"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/internal/runtime"
+	"github.com/telesma-app/kit/model/report"
 )
 
 type inspectDeviceStub struct {

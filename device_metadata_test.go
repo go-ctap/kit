@@ -3,9 +3,9 @@ package ctapkit
 import (
 	"testing"
 
-	"github.com/go-ctap/kit/model/report"
-	"github.com/go-ctap/token2"
-	"github.com/go-ctap/yubico"
+	"github.com/telesma-app/kit/model/report"
+	"github.com/telesma-app/token2"
+	"github.com/telesma-app/yubico"
 )
 
 func TestApplyDeviceMetadataKeepsYubicoPayload(t *testing.T) {

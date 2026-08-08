@@ -7,8 +7,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/go-ctap/kit/model/failure"
-	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
+	"github.com/telesma-app/kit/model/failure"
+	applargeblobs "github.com/telesma-app/kit/model/largeblobs"
 	"github.com/samber/lo"
 )
 

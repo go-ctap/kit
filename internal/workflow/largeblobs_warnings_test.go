@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
-	"github.com/go-ctap/kit/model/safety"
+	applargeblobs "github.com/telesma-app/kit/model/largeblobs"
+	"github.com/telesma-app/kit/model/safety"
 )
 
 func TestLargeBlobMutationWarningsDescribeFirstMatchingEntry(t *testing.T) {

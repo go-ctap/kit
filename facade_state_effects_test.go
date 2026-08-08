@@ -6,15 +6,15 @@ import (
 	"iter"
 	"testing"
 
-	"github.com/go-ctap/ctap/attestation"
-	"github.com/go-ctap/ctap/credential"
-	"github.com/go-ctap/ctap/protocol"
-	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
-	"github.com/go-ctap/kit/model"
-	appconfig "github.com/go-ctap/kit/model/config"
-	appcredentials "github.com/go-ctap/kit/model/credentials"
-	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
-	appwebauthn "github.com/go-ctap/kit/model/webauthn"
+	"github.com/telesma-app/ctap/attestation"
+	"github.com/telesma-app/ctap/credential"
+	"github.com/telesma-app/ctap/protocol"
+	ctapwebauthn "github.com/telesma-app/ctap/webauthn"
+	"github.com/telesma-app/kit/model"
+	appconfig "github.com/telesma-app/kit/model/config"
+	appcredentials "github.com/telesma-app/kit/model/credentials"
+	applargeblobs "github.com/telesma-app/kit/model/largeblobs"
+	appwebauthn "github.com/telesma-app/kit/model/webauthn"
 )
 
 func TestAuthenticatorMutationsInvalidateRetainedLargeBlobSnapshot(t *testing.T) {

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/conformance"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/conformance"
 )
 
 func TestAssessGetInfoJSONContractIsTypedAndDeterministic(t *testing.T) {

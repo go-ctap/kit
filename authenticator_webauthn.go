@@ -3,9 +3,9 @@ package ctapkit
 import (
 	"context"
 
-	"github.com/go-ctap/kit/internal/workflow"
-	appoperation "github.com/go-ctap/kit/model/operation"
-	"github.com/go-ctap/kit/model/webauthn"
+	"github.com/telesma-app/kit/internal/workflow"
+	appoperation "github.com/telesma-app/kit/model/operation"
+	"github.com/telesma-app/kit/model/webauthn"
 )
 
 func (a *Authenticator) MakeCredential(

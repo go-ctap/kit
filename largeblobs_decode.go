@@ -1,8 +1,8 @@
 package ctapkit
 
 import (
-	rtlargeblobs "github.com/go-ctap/kit/internal/largeblobs"
-	"github.com/go-ctap/kit/model/largeblobs"
+	rtlargeblobs "github.com/telesma-app/kit/internal/largeblobs"
+	"github.com/telesma-app/kit/model/largeblobs"
 )
 
 // DecodeLargeBlob interprets opaque large-blob bytes without accessing an

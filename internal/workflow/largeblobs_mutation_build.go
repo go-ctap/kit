@@ -1,9 +1,9 @@
 package workflow
 
 import (
-	"github.com/go-ctap/ctap/crypto"
-	"github.com/go-ctap/ctap/protocol"
-	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
+	"github.com/telesma-app/ctap/crypto"
+	"github.com/telesma-app/ctap/protocol"
+	applargeblobs "github.com/telesma-app/kit/model/largeblobs"
 )
 
 type largeBlobMutationPlan struct {

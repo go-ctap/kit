@@ -3,11 +3,11 @@ package workflow
 import (
 	"context"
 
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/errornorm"
-	rtruntime "github.com/go-ctap/kit/internal/runtime"
-	"github.com/go-ctap/kit/model/failure"
-	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/internal/errornorm"
+	rtruntime "github.com/telesma-app/kit/internal/runtime"
+	"github.com/telesma-app/kit/model/failure"
+	applargeblobs "github.com/telesma-app/kit/model/largeblobs"
 )
 
 func (r Runner) WriteLargeBlob(

@@ -4,14 +4,14 @@ import (
 	"context"
 	"sync"
 
-	"github.com/go-ctap/kit/internal/authenticator"
-	"github.com/go-ctap/kit/internal/logging"
-	rtruntime "github.com/go-ctap/kit/internal/runtime"
-	"github.com/go-ctap/kit/internal/workflow"
-	"github.com/go-ctap/kit/model"
-	"github.com/go-ctap/kit/model/failure"
-	"github.com/go-ctap/kit/model/report"
-	"github.com/go-ctap/kit/transport"
+	"github.com/telesma-app/kit/internal/authenticator"
+	"github.com/telesma-app/kit/internal/logging"
+	rtruntime "github.com/telesma-app/kit/internal/runtime"
+	"github.com/telesma-app/kit/internal/workflow"
+	"github.com/telesma-app/kit/model"
+	"github.com/telesma-app/kit/model/failure"
+	"github.com/telesma-app/kit/model/report"
+	"github.com/telesma-app/kit/transport"
 )
 
 type authenticatorOpenFunc func(context.Context, transport.Mode, string) (*authenticator.Opened, error)

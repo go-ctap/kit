@@ -5,7 +5,7 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/go-ctap/kit/model"
+	"github.com/telesma-app/kit/model"
 )
 
 type journalRecord struct {

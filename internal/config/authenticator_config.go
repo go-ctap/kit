@@ -3,9 +3,9 @@ package config
 import (
 	"strconv"
 
-	appconfig "github.com/go-ctap/kit/model/config"
-	"github.com/go-ctap/kit/model/failure"
-	"github.com/go-ctap/kit/model/safety"
+	appconfig "github.com/telesma-app/kit/model/config"
+	"github.com/telesma-app/kit/model/failure"
+	"github.com/telesma-app/kit/model/safety"
 )
 
 const (

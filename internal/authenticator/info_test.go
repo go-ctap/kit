@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/go-ctap/ctap/protocol"
+	"github.com/telesma-app/ctap/protocol"
 )
 
 func TestResolveInfoUsesValidCachedResponse(t *testing.T) {

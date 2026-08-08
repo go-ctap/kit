@@ -3,13 +3,13 @@ package webauthn
 import (
 	"strings"
 
-	"github.com/go-ctap/ctap/attestation"
-	"github.com/go-ctap/ctap/credential"
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/model/failure"
-	"github.com/go-ctap/kit/model/report"
-	"github.com/go-ctap/kit/model/safety"
-	appwebauthn "github.com/go-ctap/kit/model/webauthn"
+	"github.com/telesma-app/ctap/attestation"
+	"github.com/telesma-app/ctap/credential"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/model/failure"
+	"github.com/telesma-app/kit/model/report"
+	"github.com/telesma-app/kit/model/safety"
+	appwebauthn "github.com/telesma-app/kit/model/webauthn"
 	"github.com/samber/lo"
 )
 

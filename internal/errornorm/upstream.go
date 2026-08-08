@@ -3,9 +3,9 @@ package errornorm
 import (
 	"errors"
 
-	ctapdevice "github.com/go-ctap/ctap/authenticator"
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/model/failure"
+	ctapdevice "github.com/telesma-app/ctap/authenticator"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/model/failure"
 )
 
 func upstreamCode(err error, annotation Annotation) (failure.Code, bool) {

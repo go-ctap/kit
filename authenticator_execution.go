@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 
-	ctaptransport "github.com/go-ctap/ctap/transport"
-	"github.com/go-ctap/kit/internal/logging"
-	rtruntime "github.com/go-ctap/kit/internal/runtime"
-	"github.com/go-ctap/kit/internal/workflow"
-	appoperation "github.com/go-ctap/kit/model/operation"
+	ctaptransport "github.com/telesma-app/ctap/transport"
+	"github.com/telesma-app/kit/internal/logging"
+	rtruntime "github.com/telesma-app/kit/internal/runtime"
+	"github.com/telesma-app/kit/internal/workflow"
+	appoperation "github.com/telesma-app/kit/model/operation"
 )
 
 type workflowCall[T any] func(workflow.Runner, context.Context) (T, error)

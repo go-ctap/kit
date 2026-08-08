@@ -2,9 +2,9 @@
 package inspect
 
 import (
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/conformance"
-	"github.com/go-ctap/kit/model/report"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/conformance"
+	"github.com/telesma-app/kit/model/report"
 )
 
 type Info struct {

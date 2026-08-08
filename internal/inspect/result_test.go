@@ -3,9 +3,9 @@ package inspect
 import (
 	"testing"
 
-	"github.com/go-ctap/ctap/protocol"
-	model "github.com/go-ctap/kit/model/inspect"
-	"github.com/go-ctap/kit/model/report"
+	"github.com/telesma-app/ctap/protocol"
+	model "github.com/telesma-app/kit/model/inspect"
+	"github.com/telesma-app/kit/model/report"
 )
 
 func TestBuildResultIncludesGetInfoAssessment(t *testing.T) {

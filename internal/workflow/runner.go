@@ -1,8 +1,8 @@
 package workflow
 
 import (
-	"github.com/go-ctap/kit/internal/authenticator"
-	rtruntime "github.com/go-ctap/kit/internal/runtime"
+	"github.com/telesma-app/kit/internal/authenticator"
+	rtruntime "github.com/telesma-app/kit/internal/runtime"
 )
 
 type Runner struct {

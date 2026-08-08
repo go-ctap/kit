@@ -1,8 +1,8 @@
 package ctapkit
 
 import (
-	"github.com/go-ctap/kit/internal/logging"
-	"github.com/go-ctap/kit/model"
+	"github.com/telesma-app/kit/internal/logging"
+	"github.com/telesma-app/kit/model"
 )
 
 const (

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-ctap/ctap/protocol"
+	"github.com/telesma-app/ctap/protocol"
 )
 
 type namedPermission struct {

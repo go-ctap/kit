@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/go-ctap/kit/internal/workflow"
-	appoperation "github.com/go-ctap/kit/model/operation"
+	"github.com/telesma-app/kit/internal/workflow"
+	appoperation "github.com/telesma-app/kit/model/operation"
 )
 
 func TestExecuteSerializedOperationEnforcesZeroResultOnWorkflowFailure(t *testing.T) {

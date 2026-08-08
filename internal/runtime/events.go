@@ -3,7 +3,7 @@ package runtime
 import (
 	"context"
 
-	"github.com/go-ctap/kit/model"
+	"github.com/telesma-app/kit/model"
 )
 
 type EventDispatcher struct {

@@ -1,9 +1,9 @@
 package workflow
 
 import (
-	"github.com/go-ctap/ctap/crypto"
-	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
-	"github.com/go-ctap/kit/model/safety"
+	"github.com/telesma-app/ctap/crypto"
+	applargeblobs "github.com/telesma-app/kit/model/largeblobs"
+	"github.com/telesma-app/kit/model/safety"
 )
 
 const sharedArrayRewriteWarning = "CTAP updates one credential's blob by rewriting the authenticator's entire shared serialized large-blob array."

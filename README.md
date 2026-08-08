@@ -1,7 +1,7 @@
 # go-ctap/kit
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/go-ctap/kit.svg)](https://pkg.go.dev/github.com/go-ctap/kit)
-[![Go](https://github.com/go-ctap/kit/actions/workflows/go.yml/badge.svg)](https://github.com/go-ctap/kit/actions/workflows/go.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/telesma-app/kit.svg)](https://pkg.go.dev/github.com/telesma-app/kit)
+[![Go](https://github.com/telesma-app/kit/actions/workflows/go.yml/badge.svg)](https://github.com/telesma-app/kit/actions/workflows/go.yml)
 
 `go-ctap/kit` is a reusable Go runtime for applications that work with local FIDO2 authenticators. It provides device
 discovery, safe multi-step workflows, typed results, user interaction callbacks, and stable errors.
@@ -15,7 +15,7 @@ terminal applications, but it does not contain any user interface code.
 
 ## Support
 
-The runtime is built on [`go-ctap/ctap`](https://github.com/go-ctap/ctap) and supports authenticator features from CTAP
+The runtime is built on [`go-ctap/ctap`](https://github.com/telesma-app/ctap) and supports authenticator features from CTAP
 2.0 through CTAP 2.3. Each operation still depends on the capabilities reported by the connected authenticator.
 
 Main features include:
@@ -42,14 +42,14 @@ JSON rendering, or product-specific workflows. Applications must provide those p
 | `transport.ModeAuto`         | Linux, macOS, Windows | Discovers PC/SC smart cards together with the platform HID policy. On Windows, HID uses direct access when elevated and the Windows proxy otherwise.     |
 | `transport.ModeHID`          | Linux, macOS, Windows | Opens the authenticator through direct USB HID access.                                                                                                  |
 | `transport.ModeSmartCard`    | Linux, macOS, Windows | Discovers present PC/SC cards exposing the standard FIDO ISO 7816 applet and opens them exclusively for CTAP commands.                                  |
-| `transport.ModeWindowsProxy` | Windows               | Connects to a running [`go-ctap/windows-proxy`](https://github.com/go-ctap/windows-proxy).                                                              |
+| `transport.ModeWindowsProxy` | Windows               | Connects to a running [`go-ctap/windows-proxy`](https://github.com/telesma-app/windows-proxy).                                                              |
 
 BLE and hybrid transports are not part of this runtime.
 
 ## Installation
 
 ```sh
-go get github.com/go-ctap/kit@latest
+go get github.com/telesma-app/kit@latest
 ```
 
 See [`go.mod`](go.mod) for the required Go version.
@@ -67,8 +67,8 @@ import (
 	"fmt"
 	"log"
 
-	ctapkit "github.com/go-ctap/kit"
-	"github.com/go-ctap/kit/transport"
+	ctapkit "github.com/telesma-app/kit"
+	"github.com/telesma-app/kit/transport"
 )
 
 func main() {
@@ -187,7 +187,7 @@ summary. Verification does not use the network, clock, MDS, or an application tr
 
 These helpers do not replace relying-party validation of the WebAuthn ceremony. The application still owns expected
 challenge and origin checks, client-data type policy, and attestation trust decisions. Applications can obtain verified
-FIDO metadata separately with [`github.com/go-ctap/mds`](https://github.com/go-ctap/mds).
+FIDO metadata separately with [`github.com/telesma-app/mds`](https://github.com/telesma-app/mds).
 
 ## Previews and dry runs
 
@@ -260,7 +260,7 @@ sensitive data.
 ## Executable conformance suites
 
 The public `conformance` package can run multi-step suites directly over the transport-independent boundary from
-`github.com/go-ctap/ctap/transport`. A runner exposes the same connection to tests as both a typed
+`github.com/telesma-app/ctap/transport`. A runner exposes the same connection to tests as both a typed
 `ctap/client.Client` and raw CBOR, so positive command flows and malformed-request cases use one execution model.
 
 ```go
@@ -338,9 +338,9 @@ Hardware-dependent behavior must not be required by the default test suite.
 
 ## References
 
-- [`go-ctap/ctap`](https://github.com/go-ctap/ctap)
-- [`go-ctap/hid`](https://github.com/go-ctap/hid)
-- [`go-ctap/windows-proxy`](https://github.com/go-ctap/windows-proxy)
+- [`go-ctap/ctap`](https://github.com/telesma-app/ctap)
+- [`go-ctap/hid`](https://github.com/telesma-app/hid)
+- [`go-ctap/windows-proxy`](https://github.com/telesma-app/windows-proxy)
 - [Client to Authenticator Protocol 2.0](https://fidoalliance.org/specs/fido-v2.0-ps-20190130/fido-client-to-authenticator-protocol-v2.0-ps-20190130.html)
 - [Client to Authenticator Protocol 2.1](https://fidoalliance.org/specs/fido-v2.1-ps-20220621/ctap-2.1-spec-plus-errata-v2.1-ps-20220621.html)
 - [Client to Authenticator Protocol 2.2](https://fidoalliance.org/specs/fido-v2.2-ps-20250714/fido-client-to-authenticator-protocol-v2.2-ps-20250714.html)

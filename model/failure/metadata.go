@@ -1,9 +1,9 @@
 package failure
 
 import (
-	"github.com/go-ctap/ctap/protocol"
-	ctaptransport "github.com/go-ctap/ctap/transport"
-	"github.com/go-ctap/kit/model/operation"
+	"github.com/telesma-app/ctap/protocol"
+	ctaptransport "github.com/telesma-app/ctap/transport"
+	"github.com/telesma-app/kit/model/operation"
 )
 
 func canonicalOperation(value string) string {

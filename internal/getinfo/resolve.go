@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/conformance"
-	model "github.com/go-ctap/kit/model/inspect"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/conformance"
+	model "github.com/telesma-app/kit/model/inspect"
 )
 
 // Resolve returns every supported fact in a fixed order. Display order remains

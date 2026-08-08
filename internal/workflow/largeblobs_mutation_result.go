@@ -1,6 +1,6 @@
 package workflow
 
-import applargeblobs "github.com/go-ctap/kit/model/largeblobs"
+import applargeblobs "github.com/telesma-app/kit/model/largeblobs"
 
 func buildMutationResult(
 	state targetBlobState,

@@ -1,6 +1,6 @@
 package webauthn
 
-import "github.com/go-ctap/ctap/attestation"
+import "github.com/telesma-app/ctap/attestation"
 
 // VerificationStatus is the local integrity outcome of a WebAuthn operation result.
 type VerificationStatus string

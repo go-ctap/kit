@@ -8,12 +8,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/go-ctap/ctap/crypto"
-	"github.com/go-ctap/ctap/extension"
-	"github.com/go-ctap/ctap/protocol"
-	appcredentials "github.com/go-ctap/kit/model/credentials"
-	"github.com/go-ctap/kit/model/failure"
-	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
+	"github.com/telesma-app/ctap/crypto"
+	"github.com/telesma-app/ctap/extension"
+	"github.com/telesma-app/ctap/protocol"
+	appcredentials "github.com/telesma-app/kit/model/credentials"
+	"github.com/telesma-app/kit/model/failure"
+	applargeblobs "github.com/telesma-app/kit/model/largeblobs"
 )
 
 func TestReadLargeBlobFollowsPerCredentialReadAlgorithm(t *testing.T) {

@@ -3,14 +3,14 @@ package workflow
 import (
 	"context"
 
-	"github.com/go-ctap/ctap/crypto"
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/errornorm"
-	rtruntime "github.com/go-ctap/kit/internal/runtime"
-	"github.com/go-ctap/kit/internal/secret"
-	"github.com/go-ctap/kit/model/failure"
-	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
-	"github.com/go-ctap/kit/model/safety"
+	"github.com/telesma-app/ctap/crypto"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/internal/errornorm"
+	rtruntime "github.com/telesma-app/kit/internal/runtime"
+	"github.com/telesma-app/kit/internal/secret"
+	"github.com/telesma-app/kit/model/failure"
+	applargeblobs "github.com/telesma-app/kit/model/largeblobs"
+	"github.com/telesma-app/kit/model/safety"
 )
 
 type garbageCollectState struct {

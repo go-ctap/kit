@@ -4,14 +4,14 @@ import (
 	"context"
 	"encoding/hex"
 
-	"github.com/go-ctap/ctap/crypto"
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/authenticator"
-	rtcredentials "github.com/go-ctap/kit/internal/credentials"
-	"github.com/go-ctap/kit/internal/errornorm"
-	"github.com/go-ctap/kit/internal/secret"
-	"github.com/go-ctap/kit/model/failure"
-	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
+	"github.com/telesma-app/ctap/crypto"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/internal/authenticator"
+	rtcredentials "github.com/telesma-app/kit/internal/credentials"
+	"github.com/telesma-app/kit/internal/errornorm"
+	"github.com/telesma-app/kit/internal/secret"
+	"github.com/telesma-app/kit/model/failure"
+	applargeblobs "github.com/telesma-app/kit/model/largeblobs"
 )
 
 func (r Runner) ReadLargeBlob(

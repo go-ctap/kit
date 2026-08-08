@@ -10,12 +10,12 @@ import (
 	"sync"
 	"time"
 
-	directhid "github.com/go-ctap/ctap/backend/hid"
-	"github.com/go-ctap/ctap/backend/hidproxy"
-	ctapiso7816 "github.com/go-ctap/ctap/transport/iso7816"
-	ghid "github.com/go-ctap/hid"
-	"github.com/go-ctap/kit/transport"
-	"github.com/go-ctap/pcsc"
+	directhid "github.com/telesma-app/ctap/backend/hid"
+	"github.com/telesma-app/ctap/backend/hidproxy"
+	ctapiso7816 "github.com/telesma-app/ctap/transport/iso7816"
+	ghid "github.com/telesma-app/hid"
+	"github.com/telesma-app/kit/transport"
+	"github.com/telesma-app/pcsc"
 )
 
 const hidSettleDelay = 100 * time.Millisecond

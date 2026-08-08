@@ -1,8 +1,8 @@
 package config
 
 import (
-	appconfig "github.com/go-ctap/kit/model/config"
-	"github.com/go-ctap/kit/model/safety"
+	appconfig "github.com/telesma-app/kit/model/config"
+	"github.com/telesma-app/kit/model/safety"
 )
 
 const (

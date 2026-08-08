@@ -6,9 +6,9 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/go-ctap/ctap/client"
-	"github.com/go-ctap/ctap/options"
-	ctaptransport "github.com/go-ctap/ctap/transport"
+	"github.com/telesma-app/ctap/client"
+	"github.com/telesma-app/ctap/options"
+	ctaptransport "github.com/telesma-app/ctap/transport"
 )
 
 // Runner executes suites sequentially against one caller-owned CTAP

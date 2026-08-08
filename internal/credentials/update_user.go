@@ -3,9 +3,9 @@ package credentials
 import (
 	"strings"
 
-	appcredentials "github.com/go-ctap/kit/model/credentials"
-	"github.com/go-ctap/kit/model/failure"
-	"github.com/go-ctap/kit/model/safety"
+	appcredentials "github.com/telesma-app/kit/model/credentials"
+	"github.com/telesma-app/kit/model/failure"
+	"github.com/telesma-app/kit/model/safety"
 )
 
 func BuildUpdateUserPreview(operation appcredentials.UpdateUserOperation) (appcredentials.UpdateUserPreview, error) {

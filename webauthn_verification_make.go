@@ -7,10 +7,10 @@ import (
 	"errors"
 	"reflect"
 
-	"github.com/go-ctap/ctap/attestation"
-	"github.com/go-ctap/ctap/cose"
-	"github.com/go-ctap/ctap/protocol"
-	appwebauthn "github.com/go-ctap/kit/model/webauthn"
+	"github.com/telesma-app/ctap/attestation"
+	"github.com/telesma-app/ctap/cose"
+	"github.com/telesma-app/ctap/protocol"
+	appwebauthn "github.com/telesma-app/kit/model/webauthn"
 )
 
 func VerifyMakeCredential(

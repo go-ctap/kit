@@ -4,11 +4,11 @@ import (
 	"context"
 	"iter"
 
-	"github.com/go-ctap/ctap/attestation"
-	"github.com/go-ctap/ctap/credential"
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/ctap/transport/ctaphid"
-	"github.com/go-ctap/ctap/webauthn"
+	"github.com/telesma-app/ctap/attestation"
+	"github.com/telesma-app/ctap/credential"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/ctap/transport/ctaphid"
+	"github.com/telesma-app/ctap/webauthn"
 )
 
 type Lifecycle interface {

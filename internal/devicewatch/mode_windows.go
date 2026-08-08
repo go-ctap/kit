@@ -5,7 +5,7 @@ package devicewatch
 import (
 	"fmt"
 
-	"github.com/go-ctap/kit/transport"
+	"github.com/telesma-app/kit/transport"
 	"golang.org/x/sys/windows"
 )
 

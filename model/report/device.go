@@ -1,6 +1,6 @@
 package report
 
-import "github.com/go-ctap/kit/transport"
+import "github.com/telesma-app/kit/transport"
 
 // AttachmentID identifies one currently reachable transport endpoint. It is
 // not a physical-device identity and is never derived from hardware identity.

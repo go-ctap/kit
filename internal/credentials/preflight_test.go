@@ -3,10 +3,10 @@ package credentials
 import (
 	"testing"
 
-	. "github.com/go-ctap/kit/model/credentials"
-	"github.com/go-ctap/kit/model/failure"
-	"github.com/go-ctap/kit/model/report"
-	"github.com/go-ctap/kit/model/safety"
+	. "github.com/telesma-app/kit/model/credentials"
+	"github.com/telesma-app/kit/model/failure"
+	"github.com/telesma-app/kit/model/report"
+	"github.com/telesma-app/kit/model/safety"
 )
 
 func TestFindByHexID(t *testing.T) {

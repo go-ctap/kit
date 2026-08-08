@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/go-ctap/kit/model/report"
+	"github.com/telesma-app/kit/model/report"
 )
 
 type StateValue string

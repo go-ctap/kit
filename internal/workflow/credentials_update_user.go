@@ -4,14 +4,14 @@ import (
 	"context"
 	"encoding/hex"
 
-	"github.com/go-ctap/ctap/credential"
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/authenticator"
-	rtcredentials "github.com/go-ctap/kit/internal/credentials"
-	"github.com/go-ctap/kit/internal/errornorm"
-	rtruntime "github.com/go-ctap/kit/internal/runtime"
-	appcredentials "github.com/go-ctap/kit/model/credentials"
-	"github.com/go-ctap/kit/model/failure"
+	"github.com/telesma-app/ctap/credential"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/internal/authenticator"
+	rtcredentials "github.com/telesma-app/kit/internal/credentials"
+	"github.com/telesma-app/kit/internal/errornorm"
+	rtruntime "github.com/telesma-app/kit/internal/runtime"
+	appcredentials "github.com/telesma-app/kit/model/credentials"
+	"github.com/telesma-app/kit/model/failure"
 )
 
 func (r Runner) UpdateCredentialUser(

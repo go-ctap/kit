@@ -5,14 +5,14 @@ import (
 	"errors"
 	"slices"
 
-	ctapdevice "github.com/go-ctap/ctap/authenticator"
-	"github.com/go-ctap/ctap/protocol"
-	ctaptransport "github.com/go-ctap/ctap/transport"
-	"github.com/go-ctap/kit/internal/authenticator"
-	"github.com/go-ctap/kit/internal/errornorm"
-	"github.com/go-ctap/kit/internal/secret"
-	"github.com/go-ctap/kit/model"
-	"github.com/go-ctap/kit/model/failure"
+	ctapdevice "github.com/telesma-app/ctap/authenticator"
+	"github.com/telesma-app/ctap/protocol"
+	ctaptransport "github.com/telesma-app/ctap/transport"
+	"github.com/telesma-app/kit/internal/authenticator"
+	"github.com/telesma-app/kit/internal/errornorm"
+	"github.com/telesma-app/kit/internal/secret"
+	"github.com/telesma-app/kit/model"
+	"github.com/telesma-app/kit/model/failure"
 )
 
 type VerificationFlow string

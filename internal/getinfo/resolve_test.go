@@ -5,11 +5,11 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/go-ctap/ctap/cose"
-	"github.com/go-ctap/ctap/credential"
-	"github.com/go-ctap/ctap/extension"
-	"github.com/go-ctap/ctap/protocol"
-	model "github.com/go-ctap/kit/model/inspect"
+	"github.com/telesma-app/ctap/cose"
+	"github.com/telesma-app/ctap/credential"
+	"github.com/telesma-app/ctap/extension"
+	"github.com/telesma-app/ctap/protocol"
+	model "github.com/telesma-app/kit/model/inspect"
 )
 
 func TestResolveOptionPresenceAndDefaults(t *testing.T) {

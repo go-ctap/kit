@@ -3,8 +3,8 @@ package credentials
 import (
 	"strings"
 
-	appcredentials "github.com/go-ctap/kit/model/credentials"
-	"github.com/go-ctap/kit/model/failure"
+	appcredentials "github.com/telesma-app/kit/model/credentials"
+	"github.com/telesma-app/kit/model/failure"
 )
 
 func FindByHexID(report appcredentials.InventoryReport, credentialIDHex string) (appcredentials.CredentialTarget, error) {

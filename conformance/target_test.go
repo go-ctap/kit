@@ -5,10 +5,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/go-ctap/ctap/extension"
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/conformance"
-	"github.com/go-ctap/kit/model/failure"
+	"github.com/telesma-app/ctap/extension"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/conformance"
+	"github.com/telesma-app/kit/model/failure"
 )
 
 func TestAssessGetInfoAcceptsVersionSpecificProfiles(t *testing.T) {

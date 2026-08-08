@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-ctap/ctap/protocol"
-	. "github.com/go-ctap/kit/model/config"
-	"github.com/go-ctap/kit/model/failure"
-	"github.com/go-ctap/kit/model/safety"
+	"github.com/telesma-app/ctap/protocol"
+	. "github.com/telesma-app/kit/model/config"
+	"github.com/telesma-app/kit/model/failure"
+	"github.com/telesma-app/kit/model/safety"
 )
 
 func TestBioEnrollPreviewAllowsSupportedAuthenticatorWithNoEnrollments(t *testing.T) {

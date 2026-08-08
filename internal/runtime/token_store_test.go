@@ -3,8 +3,8 @@ package runtime
 import (
 	"testing"
 
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/internal/secret"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/internal/secret"
 )
 
 func TestTokenStoreReplacesAndWipesToken(t *testing.T) {

@@ -1,7 +1,7 @@
 package conformance
 
 import (
-	"github.com/go-ctap/ctap/protocol"
+	"github.com/telesma-app/ctap/protocol"
 	"github.com/samber/lo"
 )
 

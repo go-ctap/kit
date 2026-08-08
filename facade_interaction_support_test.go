@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/go-ctap/kit/model"
+	"github.com/telesma-app/kit/model"
 	"github.com/samber/lo"
 )
 

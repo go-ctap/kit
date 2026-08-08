@@ -1,11 +1,11 @@
 package inspect
 
 import (
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/conformance"
-	"github.com/go-ctap/kit/internal/getinfo"
-	appinspect "github.com/go-ctap/kit/model/inspect"
-	"github.com/go-ctap/kit/model/report"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/conformance"
+	"github.com/telesma-app/kit/internal/getinfo"
+	appinspect "github.com/telesma-app/kit/model/inspect"
+	"github.com/telesma-app/kit/model/report"
 )
 
 func BuildResult(device report.DeviceReport, info protocol.AuthenticatorGetInfoResponse) appinspect.Result {

@@ -3,10 +3,10 @@ package workflow
 import (
 	"testing"
 
-	"github.com/go-ctap/ctap/extension"
-	"github.com/go-ctap/ctap/protocol"
-	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
-	appwebauthn "github.com/go-ctap/kit/model/webauthn"
+	"github.com/telesma-app/ctap/extension"
+	"github.com/telesma-app/ctap/protocol"
+	ctapwebauthn "github.com/telesma-app/ctap/webauthn"
+	appwebauthn "github.com/telesma-app/kit/model/webauthn"
 )
 
 func TestMakeCredentialShouldTryWithoutTokenForPRFEvaluation(t *testing.T) {

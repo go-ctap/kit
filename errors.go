@@ -1,8 +1,8 @@
 package ctapkit
 
 import (
-	"github.com/go-ctap/kit/internal/errornorm"
-	"github.com/go-ctap/kit/model/failure"
+	"github.com/telesma-app/kit/internal/errornorm"
+	"github.com/telesma-app/kit/model/failure"
 )
 
 func normalizeRunError(err error, operation string) error {

@@ -3,8 +3,8 @@ package errornorm
 import (
 	"errors"
 
-	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/model/failure"
+	"github.com/telesma-app/ctap/protocol"
+	"github.com/telesma-app/kit/model/failure"
 )
 
 type Annotation struct {

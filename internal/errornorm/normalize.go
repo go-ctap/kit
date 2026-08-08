@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/go-ctap/ctap/protocol"
-	ctaptransport "github.com/go-ctap/ctap/transport"
-	"github.com/go-ctap/kit/model/failure"
+	"github.com/telesma-app/ctap/protocol"
+	ctaptransport "github.com/telesma-app/ctap/transport"
+	"github.com/telesma-app/kit/model/failure"
 )
 
 // Normalize converts every non-nil error into a stable failure.Error. The

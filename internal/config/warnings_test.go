@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/go-ctap/kit/model/config"
-	"github.com/go-ctap/kit/model/safety"
+	. "github.com/telesma-app/kit/model/config"
+	"github.com/telesma-app/kit/model/safety"
 )
 
 func TestPINWarningsDescribeCTAPEffects(t *testing.T) {

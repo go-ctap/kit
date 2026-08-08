@@ -3,7 +3,7 @@ package authenticator
 import (
 	"context"
 
-	"github.com/go-ctap/ctap/protocol"
+	"github.com/telesma-app/ctap/protocol"
 )
 
 // ResolveInfo returns the valid cached getInfo response or refreshes it when

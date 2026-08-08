@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/go-ctap/kit/conformance"
+	"github.com/telesma-app/kit/conformance"
 )
 
 const SchemaVersion = 1

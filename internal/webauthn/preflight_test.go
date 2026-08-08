@@ -5,10 +5,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/go-ctap/ctap/attestation"
-	"github.com/go-ctap/ctap/credential"
-	"github.com/go-ctap/kit/model/failure"
-	. "github.com/go-ctap/kit/model/webauthn"
+	"github.com/telesma-app/ctap/attestation"
+	"github.com/telesma-app/ctap/credential"
+	"github.com/telesma-app/kit/model/failure"
+	. "github.com/telesma-app/kit/model/webauthn"
 )
 
 func TestNormalizeMakeCredentialInputRequiresCoreFields(t *testing.T) {

@@ -5,16 +5,16 @@ import (
 	"errors"
 	"io/fs"
 
-	ctapdevice "github.com/go-ctap/ctap/authenticator"
-	directhid "github.com/go-ctap/ctap/backend/hid"
-	"github.com/go-ctap/ctap/backend/hidproxy"
-	ctappcsc "github.com/go-ctap/ctap/backend/pcsc"
-	"github.com/go-ctap/ctap/options"
-	ctaptransport "github.com/go-ctap/ctap/transport"
-	kitlog "github.com/go-ctap/kit/internal/logging"
-	"github.com/go-ctap/kit/model/failure"
-	"github.com/go-ctap/kit/transport"
-	"github.com/go-ctap/pcsc"
+	ctapdevice "github.com/telesma-app/ctap/authenticator"
+	directhid "github.com/telesma-app/ctap/backend/hid"
+	"github.com/telesma-app/ctap/backend/hidproxy"
+	ctappcsc "github.com/telesma-app/ctap/backend/pcsc"
+	"github.com/telesma-app/ctap/options"
+	ctaptransport "github.com/telesma-app/ctap/transport"
+	kitlog "github.com/telesma-app/kit/internal/logging"
+	"github.com/telesma-app/kit/model/failure"
+	"github.com/telesma-app/kit/transport"
+	"github.com/telesma-app/pcsc"
 )
 
 // Open opens the private CTAP authenticator implementation for a transport path.

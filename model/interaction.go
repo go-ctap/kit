@@ -1,7 +1,7 @@
 package model
 
 import (
-	"github.com/go-ctap/ctap/protocol"
+	"github.com/telesma-app/ctap/protocol"
 )
 
 type InteractionKind string

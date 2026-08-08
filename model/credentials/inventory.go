@@ -1,6 +1,6 @@
 package credentials
 
-import "github.com/go-ctap/kit/model/report"
+import "github.com/telesma-app/kit/model/report"
 
 // InventoryReport is the project-owned resident credential DTO shared by every output mode.
 type InventoryReport struct {

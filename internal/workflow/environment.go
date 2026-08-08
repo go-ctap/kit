@@ -3,10 +3,10 @@ package workflow
 import (
 	"context"
 
-	"github.com/go-ctap/ctap/protocol"
-	rtruntime "github.com/go-ctap/kit/internal/runtime"
-	"github.com/go-ctap/kit/model"
-	"github.com/go-ctap/kit/model/report"
+	"github.com/telesma-app/ctap/protocol"
+	rtruntime "github.com/telesma-app/kit/internal/runtime"
+	"github.com/telesma-app/kit/model"
+	"github.com/telesma-app/kit/model/report"
 )
 
 type Environment struct {

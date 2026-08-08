@@ -7,12 +7,12 @@ import (
 	"io"
 	"testing"
 
-	ctapdevice "github.com/go-ctap/ctap/authenticator"
-	"github.com/go-ctap/ctap/protocol"
-	ctaptransport "github.com/go-ctap/ctap/transport"
-	"github.com/go-ctap/ctap/transport/ctaphid"
-	ctaptoken2 "github.com/go-ctap/ctap/transport/token2"
-	"github.com/go-ctap/kit/model/failure"
+	ctapdevice "github.com/telesma-app/ctap/authenticator"
+	"github.com/telesma-app/ctap/protocol"
+	ctaptransport "github.com/telesma-app/ctap/transport"
+	"github.com/telesma-app/ctap/transport/ctaphid"
+	ctaptoken2 "github.com/telesma-app/ctap/transport/token2"
+	"github.com/telesma-app/kit/model/failure"
 )
 
 func TestDefaultCode(t *testing.T) {

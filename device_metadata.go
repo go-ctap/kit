@@ -5,14 +5,14 @@ import (
 	"errors"
 	"strconv"
 
-	rtauthenticator "github.com/go-ctap/kit/internal/authenticator"
-	"github.com/go-ctap/kit/model/report"
-	"github.com/go-ctap/kit/transport"
-	"github.com/go-ctap/token2"
-	token2resolver "github.com/go-ctap/token2/resolver"
-	token2ctaphid "github.com/go-ctap/token2/transport/ctaphid"
-	yubicoresolver "github.com/go-ctap/yubico/resolver"
-	yubicoctaphid "github.com/go-ctap/yubico/transport/ctaphid"
+	rtauthenticator "github.com/telesma-app/kit/internal/authenticator"
+	"github.com/telesma-app/kit/model/report"
+	"github.com/telesma-app/kit/transport"
+	"github.com/telesma-app/token2"
+	token2resolver "github.com/telesma-app/token2/resolver"
+	token2ctaphid "github.com/telesma-app/token2/transport/ctaphid"
+	yubicoresolver "github.com/telesma-app/yubico/resolver"
+	yubicoctaphid "github.com/telesma-app/yubico/transport/ctaphid"
 )
 
 const (

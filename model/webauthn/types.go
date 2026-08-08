@@ -1,11 +1,11 @@
 package webauthn
 
 import (
-	"github.com/go-ctap/ctap/attestation"
-	"github.com/go-ctap/ctap/credential"
-	ctapwebauthn "github.com/go-ctap/ctap/webauthn"
-	"github.com/go-ctap/kit/model/report"
-	"github.com/go-ctap/kit/model/safety"
+	"github.com/telesma-app/ctap/attestation"
+	"github.com/telesma-app/ctap/credential"
+	ctapwebauthn "github.com/telesma-app/ctap/webauthn"
+	"github.com/telesma-app/kit/model/report"
+	"github.com/telesma-app/kit/model/safety"
 )
 
 const PublicKeyCredentialTypePublicKey = credential.PublicKeyCredentialTypePublicKey

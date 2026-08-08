@@ -4,8 +4,8 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/go-ctap/ctap/extension"
-	"github.com/go-ctap/ctap/protocol"
+	"github.com/telesma-app/ctap/extension"
+	"github.com/telesma-app/ctap/protocol"
 )
 
 func blobRules() []getInfoRule {

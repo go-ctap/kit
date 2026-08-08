@@ -3,8 +3,8 @@ package workflow
 import (
 	"testing"
 
-	"github.com/go-ctap/ctap/protocol"
-	applargeblobs "github.com/go-ctap/kit/model/largeblobs"
+	"github.com/telesma-app/ctap/protocol"
+	applargeblobs "github.com/telesma-app/kit/model/largeblobs"
 )
 
 func TestListLargeBlobsClassifiesEveryArrayEntry(t *testing.T) {
