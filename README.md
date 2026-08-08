@@ -1,12 +1,12 @@
-# go-ctap/kit
+# telesma-app/kit
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/telesma-app/kit.svg)](https://pkg.go.dev/github.com/telesma-app/kit)
 [![Go](https://github.com/telesma-app/kit/actions/workflows/go.yml/badge.svg)](https://github.com/telesma-app/kit/actions/workflows/go.yml)
 
-`go-ctap/kit` is a reusable Go runtime for applications that work with local FIDO2 authenticators. It provides device
+`telesma-app/kit` is a reusable Go runtime for applications that work with local FIDO2 authenticators. It provides device
 discovery, safe multi-step workflows, typed results, user interaction callbacks, and stable errors.
 
-The library is the shared runtime used by the `go-ctap` application family. It can be used by desktop, command-line, and
+The library is the shared runtime used by the `telesma-app` application family. It can be used by desktop, command-line, and
 terminal applications, but it does not contain any user interface code.
 
 > [!WARNING]
@@ -15,7 +15,7 @@ terminal applications, but it does not contain any user interface code.
 
 ## Support
 
-The runtime is built on [`go-ctap/ctap`](https://github.com/telesma-app/ctap) and supports authenticator features from CTAP
+The runtime is built on [`telesma-app/ctap`](https://github.com/telesma-app/ctap) and supports authenticator features from CTAP
 2.0 through CTAP 2.3. Each operation still depends on the capabilities reported by the connected authenticator.
 
 Main features include:
@@ -42,7 +42,7 @@ JSON rendering, or product-specific workflows. Applications must provide those p
 | `transport.ModeAuto`         | Linux, macOS, Windows | Discovers PC/SC smart cards together with the platform HID policy. On Windows, HID uses direct access when elevated and the Windows proxy otherwise.     |
 | `transport.ModeHID`          | Linux, macOS, Windows | Opens the authenticator through direct USB HID access.                                                                                                  |
 | `transport.ModeSmartCard`    | Linux, macOS, Windows | Discovers present PC/SC cards exposing the standard FIDO ISO 7816 applet and opens them exclusively for CTAP commands.                                  |
-| `transport.ModeWindowsProxy` | Windows               | Connects to a running [`go-ctap/windows-proxy`](https://github.com/telesma-app/windows-proxy).                                                              |
+| `transport.ModeWindowsProxy` | Windows               | Connects to a running [`telesma-app/windows-proxy`](https://github.com/telesma-app/windows-proxy).                                                              |
 
 BLE and hybrid transports are not part of this runtime.
 
@@ -338,9 +338,9 @@ Hardware-dependent behavior must not be required by the default test suite.
 
 ## References
 
-- [`go-ctap/ctap`](https://github.com/telesma-app/ctap)
-- [`go-ctap/hid`](https://github.com/telesma-app/hid)
-- [`go-ctap/windows-proxy`](https://github.com/telesma-app/windows-proxy)
+- [`telesma-app/ctap`](https://github.com/telesma-app/ctap)
+- [`telesma-app/hid`](https://github.com/telesma-app/hid)
+- [`telesma-app/windows-proxy`](https://github.com/telesma-app/windows-proxy)
 - [Client to Authenticator Protocol 2.0](https://fidoalliance.org/specs/fido-v2.0-ps-20190130/fido-client-to-authenticator-protocol-v2.0-ps-20190130.html)
 - [Client to Authenticator Protocol 2.1](https://fidoalliance.org/specs/fido-v2.1-ps-20220621/ctap-2.1-spec-plus-errata-v2.1-ps-20220621.html)
 - [Client to Authenticator Protocol 2.2](https://fidoalliance.org/specs/fido-v2.2-ps-20250714/fido-client-to-authenticator-protocol-v2.2-ps-20250714.html)
