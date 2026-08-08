@@ -257,6 +257,26 @@ Unknown CBOR fields may be missing.
 Diagnostic records can still contain device, relying-party, user, credential, or biometric identifiers. Treat them as
 sensitive data.
 
+## Executable conformance suites
+
+The public `conformance` package can run multi-step suites directly over the transport-independent boundary from
+`github.com/go-ctap/ctap/transport`. A runner exposes the same connection to tests as both a typed
+`ctap/client.Client` and raw CBOR, so positive command flows and malformed-request cases use one execution model.
+
+```go
+runner, err := conformance.NewRunner(device)
+if err != nil {
+    return err
+}
+
+result, err := runner.Run(ctx, suite)
+```
+
+`Suite`, `Test`, and `Step` carry stable IDs, specification references, and exact upstream source locations. Step
+callbacks return `conformance.Fail(...)` for a conformance failure, `conformance.Skip(...)` when a case does not apply,
+or an ordinary error for an execution failure. Results are presentation-neutral JSON DTOs. The caller retains ownership
+of the CTAP connection.
+
 ## Packages
 
 | Package                                                                             | Use it for                                                                                |
