@@ -7,12 +7,12 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/google/uuid"
 	"github.com/telesma-app/ctap/extension"
 	"github.com/telesma-app/ctap/protocol"
 	ctaptransport "github.com/telesma-app/ctap/transport"
 	"github.com/telesma-app/kit/conformance"
 	"github.com/telesma-app/kit/conformance/ctap23"
-	"github.com/google/uuid"
 )
 
 type cborDevice struct {
@@ -126,12 +126,12 @@ func TestGetInfoP1ClassifiesTransportFailureAsExecutionError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := runner.Run(context.Background(), ctap23.Suite(ctap23.Config{
+	result, err := runner.Run(context.Background(), suiteWithTest(t, ctap23.Config{
 		Metadata: ctap23.Metadata{
 			GetInfo:       validGetInfo(),
 			GetInfoFields: []uint64{1, 2, 3},
 		},
-	}))
+	}, ctap23.TestIDAuthrGeneric1P1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,12 +161,12 @@ func TestGetInfoP1RejectsPresentZeroValuedOptionalField(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := runner.Run(context.Background(), ctap23.Suite(ctap23.Config{
+	result, err := runner.Run(context.Background(), suiteWithTest(t, ctap23.Config{
 		Metadata: ctap23.Metadata{
 			GetInfo:       info,
 			GetInfoFields: []uint64{1, 2, 3, 5},
 		},
-	}))
+	}, ctap23.TestIDAuthrGeneric1P1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,12 +195,32 @@ func runGetInfoSuite(
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := runner.Run(context.Background(), ctap23.Suite(ctap23.Config{Metadata: metadata}))
+	result, err := runner.Run(
+		context.Background(),
+		suiteWithTest(t, ctap23.Config{Metadata: metadata}, ctap23.TestIDAuthrGeneric1P1),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	return result, device
+}
+
+func suiteWithTest(t *testing.T, config ctap23.Config, testID conformance.TestID) conformance.Suite {
+	t.Helper()
+
+	suite := ctap23.Suite(config)
+	for _, test := range suite.Tests {
+		if test.ID == testID {
+			suite.Tests = []conformance.Test{test}
+
+			return suite
+		}
+	}
+
+	t.Fatalf("suite does not contain test %q", testID)
+
+	return conformance.Suite{}
 }
 
 func validGetInfo() protocol.AuthenticatorGetInfoResponse {

@@ -83,6 +83,46 @@
         "case": "P-1"
       },
       "status": "ported"
+    },
+    {
+      "moduleId": "ctap2.3-authenticator",
+      "suiteId": "fido.ctap2.3.authenticator",
+      "testId": "fido.ctap2.3.authr-generic-1.p-2",
+      "source": {
+        "path": "tests/CTAP2/Protocol/Authr-Generic-1.js",
+        "case": "P-2"
+      },
+      "status": "ported"
+    },
+    {
+      "moduleId": "ctap2.3-authenticator",
+      "suiteId": "fido.ctap2.3.authenticator",
+      "testId": "fido.ctap2.3.authr-generic-1.p-3",
+      "source": {
+        "path": "tests/CTAP2/Protocol/Authr-Generic-1.js",
+        "case": "P-3"
+      },
+      "status": "ported"
+    },
+    {
+      "moduleId": "ctap2.3-authenticator",
+      "suiteId": "fido.ctap2.3.authenticator",
+      "testId": "fido.ctap2.3.authr-generic-1.p-4",
+      "source": {
+        "path": "tests/CTAP2/Protocol/Authr-Generic-1.js",
+        "case": "P-4"
+      },
+      "status": "ported"
+    },
+    {
+      "moduleId": "ctap2.3-authenticator",
+      "suiteId": "fido.ctap2.3.authenticator",
+      "testId": "fido.ctap2.3.authr-generic-1.p-5",
+      "source": {
+        "path": "tests/CTAP2/Protocol/Authr-Generic-1.js",
+        "case": "P-5"
+      },
+      "status": "ported"
     }
   ]
 }

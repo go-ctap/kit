@@ -277,11 +277,30 @@ callbacks return `conformance.Fail(...)` for a conformance failure, `conformance
 or an ordinary error for an execution failure. Results are presentation-neutral JSON DTOs. The caller retains ownership
 of the CTAP connection.
 
-`conformance/ctap23` contains the first original Go port, `Authr-Generic-1 / P-1`, which validates the raw GetInfo CBOR
-map, typed CTAP 2.3 capability relationships, and agreement with caller-supplied authenticator metadata. The exact
-upstream artifact, corpus counts, and case-to-Go mappings are pinned in `conformance/upstream/manifest.json`; its Go
-loader rejects inconsistent totals, duplicate mappings, and unknown modules. These are independent Go implementations;
-passing them does not itself constitute FIDO certification.
+`conformance/ctap23` contains independent Go ports of `Authr-Generic-1 / P-1…P-5`. They validate the raw GetInfo CBOR
+map, typed CTAP 2.3 capability relationships, authenticator metadata, UP/UV declarations, and the lifecycle of
+`encIdentifier` and `encCredStoreState`. P-4 and P-5 each perform a factory reset. When either encrypted field is
+advertised, `ctap23.Config.PersistentTokenProvider` must acquire a persistent `pinUvAuthToken` with the requested
+permission; ownership of that byte buffer transfers to the suite and the suite wipes it after the test.
+
+The exact upstream artifact, corpus counts, and case-to-Go mappings are pinned in
+`conformance/upstream/manifest.json`. To inspect a newly extracted artifact without adding a CLI to this library, scan
+it through the public filesystem API and compare it with the pin:
+
+```go
+expected := upstream.Current()
+observed, err := upstream.Scan(os.DirFS(extractedCorpus), expected)
+if err != nil {
+    return err
+}
+
+changes := upstream.Diff(expected, observed)
+```
+
+The scanner follows every declared test-list reference, counts unique scripts and pinned Mocha case markers, and reports
+source, total, added, removed, and modified module drift. After reviewing an upstream change, update the source identity,
+module inventory, and port mappings in the manifest. Its loader rejects inconsistent totals, duplicate mappings, and
+unknown modules. These are independent Go implementations; passing them does not itself constitute FIDO certification.
 
 ## Packages
 

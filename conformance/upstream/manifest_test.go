@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/telesma-app/kit/conformance"
 	"github.com/telesma-app/kit/conformance/ctap23"
 	"github.com/telesma-app/kit/conformance/upstream"
 )
@@ -19,20 +20,30 @@ func TestCurrentManifestPinsExtractedCorpusAndPortMapping(t *testing.T) {
 	if len(manifest.Modules) != 7 {
 		t.Fatalf("modules = %d, want 7", len(manifest.Modules))
 	}
-	if len(manifest.Ports) != 1 {
-		t.Fatalf("ports = %#v, want first Go port", manifest.Ports)
+	if len(manifest.Ports) != 5 {
+		t.Fatalf("ports = %#v, want five Go ports", manifest.Ports)
 	}
 
-	port := manifest.Ports[0]
 	suite := ctap23.Suite(ctap23.Config{})
 	if suite.Source != manifest.Source {
 		t.Fatalf("suite source = %#v, manifest source = %#v", suite.Source, manifest.Source)
 	}
-	if port.SuiteID != suite.ID || port.TestID != ctap23.TestIDAuthrGeneric1P1 || port.Source != suite.Tests[0].Source {
-		t.Fatalf("port = %#v, suite/test source = %q/%q/%#v", port, suite.ID, suite.Tests[0].ID, suite.Tests[0].Source)
+	if len(suite.Tests) != len(manifest.Ports) {
+		t.Fatalf("suite tests = %d, ports = %d", len(suite.Tests), len(manifest.Ports))
 	}
-	if port.Status != upstream.PortStatusPorted {
-		t.Fatalf("port status = %q, want ported", port.Status)
+
+	ports := make(map[conformance.TestID]upstream.Port, len(manifest.Ports))
+	for _, port := range manifest.Ports {
+		ports[port.TestID] = port
+	}
+	for _, test := range suite.Tests {
+		port, present := ports[test.ID]
+		if !present || port.SuiteID != suite.ID || port.Source != test.Source {
+			t.Fatalf("test %q source %#v has port %#v", test.ID, test.Source, port)
+		}
+		if port.Status != upstream.PortStatusPorted {
+			t.Fatalf("port %q status = %q, want ported", port.TestID, port.Status)
+		}
 	}
 }
 
