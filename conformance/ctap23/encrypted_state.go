@@ -22,7 +22,10 @@ type encryptedMember struct {
 	state   string
 }
 
-func encryptedIdentifierTest(provider PinUvAuthTokenProvider) conformance.Test {
+func encryptedIdentifierTest(
+	provider PinUvAuthTokenProvider,
+	resetter AuthenticatorResetter,
+) conformance.Test {
 	return encryptedStateTest(encryptedMember{
 		testID: TestIDAuthrGeneric1P4,
 		caseID: "P-4",
@@ -33,10 +36,13 @@ func encryptedIdentifierTest(provider PinUvAuthTokenProvider) conformance.Test {
 		},
 		decrypt: ctapcrypto.DecryptDeviceIdentifier,
 		state:   "device identifier",
-	}, provider)
+	}, provider, resetter)
 }
 
-func encryptedCredentialStoreStateTest(provider PinUvAuthTokenProvider) conformance.Test {
+func encryptedCredentialStoreStateTest(
+	provider PinUvAuthTokenProvider,
+	resetter AuthenticatorResetter,
+) conformance.Test {
 	return encryptedStateTest(encryptedMember{
 		testID: TestIDAuthrGeneric1P5,
 		caseID: "P-5",
@@ -47,10 +53,14 @@ func encryptedCredentialStoreStateTest(provider PinUvAuthTokenProvider) conforma
 		},
 		decrypt: ctapcrypto.DecryptCredentialStoreState,
 		state:   "credential store state",
-	}, provider)
+	}, provider, resetter)
 }
 
-func encryptedStateTest(member encryptedMember, provider PinUvAuthTokenProvider) conformance.Test {
+func encryptedStateTest(
+	member encryptedMember,
+	provider PinUvAuthTokenProvider,
+	resetter AuthenticatorResetter,
+) conformance.Test {
 	getInfoRequirement := getInfoReference()
 	resetRequirement := resetReference()
 
@@ -161,7 +171,11 @@ func encryptedStateTest(member encryptedMember, provider PinUvAuthTokenProvider)
 				Name:       "Reset the authenticator",
 				References: []conformance.RequirementRef{resetRequirement},
 				Run: func(ctx context.Context) error {
-					return resetCommandError(test.Client().Reset(ctx))
+					if resetter == nil {
+						return resetCommandError(test.Client().Reset(ctx))
+					}
+
+					return resetCommandError(resetter(ctx, test.Client()))
 				},
 			}) {
 				return

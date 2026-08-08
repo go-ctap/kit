@@ -32,6 +32,7 @@ func TestParseCanonicalKinds(t *testing.T) {
 		{EnableLongTouchForReset, "config.longTouchForReset.enable"},
 		{MakeCredential, "webauthn.makeCredential"},
 		{GetAssertion, "webauthn.getAssertion"},
+		{ConformanceCTAP23, "conformance.ctap23"},
 	}
 
 	for _, tt := range tests {

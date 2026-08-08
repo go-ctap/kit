@@ -23,6 +23,7 @@ const (
 	CodeMDSFetchFailed                        Code = "MDS_FETCH_FAILED"
 	CodeMDSVerificationFailed                 Code = "MDS_VERIFICATION_FAILED"
 	CodeConformanceTargetInvalid              Code = "CONFORMANCE_TARGET_INVALID"
+	CodeConformanceModeInvalid                Code = "CONFORMANCE_MODE_INVALID"
 	CodeRelyingPartyIDRequired                Code = "RELYING_PARTY_ID_REQUIRED"
 	CodeUserIDRequired                        Code = "USER_ID_REQUIRED"
 	CodeClientDataJSONRequired                Code = "CLIENT_DATA_JSON_REQUIRED"

@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	ctaptransport "github.com/telesma-app/ctap/transport"
 	"github.com/telesma-app/kit/internal/authenticator"
 	"github.com/telesma-app/kit/internal/logging"
 	rtruntime "github.com/telesma-app/kit/internal/runtime"
@@ -78,6 +79,7 @@ func WithVerificationFlow(flow VerificationFlow) OperationOption {
 // lifecycle, operation serialization, and runtime token state until Close.
 type Authenticator struct {
 	selected            report.DeviceReport
+	cbor                ctaptransport.CBOR
 	lifecycle           authenticator.Lifecycle
 	vendor              authenticator.VendorProvider
 	info                authenticator.InfoProvider
@@ -130,6 +132,7 @@ func openAuthenticatorHandle(
 
 	return &Authenticator{
 		selected:            selected,
+		cbor:                opened.CBOR,
 		lifecycle:           opened.Lifecycle,
 		vendor:              opened.Vendor,
 		info:                opened.Info,

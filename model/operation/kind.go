@@ -29,6 +29,7 @@ const (
 	EnableLongTouchForReset     Kind = "config.longTouchForReset.enable"
 	MakeCredential              Kind = "webauthn.makeCredential"
 	GetAssertion                Kind = "webauthn.getAssertion"
+	ConformanceCTAP23           Kind = "conformance.ctap23"
 )
 
 // Parse returns the canonical operation kind represented by value.
@@ -59,7 +60,8 @@ func Parse(value string) (Kind, bool) {
 		SetMinPINLength,
 		EnableLongTouchForReset,
 		MakeCredential,
-		GetAssertion:
+		GetAssertion,
+		ConformanceCTAP23:
 		return kind, true
 	default:
 		return "", false

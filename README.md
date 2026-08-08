@@ -283,6 +283,37 @@ map, typed CTAP 2.3 capability relationships, authenticator metadata, UP/UV decl
 advertised, `ctap23.Config.PersistentTokenProvider` must acquire a persistent `pinUvAuthToken` with the requested
 permission; ownership of that byte buffer transfers to the suite and the suite wipes it after the test.
 
+Applications with an opened `ctapkit.Authenticator` should use the managed facade. The zero-value mode is
+non-destructive and runs P-1 through P-3 on that authenticator:
+
+```go
+result, err := authenticator.RunCTAP23Conformance(ctx, ctap23.RunRequest{
+    Metadata: metadata,
+})
+```
+
+The metadata must come from the authenticator's verified metadata statement and must include the exact advertised
+GetInfo field set. A complete run is deliberately explicit and should be paired with the application's normal
+interaction handler:
+
+```go
+result, err := authenticator.RunCTAP23Conformance(
+    ctx,
+    ctap23.RunRequest{
+        Mode:     ctap23.RunModeFull,
+        Metadata: metadata,
+    },
+    ctapkit.WithInteractionHandler(handler),
+)
+```
+
+Full mode runs P-1 through P-5. If the corresponding encrypted GetInfo members are advertised, P-4 and P-5 each ask
+for a destructive touch and factory-reset the authenticator. PIN and built-in UV requests use the same interaction
+flow as other runtime operations. When neither is configured, the runtime asks for and configures a temporary PIN;
+a successful following reset removes it. If the run is interrupted before that reset, the PIN can remain configured.
+The operation is serialized with all other work on the opened authenticator and invalidates runtime-owned token and
+state caches after reset.
+
 The exact upstream artifact, corpus counts, and case-to-Go mappings are pinned in
 `conformance/upstream/manifest.json`. To inspect a newly extracted artifact without adding a CLI to this library, scan
 it through the public filesystem API and compare it with the pin:

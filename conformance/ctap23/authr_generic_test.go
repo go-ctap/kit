@@ -217,6 +217,28 @@ func TestGetInfoP4RequiresTokenProviderWhenIdentifierIsAdvertised(t *testing.T) 
 	}
 }
 
+func TestSuiteForSelectsSafeAndFullRunModes(t *testing.T) {
+	safe, err := ctap23.SuiteFor(ctap23.RunModeSafe, ctap23.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(safe.Tests) != 3 || safe.Tests[2].ID != ctap23.TestIDAuthrGeneric1P3 {
+		t.Fatalf("safe tests = %#v", safe.Tests)
+	}
+
+	full, err := ctap23.SuiteFor(ctap23.RunModeFull, ctap23.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(full.Tests) != 5 || full.Tests[4].ID != ctap23.TestIDAuthrGeneric1P5 {
+		t.Fatalf("full tests = %#v", full.Tests)
+	}
+
+	if _, err := ctap23.SuiteFor(ctap23.RunMode("invalid"), ctap23.Config{}); err == nil {
+		t.Fatal("SuiteFor accepted an invalid run mode")
+	}
+}
+
 type scriptedDevice struct {
 	t        *testing.T
 	infos    [][]byte

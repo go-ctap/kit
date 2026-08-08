@@ -115,6 +115,7 @@ func newCodeRegistry() map[Code]codeSpec {
 		CodeInteractionHandlerRequired,
 		CodeMDSAAGUIDInvalid,
 		CodeConformanceTargetInvalid,
+		CodeConformanceModeInvalid,
 		CodeRelyingPartyIDRequired,
 		CodeUserIDRequired,
 		CodeClientDataJSONRequired,
