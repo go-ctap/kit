@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "artifact": "fido-conformance-tools",
+    "version": "1.9.1",
+    "digest": "sha256:028729315ecd36f76b9166c014ae4af3c3dde41efcad99444b519c3a867cef43"
+  },
+  "totals": {
+    "testLists": 11,
+    "references": 252,
+    "scripts": 219,
+    "cases": 1977
+  },
+  "modules": [
+    {
+      "id": "ctap2.0-authenticator",
+      "name": "CTAP 2.0 authenticator",
+      "testLists": [
+        "modules/ctap2.0-conformance-module/authr-testlist.json"
+      ],
+      "counts": {"testLists": 1, "references": 24, "scripts": 24, "cases": 158}
+    },
+    {
+      "id": "ctap2.1-authenticator-webauthn",
+      "name": "CTAP 2.1 authenticator and WebAuthn",
+      "testLists": [
+        "modules/ctap2.1-conformance-module/authr-testlist.json",
+        "modules/ctap2.1-conformance-module/webauthn-testlist.json"
+      ],
+      "counts": {"testLists": 2, "references": 63, "scripts": 62, "cases": 317}
+    },
+    {
+      "id": "ctap2.3-authenticator",
+      "name": "CTAP 2.3 authenticator",
+      "testLists": [
+        "modules/ctap2.3-conformance-module/authr-testlist.json"
+      ],
+      "counts": {"testLists": 1, "references": 49, "scripts": 49, "cases": 295}
+    },
+    {
+      "id": "fido2-server",
+      "name": "FIDO2 server",
+      "testLists": [
+        "modules/fido2-server-conformance-module/server-testlist.json"
+      ],
+      "counts": {"testLists": 1, "references": 16, "scripts": 16, "cases": 170}
+    },
+    {
+      "id": "u2f1.2-authenticator",
+      "name": "U2F 1.2 authenticator",
+      "testLists": [
+        "modules/u2f-v1.2-conformance-module/authr-testlist.json"
+      ],
+      "counts": {"testLists": 1, "references": 7, "scripts": 7, "cases": 77}
+    },
+    {
+      "id": "uaf1.1-legacy",
+      "name": "UAF 1.1 legacy",
+      "testLists": [
+        "modules/uaf-v1.1-conformance-module-LEGACY/asm-testlist.json",
+        "modules/uaf-v1.1-conformance-module-LEGACY/client-authr-combo-testlist.json",
+        "modules/uaf-v1.1-conformance-module-LEGACY/client-testlist.json",
+        "modules/uaf-v1.1-conformance-module-LEGACY/server-testlist.json"
+      ],
+      "counts": {"testLists": 4, "references": 92, "scripts": 60, "cases": 951}
+    },
+    {
+      "id": "uaf1.1-interop",
+      "name": "UAF 1.1 interop",
+      "testLists": [
+        "modules/uaf-v1.1-interop-module/interop-testlist.json"
+      ],
+      "counts": {"testLists": 1, "references": 1, "scripts": 1, "cases": 9}
+    }
+  ],
+  "ports": [
+    {
+      "moduleId": "ctap2.3-authenticator",
+      "suiteId": "fido.ctap2.3.authenticator",
+      "testId": "fido.ctap2.3.authr-generic-1.p-1",
+      "source": {
+        "path": "tests/CTAP2/Protocol/Authr-Generic-1.js",
+        "case": "P-1"
+      },
+      "status": "ported"
+    }
+  ]
+}

@@ -277,6 +277,12 @@ callbacks return `conformance.Fail(...)` for a conformance failure, `conformance
 or an ordinary error for an execution failure. Results are presentation-neutral JSON DTOs. The caller retains ownership
 of the CTAP connection.
 
+`conformance/ctap23` contains the first original Go port, `Authr-Generic-1 / P-1`, which validates the raw GetInfo CBOR
+map, typed CTAP 2.3 capability relationships, and agreement with caller-supplied authenticator metadata. The exact
+upstream artifact, corpus counts, and case-to-Go mappings are pinned in `conformance/upstream/manifest.json`; its Go
+loader rejects inconsistent totals, duplicate mappings, and unknown modules. These are independent Go implementations;
+passing them does not itself constitute FIDO certification.
+
 ## Packages
 
 | Package                                                                             | Use it for                                                                                |
@@ -290,6 +296,8 @@ of the CTAP connection.
 | `model/webauthn`                                                                    | WebAuthn operation DTOs                                                                   |
 | `model/failure`                                                                     | Stable public error codes and snapshots                                                   |
 | `conformance`                                                                       | Authenticator conformance assessment API and contracts                                    |
+| `conformance/ctap23`                                                                | Executable CTAP 2.3 authenticator tests                                                    |
+| `conformance/upstream`                                                              | Pinned upstream corpus manifest and Go port coverage                                       |
 | `model/operation`, `model/report`, `model/safety`                                   | Shared report and contract DTOs                                                           |
 | `transport`                                                                         | HID, PC/SC smart-card, and Windows proxy discovery modes                                  |
 
