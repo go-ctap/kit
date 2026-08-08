@@ -1,4 +1,4 @@
-// These tests exercise the internal evaluator through its public DTO contract.
+// These tests exercise the public assessment API as an external consumer.
 package conformance_test
 
 import (
@@ -8,11 +8,10 @@ import (
 
 	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
-	engine "github.com/go-ctap/kit/internal/conformance"
-	"github.com/go-ctap/kit/model/conformance"
+	"github.com/go-ctap/kit/conformance"
 )
 
-func TestEvaluateGetInfoRequiresOnlyNormativeConfigCommands(t *testing.T) {
+func TestAssessGetInfoRequiresOnlyNormativeConfigCommands(t *testing.T) {
 	tests := []struct {
 		name string
 		info func() protocol.AuthenticatorGetInfoResponse
@@ -85,7 +84,7 @@ func TestEvaluateGetInfoRequiresOnlyNormativeConfigCommands(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			report := engine.EvaluateGetInfo(test.info())
+			report := conformance.AssessGetInfo(test.info())
 			if len(report.Findings) != 1 || len(report.Inconclusive) != 0 {
 				t.Fatalf("report = %#v, want exactly one finding", report)
 			}
@@ -94,7 +93,7 @@ func TestEvaluateGetInfoRequiresOnlyNormativeConfigCommands(t *testing.T) {
 	}
 }
 
-func TestEvaluateGetInfoChecksConfigCommandPrerequisitesInTheSupportedDirection(t *testing.T) {
+func TestAssessGetInfoChecksConfigCommandPrerequisitesInTheSupportedDirection(t *testing.T) {
 	tests := []struct {
 		name    string
 		command protocol.ConfigSubCommand
@@ -149,13 +148,13 @@ func TestEvaluateGetInfoChecksConfigCommandPrerequisitesInTheSupportedDirection(
 		t.Run(test.name, func(t *testing.T) {
 			info := validConfigNeutralFIDO23Info()
 			info.AuthenticatorConfigCommands = []protocol.ConfigSubCommand{test.command}
-			finding := requireOnlyFinding(t, engine.EvaluateGetInfo(info), test.rule)
+			finding := requireOnlyFinding(t, conformance.AssessGetInfo(info), test.rule)
 			assertExpectations(t, finding.Expectations, test.want)
 		})
 	}
 }
 
-func TestEvaluateGetInfoDoesNotInventOptionalConfigCommands(t *testing.T) {
+func TestAssessGetInfoDoesNotInventOptionalConfigCommands(t *testing.T) {
 	tests := []struct {
 		name   string
 		mutate func(*protocol.AuthenticatorGetInfoResponse)
@@ -206,30 +205,30 @@ func TestEvaluateGetInfoDoesNotInventOptionalConfigCommands(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			info := validConfigNeutralFIDO23Info()
 			test.mutate(&info)
-			assertNoAssessments(t, engine.EvaluateGetInfo(info))
+			assertNoAssessments(t, conformance.AssessGetInfo(info))
 		})
 	}
 }
 
-func TestEvaluateGetInfoDistinguishesAbsentAndPresentConfigInventory(t *testing.T) {
+func TestAssessGetInfoDistinguishesAbsentAndPresentConfigInventory(t *testing.T) {
 	info := validConfigNeutralFIDO23Info()
 	delete(info.Options, protocol.OptionAuthenticatorConfig)
-	assertNoAssessments(t, engine.EvaluateGetInfo(info))
+	assertNoAssessments(t, conformance.AssessGetInfo(info))
 
 	info.AuthenticatorConfigCommands = []protocol.ConfigSubCommand{}
-	finding := requireOnlyFinding(t, engine.EvaluateGetInfo(info), conformance.RuleAuthenticatorConfigSupportConsistency)
+	finding := requireOnlyFinding(t, conformance.AssessGetInfo(info), conformance.RuleAuthenticatorConfigSupportConsistency)
 	assertExpectations(t, finding.Expectations, []conformance.Expectation{
 		expectation([]conformance.FieldPath{"options.authnrCfg"}, conformance.ExpectationAll, conformance.ExpectationTrue),
 	})
 }
 
-func TestEvaluateGetInfoAggregatesSetMinPINSupportProjections(t *testing.T) {
+func TestAssessGetInfoAggregatesSetMinPINSupportProjections(t *testing.T) {
 	info := validFIDO23Info()
 	info.AuthenticatorConfigCommands = nil
 	info.PinComplexityPolicy = ptr(false)
 	info.Extensions = append(info.Extensions, extension.ExtensionIdentifierPinComplexityPolicy)
 
-	finding := requireOnlyFinding(t, engine.EvaluateGetInfo(info), conformance.RuleSetMinPINSupportConsistency)
+	finding := requireOnlyFinding(t, conformance.AssessGetInfo(info), conformance.RuleSetMinPINSupportConsistency)
 	assertExpectations(t, finding.Expectations, []conformance.Expectation{
 		expectation([]conformance.FieldPath{"authenticatorConfigCommands"}, conformance.ExpectationAll, conformance.ExpectationContains, "0x03"),
 	})
@@ -238,7 +237,7 @@ func TestEvaluateGetInfoAggregatesSetMinPINSupportProjections(t *testing.T) {
 	}
 }
 
-func TestEvaluateGetInfoSetMinPINReferencesFollowActualTriggers(t *testing.T) {
+func TestAssessGetInfoSetMinPINReferencesFollowActualTriggers(t *testing.T) {
 	const prefix = "ctap-2.3-ps-20260226:"
 	option := conformance.RequirementID(prefix + "6.4:set-min-pin-length-option-reflects-subcommand-support")
 	commands := conformance.RequirementID(prefix + "6.4:authenticator-config-commands-indicate-command-support")
@@ -303,7 +302,7 @@ func TestEvaluateGetInfoSetMinPINReferencesFollowActualTriggers(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			info := validConfigNeutralFIDO23Info()
 			test.mutate(&info)
-			finding := requireOnlyFinding(t, engine.EvaluateGetInfo(info), conformance.RuleSetMinPINSupportConsistency)
+			finding := requireOnlyFinding(t, conformance.AssessGetInfo(info), conformance.RuleSetMinPINSupportConsistency)
 			got := make([]conformance.RequirementID, 0, len(finding.References))
 			for _, reference := range finding.References {
 				got = append(got, reference.ID)
@@ -316,13 +315,13 @@ func TestEvaluateGetInfoSetMinPINReferencesFollowActualTriggers(t *testing.T) {
 	}
 }
 
-func TestEvaluateGetInfoReportsAllMissingRequiredCommandsDeterministically(t *testing.T) {
+func TestAssessGetInfoReportsAllMissingRequiredCommandsDeterministically(t *testing.T) {
 	info := validFIDO23Info()
 	info.AuthenticatorConfigCommands = nil
 	info.Options[protocol.OptionEnterpriseAttestation] = false
 	info.VendorPrototypeConfigCommands = []protocol.VendorCommandID{}
 
-	report := engine.EvaluateGetInfo(info)
+	report := conformance.AssessGetInfo(info)
 	if len(report.Findings) != 3 || len(report.Inconclusive) != 0 {
 		t.Fatalf("report = %#v, want three findings", report)
 	}
@@ -347,7 +346,7 @@ func TestEvaluateGetInfoReportsAllMissingRequiredCommandsDeterministically(t *te
 		t.Fatal(err)
 	}
 
-	second, err := json.Marshal(engine.EvaluateGetInfo(info))
+	second, err := json.Marshal(conformance.AssessGetInfo(info))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -168,11 +168,11 @@ type Inconclusive struct {
 	References   []RequirementRef `json:"references"`
 }
 
-// Report is a static assessment of the information observable in one
+// Assessment is a static assessment of the information observable in one
 // authenticatorGetInfo response. Target is nil and no normative rules are run
-// when the response does not advertise a stable supported FIDO2 profile. A
-// report is not a replacement for protocol-level certification testing.
-type Report struct {
+// when the response does not advertise a stable supported FIDO2 profile. It is
+// not a replacement for protocol-level certification testing.
+type Assessment struct {
 	Target             *Target        `json:"target"`
 	AdvertisedProfiles []Profile      `json:"advertisedProfiles"`
 	Findings           []Finding      `json:"findings"`

@@ -1,4 +1,4 @@
-// These tests exercise the internal evaluator through its public DTO contract.
+// These tests exercise the public assessment API as an external consumer.
 package conformance_test
 
 import (
@@ -7,12 +7,11 @@ import (
 
 	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
-	engine "github.com/go-ctap/kit/internal/conformance"
-	"github.com/go-ctap/kit/model/conformance"
+	"github.com/go-ctap/kit/conformance"
 	"github.com/go-ctap/kit/model/failure"
 )
 
-func TestEvaluateGetInfoAcceptsVersionSpecificProfiles(t *testing.T) {
+func TestAssessGetInfoAcceptsVersionSpecificProfiles(t *testing.T) {
 	tests := []struct {
 		name   string
 		info   protocol.AuthenticatorGetInfoResponse
@@ -38,7 +37,7 @@ func TestEvaluateGetInfoAcceptsVersionSpecificProfiles(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			report := engine.EvaluateGetInfo(test.info)
+			report := conformance.AssessGetInfo(test.info)
 			if report.Target == nil || *report.Target != test.target {
 				t.Fatalf("target = %#v, want %#v", report.Target, test.target)
 			}
@@ -47,16 +46,16 @@ func TestEvaluateGetInfoAcceptsVersionSpecificProfiles(t *testing.T) {
 	}
 }
 
-func TestEvaluateGetInfoScreenshotRegressionIsProfileSpecific(t *testing.T) {
+func TestAssessGetInfoScreenshotRegressionIsProfileSpecific(t *testing.T) {
 	info := validFIDO21Info()
 	info.Options[protocol.OptionLargeBlobs] = true
 	info.MaxSerializedLargeBlobArray = 1024
 
-	report21 := engine.EvaluateGetInfo(info)
+	report21 := conformance.AssessGetInfo(info)
 	assertNoAssessments(t, report21)
 
 	info.Versions = protocol.Versions{protocol.FIDO_2_3}
-	report23 := engine.EvaluateGetInfo(info)
+	report23 := conformance.AssessGetInfo(info)
 	finding := requireOnlyFinding(t, report23, conformance.RuleSetMinPINSupportConsistency)
 	assertExpectations(t, finding.Expectations, []conformance.Expectation{
 		expectation([]conformance.FieldPath{"authenticatorConfigCommands"}, conformance.ExpectationAll, conformance.ExpectationContains, "0x03"),
@@ -66,7 +65,7 @@ func TestEvaluateGetInfoScreenshotRegressionIsProfileSpecific(t *testing.T) {
 	}
 }
 
-func TestEvaluateGetInfoResolvesProfilesIndependentlyOfVersionOrder(t *testing.T) {
+func TestAssessGetInfoResolvesProfilesIndependentlyOfVersionOrder(t *testing.T) {
 	info := validFIDO23Info()
 	info.Versions = protocol.Versions{
 		protocol.FIDO_2_1,
@@ -75,7 +74,7 @@ func TestEvaluateGetInfoResolvesProfilesIndependentlyOfVersionOrder(t *testing.T
 		protocol.FIDO_2_1_PRE,
 	}
 
-	report := engine.EvaluateGetInfo(info)
+	report := conformance.AssessGetInfo(info)
 	if report.Target == nil || *report.Target != (conformance.Target{Specification: conformance.SpecificationCTAP23, Profile: conformance.ProfileFIDO23}) {
 		t.Fatalf("target = %#v", report.Target)
 	}
@@ -92,9 +91,9 @@ func TestEvaluateGetInfoResolvesProfilesIndependentlyOfVersionOrder(t *testing.T
 	assertNoAssessments(t, report)
 }
 
-func TestEvaluateGetInfoUsesStableTargetsAndLeavesOtherProfilesUnresolved(t *testing.T) {
+func TestAssessGetInfoUsesStableTargetsAndLeavesOtherProfilesUnresolved(t *testing.T) {
 	t.Run("preview does not outrank stable FIDO 2.0", func(t *testing.T) {
-		report := engine.EvaluateGetInfo(protocol.AuthenticatorGetInfoResponse{
+		report := conformance.AssessGetInfo(protocol.AuthenticatorGetInfoResponse{
 			Versions: protocol.Versions{protocol.FIDO_2_1_PRE, protocol.FIDO_2_0},
 		})
 		want := conformance.Target{Specification: conformance.SpecificationCTAP20, Profile: conformance.ProfileFIDO20}
@@ -116,7 +115,7 @@ func TestEvaluateGetInfoUsesStableTargetsAndLeavesOtherProfilesUnresolved(t *tes
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			report := engine.EvaluateGetInfo(protocol.AuthenticatorGetInfoResponse{Versions: test.versions})
+			report := conformance.AssessGetInfo(protocol.AuthenticatorGetInfoResponse{Versions: test.versions})
 			if report.Target != nil {
 				t.Fatalf("target = %#v, want unresolved", report.Target)
 			}
@@ -129,11 +128,11 @@ func TestEvaluateGetInfoUsesStableTargetsAndLeavesOtherProfilesUnresolved(t *tes
 	}
 }
 
-func TestEvaluateGetInfoDoesNotPromoteFIDO22NoteToNormativeFinding(t *testing.T) {
+func TestAssessGetInfoDoesNotPromoteFIDO22NoteToNormativeFinding(t *testing.T) {
 	t.Run("identifier only remains unresolved", func(t *testing.T) {
 		const fido22 protocol.Version = "FIDO_2_2"
 
-		report := engine.EvaluateGetInfo(protocol.AuthenticatorGetInfoResponse{
+		report := conformance.AssessGetInfo(protocol.AuthenticatorGetInfoResponse{
 			Versions: protocol.Versions{fido22},
 		})
 		if report.Target != nil {
@@ -149,30 +148,30 @@ func TestEvaluateGetInfoDoesNotPromoteFIDO22NoteToNormativeFinding(t *testing.T)
 				info = validFIDO23Info()
 			}
 			info.Versions = append(info.Versions, protocol.Version("FIDO_2_2"))
-			assertNoAssessments(t, engine.EvaluateGetInfo(info))
+			assertNoAssessments(t, conformance.AssessGetInfo(info))
 		})
 	}
 }
 
-func TestEvaluateGetInfoStrictFIDO21IgnoresCTAP23OnlyInventory(t *testing.T) {
+func TestAssessGetInfoStrictFIDO21IgnoresCTAP23OnlyInventory(t *testing.T) {
 	info := validFIDO21Info()
 	info.Options[protocol.OptionSetMinPINLength] = false
 	info.AuthenticatorConfigCommands = []protocol.ConfigSubCommand{protocol.ConfigSubCommandSetMinPINLength}
 
-	finding := requireOnlyFinding(t, engine.EvaluateGetInfo(info), conformance.RuleSetMinPINSupportConsistency)
+	finding := requireOnlyFinding(t, conformance.AssessGetInfo(info), conformance.RuleSetMinPINSupportConsistency)
 	assertExpectations(t, finding.Expectations, []conformance.Expectation{
 		expectation([]conformance.FieldPath{"maxRPIDsForSetMinPINLength"}, conformance.ExpectationAll, conformance.ExpectationAbsent),
 	})
 }
 
-func TestEvaluateGetInfoAgainstRejectsNonCanonicalTargets(t *testing.T) {
+func TestAssessGetInfoAgainstRejectsNonCanonicalTargets(t *testing.T) {
 	for _, target := range []conformance.Target{
 		{Specification: conformance.SpecificationCTAP23, Profile: conformance.ProfileFIDO21},
 		{Specification: conformance.SpecificationCTAP21, Profile: conformance.ProfileFIDO23},
 		{Specification: conformance.SpecificationCTAP21, Profile: conformance.ProfileFIDO21Pre},
 		{Specification: conformance.SpecificationCTAP20, Profile: conformance.ProfileU2FV2},
 	} {
-		_, err := engine.EvaluateGetInfoAgainst(validFIDO21Info(), target)
+		_, err := conformance.AssessGetInfoAgainst(validFIDO21Info(), target)
 		if !failure.IsCode(err, failure.CodeConformanceTargetInvalid) {
 			t.Fatalf("target %#v: error = %v, want %s", target, err, failure.CodeConformanceTargetInvalid)
 		}
@@ -187,7 +186,7 @@ func TestEvaluateGetInfoAgainstRejectsNonCanonicalTargets(t *testing.T) {
 		}
 	}
 
-	report, err := engine.EvaluateGetInfoAgainst(validFIDO23Info(), conformance.Target{
+	report, err := conformance.AssessGetInfoAgainst(validFIDO23Info(), conformance.Target{
 		Specification: conformance.SpecificationCTAP23,
 		Profile:       conformance.ProfileFIDO23,
 	})
@@ -197,12 +196,12 @@ func TestEvaluateGetInfoAgainstRejectsNonCanonicalTargets(t *testing.T) {
 	assertNoAssessments(t, report)
 }
 
-func TestEvaluateGetInfoReferencesMatchResolvedTarget(t *testing.T) {
+func TestAssessGetInfoReferencesMatchResolvedTarget(t *testing.T) {
 	for _, info := range []protocol.AuthenticatorGetInfoResponse{validFIDO21Info(), validFIDO23Info()} {
 		info.Extensions = slices.DeleteFunc(info.Extensions, func(value extension.ExtensionIdentifier) bool {
 			return value == extension.ExtensionIdentifierHMACSecret
 		})
-		report := engine.EvaluateGetInfo(info)
+		report := conformance.AssessGetInfo(info)
 		if report.Target == nil {
 			t.Fatal("resolved fixture returned a nil target")
 		}

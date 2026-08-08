@@ -1,4 +1,4 @@
-// These tests exercise the internal evaluator through its public DTO contract.
+// These tests exercise the public assessment API as an external consumer.
 package conformance_test
 
 import (
@@ -8,14 +8,13 @@ import (
 
 	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
-	engine "github.com/go-ctap/kit/internal/conformance"
-	"github.com/go-ctap/kit/model/conformance"
+	"github.com/go-ctap/kit/conformance"
 )
 
-func TestEvaluateGetInfoSeparatesFIDO21AndFIDO23RKSemantics(t *testing.T) {
+func TestAssessGetInfoSeparatesFIDO21AndFIDO23RKSemantics(t *testing.T) {
 	info21 := validFIDO21Info()
 	info21.Options[protocol.OptionClientPIN] = false
-	finding := requireOnlyFinding(t, engine.EvaluateGetInfo(info21), conformance.RuleProfileRKUVCapabilityRequired)
+	finding := requireOnlyFinding(t, conformance.AssessGetInfo(info21), conformance.RuleProfileRKUVCapabilityRequired)
 	assertExpectations(t, finding.Expectations, []conformance.Expectation{
 		expectation(
 			[]conformance.FieldPath{"options.clientPin", "options.uv"},
@@ -26,14 +25,14 @@ func TestEvaluateGetInfoSeparatesFIDO21AndFIDO23RKSemantics(t *testing.T) {
 
 	info23 := validFIDO23Info()
 	info23.Options[protocol.OptionClientPIN] = false
-	assertNoAssessments(t, engine.EvaluateGetInfo(info23))
+	assertNoAssessments(t, conformance.AssessGetInfo(info23))
 
 	missingState := validConfigNeutralFIDO23Info()
 	missingState.Options[protocol.OptionResidentKeys] = true
 	missingState.Options[protocol.OptionCredentialManagement] = true
 	delete(missingState.Options, protocol.OptionClientPIN)
 	missingState.MinPINLength = 0
-	finding = requireOnlyFinding(t, engine.EvaluateGetInfo(missingState), conformance.RuleProfileRKUVCapabilityRequired)
+	finding = requireOnlyFinding(t, conformance.AssessGetInfo(missingState), conformance.RuleProfileRKUVCapabilityRequired)
 	assertExpectations(t, finding.Expectations, []conformance.Expectation{
 		expectation(
 			[]conformance.FieldPath{"options.clientPin", "options.uv"},
@@ -43,7 +42,7 @@ func TestEvaluateGetInfoSeparatesFIDO21AndFIDO23RKSemantics(t *testing.T) {
 	})
 }
 
-func TestEvaluateGetInfoRequiresObservableBuiltInUVForAlwaysUVWithU2F(t *testing.T) {
+func TestAssessGetInfoRequiresObservableBuiltInUVForAlwaysUVWithU2F(t *testing.T) {
 	for _, test := range []struct {
 		name          string
 		info          protocol.AuthenticatorGetInfoResponse
@@ -58,7 +57,7 @@ func TestEvaluateGetInfoRequiresObservableBuiltInUVForAlwaysUVWithU2F(t *testing
 			info.Options[protocol.OptionAlwaysUv] = true
 			delete(info.Options, protocol.OptionUserVerification)
 
-			finding := requireOnlyFinding(t, engine.EvaluateGetInfo(info), conformance.RuleAlwaysUVU2FRequiresBuiltInUV)
+			finding := requireOnlyFinding(t, conformance.AssessGetInfo(info), conformance.RuleAlwaysUVU2FRequiresBuiltInUV)
 			assertExpectations(t, finding.Expectations, []conformance.Expectation{
 				expectation([]conformance.FieldPath{"options.uv"}, conformance.ExpectationAll, conformance.ExpectationTrue),
 			})
@@ -96,7 +95,7 @@ func TestEvaluateGetInfoRequiresObservableBuiltInUVForAlwaysUVWithU2F(t *testing
 		} {
 			info := validFIDO23Info()
 			mutate(&info)
-			assertNoAssessments(t, engine.EvaluateGetInfo(info))
+			assertNoAssessments(t, conformance.AssessGetInfo(info))
 		}
 	})
 
@@ -105,31 +104,31 @@ func TestEvaluateGetInfoRequiresObservableBuiltInUVForAlwaysUVWithU2F(t *testing
 		info.Versions = append(info.Versions, protocol.U2F_V2)
 		info.Options[protocol.OptionAlwaysUv] = true
 		info.Options[protocol.OptionUserVerification] = false
-		requireOnlyFinding(t, engine.EvaluateGetInfo(info), conformance.RuleAlwaysUVU2FRequiresBuiltInUV)
+		requireOnlyFinding(t, conformance.AssessGetInfo(info), conformance.RuleAlwaysUVU2FRequiresBuiltInUV)
 	})
 }
 
-func TestEvaluateGetInfoUsesEditionSpecificCertificationRanges(t *testing.T) {
+func TestAssessGetInfoUsesEditionSpecificCertificationRanges(t *testing.T) {
 	info21 := validFIDO21Info()
 	info21.Certifications = map[string]uint64{"FIDO": 7, "CCN-CPSTIC": 2, "future-certification": 999}
-	finding := requireOnlyFinding(t, engine.EvaluateGetInfo(info21), conformance.RuleCertificationLevelRange)
+	finding := requireOnlyFinding(t, conformance.AssessGetInfo(info21), conformance.RuleCertificationLevelRange)
 	assertExpectations(t, finding.Expectations, []conformance.Expectation{
 		expectation([]conformance.FieldPath{"certifications.FIDO"}, conformance.ExpectationAll, conformance.ExpectationRange, "1", "6"),
 	})
 
 	info23 := validFIDO23Info()
 	info23.Certifications = map[string]uint64{"CCN-CPSTIC": 2, "future-certification": 999}
-	finding = requireOnlyFinding(t, engine.EvaluateGetInfo(info23), conformance.RuleCertificationLevelRange)
+	finding = requireOnlyFinding(t, conformance.AssessGetInfo(info23), conformance.RuleCertificationLevelRange)
 	assertExpectations(t, finding.Expectations, []conformance.Expectation{
 		expectation([]conformance.FieldPath{"certifications.CCN-CPSTIC"}, conformance.ExpectationAll, conformance.ExpectationRange, "1", "1"),
 	})
 }
 
-func TestEvaluateGetInfoKeepsUnobservableExceptionsInconclusive(t *testing.T) {
+func TestAssessGetInfoKeepsUnobservableExceptionsInconclusive(t *testing.T) {
 	t.Run("credential management may be built in", func(t *testing.T) {
 		info := validFIDO23Info()
 		delete(info.Options, protocol.OptionCredentialManagement)
-		result := requireOnlyInconclusive(t, engine.EvaluateGetInfo(info), conformance.RuleProfileRKCredentialManagementRequired)
+		result := requireOnlyInconclusive(t, conformance.AssessGetInfo(info), conformance.RuleProfileRKCredentialManagementRequired)
 		if result.Reason != conformance.EvidenceGapAuthenticatorUIUnknown {
 			t.Fatalf("reason = %s", result.Reason)
 		}
@@ -140,7 +139,7 @@ func TestEvaluateGetInfoKeepsUnobservableExceptionsInconclusive(t *testing.T) {
 		info.Extensions = slices.DeleteFunc(info.Extensions, func(value extension.ExtensionIdentifier) bool {
 			return value == extension.ExtensionIdentifierCredentialProtection
 		})
-		result := requireOnlyInconclusive(t, engine.EvaluateGetInfo(info), conformance.RuleProfileCredentialProtectionRequired)
+		result := requireOnlyInconclusive(t, conformance.AssessGetInfo(info), conformance.RuleProfileCredentialProtectionRequired)
 		if result.Reason != conformance.EvidenceGapImplicitCredProtectUnknown {
 			t.Fatalf("reason = %s", result.Reason)
 		}
@@ -155,7 +154,7 @@ func TestEvaluateGetInfoKeepsUnobservableExceptionsInconclusive(t *testing.T) {
 		info.Extensions = append(info.Extensions, extension.ExtensionIdentifierMinPinLength)
 		info.AuthenticatorConfigCommands = []protocol.ConfigSubCommand{protocol.ConfigSubCommandSetMinPINLength}
 		info.MaxRPIDsForSetMinPINLength = ptr(uint(3))
-		result := requireOnlyInconclusive(t, engine.EvaluateGetInfo(info), conformance.RuleSetMinPINRequiresPINCapability)
+		result := requireOnlyInconclusive(t, conformance.AssessGetInfo(info), conformance.RuleSetMinPINRequiresPINCapability)
 		if result.Reason != conformance.EvidenceGapBuiltInPINEntryUnknown {
 			t.Fatalf("reason = %s", result.Reason)
 		}
@@ -167,7 +166,7 @@ func TestEvaluateGetInfoKeepsUnobservableExceptionsInconclusive(t *testing.T) {
 		delete(info.Options, protocol.OptionResidentKeys)
 		info.Options[protocol.OptionUserVerification] = false
 		info.MinPINLength = 0
-		finding := requireOnlyFinding(t, engine.EvaluateGetInfo(info), conformance.RuleSetMinPINRequiresPINCapability)
+		finding := requireOnlyFinding(t, conformance.AssessGetInfo(info), conformance.RuleSetMinPINRequiresPINCapability)
 		if len(finding.References) != 1 ||
 			finding.References[0].Specification != conformance.SpecificationCTAP21 ||
 			finding.References[0].Section != "7.4" ||
@@ -177,7 +176,7 @@ func TestEvaluateGetInfoKeepsUnobservableExceptionsInconclusive(t *testing.T) {
 	})
 }
 
-func TestEvaluateGetInfoSetMinPINFalseDoesNotRequirePINCapability(t *testing.T) {
+func TestAssessGetInfoSetMinPINFalseDoesNotRequirePINCapability(t *testing.T) {
 	info21 := validFIDO21Info()
 	info21.Options[protocol.OptionSetMinPINLength] = false
 	delete(info21.Options, protocol.OptionClientPIN)
@@ -187,11 +186,11 @@ func TestEvaluateGetInfoSetMinPINFalseDoesNotRequirePINCapability(t *testing.T) 
 	info21.Extensions = slices.DeleteFunc(info21.Extensions, func(value extension.ExtensionIdentifier) bool {
 		return value == extension.ExtensionIdentifierMinPinLength
 	})
-	assertNoAssessments(t, engine.EvaluateGetInfo(info21))
+	assertNoAssessments(t, conformance.AssessGetInfo(info21))
 
 	info23 := validConfigNeutralFIDO23Info()
 	info23.Options[protocol.OptionSetMinPINLength] = false
 	delete(info23.Options, protocol.OptionClientPIN)
 	info23.MinPINLength = 0
-	assertNoAssessments(t, engine.EvaluateGetInfo(info23))
+	assertNoAssessments(t, conformance.AssessGetInfo(info23))
 }

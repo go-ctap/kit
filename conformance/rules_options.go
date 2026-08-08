@@ -2,35 +2,34 @@ package conformance
 
 import (
 	"github.com/go-ctap/ctap/protocol"
-	model "github.com/go-ctap/kit/model/conformance"
 	"github.com/samber/lo"
 )
 
 func optionDependencyRules() []getInfoRule {
 	return []getInfoRule{
 		optionPlacementRule(
-			model.RuleNoMCGARequiresClientPIN,
+			RuleNoMCGARequiresClientPIN,
 			protocol.OptionNoMcGaPermissionsWithClientPin,
 			protocol.OptionClientPIN,
 			"no-mc-ga-permissions-requires-client-pin",
 		),
 		optionPlacementRule(
-			model.RuleUVBioEnrollRequiresBioEnroll,
+			RuleUVBioEnrollRequiresBioEnroll,
 			protocol.OptionUvBioEnroll,
 			protocol.OptionBioEnroll,
 			"uv-bio-enroll-requires-bio-enroll",
 		),
 		optionPlacementRule(
-			model.RuleUVAcfgRequiresAuthnrCfg,
+			RuleUVAcfgRequiresAuthnrCfg,
 			protocol.OptionUvAcfg,
 			protocol.OptionAuthenticatorConfig,
 			"uv-acfg-requires-authnr-cfg",
 		),
 		{
-			id:       model.RuleAlwaysUVConflictsWithMakeCredUVNotRqd,
+			id:       RuleAlwaysUVConflictsWithMakeCredUVNotRqd,
 			selector: selectCTAP21OrLater,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{getInfoRequirement(context.target, "always-uv-conflicts-with-make-cred-uv-not-required", model.RequirementMust)}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{getInfoRequirement(context.target, "always-uv-conflicts-with-make-cred-uv-not-required", RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				if !optionTrue(context.info, protocol.OptionAlwaysUv) || !optionTrue(context.info, protocol.OptionMakeCredentialUvNotRequired) {
@@ -38,23 +37,23 @@ func optionDependencyRules() []getInfoRule {
 				}
 
 				return finding(
-					[]model.FieldPath{"options.alwaysUv", "options.makeCredUvNotRqd"},
-					expected(model.ExpectationNotBoth),
+					[]FieldPath{"options.alwaysUv", "options.makeCredUvNotRqd"},
+					expected(ExpectationNotBoth),
 					observedOption(context.info, protocol.OptionAlwaysUv),
 					observedOption(context.info, protocol.OptionMakeCredentialUvNotRequired),
 				)
 			},
 		},
 		{
-			id:       model.RuleAlwaysUVU2FRequiresBuiltInUV,
+			id:       RuleAlwaysUVU2FRequiresBuiltInUV,
 			selector: selectCTAP21OrLater,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{featureRequirement(
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{featureRequirement(
 					context.target,
 					"7.2.4",
 					"always-uv-disabled-u2f-must-not-be-advertised",
 					"#sctn-feature-descriptions-alwaysUv",
-					model.RequirementMustNot,
+					RequirementMustNot,
 				)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
@@ -65,8 +64,8 @@ func optionDependencyRules() []getInfoRule {
 				}
 
 				return finding(
-					[]model.FieldPath{"options.uv"},
-					expected(model.ExpectationTrue),
+					[]FieldPath{"options.uv"},
+					expected(ExpectationTrue),
 					observedOption(context.info, protocol.OptionAlwaysUv),
 					observedStrings("versions", true, lo.Map(
 						context.info.Versions,
@@ -79,12 +78,12 @@ func optionDependencyRules() []getInfoRule {
 	}
 }
 
-func optionPlacementRule(id model.RuleID, dependent, required protocol.Option, clause string) getInfoRule {
+func optionPlacementRule(id RuleID, dependent, required protocol.Option, clause string) getInfoRule {
 	return getInfoRule{
 		id:       id,
 		selector: selectCTAP21OrLater,
-		references: func(context *getInfoContext) []model.RequirementRef {
-			return []model.RequirementRef{getInfoRequirement(context.target, clause, model.RequirementMust)}
+		references: func(context *getInfoContext) []RequirementRef {
+			return []RequirementRef{getInfoRequirement(context.target, clause, RequirementMust)}
 		},
 		evaluate: func(context *getInfoContext) []assessment {
 			if !optionPresent(context.info, dependent) || optionPresent(context.info, required) {
@@ -92,8 +91,8 @@ func optionPlacementRule(id model.RuleID, dependent, required protocol.Option, c
 			}
 
 			return finding(
-				[]model.FieldPath{model.FieldPath("options." + string(required))},
-				expected(model.ExpectationRequired),
+				[]FieldPath{FieldPath("options." + string(required))},
+				expected(ExpectationRequired),
 				observedOption(context.info, dependent),
 				observedOption(context.info, required),
 			)

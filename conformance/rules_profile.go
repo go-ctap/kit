@@ -5,20 +5,19 @@ import (
 
 	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
-	model "github.com/go-ctap/kit/model/conformance"
 )
 
 func profileRules() []getInfoRule {
 	stableProfile := func(context *getInfoContext) bool {
-		return context.target.Profile == model.ProfileFIDO21 || context.target.Profile == model.ProfileFIDO23
+		return context.target.Profile == ProfileFIDO21 || context.target.Profile == ProfileFIDO23
 	}
 
 	return []getInfoRule{
 		{
-			id:       model.RuleProfileHMACSecretRequired,
+			id:       RuleProfileHMACSecretRequired,
 			selector: stableProfile,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{mandatoryRequirement(context.target, "1", "hmac-secret-required")}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{mandatoryRequirement(context.target, "1", "hmac-secret-required")}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				if slices.Contains(context.info.Extensions, extension.ExtensionIdentifierHMACSecret) {
@@ -26,17 +25,17 @@ func profileRules() []getInfoRule {
 				}
 
 				return finding(
-					[]model.FieldPath{"extensions.hmac-secret"},
-					expected(model.ExpectationContains, "hmac-secret"),
+					[]FieldPath{"extensions.hmac-secret"},
+					expected(ExpectationContains, "hmac-secret"),
 					observedStrings("extensions", context.info.Extensions != nil, extensionValues(context.info)),
 				)
 			},
 		},
 		{
-			id:       model.RuleProfileRKUVCapabilityRequired,
+			id:       RuleProfileRKUVCapabilityRequired,
 			selector: selectFIDO21,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{mandatoryRequirement(context.target, "2", "rk-requires-configured-user-verification")}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{mandatoryRequirement(context.target, "2", "rk-requires-configured-user-verification")}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				if !optionTrue(context.info, protocol.OptionResidentKeys) ||
@@ -46,8 +45,8 @@ func profileRules() []getInfoRule {
 				}
 
 				return finding(
-					[]model.FieldPath{"options.clientPin", "options.uv"},
-					expectedAny(model.ExpectationTrue),
+					[]FieldPath{"options.clientPin", "options.uv"},
+					expectedAny(ExpectationTrue),
 					observedOption(context.info, protocol.OptionResidentKeys),
 					observedOption(context.info, protocol.OptionClientPIN),
 					observedOption(context.info, protocol.OptionUserVerification),
@@ -55,10 +54,10 @@ func profileRules() []getInfoRule {
 			},
 		},
 		{
-			id:       model.RuleProfileRKUVCapabilityRequired,
+			id:       RuleProfileRKUVCapabilityRequired,
 			selector: selectFIDO23,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{mandatoryRequirement(context.target, "2", "rk-requires-user-verification-capability-state")}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{mandatoryRequirement(context.target, "2", "rk-requires-user-verification-capability-state")}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				if !optionTrue(context.info, protocol.OptionResidentKeys) ||
@@ -68,8 +67,8 @@ func profileRules() []getInfoRule {
 				}
 
 				return finding(
-					[]model.FieldPath{"options.clientPin", "options.uv"},
-					expectedAny(model.ExpectationRequired),
+					[]FieldPath{"options.clientPin", "options.uv"},
+					expectedAny(ExpectationRequired),
 					observedOption(context.info, protocol.OptionResidentKeys),
 					observedOption(context.info, protocol.OptionClientPIN),
 					observedOption(context.info, protocol.OptionUserVerification),
@@ -77,10 +76,10 @@ func profileRules() []getInfoRule {
 			},
 		},
 		{
-			id:       model.RuleProfileRKCredentialManagementRequired,
+			id:       RuleProfileRKCredentialManagementRequired,
 			selector: stableProfile,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{mandatoryRequirement(context.target, "3", "rk-requires-credential-inventory")}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{mandatoryRequirement(context.target, "3", "rk-requires-credential-inventory")}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				if !optionTrue(context.info, protocol.OptionResidentKeys) || optionTrue(context.info, protocol.OptionCredentialManagement) {
@@ -88,19 +87,19 @@ func profileRules() []getInfoRule {
 				}
 
 				return inconclusive(
-					[]model.FieldPath{"options.credMgmt"},
-					expected(model.ExpectationTrue),
-					model.EvidenceGapAuthenticatorUIUnknown,
+					[]FieldPath{"options.credMgmt"},
+					expected(ExpectationTrue),
+					EvidenceGapAuthenticatorUIUnknown,
 					observedOption(context.info, protocol.OptionResidentKeys),
 					observedOption(context.info, protocol.OptionCredentialManagement),
 				)
 			},
 		},
 		{
-			id:       model.RuleProfileCredentialProtectionRequired,
+			id:       RuleProfileCredentialProtectionRequired,
 			selector: stableProfile,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{mandatoryRequirement(context.target, "4", "user-verification-requires-cred-protect")}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{mandatoryRequirement(context.target, "4", "user-verification-requires-cred-protect")}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				uvSupported := optionPresent(context.info, protocol.OptionClientPIN) || optionPresent(context.info, protocol.OptionUserVerification)
@@ -109,9 +108,9 @@ func profileRules() []getInfoRule {
 				}
 
 				return inconclusive(
-					[]model.FieldPath{"extensions.credProtect"},
-					expected(model.ExpectationContains, "credProtect"),
-					model.EvidenceGapImplicitCredProtectUnknown,
+					[]FieldPath{"extensions.credProtect"},
+					expected(ExpectationContains, "credProtect"),
+					EvidenceGapImplicitCredProtectUnknown,
 					observedOption(context.info, protocol.OptionClientPIN),
 					observedOption(context.info, protocol.OptionUserVerification),
 					observedStrings("extensions", context.info.Extensions != nil, extensionValues(context.info)),
@@ -119,10 +118,10 @@ func profileRules() []getInfoRule {
 			},
 		},
 		{
-			id:       model.RuleProfilePinUVAuthTokenRequired,
+			id:       RuleProfilePinUVAuthTokenRequired,
 			selector: stableProfile,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{mandatoryRequirement(context.target, "5", "configured-user-verification-requires-pin-uv-auth-token")}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{mandatoryRequirement(context.target, "5", "configured-user-verification-requires-pin-uv-auth-token")}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				uvConfigured := optionTrue(context.info, protocol.OptionClientPIN) || optionTrue(context.info, protocol.OptionUserVerification)
@@ -131,8 +130,8 @@ func profileRules() []getInfoRule {
 				}
 
 				return finding(
-					[]model.FieldPath{"options.pinUvAuthToken"},
-					expected(model.ExpectationTrue),
+					[]FieldPath{"options.pinUvAuthToken"},
+					expected(ExpectationTrue),
 					observedOption(context.info, protocol.OptionClientPIN),
 					observedOption(context.info, protocol.OptionUserVerification),
 					observedOption(context.info, protocol.OptionPinUvAuthToken),
@@ -140,10 +139,10 @@ func profileRules() []getInfoRule {
 			},
 		},
 		{
-			id:       model.RuleProfilePinUVProtocolTwoRequired,
+			id:       RuleProfilePinUVProtocolTwoRequired,
 			selector: stableProfile,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{mandatoryRequirement(context.target, "6", "pin-uv-auth-protocol-two-required")}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{mandatoryRequirement(context.target, "6", "pin-uv-auth-protocol-two-required")}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				if len(context.info.PinUvAuthProtocols) == 0 || slices.Contains(context.info.PinUvAuthProtocols, protocol.PinUvAuthProtocolTwo) {
@@ -151,8 +150,8 @@ func profileRules() []getInfoRule {
 				}
 
 				return finding(
-					[]model.FieldPath{"pinUvAuthProtocols"},
-					expected(model.ExpectationContains, "2"),
+					[]FieldPath{"pinUvAuthProtocols"},
+					expected(ExpectationContains, "2"),
 					observedStrings("pinUvAuthProtocols", true, pinProtocolValues(context.info)),
 				)
 			},

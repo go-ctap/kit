@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/model/conformance"
+	"github.com/go-ctap/kit/conformance"
 )
 
 func validFIDO21Info() protocol.AuthenticatorGetInfoResponse {
@@ -66,7 +66,7 @@ func expectation(subjects []conformance.FieldPath, quantifier conformance.Expect
 	}
 }
 
-func assertNoAssessments(t *testing.T, report conformance.Report) {
+func assertNoAssessments(t *testing.T, report conformance.Assessment) {
 	t.Helper()
 
 	if len(report.Findings) != 0 || len(report.Inconclusive) != 0 {
@@ -74,7 +74,7 @@ func assertNoAssessments(t *testing.T, report conformance.Report) {
 	}
 }
 
-func requireOnlyFinding(t *testing.T, report conformance.Report, rule conformance.RuleID) conformance.Finding {
+func requireOnlyFinding(t *testing.T, report conformance.Assessment, rule conformance.RuleID) conformance.Finding {
 	t.Helper()
 
 	if len(report.Findings) != 1 || len(report.Inconclusive) != 0 {
@@ -88,7 +88,7 @@ func requireOnlyFinding(t *testing.T, report conformance.Report, rule conformanc
 	return report.Findings[0]
 }
 
-func requireOnlyInconclusive(t *testing.T, report conformance.Report, rule conformance.RuleID) conformance.Inconclusive {
+func requireOnlyInconclusive(t *testing.T, report conformance.Assessment, rule conformance.RuleID) conformance.Inconclusive {
 	t.Helper()
 
 	if len(report.Findings) != 0 || len(report.Inconclusive) != 1 {
@@ -115,7 +115,7 @@ func assertExpectations(t *testing.T, got, want []conformance.Expectation) {
 	}
 }
 
-func hasExpectedValue(report conformance.Report, value string) bool {
+func hasExpectedValue(report conformance.Assessment, value string) bool {
 	for _, finding := range report.Findings {
 		if expectationsContainValue(finding.Expectations, value) {
 			return true

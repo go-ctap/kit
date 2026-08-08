@@ -9,7 +9,7 @@ import (
 	"strconv"
 
 	"github.com/go-ctap/ctap/protocol"
-	"github.com/go-ctap/kit/model/conformance"
+	"github.com/go-ctap/kit/conformance"
 	model "github.com/go-ctap/kit/model/inspect"
 )
 

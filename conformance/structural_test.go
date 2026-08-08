@@ -1,4 +1,4 @@
-// These tests exercise the internal evaluator through its public DTO contract.
+// These tests exercise the public assessment API as an external consumer.
 package conformance_test
 
 import (
@@ -7,19 +7,18 @@ import (
 	"github.com/go-ctap/ctap/attestation"
 	"github.com/go-ctap/ctap/credential"
 	"github.com/go-ctap/ctap/protocol"
-	engine "github.com/go-ctap/kit/internal/conformance"
-	"github.com/go-ctap/kit/model/conformance"
+	"github.com/go-ctap/kit/conformance"
 )
 
-func TestEvaluateGetInfoAllowsDeclaredMaxMessageSize(t *testing.T) {
+func TestAssessGetInfoAllowsDeclaredMaxMessageSize(t *testing.T) {
 	for _, value := range []uint{0, 512, 1024, 4096} {
 		info := validFIDO23Info()
 		info.MaxMsgSize = value
-		assertNoAssessments(t, engine.EvaluateGetInfo(info))
+		assertNoAssessments(t, conformance.AssessGetInfo(info))
 	}
 }
 
-func TestEvaluateGetInfoValidatesOptionalListShape(t *testing.T) {
+func TestAssessGetInfoValidatesOptionalListShape(t *testing.T) {
 	tests := []struct {
 		name   string
 		mutate func(*protocol.AuthenticatorGetInfoResponse)
@@ -67,7 +66,7 @@ func TestEvaluateGetInfoValidatesOptionalListShape(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			info := validFIDO23Info()
 			test.mutate(&info)
-			requireOnlyFinding(t, engine.EvaluateGetInfo(info), test.rule)
+			requireOnlyFinding(t, conformance.AssessGetInfo(info), test.rule)
 		})
 	}
 }

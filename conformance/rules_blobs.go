@@ -6,16 +6,15 @@ import (
 
 	"github.com/go-ctap/ctap/extension"
 	"github.com/go-ctap/ctap/protocol"
-	model "github.com/go-ctap/kit/model/conformance"
 )
 
 func blobRules() []getInfoRule {
 	return []getInfoRule{
 		{
-			id:       model.RuleCredBlobRequiresCredProtect,
+			id:       RuleCredBlobRequiresCredProtect,
 			selector: selectCTAP21OrLater,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{featureRequirement(context.target, "12.2.1", "cred-blob-requires-cred-protect", "#sctn-credBlob-extension", model.RequirementMust)}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{featureRequirement(context.target, "12.2.1", "cred-blob-requires-cred-protect", "#sctn-credBlob-extension", RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				credBlob := slices.Contains(context.info.Extensions, extension.ExtensionIdentifierCredentialBlob)
@@ -25,17 +24,17 @@ func blobRules() []getInfoRule {
 				}
 
 				return finding(
-					[]model.FieldPath{"extensions.credProtect"},
-					expected(model.ExpectationContains, "credProtect"),
+					[]FieldPath{"extensions.credProtect"},
+					expected(ExpectationContains, "credProtect"),
 					observedStrings("extensions", context.info.Extensions != nil, extensionValues(context.info)),
 				)
 			},
 		},
 		{
-			id:       model.RuleCredBlobRequiresMaxLength,
+			id:       RuleCredBlobRequiresMaxLength,
 			selector: selectCTAP21OrLater,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{getInfoRequirement(context.target, "cred-blob-requires-max-length", model.RequirementMust)}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{getInfoRequirement(context.target, "cred-blob-requires-max-length", RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				if !slices.Contains(context.info.Extensions, extension.ExtensionIdentifierCredentialBlob) || context.info.MaxCredBlobLength != 0 {
@@ -43,18 +42,18 @@ func blobRules() []getInfoRule {
 				}
 
 				return finding(
-					[]model.FieldPath{"maxCredBlobLength"},
-					expected(model.ExpectationRequired),
+					[]FieldPath{"maxCredBlobLength"},
+					expected(ExpectationRequired),
 					observedStrings("extensions", context.info.Extensions != nil, extensionValues(context.info)),
-					observed("maxCredBlobLength", model.EvidenceAbsent),
+					observed("maxCredBlobLength", EvidenceAbsent),
 				)
 			},
 		},
 		{
-			id:       model.RuleCredBlobMaxLengthMinimum,
+			id:       RuleCredBlobMaxLengthMinimum,
 			selector: selectCTAP21OrLater,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{getInfoRequirement(context.target, "cred-blob-max-length-minimum", model.RequirementMust)}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{getInfoRequirement(context.target, "cred-blob-max-length-minimum", RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				if context.info.MaxCredBlobLength == 0 || context.info.MaxCredBlobLength >= 32 {
@@ -62,17 +61,17 @@ func blobRules() []getInfoRule {
 				}
 
 				return finding(
-					[]model.FieldPath{"maxCredBlobLength"},
-					expected(model.ExpectationMinimum, "32"),
+					[]FieldPath{"maxCredBlobLength"},
+					expected(ExpectationMinimum, "32"),
 					observedUnsigned("maxCredBlobLength", context.info.MaxCredBlobLength),
 				)
 			},
 		},
 		{
-			id:       model.RuleCredBlobMaxLengthRequiresExtension,
+			id:       RuleCredBlobMaxLengthRequiresExtension,
 			selector: selectCTAP21OrLater,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{getInfoRequirement(context.target, "cred-blob-max-length-requires-extension", model.RequirementMust)}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{getInfoRequirement(context.target, "cred-blob-max-length-requires-extension", RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				if context.info.MaxCredBlobLength == 0 || slices.Contains(context.info.Extensions, extension.ExtensionIdentifierCredentialBlob) {
@@ -80,18 +79,18 @@ func blobRules() []getInfoRule {
 				}
 
 				return finding(
-					[]model.FieldPath{"maxCredBlobLength"},
-					expected(model.ExpectationAbsent),
+					[]FieldPath{"maxCredBlobLength"},
+					expected(ExpectationAbsent),
 					observedUnsigned("maxCredBlobLength", context.info.MaxCredBlobLength),
 					observedStrings("extensions", context.info.Extensions != nil, extensionValues(context.info)),
 				)
 			},
 		},
 		{
-			id:       model.RuleLargeBlobModesMutuallyExclusive,
+			id:       RuleLargeBlobModesMutuallyExclusive,
 			selector: selectCTAP23Document,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{getInfoRequirement(context.target, "large-blob-modes-mutually-exclusive", model.RequirementMustNot)}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{getInfoRequirement(context.target, "large-blob-modes-mutually-exclusive", RequirementMustNot)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				legacy := slices.Contains(context.info.Extensions, extension.ExtensionIdentifierLargeBlob)
@@ -100,18 +99,18 @@ func blobRules() []getInfoRule {
 				}
 
 				return finding(
-					[]model.FieldPath{"extensions.largeBlob", "options.largeBlobs"},
-					expected(model.ExpectationNotBoth),
+					[]FieldPath{"extensions.largeBlob", "options.largeBlobs"},
+					expected(ExpectationNotBoth),
 					observedStrings("extensions", context.info.Extensions != nil, extensionValues(context.info)),
 					observedOption(context.info, protocol.OptionLargeBlobs),
 				)
 			},
 		},
 		{
-			id:       model.RuleLargeBlobExtensionsMutuallyExclusive,
+			id:       RuleLargeBlobExtensionsMutuallyExclusive,
 			selector: selectCTAP23Document,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{featureRequirement(context.target, "12.4", "large-blob-extensions-mutually-exclusive", "#sctn-largeBlob-extension", model.RequirementMustNot)}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{featureRequirement(context.target, "12.4", "large-blob-extensions-mutually-exclusive", "#sctn-largeBlob-extension", RequirementMustNot)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				legacy := slices.Contains(context.info.Extensions, extension.ExtensionIdentifierLargeBlob)
@@ -121,17 +120,17 @@ func blobRules() []getInfoRule {
 				}
 
 				return finding(
-					[]model.FieldPath{"extensions.largeBlob", "extensions.largeBlobKey"},
-					expected(model.ExpectationNotBoth),
+					[]FieldPath{"extensions.largeBlob", "extensions.largeBlobKey"},
+					expected(ExpectationNotBoth),
 					observedStrings("extensions", context.info.Extensions != nil, extensionValues(context.info)),
 				)
 			},
 		},
 		{
-			id:       model.RuleLargeBlobKeyRequiresCommand,
+			id:       RuleLargeBlobKeyRequiresCommand,
 			selector: selectCTAP21OrLater,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{featureRequirement(context.target, "6.10.1", "large-blob-key-requires-large-blobs-command", "#largeBlobsFeatureDetection", model.RequirementMust)}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{featureRequirement(context.target, "6.10.1", "large-blob-key-requires-large-blobs-command", "#largeBlobsFeatureDetection", RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				key := slices.Contains(context.info.Extensions, extension.ExtensionIdentifierLargeBlobKey)
@@ -140,18 +139,18 @@ func blobRules() []getInfoRule {
 				}
 
 				return finding(
-					[]model.FieldPath{"options.largeBlobs"},
-					expected(model.ExpectationTrue),
+					[]FieldPath{"options.largeBlobs"},
+					expected(ExpectationTrue),
 					observedStrings("extensions", context.info.Extensions != nil, extensionValues(context.info)),
 					observedOption(context.info, protocol.OptionLargeBlobs),
 				)
 			},
 		},
 		{
-			id:       model.RuleLargeBlobsRequiresCapacity,
+			id:       RuleLargeBlobsRequiresCapacity,
 			selector: selectCTAP21OrLater,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{getInfoRequirement(context.target, "large-blobs-command-requires-capacity", model.RequirementMust)}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{getInfoRequirement(context.target, "large-blobs-command-requires-capacity", RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				if !optionTrue(context.info, protocol.OptionLargeBlobs) || context.info.MaxSerializedLargeBlobArray != 0 {
@@ -159,18 +158,18 @@ func blobRules() []getInfoRule {
 				}
 
 				return finding(
-					[]model.FieldPath{"maxSerializedLargeBlobArray"},
-					expected(model.ExpectationRequired),
+					[]FieldPath{"maxSerializedLargeBlobArray"},
+					expected(ExpectationRequired),
 					observedOption(context.info, protocol.OptionLargeBlobs),
-					observed("maxSerializedLargeBlobArray", model.EvidenceAbsent),
+					observed("maxSerializedLargeBlobArray", EvidenceAbsent),
 				)
 			},
 		},
 		{
-			id:       model.RuleLargeBlobsCapacityMinimum,
+			id:       RuleLargeBlobsCapacityMinimum,
 			selector: selectCTAP21OrLater,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{getInfoRequirement(context.target, "large-blobs-capacity-minimum", model.RequirementMust)}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{getInfoRequirement(context.target, "large-blobs-capacity-minimum", RequirementMust)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				value := context.info.MaxSerializedLargeBlobArray
@@ -179,17 +178,17 @@ func blobRules() []getInfoRule {
 				}
 
 				return finding(
-					[]model.FieldPath{"maxSerializedLargeBlobArray"},
-					expected(model.ExpectationMinimum, "1024"),
-					observed("maxSerializedLargeBlobArray", model.EvidenceValue, strconv.FormatUint(uint64(value), 10)),
+					[]FieldPath{"maxSerializedLargeBlobArray"},
+					expected(ExpectationMinimum, "1024"),
+					observed("maxSerializedLargeBlobArray", EvidenceValue, strconv.FormatUint(uint64(value), 10)),
 				)
 			},
 		},
 		{
-			id:       model.RuleLargeBlobsCapacityRequiresCommand,
+			id:       RuleLargeBlobsCapacityRequiresCommand,
 			selector: selectCTAP21OrLater,
-			references: func(context *getInfoContext) []model.RequirementRef {
-				return []model.RequirementRef{getInfoRequirement(context.target, "large-blobs-capacity-requires-command", model.RequirementMustNot)}
+			references: func(context *getInfoContext) []RequirementRef {
+				return []RequirementRef{getInfoRequirement(context.target, "large-blobs-capacity-requires-command", RequirementMustNot)}
 			},
 			evaluate: func(context *getInfoContext) []assessment {
 				value := context.info.MaxSerializedLargeBlobArray
@@ -198,8 +197,8 @@ func blobRules() []getInfoRule {
 				}
 
 				return finding(
-					[]model.FieldPath{"maxSerializedLargeBlobArray"},
-					expected(model.ExpectationAbsent),
+					[]FieldPath{"maxSerializedLargeBlobArray"},
+					expected(ExpectationAbsent),
 					observedUnsigned("maxSerializedLargeBlobArray", value),
 					observedOption(context.info, protocol.OptionLargeBlobs),
 				)

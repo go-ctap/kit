@@ -1,4 +1,4 @@
-// These tests exercise the internal evaluator through its public DTO contract.
+// These tests exercise the public assessment API as an external consumer.
 package conformance_test
 
 import (
@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"github.com/go-ctap/ctap/protocol"
-	engine "github.com/go-ctap/kit/internal/conformance"
+	"github.com/go-ctap/kit/conformance"
 )
 
-func TestEvaluateGetInfoJSONContractIsTypedAndDeterministic(t *testing.T) {
-	valid := engine.EvaluateGetInfo(validFIDO23Info())
+func TestAssessGetInfoJSONContractIsTypedAndDeterministic(t *testing.T) {
+	valid := conformance.AssessGetInfo(validFIDO23Info())
 	raw, err := json.Marshal(valid)
 	if err != nil {
 		t.Fatal(err)
@@ -30,7 +30,7 @@ func TestEvaluateGetInfoJSONContractIsTypedAndDeterministic(t *testing.T) {
 			t.Fatalf("legacy field %s leaked into %s", legacy, text)
 		}
 	}
-	unresolved, err := json.Marshal(engine.EvaluateGetInfo(protocol.AuthenticatorGetInfoResponse{}))
+	unresolved, err := json.Marshal(conformance.AssessGetInfo(protocol.AuthenticatorGetInfoResponse{}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +43,7 @@ func TestEvaluateGetInfoJSONContractIsTypedAndDeterministic(t *testing.T) {
 
 	info := validFIDO23Info()
 	info.AuthenticatorConfigCommands = nil
-	invalid := engine.EvaluateGetInfo(info)
+	invalid := conformance.AssessGetInfo(info)
 	for _, finding := range invalid.Findings {
 		if len(finding.References) == 0 {
 			t.Fatalf("finding has no normative references: %#v", finding)
@@ -61,7 +61,7 @@ func TestEvaluateGetInfoJSONContractIsTypedAndDeterministic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	second, err := json.Marshal(engine.EvaluateGetInfo(info))
+	second, err := json.Marshal(conformance.AssessGetInfo(info))
 	if err != nil {
 		t.Fatal(err)
 	}

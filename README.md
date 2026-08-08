@@ -269,7 +269,8 @@ sensitive data.
 | `model/largeblobs`                                                                  | Large-blob operation DTOs                                                                 |
 | `model/webauthn`                                                                    | WebAuthn operation DTOs                                                                   |
 | `model/failure`                                                                     | Stable public error codes and snapshots                                                   |
-| `model/conformance`, `model/operation`, `model/report`, `model/safety`              | Shared report and contract DTOs                                                           |
+| `conformance`                                                                       | Authenticator conformance assessment API and contracts                                    |
+| `model/operation`, `model/report`, `model/safety`                                   | Shared report and contract DTOs                                                           |
 | `transport`                                                                         | HID, PC/SC smart-card, and Windows proxy discovery modes                                  |
 
 Packages under `internal` contain runtime implementation details and are not a public API.
